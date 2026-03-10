@@ -116,4 +116,69 @@ public sealed class SourceValidatorTests : IDisposable
         result.IsValid.Should().BeTrue();
         result.FilesScanned.Should().Be(0);
     }
+
+    private static RulePack CreateTestPackWithRoles()
+    {
+        return new RulePack
+        {
+            Name = "test",
+            Layers =
+            [
+                new LayerDefinition { Name = "Domain", AllowedDependencies = [] },
+                new LayerDefinition { Name = "Application", AllowedDependencies = ["Domain"] },
+                new LayerDefinition { Name = "Infrastructure", AllowedDependencies = ["Domain", "Application"] },
+            ],
+            ComponentRoles =
+            [
+                new ComponentRoleDefinition { Name = "Entity", Layer = "Domain", TypeKind = CSharpTypeKind.Class },
+                new ComponentRoleDefinition { Name = "Command", Layer = "Application", TypeKind = CSharpTypeKind.Record },
+                new ComponentRoleDefinition { Name = "Repository", Layer = "Infrastructure", TypeKind = CSharpTypeKind.Class, RequiresInterface = true, InterfaceRole = "RepositoryInterface", Accessibility = "internal" },
+                new ComponentRoleDefinition { Name = "RepositoryInterface", Layer = "Domain", TypeKind = CSharpTypeKind.Interface },
+            ],
+            NamingConventions = new NamingConventions
+            {
+                Namespace = "{SolutionName}.{Feature}.{Layer}",
+                FilePath = "src/{SolutionName}.{Feature}.{Layer}/{ComponentName}.cs",
+            },
+        };
+    }
+
+    [Fact]
+    public void Validate_CommandIsClass_ShouldReturnTypeKindMismatch()
+    {
+        var appDir = Path.Combine(_tempDir, "MyApp.Orders.Application");
+        Directory.CreateDirectory(appDir);
+        File.WriteAllText(
+            Path.Combine(appDir, "CreateOrderCommand.cs"),
+            """
+            namespace MyApp.Orders.Application;
+
+            public class CreateOrderCommand { }
+            """);
+
+        var validator = new SourceValidator();
+        var result = validator.Validate(CreateTestPackWithRoles(), _tempDir);
+
+        result.IsValid.Should().BeFalse();
+        result.Violations.Should().ContainSingle(v => v.ViolationType == "TypeKindMismatch");
+    }
+
+    [Fact]
+    public void Validate_CommandIsRecord_ShouldBeValid()
+    {
+        var appDir = Path.Combine(_tempDir, "MyApp.Orders.Application");
+        Directory.CreateDirectory(appDir);
+        File.WriteAllText(
+            Path.Combine(appDir, "CreateOrderCommand.cs"),
+            """
+            namespace MyApp.Orders.Application;
+
+            public record CreateOrderCommand;
+            """);
+
+        var validator = new SourceValidator();
+        var result = validator.Validate(CreateTestPackWithRoles(), _tempDir);
+
+        result.Violations.Where(v => v.ViolationType == "TypeKindMismatch").Should().BeEmpty();
+    }
 }

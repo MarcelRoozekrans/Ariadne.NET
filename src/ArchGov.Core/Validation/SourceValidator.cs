@@ -1,4 +1,5 @@
 using ArchGov.Core.RuleSchema;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -21,7 +22,7 @@ public sealed class SourceValidator : ISourceValidator
 
         foreach (var filePath in csFiles)
         {
-            ValidateFile(filePath, knownLayers, allowedDependencies, violations);
+            ValidateFile(filePath, knownLayers, allowedDependencies, resolvedPack.ComponentRoles, violations);
         }
 
         return new SourceValidationResult
@@ -47,6 +48,7 @@ public sealed class SourceValidator : ISourceValidator
         string filePath,
         HashSet<string> knownLayers,
         Dictionary<string, HashSet<string>> allowedDependencies,
+        IList<ComponentRoleDefinition> roles,
         List<SourceViolation> violations)
     {
         var sourceText = File.ReadAllText(filePath);
@@ -88,6 +90,91 @@ public sealed class SourceValidator : ISourceValidator
                     Message = $"Layer '{sourceLayer}' is not allowed to depend on '{targetLayer}' (via using '{usingName}')",
                 });
             }
+        }
+
+        ValidateTypeDeclarations(root, sourceLayer, roles, filePath, violations);
+    }
+
+    private static void ValidateTypeDeclarations(
+        CompilationUnitSyntax root,
+        string sourceLayer,
+        IList<ComponentRoleDefinition> roles,
+        string filePath,
+        List<SourceViolation> violations)
+    {
+        var typeDeclarations = root.DescendantNodes()
+            .OfType<TypeDeclarationSyntax>();
+
+        foreach (var typeDecl in typeDeclarations)
+        {
+            var typeName = typeDecl.Identifier.Text;
+            var matchedRole = MatchTypeToRole(typeName, sourceLayer, roles);
+            if (matchedRole is null)
+            {
+                continue;
+            }
+
+            CheckTypeKind(typeDecl, matchedRole, filePath, violations);
+        }
+    }
+
+    private static ComponentRoleDefinition? MatchTypeToRole(
+        string typeName,
+        string layer,
+        IList<ComponentRoleDefinition> roles)
+    {
+        foreach (var role in roles)
+        {
+            if (!string.Equals(role.Layer, layer, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (typeName.EndsWith(role.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                return role;
+            }
+
+            foreach (var alt in role.AlternativeNames)
+            {
+                if (typeName.EndsWith(alt, StringComparison.OrdinalIgnoreCase))
+                {
+                    return role;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static CSharpTypeKind GetActualTypeKind(TypeDeclarationSyntax typeDecl)
+    {
+        return typeDecl switch
+        {
+            RecordDeclarationSyntax record when record.ClassOrStructKeyword.IsKind(SyntaxKind.StructKeyword)
+                => CSharpTypeKind.RecordStruct,
+            RecordDeclarationSyntax => CSharpTypeKind.Record,
+            InterfaceDeclarationSyntax => CSharpTypeKind.Interface,
+            StructDeclarationSyntax => CSharpTypeKind.Struct,
+            _ => CSharpTypeKind.Class,
+        };
+    }
+
+    private static void CheckTypeKind(
+        TypeDeclarationSyntax typeDecl,
+        ComponentRoleDefinition role,
+        string filePath,
+        List<SourceViolation> violations)
+    {
+        var actual = GetActualTypeKind(typeDecl);
+        if (actual != role.TypeKind)
+        {
+            violations.Add(new SourceViolation
+            {
+                FilePath = filePath,
+                ViolationType = "TypeKindMismatch",
+                Message = $"Type '{typeDecl.Identifier.Text}' matches role '{role.Name}' and should be a '{role.TypeKind}' but is declared as a '{actual}'",
+            });
         }
     }
 
