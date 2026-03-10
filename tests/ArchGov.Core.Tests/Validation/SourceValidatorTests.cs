@@ -181,4 +181,42 @@ public sealed class SourceValidatorTests : IDisposable
 
         result.Violations.Where(v => v.ViolationType == "TypeKindMismatch").Should().BeEmpty();
     }
+
+    [Fact]
+    public void Validate_RepositoryIsPublic_ShouldReturnAccessibilityMismatch()
+    {
+        var infraDir = Path.Combine(_tempDir, "MyApp.Orders.Infrastructure");
+        Directory.CreateDirectory(infraDir);
+        File.WriteAllText(
+            Path.Combine(infraDir, "OrderRepository.cs"),
+            """
+            namespace MyApp.Orders.Infrastructure;
+
+            public class OrderRepository { }
+            """);
+
+        var validator = new SourceValidator();
+        var result = validator.Validate(CreateTestPackWithRoles(), _tempDir);
+
+        result.Violations.Should().Contain(v => v.ViolationType == "AccessibilityMismatch");
+    }
+
+    [Fact]
+    public void Validate_RepositoryIsInternal_ShouldNotReportAccessibilityMismatch()
+    {
+        var infraDir = Path.Combine(_tempDir, "MyApp.Orders.Infrastructure");
+        Directory.CreateDirectory(infraDir);
+        File.WriteAllText(
+            Path.Combine(infraDir, "OrderRepository.cs"),
+            """
+            namespace MyApp.Orders.Infrastructure;
+
+            internal class OrderRepository { }
+            """);
+
+        var validator = new SourceValidator();
+        var result = validator.Validate(CreateTestPackWithRoles(), _tempDir);
+
+        result.Violations.Where(v => v.ViolationType == "AccessibilityMismatch").Should().BeEmpty();
+    }
 }

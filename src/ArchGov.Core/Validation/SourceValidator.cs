@@ -115,6 +115,7 @@ public sealed class SourceValidator : ISourceValidator
             }
 
             CheckTypeKind(typeDecl, matchedRole, filePath, violations);
+            CheckAccessibility(typeDecl, matchedRole, filePath, violations);
         }
     }
 
@@ -158,6 +159,32 @@ public sealed class SourceValidator : ISourceValidator
             StructDeclarationSyntax => CSharpTypeKind.Struct,
             _ => CSharpTypeKind.Class,
         };
+    }
+
+    private static void CheckAccessibility(
+        TypeDeclarationSyntax typeDecl,
+        ComponentRoleDefinition role,
+        string filePath,
+        List<SourceViolation> violations)
+    {
+        var expectedAccessibility = role.Accessibility;
+        if (string.IsNullOrEmpty(expectedAccessibility) ||
+            string.Equals(expectedAccessibility, "public", StringComparison.OrdinalIgnoreCase))
+        {
+            // Default is public — only report if role explicitly requires non-public
+            return;
+        }
+
+        var isInternal = typeDecl.Modifiers.Any(m => m.IsKind(SyntaxKind.InternalKeyword));
+        if (string.Equals(expectedAccessibility, "internal", StringComparison.OrdinalIgnoreCase) && !isInternal)
+        {
+            violations.Add(new SourceViolation
+            {
+                FilePath = filePath,
+                ViolationType = "AccessibilityMismatch",
+                Message = $"Type '{typeDecl.Identifier.Text}' matches role '{role.Name}' and should be '{expectedAccessibility}' but is declared 'public'",
+            });
+        }
     }
 
     private static void CheckTypeKind(
