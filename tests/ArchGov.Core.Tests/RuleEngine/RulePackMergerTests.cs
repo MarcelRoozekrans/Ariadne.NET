@@ -108,4 +108,113 @@ public class RulePackMergerTests
 
         result.NamingConventions.Namespace.Should().Be("new");
     }
+
+    [Fact]
+    public void Merge_LockedRuleCannotBeOverridden()
+    {
+        var pack1 = new RulePack
+        {
+            Name = "org",
+            CodeFeatureRules =
+            [
+                new CodeFeatureRuleDefinition
+                {
+                    Id = "ARCH-001",
+                    Description = "Domain must not depend on Infrastructure",
+                    Locked = true,
+                },
+            ],
+        };
+        var pack2 = new RulePack
+        {
+            Name = "team",
+            CodeFeatureRules =
+            [
+                new CodeFeatureRuleDefinition
+                {
+                    Id = "ARCH-001",
+                    Description = "Overridden - should be ignored",
+                },
+            ],
+        };
+
+        var merger = new RulePackMerger();
+        var result = merger.Merge([pack1, pack2]);
+
+        result.CodeFeatureRules.Should().HaveCount(1);
+        result.CodeFeatureRules[0].Description.Should().Be("Domain must not depend on Infrastructure");
+    }
+
+    [Fact]
+    public void MergeWithDiagnostics_LockedRuleOverrideProducesWarning()
+    {
+        var pack1 = new RulePack
+        {
+            Name = "org",
+            CodeFeatureRules =
+            [
+                new CodeFeatureRuleDefinition
+                {
+                    Id = "ARCH-001",
+                    Description = "Locked rule",
+                    Locked = true,
+                },
+            ],
+        };
+        var pack2 = new RulePack
+        {
+            Name = "team",
+            CodeFeatureRules =
+            [
+                new CodeFeatureRuleDefinition
+                {
+                    Id = "ARCH-001",
+                    Description = "Override attempt",
+                },
+            ],
+        };
+
+        var merger = new RulePackMerger();
+        var result = merger.MergeWithDiagnostics([pack1, pack2]);
+
+        result.MergedPack.CodeFeatureRules[0].Description.Should().Be("Locked rule");
+        result.Warnings.Should().ContainSingle();
+        result.Warnings[0].Message.Should().Contain("ARCH-001");
+        result.Warnings[0].Message.Should().Contain("locked");
+    }
+
+    [Fact]
+    public void Merge_UnlockedRuleCanBeOverridden()
+    {
+        var pack1 = new RulePack
+        {
+            Name = "org",
+            CodeFeatureRules =
+            [
+                new CodeFeatureRuleDefinition
+                {
+                    Id = "NAMING-001",
+                    Description = "Original",
+                    Locked = false,
+                },
+            ],
+        };
+        var pack2 = new RulePack
+        {
+            Name = "team",
+            CodeFeatureRules =
+            [
+                new CodeFeatureRuleDefinition
+                {
+                    Id = "NAMING-001",
+                    Description = "Team override",
+                },
+            ],
+        };
+
+        var merger = new RulePackMerger();
+        var result = merger.Merge([pack1, pack2]);
+
+        result.CodeFeatureRules[0].Description.Should().Be("Team override");
+    }
 }

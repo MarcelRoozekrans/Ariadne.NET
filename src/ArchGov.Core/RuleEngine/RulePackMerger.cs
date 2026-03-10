@@ -6,26 +6,42 @@ public sealed class RulePackMerger : IRulePackMerger
 {
     public RulePack Merge(IReadOnlyList<RulePack> packs)
     {
+        return MergeWithDiagnostics(packs).MergedPack;
+    }
+
+    public MergeResult MergeWithDiagnostics(IReadOnlyList<RulePack> packs)
+    {
         ArgumentNullException.ThrowIfNull(packs);
 
         if (packs.Count == 0)
         {
-            return new RulePack { Name = "" };
+            return new MergeResult
+            {
+                MergedPack = new RulePack { Name = "" },
+                Warnings = [],
+            };
         }
 
+        var warnings = new List<MergeWarning>();
         var mergedName = string.Join("+", packs.Select(p => p.Name));
         var mergedLayers = MergeLayers(packs);
         var mergedRoles = MergeComponentRoles(packs);
-        var mergedFeatureRules = MergeCodeFeatureRules(packs);
+        var mergedFeatureRules = MergeCodeFeatureRules(packs, warnings);
         var mergedNaming = packs[^1].NamingConventions;
 
-        return new RulePack
+        var mergedPack = new RulePack
         {
             Name = mergedName,
             Layers = mergedLayers,
             ComponentRoles = mergedRoles,
             CodeFeatureRules = mergedFeatureRules,
             NamingConventions = mergedNaming,
+        };
+
+        return new MergeResult
+        {
+            MergedPack = mergedPack,
+            Warnings = warnings,
         };
     }
 
@@ -79,7 +95,9 @@ public sealed class RulePackMerger : IRulePackMerger
         return roleMap.Values.ToList();
     }
 
-    private static IList<CodeFeatureRuleDefinition> MergeCodeFeatureRules(IReadOnlyList<RulePack> packs)
+    private static IList<CodeFeatureRuleDefinition> MergeCodeFeatureRules(
+        IReadOnlyList<RulePack> packs,
+        List<MergeWarning> warnings)
     {
         var ruleMap = new Dictionary<string, CodeFeatureRuleDefinition>(StringComparer.OrdinalIgnoreCase);
 
@@ -87,6 +105,13 @@ public sealed class RulePackMerger : IRulePackMerger
         {
             foreach (var rule in pack.CodeFeatureRules)
             {
+                if (ruleMap.TryGetValue(rule.Id, out var existing) && existing.Locked)
+                {
+                    warnings.Add(new MergeWarning(
+                        $"Rule '{rule.Id}' is locked and cannot be overridden by pack '{pack.Name}'."));
+                    continue;
+                }
+
                 ruleMap[rule.Id] = rule;
             }
         }
