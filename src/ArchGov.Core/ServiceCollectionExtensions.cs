@@ -2,6 +2,7 @@ using ArchGov.Core.CodeGeneration;
 using ArchGov.Core.Orchestration;
 using ArchGov.Core.RuleEngine;
 using ArchGov.Core.RuleLoader;
+using ArchGov.Core.Sync;
 using ArchGov.Core.Validation;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -22,6 +23,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISourceValidator, SourceValidator>();
         services.AddSingleton<ILinter, Linter>();
         services.AddSingleton<IWorkspaceOrchestrator, WorkspaceOrchestrator>();
+        services.AddSingleton<IImportsLoader, ImportsYamlLoader>();
+        services.AddSingleton<IGitSyncProvider, GitCliSyncProvider>();
+        services.AddSingleton<ISyncOrchestrator, SyncOrchestrator>();
 
         return services;
     }
