@@ -1,0 +1,84 @@
+name: event-driven
+version: "1.0.0"
+author: platform-team
+
+layers:
+  - name: Domain
+    description: "Core domain model"
+    allowedDependencies: []
+  - name: Events
+    description: "Event definitions"
+    allowedDependencies:
+      - Domain
+  - name: Producers
+    description: "Event publishers"
+    allowedDependencies:
+      - Domain
+      - Events
+  - name: Consumers
+    description: "Event handlers/subscribers"
+    allowedDependencies:
+      - Domain
+      - Events
+  - name: Infrastructure
+    description: "Messaging infrastructure"
+    allowedDependencies:
+      - Domain
+      - Events
+      - Producers
+      - Consumers
+
+componentRoles:
+  - name: Event
+    layer: Events
+    typeKind: Record
+    requiresInterface: false
+    description: "Event message"
+  - name: IntegrationEvent
+    layer: Events
+    typeKind: Record
+    requiresInterface: false
+    description: "Cross-boundary event"
+  - name: EventProducer
+    layer: Producers
+    typeKind: Class
+    requiresInterface: true
+    interfaceRole: EventProducerInterface
+    description: "Publishes events"
+  - name: EventProducerInterface
+    layer: Producers
+    typeKind: Interface
+    requiresInterface: false
+    description: "Interface for event producer"
+  - name: EventConsumer
+    layer: Consumers
+    typeKind: Class
+    requiresInterface: true
+    interfaceRole: EventConsumerInterface
+    description: "Handles events"
+  - name: EventConsumerInterface
+    layer: Consumers
+    typeKind: Interface
+    requiresInterface: false
+    description: "Interface for event consumer"
+  - name: EventHandler
+    layer: Consumers
+    typeKind: Class
+    requiresInterface: false
+    description: "Alias for consumer"
+  - name: MessageBrokerAdapter
+    layer: Infrastructure
+    typeKind: Class
+    requiresInterface: true
+    interfaceRole: MessageBrokerInterface
+    accessibility: internal
+    description: "Broker implementation"
+  - name: MessageBrokerInterface
+    layer: Infrastructure
+    typeKind: Interface
+    requiresInterface: false
+    description: "Broker contract"
+
+namingConventions:
+  namespace: "{SolutionName}.{Feature}.{Layer}"
+  filePath: "src/{SolutionName}.{Feature}.{Layer}/{ComponentName}.cs"

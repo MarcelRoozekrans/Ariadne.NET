@@ -1,0 +1,62 @@
+name: vertical-slice
+version: "1.0.0"
+author: platform-team
+
+layers:
+  - name: Feature
+    description: "Each feature is self-contained"
+    allowedDependencies: []
+  - name: SharedKernel
+    description: "Shared types across features"
+    allowedDependencies: []
+  - name: Infrastructure
+    description: "Cross-cutting infrastructure"
+    allowedDependencies:
+      - Feature
+      - SharedKernel
+
+componentRoles:
+  - name: Request
+    layer: Feature
+    typeKind: Record
+    requiresInterface: false
+    description: "Incoming request/command"
+  - name: Response
+    layer: Feature
+    typeKind: Record
+    requiresInterface: false
+    description: "Outgoing response/result"
+  - name: Handler
+    layer: Feature
+    typeKind: Class
+    requiresInterface: false
+    description: "Handles the request"
+  - name: Validator
+    layer: Feature
+    typeKind: Class
+    requiresInterface: false
+    description: "Validates input"
+  - name: Endpoint
+    layer: Feature
+    typeKind: Class
+    requiresInterface: false
+    description: "API endpoint/controller"
+  - name: SharedEntity
+    layer: SharedKernel
+    typeKind: Class
+    requiresInterface: false
+    description: "Shared domain entity"
+  - name: SharedDto
+    layer: SharedKernel
+    typeKind: Record
+    requiresInterface: false
+    description: "Shared DTO"
+  - name: DbContext
+    layer: Infrastructure
+    typeKind: Class
+    requiresInterface: false
+    description: "Database context"
+
+namingConventions:
+  namespace: "{SolutionName}.{Feature}.{Layer}"
+  filePath: "src/{SolutionName}.{Feature}.{Layer}/{ComponentName}.cs"
