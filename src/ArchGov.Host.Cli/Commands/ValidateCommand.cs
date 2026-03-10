@@ -1,4 +1,6 @@
 using System.CommandLine;
+using ArchGov.Core.Validation;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ArchGov.Host.Cli.Commands;
 
@@ -20,10 +22,38 @@ public static class ValidateCommand
         command.SetAction(parseResult =>
         {
             var path = parseResult.GetValue(pathArgument)!;
-            _ = RulesCommand.ResolveRulesFromFile(provider);
+            var resolvedPack = RulesCommand.ResolveRulesFromFile(provider);
+            var validator = provider.GetRequiredService<ISourceValidator>();
 
-            Console.WriteLine($"Validation of '{path}' is not yet implemented.");
-            Console.WriteLine("This feature will be available in a future release.");
+            var fullPath = Path.GetFullPath(path);
+            if (!Directory.Exists(fullPath))
+            {
+                Console.WriteLine($"Error: Directory '{fullPath}' does not exist.");
+                return;
+            }
+
+            Console.WriteLine($"Validating source files in: {fullPath}");
+            Console.WriteLine();
+
+            var result = validator.Validate(resolvedPack, fullPath);
+
+            Console.WriteLine($"Files scanned: {result.FilesScanned}");
+
+            if (result.IsValid)
+            {
+                Console.WriteLine("Result: PASS - No violations found.");
+            }
+            else
+            {
+                Console.WriteLine($"Result: FAIL - {result.Violations.Count} violation(s) found.");
+                Console.WriteLine();
+
+                foreach (var violation in result.Violations)
+                {
+                    Console.WriteLine($"  [{violation.ViolationType}] {violation.FilePath}");
+                    Console.WriteLine($"    {violation.Message}");
+                }
+            }
         });
 
         return command;

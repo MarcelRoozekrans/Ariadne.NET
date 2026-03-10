@@ -1,6 +1,7 @@
 using ArchGov.Core.Orchestration;
 using ArchGov.Core.RuleLoader;
 using ArchGov.Core.RuleSchema;
+using ArchGov.Core.Validation;
 using ArchGov.Host.Api.Models;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
@@ -15,15 +16,21 @@ public class ArchitectureController : ControllerBase
     private readonly IBuiltinPackRegistry _registry;
     private readonly IRulePackResolver _resolver;
     private readonly IGenerateOrchestrator _orchestrator;
+    private readonly ISourceValidator _validator;
+    private readonly IWorkspaceOrchestrator _workspaceOrchestrator;
 
     public ArchitectureController(
         IBuiltinPackRegistry registry,
         IRulePackResolver resolver,
-        IGenerateOrchestrator orchestrator)
+        IGenerateOrchestrator orchestrator,
+        ISourceValidator validator,
+        IWorkspaceOrchestrator workspaceOrchestrator)
     {
         _registry = registry;
         _resolver = resolver;
         _orchestrator = orchestrator;
+        _validator = validator;
+        _workspaceOrchestrator = workspaceOrchestrator;
     }
 
     [HttpGet("layers")]
@@ -71,6 +78,41 @@ public class ArchitectureController : ControllerBase
         };
 
         var result = _orchestrator.Generate(resolved, generateRequest);
+        return Ok(result);
+    }
+
+    [HttpPost("validate")]
+    public IActionResult Validate([FromBody] ApiValidateRequest request)
+    {
+        var template = request.Template ?? "clean-architecture";
+        var userPack = new RulePack
+        {
+            Name = "validation",
+            Extends = [$"builtin://{template}"],
+        };
+        var resolved = _resolver.Resolve(userPack);
+        var result = _validator.Validate(resolved, request.SourceDirectory);
+        return Ok(result);
+    }
+
+    [HttpPost("generate-workspace")]
+    public IActionResult GenerateWorkspace([FromBody] ApiWorkspaceRequest request)
+    {
+        var template = request.Template ?? "clean-architecture";
+        var userPack = new RulePack
+        {
+            Name = request.SolutionName,
+            Extends = [$"builtin://{template}"],
+        };
+        var resolved = _resolver.Resolve(userPack);
+
+        var workspaceRequest = new WorkspaceGenerateRequest
+        {
+            SolutionName = request.SolutionName,
+            Features = request.Features,
+        };
+
+        var result = _workspaceOrchestrator.GenerateWorkspace(resolved, workspaceRequest);
         return Ok(result);
     }
 }

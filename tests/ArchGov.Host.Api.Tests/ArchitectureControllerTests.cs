@@ -43,4 +43,36 @@ public class ArchitectureControllerTests : IClassFixture<WebApplicationFactory<P
         var response = await _client.GetAsync("/v1.0/architecture/rules");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
+
+    [Fact]
+    public async Task PostGenerate_ShouldReturnGeneratedCode()
+    {
+        var request = new
+        {
+            solutionName = "TestApp",
+            components = new[]
+            {
+                new { componentRole = "Entity", name = "Order" },
+            },
+        };
+        var response = await _client.PostAsJsonAsync("/v1.0/architecture/generate", request);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var content = await response.Content.ReadAsStringAsync();
+        content.Should().Contain("Order");
+        content.Should().Contain("success");
+    }
+
+    [Fact]
+    public async Task PostGenerateWorkspace_ShouldReturnProjectPaths()
+    {
+        var request = new
+        {
+            solutionName = "TestApp",
+            features = new[] { "Orders" },
+        };
+        var response = await _client.PostAsJsonAsync("/v1.0/architecture/generate-workspace", request);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var content = await response.Content.ReadAsStringAsync();
+        content.Should().Contain("TestApp.Orders.Domain");
+    }
 }
