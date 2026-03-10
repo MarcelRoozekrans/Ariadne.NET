@@ -1,0 +1,29 @@
+name: architecture-governance-engine
+version: "1.0.0"
+author: archgov-team
+extends:
+  - builtin://clean-architecture
+
+layers:
+  - name: Core
+    description: "Domain models, rule engine, code generation, validation"
+    allowedDependencies: []
+  - name: Host
+    description: "API and CLI hosts - thin wrappers over Core"
+    allowedDependencies:
+      - Core
+  - name: Tests
+    description: "Unit and integration tests"
+    allowedDependencies:
+      - Core
+      - Host
+
+codeFeatureRules:
+  - id: ARCHGOV-001
+    description: "Core must have zero host dependencies"
+    appliesTo:
+      layer: Core
+  - id: ARCHGOV-002
+    description: "Hosts must only orchestrate, not contain business logic"
+    appliesTo:
+      layer: Host
