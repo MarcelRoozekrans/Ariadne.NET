@@ -55,6 +55,6 @@ public static class RulesCommand
         var resolver = provider.GetRequiredService<IRulePackResolver>();
 
         var userPack = loader.LoadFromFile(rulesPath);
-        return resolver.Resolve(userPack);
+        return resolver.Resolve(userPack, Directory.GetCurrentDirectory());
     }
 }

@@ -16,6 +16,7 @@ rootCommand.Subcommands.Add(RolesCommand.Create(provider));
 rootCommand.Subcommands.Add(GenerateCommand.Create(provider));
 rootCommand.Subcommands.Add(ValidateCommand.Create(provider));
 rootCommand.Subcommands.Add(LintCommand.Create(provider));
+rootCommand.Subcommands.Add(SyncCommand.Create(provider));
 
 var parseResult = CommandLineParser.Parse(rootCommand, args, new ParserConfiguration());
 return parseResult.Invoke();
