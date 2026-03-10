@@ -9,9 +9,3 @@ public sealed record LayerInferenceResult
     public string? Message { get; init; }
 }
 
-public enum LayerInferenceStatus
-{
-    Ok,
-    Ambiguous,
-    Invalid,
-}
