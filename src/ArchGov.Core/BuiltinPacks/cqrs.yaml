@@ -1,0 +1,46 @@
+name: cqrs
+version: "1.0.0"
+author: platform-team
+
+componentRoles:
+  - name: Command
+    layer: Application
+    typeKind: Record
+    requiresInterface: false
+    description: "Command message"
+  - name: CommandHandler
+    layer: Application
+    typeKind: Class
+    requiresInterface: true
+    interfaceRole: CommandHandlerInterface
+    description: "Handles a command"
+  - name: CommandHandlerInterface
+    layer: Application
+    typeKind: Interface
+    requiresInterface: false
+    description: "Interface for command handler"
+  - name: Query
+    layer: Application
+    typeKind: Record
+    requiresInterface: false
+    description: "Query message"
+  - name: QueryHandler
+    layer: Application
+    typeKind: Class
+    requiresInterface: true
+    interfaceRole: QueryHandlerInterface
+    description: "Handles a query"
+  - name: QueryHandlerInterface
+    layer: Application
+    typeKind: Interface
+    requiresInterface: false
+    description: "Interface for query handler"
+  - name: QueryResult
+    layer: Application
+    typeKind: Record
+    requiresInterface: false
+    description: "Query result DTO"
+
+namingConventions:
+  namespace: "{SolutionName}.{Feature}.{Layer}"
+  filePath: "src/{SolutionName}.{Feature}.{Layer}/{ComponentName}.cs"

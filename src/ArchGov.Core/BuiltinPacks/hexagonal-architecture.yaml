@@ -1,0 +1,61 @@
+name: hexagonal-architecture
+version: "1.0.0"
+author: platform-team
+
+layers:
+  - name: Core
+    description: "Domain entities, domain services"
+    allowedDependencies: []
+  - name: Ports
+    description: "Interfaces — driving and driven ports"
+    allowedDependencies:
+      - Core
+  - name: Adapters
+    description: "Implementations — primary and secondary adapters"
+    allowedDependencies:
+      - Core
+      - Ports
+
+componentRoles:
+  - name: Entity
+    layer: Core
+    typeKind: Class
+    requiresInterface: false
+    description: "Domain entity"
+  - name: ValueObject
+    layer: Core
+    typeKind: Class
+    requiresInterface: false
+    description: "Value object"
+  - name: DomainService
+    layer: Core
+    typeKind: Class
+    requiresInterface: false
+    description: "Domain service"
+  - name: DrivingPort
+    layer: Ports
+    typeKind: Interface
+    requiresInterface: false
+    description: "Driving port (inbound)"
+  - name: DrivenPort
+    layer: Ports
+    typeKind: Interface
+    requiresInterface: false
+    description: "Driven port (outbound)"
+  - name: PrimaryAdapter
+    layer: Adapters
+    typeKind: Class
+    requiresInterface: true
+    interfaceRole: DrivingPort
+    description: "Primary adapter (e.g. controller)"
+  - name: SecondaryAdapter
+    layer: Adapters
+    typeKind: Class
+    requiresInterface: true
+    interfaceRole: DrivenPort
+    accessibility: internal
+    description: "Secondary adapter (e.g. repository)"
+
+namingConventions:
+  namespace: "{SolutionName}.{Feature}.{Layer}"
+  filePath: "src/{SolutionName}.{Feature}.{Layer}/{ComponentName}.cs"

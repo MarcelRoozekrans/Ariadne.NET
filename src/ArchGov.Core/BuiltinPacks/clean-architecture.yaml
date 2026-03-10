@@ -1,0 +1,142 @@
+name: clean-architecture
+version: "1.0.0"
+author: platform-team
+
+layers:
+  - name: Domain
+    description: "Entities, value objects, domain services"
+    allowedDependencies: []
+  - name: Application
+    description: "Use cases, commands, queries, DTOs"
+    allowedDependencies:
+      - Domain
+  - name: Infrastructure
+    description: "Repositories, external services, persistence"
+    allowedDependencies:
+      - Domain
+      - Application
+  - name: WebApi
+    description: "Controllers, middleware, filters"
+    allowedDependencies:
+      - Domain
+      - Application
+      - Infrastructure
+
+componentRoles:
+  - name: Entity
+    layer: Domain
+    typeKind: Class
+    requiresInterface: false
+    description: "Domain entity with identity"
+  - name: ValueObject
+    layer: Domain
+    typeKind: Class
+    requiresInterface: false
+    description: "Immutable value type"
+  - name: DomainService
+    layer: Domain
+    typeKind: Class
+    requiresInterface: true
+    interfaceRole: DomainServiceInterface
+    description: "Domain logic that doesn't belong to a single entity"
+  - name: DomainServiceInterface
+    layer: Domain
+    typeKind: Interface
+    requiresInterface: false
+    description: "Interface for domain service"
+  - name: DomainEvent
+    layer: Domain
+    typeKind: Record
+    requiresInterface: false
+    description: "Domain event"
+  - name: Specification
+    layer: Domain
+    typeKind: Class
+    requiresInterface: false
+    description: "Query specification"
+  - name: CommandHandler
+    layer: Application
+    typeKind: Class
+    requiresInterface: true
+    interfaceRole: CommandHandlerInterface
+    description: "Handles a command"
+  - name: CommandHandlerInterface
+    layer: Application
+    typeKind: Interface
+    requiresInterface: false
+    description: "Interface for command handler"
+  - name: QueryHandler
+    layer: Application
+    typeKind: Class
+    requiresInterface: true
+    interfaceRole: QueryHandlerInterface
+    description: "Handles a query"
+  - name: QueryHandlerInterface
+    layer: Application
+    typeKind: Interface
+    requiresInterface: false
+    description: "Interface for query handler"
+  - name: Dto
+    layer: Application
+    typeKind: Record
+    requiresInterface: false
+    description: "Data transfer object"
+  - name: Mapper
+    layer: Application
+    typeKind: Class
+    requiresInterface: false
+    description: "Maps between domain and DTOs"
+  - name: Validator
+    layer: Application
+    typeKind: Class
+    requiresInterface: false
+    description: "Input validator"
+  - name: RepositoryInterface
+    layer: Domain
+    typeKind: Interface
+    requiresInterface: false
+    description: "Repository contract (defined in Domain)"
+  - name: Repository
+    layer: Infrastructure
+    typeKind: Class
+    requiresInterface: true
+    interfaceRole: RepositoryInterface
+    accessibility: internal
+    description: "Repository implementation"
+  - name: ExternalServiceInterface
+    layer: Application
+    typeKind: Interface
+    requiresInterface: false
+    description: "External service contract"
+  - name: ExternalService
+    layer: Infrastructure
+    typeKind: Class
+    requiresInterface: true
+    interfaceRole: ExternalServiceInterface
+    accessibility: internal
+    description: "External service implementation"
+  - name: Controller
+    layer: WebApi
+    typeKind: Class
+    requiresInterface: false
+    description: "API controller"
+  - name: Middleware
+    layer: WebApi
+    typeKind: Class
+    requiresInterface: false
+    description: "HTTP middleware"
+
+codeFeatureRules:
+  - id: CODE-001
+    description: "Interface-required roles must have a matching interface"
+    appliesTo:
+      requiresInterface: true
+  - id: CODE-002
+    description: "Implementations with required interfaces should be internal"
+    appliesTo:
+      requiresInterface: true
+      isInterface: false
+
+namingConventions:
+  namespace: "{SolutionName}.{Feature}.{Layer}"
+  filePath: "src/{SolutionName}.{Feature}.{Layer}/{ComponentName}.cs"
