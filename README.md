@@ -100,13 +100,17 @@ namingConventions:
 
 ### 2. Built-in Templates
 
-Three templates ship with the engine:
+Seven templates ship with the engine:
 
 | Template | Layers | Roles | Description |
 |----------|--------|-------|-------------|
 | `clean-architecture` | Domain, Application, Infrastructure, WebApi | 19 | Classic Clean Architecture |
 | `hexagonal-architecture` | Core, Ports, Adapters | 7 | Ports & Adapters pattern |
 | `cqrs` | _(composable add-on)_ | 7 | Command/Query separation |
+| `ddd-tactical` | _(composable add-on)_ | 9 | DDD tactical patterns (Aggregate, ValueObject, Factory) |
+| `event-driven` | Domain, Events, Producers, Consumers, Infrastructure | 9 | Event-driven architecture |
+| `vertical-slice` | Feature, SharedKernel, Infrastructure | 8 | Vertical slice / feature-based |
+| `modular-monolith` | Module.Public, Module.Core, Module.Infrastructure, Host | 8 | Modular monolith pattern |
 
 Templates are composable — `clean-architecture+cqrs` merges both packs.
 
@@ -130,7 +134,10 @@ componentRoles:
 Merge rules:
 - **Layers**: merged by name — duplicate names union their `allowedDependencies`
 - **Component Roles**: merged by name — later pack wins
+- **Code Feature Rules**: merged by ID — **locked rules** in base packs cannot be overridden
 - **Naming Conventions**: last pack wins
+
+Use `MergeWithDiagnostics` to get warnings when locked rules are skipped during merging.
 
 ### 4. Code Generation
 
@@ -153,13 +160,37 @@ The generated code respects:
 - **Interface inheritance** when `requiresInterface` is set
 - **Namespace** and **file path** from naming conventions
 
-### 5. Dependency Validation
+### 5. Source Validation
 
-The engine validates that component dependencies comply with layer rules. For example, with clean architecture rules:
+The engine validates existing source code against architecture rules using Roslyn parsing:
 
-- `Application` -> `Domain` is valid
-- `Domain` -> `Infrastructure` is a violation
-- `Infrastructure` -> `Domain`, `Application` is valid
+```bash
+# CLI
+dotnet run --project src/ArchGov.Host.Cli -- validate ./src
+
+# API
+curl -X POST http://localhost:5000/v1.0/architecture/validate \
+  -H "Content-Type: application/json" \
+  -d '{"sourceDirectory": "./src", "template": "clean-architecture"}'
+```
+
+Checks performed:
+- **Dependency validation**: verifies `using` directives comply with layer dependency rules (e.g. Domain cannot reference Infrastructure)
+- **Lint**: checks namespace segments match directory-based layer structure
+
+### 6. Lint
+
+A lighter check that detects namespace-vs-directory layer mismatches:
+
+```bash
+# CLI
+dotnet run --project src/ArchGov.Host.Cli -- lint ./src
+
+# API
+curl -X POST http://localhost:5000/v1.0/architecture/lint \
+  -H "Content-Type: application/json" \
+  -d '{"sourceDirectory": "./src", "template": "clean-architecture"}'
+```
 
 ## Architecture
 
@@ -178,7 +209,7 @@ src/
   ArchGov.Host.Cli/           # CLI tool (System.CommandLine)
 
 tests/
-  ArchGov.Core.Tests/         # 40 unit tests
+  ArchGov.Core.Tests/         # 82 unit + integration tests
   ArchGov.Host.Api.Tests/     # 6 integration tests
 ```
 
@@ -214,6 +245,7 @@ This registers:
 | `IGenerateOrchestrator` | `GenerateOrchestrator` | Singleton |
 | `IWorkspaceOrchestrator` | `WorkspaceOrchestrator` | Singleton |
 | `ISourceValidator` | `SourceValidator` | Singleton |
+| `ILinter` | `Linter` | Singleton |
 
 ## API Reference
 
@@ -228,6 +260,7 @@ This registers:
 | `/v1.0/architecture/generate` | POST | Generate component code |
 | `/v1.0/architecture/generate-workspace` | POST | Scaffold solution project structure |
 | `/v1.0/architecture/validate` | POST | Validate source files against rules |
+| `/v1.0/architecture/lint` | POST | Lint source files for layer mismatches |
 
 ### CLI Commands
 
@@ -238,6 +271,7 @@ This registers:
 | `arch roles` | Print component roles table |
 | `arch generate --role <role> --name <name> --solution <sol> --feature <feat>` | Generate a component |
 | `arch validate <path>` | Validate source files against architecture rules |
+| `arch lint <path>` | Lint source files for namespace-layer mismatches |
 
 ## Building
 
