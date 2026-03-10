@@ -9,5 +9,5 @@ public sealed class ComponentRoleDefinition
     public string? InterfaceRole { get; init; }
     public string Accessibility { get; init; } = "public";
     public string Description { get; init; } = "";
-    public List<string> AlternativeNames { get; init; } = [];
+    public IList<string> AlternativeNames { get; init; } = [];
 }
