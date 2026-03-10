@@ -2,6 +2,7 @@ using ArchGov.Core.CodeGeneration;
 using ArchGov.Core.Orchestration;
 using ArchGov.Core.RuleEngine;
 using ArchGov.Core.RuleLoader;
+using ArchGov.Core.Validation;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -24,5 +25,6 @@ public class ServiceRegistrationTests
         provider.GetService<ILayerInferenceEngine>().Should().NotBeNull();
         provider.GetService<ICodeGeneratorService>().Should().NotBeNull();
         provider.GetService<IGenerateOrchestrator>().Should().NotBeNull();
+        provider.GetService<ISourceValidator>().Should().NotBeNull();
     }
 }

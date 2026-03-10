@@ -2,6 +2,7 @@ using ArchGov.Core.CodeGeneration;
 using ArchGov.Core.Orchestration;
 using ArchGov.Core.RuleEngine;
 using ArchGov.Core.RuleLoader;
+using ArchGov.Core.Validation;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ArchGov.Core;
@@ -18,6 +19,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ILayerInferenceEngine, LayerInferenceEngine>();
         services.AddSingleton<ICodeGeneratorService, CodeGeneratorService>();
         services.AddSingleton<IGenerateOrchestrator, GenerateOrchestrator>();
+        services.AddSingleton<ISourceValidator, SourceValidator>();
 
         return services;
     }
