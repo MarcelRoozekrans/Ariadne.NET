@@ -1,0 +1,6 @@
+name: simple-test
+version: "1.0.0"
+layers:
+  - name: Domain
+    description: "Domain layer"
+    allowedDependencies: []
