@@ -18,7 +18,10 @@ public class BuiltinPackRegistryTests
         packs.Should().Contain("event-driven");
         packs.Should().Contain("vertical-slice");
         packs.Should().Contain("modular-monolith");
-        packs.Should().HaveCount(7);
+        packs.Should().Contain("onion-architecture");
+        packs.Should().Contain("layered");
+        packs.Should().Contain("microservice");
+        packs.Should().HaveCount(10);
     }
 
     [Fact]
@@ -37,6 +40,9 @@ public class BuiltinPackRegistryTests
     [InlineData("event-driven")]
     [InlineData("vertical-slice")]
     [InlineData("modular-monolith")]
+    [InlineData("onion-architecture")]
+    [InlineData("layered")]
+    [InlineData("microservice")]
     public void GetPack_ShouldReturnNewPack(string packName)
     {
         var registry = new BuiltinPackRegistry(new YamlRulePackLoader());

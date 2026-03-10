@@ -36,6 +36,22 @@ public class BuiltinPackIntegrationTests
     [InlineData("modular-monolith", "ModuleContract", "IOrderModule")]
     [InlineData("modular-monolith", "ModuleService", "OrderModuleService")]
     [InlineData("modular-monolith", "ModuleEntity", "OrderEntity")]
+    [InlineData("onion-architecture", "Entity", "Order")]
+    [InlineData("onion-architecture", "RepositoryInterface", "IOrderRepository")]
+    [InlineData("onion-architecture", "ApplicationService", "OrderService")]
+    [InlineData("onion-architecture", "Controller", "OrdersController")]
+    [InlineData("onion-architecture", "ViewModel", "OrderViewModel")]
+    [InlineData("layered", "Controller", "OrdersController")]
+    [InlineData("layered", "Service", "OrderService")]
+    [InlineData("layered", "Repository", "OrderRepository")]
+    [InlineData("layered", "DataModel", "OrderDataModel")]
+    [InlineData("layered", "ApiModel", "CreateOrderApiModel")]
+    [InlineData("microservice", "Entity", "Order")]
+    [InlineData("microservice", "Aggregate", "OrderAggregate")]
+    [InlineData("microservice", "Handler", "CreateOrderHandler")]
+    [InlineData("microservice", "Controller", "OrdersController")]
+    [InlineData("microservice", "IntegrationEvent", "OrderCreatedIntegrationEvent")]
+    [InlineData("microservice", "MessagePublisher", "OrderMessagePublisher")]
     public void Generate_WithBuiltinPack_ShouldProduceValidCode(
         string packName, string roleName, string componentName)
     {
@@ -129,6 +145,9 @@ public class BuiltinPackIntegrationTests
     [InlineData("event-driven")]
     [InlineData("vertical-slice")]
     [InlineData("modular-monolith")]
+    [InlineData("onion-architecture")]
+    [InlineData("layered")]
+    [InlineData("microservice")]
     public void Pack_ShouldHaveLayersAndRoles(string packName)
     {
         var pack = _registry.GetPack(packName);
@@ -151,5 +170,88 @@ public class BuiltinPackIntegrationTests
         pack.Name.Should().Be(packName);
         pack.Layers.Should().BeEmpty($"composable pack '{packName}' should not define its own layers");
         pack.ComponentRoles.Should().NotBeEmpty($"composable pack '{packName}' should define component roles");
+    }
+
+    [Fact]
+    public void OnionArchitecture_ShouldHaveFiveLayers()
+    {
+        var pack = _registry.GetPack("onion-architecture");
+
+        pack.Layers.Should().HaveCount(5);
+        pack.Layers.Select(l => l.Name).Should().BeEquivalentTo(
+            ["DomainModel", "DomainServices", "ApplicationServices", "Infrastructure", "Presentation"]);
+    }
+
+    [Fact]
+    public void OnionArchitecture_DomainModel_ShouldHaveNoDependencies()
+    {
+        var pack = _registry.GetPack("onion-architecture");
+        var domainModel = pack.Layers.Single(l => l.Name == "DomainModel");
+
+        domainModel.AllowedDependencies.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void OnionArchitecture_Presentation_ShouldNotDependOnInfrastructure()
+    {
+        var pack = _registry.GetPack("onion-architecture");
+        var presentation = pack.Layers.Single(l => l.Name == "Presentation");
+
+        presentation.AllowedDependencies.Should().NotContain("Infrastructure");
+    }
+
+    [Fact]
+    public void Layered_ShouldHaveThreeLayers()
+    {
+        var pack = _registry.GetPack("layered");
+
+        pack.Layers.Should().HaveCount(3);
+        pack.Layers.Select(l => l.Name).Should().BeEquivalentTo(
+            ["Presentation", "Business", "DataAccess"]);
+    }
+
+    [Fact]
+    public void Layered_ShouldEnforceTopDownDependencies()
+    {
+        var pack = _registry.GetPack("layered");
+
+        var presentation = pack.Layers.Single(l => l.Name == "Presentation");
+        var business = pack.Layers.Single(l => l.Name == "Business");
+        var dataAccess = pack.Layers.Single(l => l.Name == "DataAccess");
+
+        // Top-down only: Presentation -> Business -> DataAccess
+        presentation.AllowedDependencies.Should().BeEquivalentTo(["Business"]);
+        business.AllowedDependencies.Should().BeEquivalentTo(["DataAccess"]);
+        dataAccess.AllowedDependencies.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Microservice_ShouldHaveFiveLayers()
+    {
+        var pack = _registry.GetPack("microservice");
+
+        pack.Layers.Should().HaveCount(5);
+        pack.Layers.Select(l => l.Name).Should().BeEquivalentTo(
+            ["Domain", "Application", "Infrastructure", "Api", "Contracts"]);
+    }
+
+    [Fact]
+    public void Microservice_Contracts_ShouldHaveNoDependencies()
+    {
+        var pack = _registry.GetPack("microservice");
+        var contracts = pack.Layers.Single(l => l.Name == "Contracts");
+
+        contracts.AllowedDependencies.Should().BeEmpty(
+            "Contracts is the public API surface — it must not depend on internal layers");
+    }
+
+    [Fact]
+    public void Microservice_Domain_ShouldNotDependOnContracts()
+    {
+        var pack = _registry.GetPack("microservice");
+        var domain = pack.Layers.Single(l => l.Name == "Domain");
+
+        domain.AllowedDependencies.Should().BeEmpty(
+            "Domain is the innermost layer and should have no dependencies");
     }
 }

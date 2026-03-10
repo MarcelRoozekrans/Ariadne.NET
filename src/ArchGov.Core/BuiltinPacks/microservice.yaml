@@ -1,0 +1,135 @@
+name: microservice
+version: "1.0.0"
+author: platform-team
+
+layers:
+  - name: Domain
+    description: "Entities, aggregates, value objects, domain events"
+    allowedDependencies: []
+  - name: Application
+    description: "Use cases, handlers, application services"
+    allowedDependencies:
+      - Domain
+      - Contracts
+  - name: Infrastructure
+    description: "Persistence, messaging, external service clients"
+    allowedDependencies:
+      - Domain
+      - Application
+      - Contracts
+  - name: Api
+    description: "Controllers, gRPC services, middleware"
+    allowedDependencies:
+      - Domain
+      - Application
+      - Contracts
+  - name: Contracts
+    description: "Shared DTOs, integration events, public API models"
+    allowedDependencies: []
+
+componentRoles:
+  - name: Entity
+    layer: Domain
+    typeKind: Class
+    requiresInterface: false
+    description: "Domain entity with identity"
+  - name: Aggregate
+    layer: Domain
+    typeKind: Class
+    requiresInterface: false
+    description: "Aggregate root"
+  - name: ValueObject
+    layer: Domain
+    typeKind: Class
+    requiresInterface: false
+    description: "Immutable value type"
+  - name: DomainEvent
+    layer: Domain
+    typeKind: Record
+    requiresInterface: false
+    description: "Internal domain event"
+  - name: RepositoryInterface
+    layer: Domain
+    typeKind: Interface
+    requiresInterface: false
+    alternativeNames: [Repository]
+    description: "Repository contract"
+  - name: Handler
+    layer: Application
+    typeKind: Class
+    requiresInterface: false
+    description: "Command or query handler"
+  - name: ApplicationService
+    layer: Application
+    typeKind: Class
+    requiresInterface: true
+    interfaceRole: ApplicationServiceInterface
+    description: "Application service"
+  - name: ApplicationServiceInterface
+    layer: Application
+    typeKind: Interface
+    requiresInterface: false
+    alternativeNames: [ApplicationService]
+    description: "Application service contract"
+  - name: Repository
+    layer: Infrastructure
+    typeKind: Class
+    requiresInterface: true
+    interfaceRole: RepositoryInterface
+    accessibility: internal
+    description: "Repository implementation"
+  - name: DbContext
+    layer: Infrastructure
+    typeKind: Class
+    requiresInterface: false
+    description: "Database context"
+  - name: MessagePublisher
+    layer: Infrastructure
+    typeKind: Class
+    requiresInterface: false
+    description: "Publishes integration events to message broker"
+  - name: MessageConsumer
+    layer: Infrastructure
+    typeKind: Class
+    requiresInterface: false
+    description: "Consumes integration events from message broker"
+  - name: Controller
+    layer: Api
+    typeKind: Class
+    requiresInterface: false
+    description: "REST API controller"
+  - name: GrpcService
+    layer: Api
+    typeKind: Class
+    requiresInterface: false
+    description: "gRPC service endpoint"
+  - name: IntegrationEvent
+    layer: Contracts
+    typeKind: Record
+    requiresInterface: false
+    description: "Event published to other services"
+  - name: ApiRequest
+    layer: Contracts
+    typeKind: Record
+    requiresInterface: false
+    description: "Public API request model"
+  - name: ApiResponse
+    layer: Contracts
+    typeKind: Record
+    requiresInterface: false
+    description: "Public API response model"
+
+codeFeatureRules:
+  - id: CODE-001
+    description: "Interface-required roles must have a matching interface"
+    appliesTo:
+      requiresInterface: true
+  - id: CODE-002
+    description: "Implementations with required interfaces should be internal"
+    appliesTo:
+      requiresInterface: true
+      isInterface: false
+
+namingConventions:
+  namespace: "{SolutionName}.{Feature}.{Layer}"
+  filePath: "src/{SolutionName}.{Feature}.{Layer}/{ComponentName}.cs"

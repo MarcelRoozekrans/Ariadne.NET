@@ -199,6 +199,9 @@ public sealed class WorkspaceIntegrationTests : IDisposable
     [InlineData("event-driven")]
     [InlineData("vertical-slice")]
     [InlineData("modular-monolith")]
+    [InlineData("onion-architecture")]
+    [InlineData("layered")]
+    [InlineData("microservice")]
     public void ScaffoldWorkspace_AllTemplates_ShouldProduceConsistentStructure(string templateName)
     {
         var pack = _registry.GetPack(templateName);

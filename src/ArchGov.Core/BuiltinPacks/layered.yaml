@@ -1,0 +1,81 @@
+name: layered
+version: "1.0.0"
+author: platform-team
+
+layers:
+  - name: Presentation
+    description: "UI, API controllers, view models"
+    allowedDependencies:
+      - Business
+  - name: Business
+    description: "Business logic, services, validation"
+    allowedDependencies:
+      - DataAccess
+  - name: DataAccess
+    description: "Repositories, database context, data models"
+    allowedDependencies: []
+
+componentRoles:
+  - name: Controller
+    layer: Presentation
+    typeKind: Class
+    requiresInterface: false
+    description: "API controller or MVC controller"
+  - name: ViewModel
+    layer: Presentation
+    typeKind: Class
+    requiresInterface: false
+    description: "View model for UI binding"
+  - name: ApiModel
+    layer: Presentation
+    typeKind: Record
+    requiresInterface: false
+    description: "API request/response model"
+  - name: Service
+    layer: Business
+    typeKind: Class
+    requiresInterface: true
+    interfaceRole: ServiceInterface
+    description: "Business service"
+  - name: ServiceInterface
+    layer: Business
+    typeKind: Interface
+    requiresInterface: false
+    alternativeNames: [Service]
+    description: "Business service contract"
+  - name: Validator
+    layer: Business
+    typeKind: Class
+    requiresInterface: false
+    description: "Input validator"
+  - name: BusinessModel
+    layer: Business
+    typeKind: Class
+    requiresInterface: false
+    description: "Business domain model"
+  - name: Repository
+    layer: DataAccess
+    typeKind: Class
+    requiresInterface: true
+    interfaceRole: RepositoryInterface
+    description: "Data access repository"
+  - name: RepositoryInterface
+    layer: DataAccess
+    typeKind: Interface
+    requiresInterface: false
+    alternativeNames: [Repository]
+    description: "Repository contract"
+  - name: DbContext
+    layer: DataAccess
+    typeKind: Class
+    requiresInterface: false
+    description: "Database context"
+  - name: DataModel
+    layer: DataAccess
+    typeKind: Class
+    requiresInterface: false
+    description: "Database entity / data model"
+
+namingConventions:
+  namespace: "{SolutionName}.{Feature}.{Layer}"
+  filePath: "src/{SolutionName}.{Feature}.{Layer}/{ComponentName}.cs"

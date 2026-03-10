@@ -143,12 +143,15 @@ namingConventions:
 
 ### 2. Built-in Templates
 
-Seven templates ship with the engine:
+Ten templates ship with the engine:
 
 | Template | Layers | Roles | Description |
 |----------|--------|-------|-------------|
 | `clean-architecture` | Domain, Application, Infrastructure, WebApi | 19 | Classic Clean Architecture |
+| `onion-architecture` | DomainModel, DomainServices, ApplicationServices, Infrastructure, Presentation | 15 | Onion Architecture (Jeffrey Palermo) |
 | `hexagonal-architecture` | Core, Ports, Adapters | 7 | Ports & Adapters pattern |
+| `layered` | Presentation, Business, DataAccess | 11 | Traditional N-tier / layered |
+| `microservice` | Domain, Application, Infrastructure, Api, Contracts | 17 | Per-service microservice structure |
 | `cqrs` | _(composable add-on)_ | 7 | Command/Query separation |
 | `ddd-tactical` | _(composable add-on)_ | 9 | DDD tactical patterns (Aggregate, ValueObject, Factory) |
 | `event-driven` | Domain, Events, Producers, Consumers, Infrastructure | 9 | Event-driven architecture |
@@ -295,9 +298,9 @@ src/
   ArchGov.Host.Mcp/           # MCP stdio server for AI agents
 
 tests/
-  ArchGov.Core.Tests/         # 168 unit + integration tests
-  ArchGov.Host.Mcp.Tests/     # 10 MCP tool + resource tests
-  ArchGov.Host.Api.Tests/     # 6 integration tests
+  ArchGov.Core.Tests/         # 218 unit + integration tests
+  ArchGov.Host.Mcp.Tests/     # 22 MCP tool + resource tests
+  ArchGov.Host.Api.Tests/     # 12 integration tests
 ```
 
 ### Core Pipeline
