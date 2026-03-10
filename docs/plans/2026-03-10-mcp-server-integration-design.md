@@ -1,7 +1,7 @@
 # MCP Server Integration — Design Document
 
 **Date:** 2026-03-10
-**Status:** Approved
+**Status:** Implemented
 
 ## Goal
 
@@ -35,10 +35,12 @@ src/
 ```
 ArchGov.Host.Mcp.csproj:
   - ArchGov.Core (project ref)
-  - ModelContextProtocol (latest stable)
+  - ModelContextProtocol 1.1.0
+  - Microsoft.Extensions.Hosting 10.0.3
 
 ArchGov.Host.Api.csproj (updated):
-  + ModelContextProtocol.AspNetCore (latest stable)
+  + ArchGov.Host.Mcp (project ref — reuses tool/resource classes)
+  + ModelContextProtocol.AspNetCore 1.1.0
 ```
 
 ## MCP Tools (7)
@@ -64,11 +66,11 @@ All `template?` parameters follow this resolution order:
 
 Rule packs exposed as readable resources so agents can inspect full definitions:
 
-| Resource URI | Description |
-|-------------|-------------|
-| `archgov://packs` | List all available pack names |
-| `archgov://packs/{name}` | Full YAML content of a specific built-in pack |
-| `archgov://active-rules` | The resolved rule pack for the current working directory |
+| Resource URI | Description | Status |
+|-------------|-------------|--------|
+| `archgov://packs/{name}` | Full YAML content of a specific built-in pack | Implemented |
+| `archgov://packs` | List all available pack names | Future |
+| `archgov://active-rules` | The resolved rule pack for the current working directory | Future |
 
 ## Context Auto-Detection
 
@@ -82,20 +84,27 @@ This means AI agents working in a project with `.architecture/rules.yaml` get co
 
 ## Stdio Server (`ArchGov.Host.Mcp`)
 
-Minimal console app:
+Console app with stdio transport:
 
 ```csharp
-var builder = Host.CreateApplicationBuilder(args);
+var builder = Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder(args);
+builder.Logging.AddConsole(options =>
+{
+    options.LogToStandardErrorThreshold = LogLevel.Trace;
+});
+
 builder.Services.AddArchGovCore();
-builder.Services.AddMcpServer()
-    .WithStdioTransport()
-    .WithTools()
-    .WithResources();
-var app = builder.Build();
-await app.RunAsync();
+builder.Services.AddSingleton<RuleResolutionHelper>();
+builder.Services
+    .AddMcpServer()
+    .WithStdioServerTransport()
+    .WithToolsFromAssembly()
+    .WithResourcesFromAssembly();
+
+await builder.Build().RunAsync().ConfigureAwait(false);
 ```
 
-Tools implemented as classes with `[McpServerTool]` and `[McpServerToolType]` attributes, or registered via the builder API.
+Tools implemented as static classes with `[McpServerToolType]` and `[McpServerTool]` attributes. DI services injected as method parameters automatically by the SDK.
 
 ### Agent Configuration
 
@@ -113,31 +122,39 @@ Claude Code (`.mcp.json`):
 
 ## API MCP Transport (`ArchGov.Host.Api`)
 
-Add SSE endpoint to existing API:
+MCP HTTP transport added alongside existing REST endpoints:
 
 ```csharp
-app.MapMcp("/mcp");  // SSE transport at /mcp
+builder.Services.AddSingleton<RuleResolutionHelper>();
+builder.Services
+    .AddMcpServer()
+    .WithHttpTransport()
+    .WithToolsFromAssembly(typeof(TemplateTools).Assembly)
+    .WithResourcesFromAssembly(typeof(PackResources).Assembly);
+
+// ...
+app.MapMcp();
 ```
 
-Same tools and resources, different transport. Enables remote teams to share a single governance server.
+Same tools and resources from `ArchGov.Host.Mcp` assembly, different transport. Enables remote teams to share a single governance server.
 
 ## Tool Implementation Pattern
 
-Each tool is a thin wrapper that delegates to core services:
+Each tool is a thin static wrapper that delegates to core services. DI services are injected as method parameters by the MCP SDK:
 
 ```csharp
 [McpServerToolType]
-public class GenerateComponentTool
+public static class GenerateTools
 {
-    [McpServerTool("generate_component"), Description("Generate a C# component...")]
-    public GenerateResult Generate(
+    [McpServerTool(Name = "generate_component")]
+    [Description("Generate a C# component that conforms to architecture rules.")]
+    public static GenerateResult GenerateComponent(
+        RuleResolutionHelper helper,
         IGenerateOrchestrator orchestrator,
-        IRulePackResolver resolver,
-        IBuiltinPackRegistry registry,
         string role, string name, string solution, string feature,
         string? template = null)
     {
-        var resolved = ResolveRules(template, resolver, registry);
+        var resolved = helper.Resolve(template);
         var request = new GenerateRequest { ... };
         return orchestrator.Generate(resolved, request);
     }
@@ -146,13 +163,23 @@ public class GenerateComponentTool
 
 ## Testing Strategy
 
-- **Unit tests**: each MCP tool class tested in isolation with mocked core services
-- **Integration tests**: start stdio server in-process, send JSON-RPC messages, verify responses
-- **Smoke tests**: launch actual process, connect via `ModelContextProtocol` client SDK
+- **Unit tests**: 10 tests covering all tool and resource classes with real core services (no mocks needed — core is stateless)
+- **Integration tests**: covered by existing API integration tests (6 tests) and core integration tests (32 per-pack tests)
+
+## Implemented
+
+- 7 MCP tools (list_templates, get_layers, get_component_roles, get_rules, generate_component, validate_source, lint_source)
+- 1 MCP resource template (archgov://packs/{name})
+- Stdio transport (ArchGov.Host.Mcp)
+- HTTP transport (ArchGov.Host.Api at /mcp)
+- RuleResolutionHelper with 3-strategy resolution (explicit > .architecture/rules.yaml > clean-architecture)
+- 10 unit tests
 
 ## Out of Scope (for now)
 
 - MCP prompts (prompt templates for AI agents)
 - MCP sampling (requesting AI completions from within the server)
 - File watching / live reload of `.architecture/rules.yaml`
-- Authentication on SSE endpoint
+- Authentication on HTTP endpoint
+- `archgov://packs` list resource
+- `archgov://active-rules` resource

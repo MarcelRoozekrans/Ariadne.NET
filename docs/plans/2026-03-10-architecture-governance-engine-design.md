@@ -77,15 +77,15 @@ Shipped with the engine — users start immediately without writing YAML:
 
 | Pack | Description |
 |------|-------------|
-| `clean-architecture` | Domain/Application/Infrastructure/WebApi layers |
-| `hexagonal-architecture` | Ports & adapters, primary/secondary |
-| `modular-monolith` | Module boundaries, internal/public APIs |
-| `event-driven` | Event producers/consumers, message handlers |
-| `mvvm` | Model/View/ViewModel layers |
-| `vertical-slice` | Feature-based organization |
-| `microservice` | Service boundaries, API gateway patterns |
-| `ddd-tactical` | Aggregates, entities, value objects, domain events |
-| `cqrs` | Command/query separation (composable add-on) |
+| `clean-architecture` | Domain/Application/Infrastructure/WebApi layers (19 roles) | Shipped |
+| `hexagonal-architecture` | Ports & adapters, primary/secondary (7 roles) | Shipped |
+| `cqrs` | Command/query separation, composable add-on (7 roles) | Shipped |
+| `ddd-tactical` | Aggregates, value objects, domain events, composable add-on (9 roles) | Shipped |
+| `event-driven` | Event producers/consumers, message handlers (9 roles) | Shipped |
+| `vertical-slice` | Feature-based organization (8 roles) | Shipped |
+| `modular-monolith` | Module boundaries, internal/public APIs (8 roles) | Shipped |
+| `mvvm` | Model/View/ViewModel layers | Planned |
+| `microservice` | Service boundaries, API gateway patterns | Planned |
 
 ### Initialization
 
@@ -275,17 +275,20 @@ ArchitectureGovernance/
 
 | Priority | Feature |
 |----------|---------|
-| v1 | Rule schema + YAML loader |
-| v1 | 3 built-in packs: clean-architecture, hexagonal, cqrs |
-| v1 | CLI: `init`, `generate`, `validate` |
-| v1 | API host (MCP compatible) |
-| v1 | Pack composability (`extends`) |
-| v2 | Git-based sync |
-| v2 | Override control (locked rules) |
-| v2 | `lint` command |
-| v2 | Additional built-in packs |
-| v3 | NuGet sync provider |
-| v3 | CI/CD integration examples |
+| v1 | Rule schema + YAML loader | Done |
+| v1 | 3 built-in packs: clean-architecture, hexagonal, cqrs | Done |
+| v1 | CLI: `init`, `generate`, `validate` | Done |
+| v1 | API host (MCP compatible) | Done |
+| v1 | Pack composability (`extends`) | Done |
+| v1 | Source validation (Roslyn-based dependency checking) | Done |
+| v1 | Workspace scaffolding (`generate-workspace`) | Done |
+| v2 | Override control (locked rules) | Done |
+| v2 | `lint` command | Done |
+| v2 | Additional built-in packs (ddd-tactical, event-driven, vertical-slice, modular-monolith) | Done |
+| v2 | MCP server (stdio + HTTP) with 7 tools + resources | Done |
+| v3 | Git-based sync | — |
+| v3 | NuGet sync provider | — |
+| v3 | CI/CD integration examples | — |
 
 ---
 
