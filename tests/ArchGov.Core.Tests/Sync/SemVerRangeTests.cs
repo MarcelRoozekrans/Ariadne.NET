@@ -123,4 +123,34 @@ public class SemVerRangeTests
 
         act.Should().Throw<FormatException>();
     }
+
+    [Theory]
+    [InlineData("v1.0.0-beta")]
+    [InlineData("v1.0.0-rc.1")]
+    [InlineData("v2.0.0-alpha+build.123")]
+    [InlineData("1.0.0-pre")]
+    public void TryParse_PreReleaseTags_ShouldBeRejected(string input)
+    {
+        SemVer.TryParse(input, out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void FindBestMatch_ShouldIgnorePreReleaseTags()
+    {
+        var tags = new[] { "v1.0.0-beta", "v1.0.0", "v1.1.0-rc.1", "v1.1.0" };
+        var range = SemVerRange.Parse("^1.0");
+
+        var best = range.FindBestMatch(tags);
+
+        best.Should().Be("v1.1.0");
+    }
+
+    [Fact]
+    public void FindBestMatch_OnlyPreReleaseTags_ShouldReturnNull()
+    {
+        var tags = new[] { "v1.0.0-beta", "v1.1.0-rc.1", "v2.0.0-alpha" };
+        var range = SemVerRange.Parse("^1.0");
+
+        range.FindBestMatch(tags).Should().BeNull();
+    }
 }

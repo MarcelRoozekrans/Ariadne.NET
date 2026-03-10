@@ -103,4 +103,63 @@ public class SyncOrchestratorTests
         results[0].Success.Should().BeFalse();
         results[0].Error.Should().Contain("nuget");
     }
+
+    [Fact]
+    public async Task SyncAllAsync_PartialFailure_ShouldReportBothSuccessAndFailure()
+    {
+        var gitProvider = Substitute.For<IGitSyncProvider>();
+        gitProvider.SyncAsync(
+                Arg.Is<ImportDefinition>(i => i.Name == "good-pack"),
+                Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(new SyncResult { ImportName = "good-pack", ResolvedVersion = "v1.0.0" });
+        gitProvider.SyncAsync(
+                Arg.Is<ImportDefinition>(i => i.Name == "bad-pack"),
+                Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(new SyncResult { ImportName = "bad-pack", Success = false, Error = "No matching tag" });
+
+        var sut = new SyncOrchestrator(gitProvider);
+        var manifest = new ImportsManifest
+        {
+            Imports =
+            [
+                new ImportDefinition { Name = "good-pack", Type = "git", Url = "https://example.com/good.git", Version = "^1.0" },
+                new ImportDefinition { Name = "bad-pack", Type = "git", Url = "https://example.com/bad.git", Version = "^9.0" },
+            ],
+        };
+
+        var results = await sut.SyncAllAsync(manifest, "/tmp/cache", false);
+
+        results.Should().HaveCount(2);
+        results.Should().ContainSingle(r => r.Success && r.ImportName == "good-pack");
+        results.Should().ContainSingle(r => !r.Success && r.ImportName == "bad-pack");
+    }
+
+    [Fact]
+    public async Task SyncAllAsync_MixedTypes_ShouldHandleGitAndRejectOthers()
+    {
+        var gitProvider = Substitute.For<IGitSyncProvider>();
+        gitProvider.SyncAsync(Arg.Any<ImportDefinition>(), Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo => new SyncResult
+            {
+                ImportName = callInfo.ArgAt<ImportDefinition>(0).Name,
+                ResolvedVersion = "v1.0.0",
+            });
+
+        var sut = new SyncOrchestrator(gitProvider);
+        var manifest = new ImportsManifest
+        {
+            Imports =
+            [
+                new ImportDefinition { Name = "git-pack", Type = "git", Url = "https://example.com/a.git", Version = "^1.0" },
+                new ImportDefinition { Name = "nuget-pack", Type = "nuget", Url = "https://nuget.org/pkg", Version = "1.0.0" },
+            ],
+        };
+
+        var results = await sut.SyncAllAsync(manifest, "/tmp/cache", false);
+
+        results.Should().HaveCount(2);
+        results[0].Success.Should().BeTrue();
+        results[1].Success.Should().BeFalse();
+        results[1].Error.Should().Contain("nuget");
+    }
 }

@@ -286,7 +286,7 @@ ArchitectureGovernance/
 | v2 | `lint` command | Done |
 | v2 | Additional built-in packs (ddd-tactical, event-driven, vertical-slice, modular-monolith) | Done |
 | v2 | MCP server (stdio + HTTP) with 7 tools + resources | Done |
-| v3 | Git-based sync | — |
+| v3 | Git-based sync | Done |
 | v3 | NuGet sync provider | — |
 | v3 | CI/CD integration examples | — |
 

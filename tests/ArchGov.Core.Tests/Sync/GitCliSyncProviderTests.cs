@@ -134,6 +134,47 @@ public class GitCliSyncProviderTests
     }
 
     [Fact]
+    public void ParseTagsFromLsRemote_ShouldIgnorePreReleaseTags()
+    {
+        var output = string.Join('\n',
+            "aaa1234567890123456789012345678901234567\trefs/tags/v1.0.0",
+            "bbb1234567890123456789012345678901234567\trefs/tags/v1.1.0-beta",
+            "ccc1234567890123456789012345678901234567\trefs/tags/v2.0.0-rc.1",
+            "ddd1234567890123456789012345678901234567\trefs/tags/v2.0.0");
+
+        var tags = GitCliSyncProvider.ParseTagsFromLsRemote(output);
+
+        tags.Should().BeEquivalentTo(["v1.0.0", "v2.0.0"]);
+    }
+
+    [Fact]
+    public void IsCacheValid_CorruptedGitInfo_ShouldReturnFalse()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        try
+        {
+            Directory.CreateDirectory(tempDir);
+            File.WriteAllText(
+                Path.Combine(tempDir, ".git-info.json"),
+                "{ this is not valid json }");
+
+            var result = GitCliSyncProvider.IsCacheValid(
+                tempDir,
+                "https://example.com/repo.git",
+                SemVerRange.Parse("^1.0"));
+
+            result.Should().BeFalse();
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void IsCacheValid_VersionNotSatisfied_ShouldReturnFalse()
     {
         var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());

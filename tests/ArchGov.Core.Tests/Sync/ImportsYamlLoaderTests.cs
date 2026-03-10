@@ -95,4 +95,36 @@ public class ImportsYamlLoaderTests : IDisposable
 
         act.Should().Throw<FileNotFoundException>();
     }
+
+    [Fact]
+    public void LoadFromString_MalformedYaml_ShouldThrow()
+    {
+        var yaml = """
+            imports:
+              - name: broken
+                type: [this is not valid
+            """;
+
+        var act = () => _loader.LoadFromString(yaml);
+
+        act.Should().Throw<Exception>();
+    }
+
+    [Fact]
+    public void LoadFromString_ExtraFields_ShouldBeIgnored()
+    {
+        var yaml = """
+            imports:
+              - name: test-pack
+                type: git
+                url: https://example.com/pack.git
+                version: "1.0.0"
+                unknownField: should-be-ignored
+            """;
+
+        var manifest = _loader.LoadFromString(yaml);
+
+        manifest.Imports.Should().ContainSingle();
+        manifest.Imports[0].Name.Should().Be("test-pack");
+    }
 }
