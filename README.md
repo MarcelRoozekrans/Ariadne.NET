@@ -57,6 +57,49 @@ curl -X POST http://localhost:5000/v1.0/architecture/generate \
   }'
 ```
 
+### MCP Server
+
+The engine runs as an MCP server for AI agent integration (Claude Code, Cursor, etc.):
+
+**Stdio (local)** — add to your `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "archgov": {
+      "command": "dotnet",
+      "args": ["run", "--project", "path/to/src/ArchGov.Host.Mcp"]
+    }
+  }
+}
+```
+
+**HTTP (remote/team)** — start the API server, MCP endpoint at `/mcp`:
+
+```bash
+dotnet run --project src/ArchGov.Host.Api
+```
+
+**MCP Tools:**
+
+| Tool | Description |
+|------|-------------|
+| `list_templates` | List available architecture templates |
+| `get_layers` | Get layer definitions with allowed dependencies |
+| `get_component_roles` | Get available component roles |
+| `get_rules` | Get code feature rules |
+| `generate_component` | Generate a C# component |
+| `validate_source` | Validate source files against rules |
+| `lint_source` | Lint for namespace-layer mismatches |
+
+**MCP Resources:**
+
+| Resource | Description |
+|----------|-------------|
+| `archgov://packs/{name}` | Full YAML content of a built-in rule pack |
+
+All tools auto-detect `.architecture/rules.yaml` in the working directory. Pass an explicit `template` parameter to override.
+
 ## How It Works
 
 ### 1. Declarative Rule Packs
@@ -205,11 +248,13 @@ src/
     Validation/               # Source file validation with Roslyn parsing
     BuiltinPacks/             # Embedded YAML templates
 
-  ArchGov.Host.Api/           # ASP.NET REST API (MCP-compatible)
+  ArchGov.Host.Api/           # ASP.NET REST API + MCP HTTP transport
   ArchGov.Host.Cli/           # CLI tool (System.CommandLine)
+  ArchGov.Host.Mcp/           # MCP stdio server for AI agents
 
 tests/
   ArchGov.Core.Tests/         # 82 unit + integration tests
+  ArchGov.Host.Mcp.Tests/     # 10 MCP tool + resource tests
   ArchGov.Host.Api.Tests/     # 6 integration tests
 ```
 
@@ -287,4 +332,5 @@ dotnet test src/ArchGov.slnx
 - **Microsoft.CodeAnalysis.CSharp** (Roslyn) — Code generation
 - **System.CommandLine** — CLI framework
 - **ASP.NET Core** — API host with API versioning + Swagger
+- **ModelContextProtocol** — MCP server SDK (stdio + HTTP)
 - **xUnit + FluentAssertions** — Testing
