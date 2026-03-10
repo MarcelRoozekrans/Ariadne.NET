@@ -26,6 +26,7 @@ public class ServiceRegistrationTests
         provider.GetService<ICodeGeneratorService>().Should().NotBeNull();
         provider.GetService<IGenerateOrchestrator>().Should().NotBeNull();
         provider.GetService<ISourceValidator>().Should().NotBeNull();
+        provider.GetService<ILinter>().Should().NotBeNull();
         provider.GetService<IWorkspaceOrchestrator>().Should().NotBeNull();
     }
 }

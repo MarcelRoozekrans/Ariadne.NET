@@ -17,6 +17,7 @@ public class ArchitectureController : ControllerBase
     private readonly IRulePackResolver _resolver;
     private readonly IGenerateOrchestrator _orchestrator;
     private readonly ISourceValidator _validator;
+    private readonly ILinter _linter;
     private readonly IWorkspaceOrchestrator _workspaceOrchestrator;
 
     public ArchitectureController(
@@ -24,12 +25,14 @@ public class ArchitectureController : ControllerBase
         IRulePackResolver resolver,
         IGenerateOrchestrator orchestrator,
         ISourceValidator validator,
+        ILinter linter,
         IWorkspaceOrchestrator workspaceOrchestrator)
     {
         _registry = registry;
         _resolver = resolver;
         _orchestrator = orchestrator;
         _validator = validator;
+        _linter = linter;
         _workspaceOrchestrator = workspaceOrchestrator;
     }
 
@@ -92,6 +95,20 @@ public class ArchitectureController : ControllerBase
         };
         var resolved = _resolver.Resolve(userPack);
         var result = _validator.Validate(resolved, request.SourceDirectory);
+        return Ok(result);
+    }
+
+    [HttpPost("lint")]
+    public IActionResult Lint([FromBody] ApiValidateRequest request)
+    {
+        var template = request.Template ?? "clean-architecture";
+        var userPack = new RulePack
+        {
+            Name = "lint",
+            Extends = [$"builtin://{template}"],
+        };
+        var resolved = _resolver.Resolve(userPack);
+        var result = _linter.Lint(resolved, request.SourceDirectory);
         return Ok(result);
     }
 

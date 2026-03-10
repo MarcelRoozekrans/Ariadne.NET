@@ -20,6 +20,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ICodeGeneratorService, CodeGeneratorService>();
         services.AddSingleton<IGenerateOrchestrator, GenerateOrchestrator>();
         services.AddSingleton<ISourceValidator, SourceValidator>();
+        services.AddSingleton<ILinter, Linter>();
         services.AddSingleton<IWorkspaceOrchestrator, WorkspaceOrchestrator>();
 
         return services;
