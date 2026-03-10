@@ -73,10 +73,10 @@ namingConventions:
 
 ## 2. Built-in Rule Pack Library
 
-Shipped with the engine — users start immediately without writing YAML:
+Shipped with the engine (10 packs) — users start immediately without writing YAML:
 
-| Pack | Description |
-|------|-------------|
+| Pack | Description | Status |
+|------|-------------|--------|
 | `clean-architecture` | Domain/Application/Infrastructure/WebApi layers (19 roles) | Shipped |
 | `hexagonal-architecture` | Ports & adapters, primary/secondary (7 roles) | Shipped |
 | `cqrs` | Command/query separation, composable add-on (7 roles) | Shipped |
@@ -84,8 +84,9 @@ Shipped with the engine — users start immediately without writing YAML:
 | `event-driven` | Event producers/consumers, message handlers (9 roles) | Shipped |
 | `vertical-slice` | Feature-based organization (8 roles) | Shipped |
 | `modular-monolith` | Module boundaries, internal/public APIs (8 roles) | Shipped |
-| `mvvm` | Model/View/ViewModel layers | Planned |
-| `microservice` | Service boundaries, API gateway patterns | Planned |
+| `onion-architecture` | Five concentric layers: DomainModel → DomainServices → ApplicationServices → Infrastructure / Presentation (15 roles) | Shipped |
+| `layered` | Classic three-tier: Presentation → Business → DataAccess with strict top-down dependencies (11 roles) | Shipped |
+| `microservice` | Domain/Application/Infrastructure/Api/Contracts with isolated Contracts layer for cross-service communication (17 roles) | Shipped |
 
 ### Initialization
 
@@ -240,11 +241,17 @@ ArchitectureGovernance/
 │   │   ├── RuleLoader/                # Read YAML, resolve extends/imports
 │   │   └── CodeGeneration/            # Pattern-agnostic scaffolding (Roslyn)
 │   │
-│   ├── BuiltinPacks/                  # Shipped templates
+│   ├── BuiltinPacks/                  # Shipped templates (10 packs)
 │   │   ├── clean-architecture.yaml
 │   │   ├── hexagonal-architecture.yaml
 │   │   ├── cqrs.yaml
-│   │   └── ...
+│   │   ├── ddd-tactical.yaml
+│   │   ├── event-driven.yaml
+│   │   ├── vertical-slice.yaml
+│   │   ├── modular-monolith.yaml
+│   │   ├── onion-architecture.yaml
+│   │   ├── layered.yaml
+│   │   └── microservice.yaml
 │   │
 │   ├── Sync/                          # Import resolvers
 │   │   ├── GitSyncProvider/           # Clone/pull from git repos
@@ -277,6 +284,7 @@ ArchitectureGovernance/
 |----------|---------|
 | v1 | Rule schema + YAML loader | Done |
 | v1 | 3 built-in packs: clean-architecture, hexagonal, cqrs | Done |
+| v2 | 3 additional packs: onion-architecture, layered, microservice | Done |
 | v1 | CLI: `init`, `generate`, `validate` | Done |
 | v1 | API host (MCP compatible) | Done |
 | v1 | Pack composability (`extends`) | Done |
@@ -294,7 +302,9 @@ ArchitectureGovernance/
 
 ## 7. Verification
 
-- **Unit tests:** Rule loading, merging, conflict detection, validation logic
-- **Integration tests:** End-to-end generate flow with each built-in pack
+- **Unit tests:** Rule loading, merging, conflict detection, validation logic, workspace scaffolding (218 Core tests)
+- **Integration tests:** End-to-end generate flow with all 10 built-in packs, scaffold→generate→validate pipeline
+- **API tests:** Controller endpoints for generate, validate, lint, workspace scaffolding (12 tests)
+- **MCP tests:** Tool-level tests for generate, validate, lint operations (22 tests)
+- **Total:** 252 tests, all passing
 - **Dogfooding:** The engine governs its own source structure
-- **Manual verification:** Initialize a project with each template, generate components, validate output matches expected structure
