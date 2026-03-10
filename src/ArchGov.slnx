@@ -4,4 +4,5 @@
   <Project Path="ArchGov.Core/ArchGov.Core.csproj" />
   <Project Path="ArchGov.Host.Api/ArchGov.Host.Api.csproj" />
   <Project Path="ArchGov.Host.Cli/ArchGov.Host.Cli.csproj" />
+  <Project Path="ArchGov.Host.Mcp/ArchGov.Host.Mcp.csproj" />
 </Solution>
