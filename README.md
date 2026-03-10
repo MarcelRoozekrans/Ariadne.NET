@@ -170,15 +170,16 @@ src/
     RuleLoader/               # YAML parsing, built-in pack registry, resolver
     RuleEngine/               # Merger, dependency validator, layer inference
     CodeGeneration/           # Roslyn-based code generator
-    Orchestration/            # Wires inference + validation + generation
+    Orchestration/            # Wires inference + validation + generation + workspace
+    Validation/               # Source file validation with Roslyn parsing
     BuiltinPacks/             # Embedded YAML templates
 
   ArchGov.Host.Api/           # ASP.NET REST API (MCP-compatible)
   ArchGov.Host.Cli/           # CLI tool (System.CommandLine)
 
 tests/
-  ArchGov.Core.Tests/         # 36 unit tests
-  ArchGov.Host.Api.Tests/     # 4 integration tests
+  ArchGov.Core.Tests/         # 40 unit tests
+  ArchGov.Host.Api.Tests/     # 6 integration tests
 ```
 
 ### Core Pipeline
@@ -211,6 +212,8 @@ This registers:
 | `ILayerInferenceEngine` | `LayerInferenceEngine` | Singleton |
 | `ICodeGeneratorService` | `CodeGeneratorService` | Singleton |
 | `IGenerateOrchestrator` | `GenerateOrchestrator` | Singleton |
+| `IWorkspaceOrchestrator` | `WorkspaceOrchestrator` | Singleton |
+| `ISourceValidator` | `SourceValidator` | Singleton |
 
 ## API Reference
 
@@ -223,6 +226,8 @@ This registers:
 | `/v1.0/architecture/component-roles` | GET | Get component roles (query: `?template=`) |
 | `/v1.0/architecture/rules` | GET | Get code feature rules (query: `?template=`) |
 | `/v1.0/architecture/generate` | POST | Generate component code |
+| `/v1.0/architecture/generate-workspace` | POST | Scaffold solution project structure |
+| `/v1.0/architecture/validate` | POST | Validate source files against rules |
 
 ### CLI Commands
 
@@ -232,7 +237,7 @@ This registers:
 | `arch rules` | Print resolved layer rules |
 | `arch roles` | Print component roles table |
 | `arch generate --role <role> --name <name> --solution <sol> --feature <feat>` | Generate a component |
-| `arch validate <path>` | Validate source files _(stub)_ |
+| `arch validate <path>` | Validate source files against architecture rules |
 
 ## Building
 
