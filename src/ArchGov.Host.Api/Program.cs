@@ -1,8 +1,15 @@
 using ArchGov.Core;
+using ModelContextProtocol.Server;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddArchGovCore();
+builder.Services.AddSingleton<ArchGov.Host.Mcp.RuleResolutionHelper>();
+builder.Services
+    .AddMcpServer()
+    .WithHttpTransport()
+    .WithToolsFromAssembly(typeof(ArchGov.Host.Mcp.Tools.TemplateTools).Assembly)
+    .WithResourcesFromAssembly(typeof(ArchGov.Host.Mcp.Resources.PackResources).Assembly);
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -38,6 +45,7 @@ app.UseSwaggerUI();
 app.UseCors();
 app.UseHttpsRedirection();
 app.MapControllers();
+app.MapMcp();
 
 app.Run();
 

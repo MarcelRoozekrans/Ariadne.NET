@@ -2,11 +2,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ArchGov.Core\ArchGov.Core.csproj" />
+    <ProjectReference Include="..\ArchGov.Host.Mcp\ArchGov.Host.Mcp.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Asp.Versioning.Mvc" Version="8.1.1" />
     <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" Version="8.1.1" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="1.1.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.4" />
   </ItemGroup>
 
