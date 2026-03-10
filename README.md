@@ -157,7 +157,48 @@ Seven templates ship with the engine:
 
 Templates are composable — `clean-architecture+cqrs` merges both packs.
 
-### 3. Composability & Merge Semantics
+### 3. Sharing Rule Packs via Git Sync
+
+Teams can publish rule packs to git repositories and consume them across projects:
+
+```yaml
+# .architecture/imports.yaml
+imports:
+  - name: company-standards
+    type: git
+    url: git@github.com:acme/architecture-packs.git
+    path: packs/clean-architecture
+    version: "^2.0"
+
+  - name: team-conventions
+    type: git
+    url: https://github.com/acme/team-rules.git
+    version: "1.3.0"
+```
+
+```bash
+# Fetch rule packs from git repos
+dotnet run --project src/ArchGov.Host.Cli -- sync
+
+# Force fresh sync (ignore cache)
+dotnet run --project src/ArchGov.Host.Cli -- sync --no-cache
+
+# Sync a single import
+dotnet run --project src/ArchGov.Host.Cli -- sync --name company-standards
+```
+
+Then reference synced packs in your rules:
+
+```yaml
+# .architecture/rules.yaml
+extends:
+  - import://company-standards
+  - import://team-conventions
+```
+
+Private repos work out of the box — the engine uses your existing git credentials (SSH keys, credential managers). Versions are resolved against git tags using semver ranges (`^2.0`, `~1.3`, or exact `1.0.0`). Packs are cached locally in `.architecture/.cache/` so validation works offline.
+
+### 5. Composability & Merge Semantics
 
 Multiple rule packs can be composed together:
 
@@ -182,7 +223,7 @@ Merge rules:
 
 Use `MergeWithDiagnostics` to get warnings when locked rules are skipped during merging.
 
-### 4. Code Generation
+### 6. Code Generation
 
 The engine uses Roslyn to generate correctly structured C# code based on rule pack definitions:
 
@@ -203,7 +244,7 @@ The generated code respects:
 - **Interface inheritance** when `requiresInterface` is set
 - **Namespace** and **file path** from naming conventions
 
-### 5. Source Validation
+### 7. Source Validation
 
 The engine validates existing source code against architecture rules using Roslyn parsing:
 
@@ -221,7 +262,7 @@ Checks performed:
 - **Dependency validation**: verifies `using` directives comply with layer dependency rules (e.g. Domain cannot reference Infrastructure)
 - **Lint**: checks namespace segments match directory-based layer structure
 
-### 6. Lint
+### 8. Lint
 
 A lighter check that detects namespace-vs-directory layer mismatches:
 
@@ -246,6 +287,7 @@ src/
     CodeGeneration/           # Roslyn-based code generator
     Orchestration/            # Wires inference + validation + generation + workspace
     Validation/               # Source file validation with Roslyn parsing
+    Sync/                     # Git-based sync: imports, semver, caching
     BuiltinPacks/             # Embedded YAML templates
 
   ArchGov.Host.Api/           # ASP.NET REST API + MCP HTTP transport
@@ -253,7 +295,7 @@ src/
   ArchGov.Host.Mcp/           # MCP stdio server for AI agents
 
 tests/
-  ArchGov.Core.Tests/         # 82 unit + integration tests
+  ArchGov.Core.Tests/         # 168 unit + integration tests
   ArchGov.Host.Mcp.Tests/     # 10 MCP tool + resource tests
   ArchGov.Host.Api.Tests/     # 6 integration tests
 ```
@@ -291,6 +333,9 @@ This registers:
 | `IWorkspaceOrchestrator` | `WorkspaceOrchestrator` | Singleton |
 | `ISourceValidator` | `SourceValidator` | Singleton |
 | `ILinter` | `Linter` | Singleton |
+| `IImportsLoader` | `ImportsYamlLoader` | Singleton |
+| `IGitSyncProvider` | `GitCliSyncProvider` | Singleton |
+| `ISyncOrchestrator` | `SyncOrchestrator` | Singleton |
 
 ## API Reference
 
@@ -317,6 +362,7 @@ This registers:
 | `arch generate --role <role> --name <name> --solution <sol> --feature <feat>` | Generate a component |
 | `arch validate <path>` | Validate source files against architecture rules |
 | `arch lint <path>` | Lint source files for namespace-layer mismatches |
+| `arch sync` | Sync rule packs from git repositories defined in imports.yaml |
 
 ## Building
 

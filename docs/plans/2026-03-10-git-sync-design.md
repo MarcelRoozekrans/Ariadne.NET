@@ -1,6 +1,22 @@
 # Git-Based Sync Design
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:writing-plans to create the implementation plan from this design.
+**Status:** Implemented
+
+## Why This Matters
+
+Architecture governance only works when rules are consistent across teams. Without a distribution mechanism, each team maintains its own copy of rule packs — leading to drift, inconsistency, and the exact structural chaos the engine exists to prevent.
+
+Git-based sync solves this by letting a platform or architecture team publish rule packs to a git repository (public or private), and having every consuming project pull a specific, versioned snapshot. This gives organizations:
+
+- **Single source of truth** — architecture rules are defined once and consumed everywhere, eliminating copy-paste drift between projects
+- **Version pinning** — teams pin to a known-good version (`^2.0`) and upgrade on their own schedule, avoiding surprise breakage from upstream changes
+- **Private repo support** — works with enterprise GitHub/GitLab/Azure DevOps out of the box, using existing SSH keys or credential managers with zero extra auth setup
+- **Offline-first** — packs are cached locally after first sync; `arch validate` and `arch lint` work without network access
+- **CI/CD ready** — `arch sync` runs as a pipeline step before validation, ensuring builds always use the latest compatible rules
+
+In short: teams author rules centrally, projects consume them declaratively, and the engine enforces them automatically.
+
+---
 
 **Goal:** Allow teams to share rule packs via git repositories (including private repos), with local caching and semver-based version resolution via git tags.
 
