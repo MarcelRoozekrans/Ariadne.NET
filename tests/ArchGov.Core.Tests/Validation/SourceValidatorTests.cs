@@ -133,7 +133,7 @@ public sealed class SourceValidatorTests : IDisposable
                 new ComponentRoleDefinition { Name = "Entity", Layer = "Domain", TypeKind = CSharpTypeKind.Class },
                 new ComponentRoleDefinition { Name = "Command", Layer = "Application", TypeKind = CSharpTypeKind.Record },
                 new ComponentRoleDefinition { Name = "Repository", Layer = "Infrastructure", TypeKind = CSharpTypeKind.Class, RequiresInterface = true, InterfaceRole = "RepositoryInterface", Accessibility = "internal" },
-                new ComponentRoleDefinition { Name = "RepositoryInterface", Layer = "Domain", TypeKind = CSharpTypeKind.Interface },
+                new ComponentRoleDefinition { Name = "RepositoryInterface", Layer = "Domain", TypeKind = CSharpTypeKind.Interface, AlternativeNames = ["Repository"] },
             ],
             NamingConventions = new NamingConventions
             {
@@ -218,5 +218,55 @@ public sealed class SourceValidatorTests : IDisposable
         var result = validator.Validate(CreateTestPackWithRoles(), _tempDir);
 
         result.Violations.Where(v => v.ViolationType == "AccessibilityMismatch").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Validate_RepositoryWithoutInterface_ShouldReturnMissingInterface()
+    {
+        // Repository exists but no matching RepositoryInterface
+        var infraDir = Path.Combine(_tempDir, "MyApp.Orders.Infrastructure");
+        Directory.CreateDirectory(infraDir);
+        File.WriteAllText(
+            Path.Combine(infraDir, "OrderRepository.cs"),
+            """
+            namespace MyApp.Orders.Infrastructure;
+
+            internal class OrderRepository { }
+            """);
+
+        var validator = new SourceValidator();
+        var result = validator.Validate(CreateTestPackWithRoles(), _tempDir);
+
+        result.Violations.Should().Contain(v => v.ViolationType == "MissingInterface");
+    }
+
+    [Fact]
+    public void Validate_RepositoryWithInterface_ShouldNotReportMissingInterface()
+    {
+        // Both Repository and RepositoryInterface exist
+        var infraDir = Path.Combine(_tempDir, "MyApp.Orders.Infrastructure");
+        Directory.CreateDirectory(infraDir);
+        File.WriteAllText(
+            Path.Combine(infraDir, "OrderRepository.cs"),
+            """
+            namespace MyApp.Orders.Infrastructure;
+
+            internal class OrderRepository { }
+            """);
+
+        var domainDir = Path.Combine(_tempDir, "MyApp.Orders.Domain");
+        Directory.CreateDirectory(domainDir);
+        File.WriteAllText(
+            Path.Combine(domainDir, "IOrderRepository.cs"),
+            """
+            namespace MyApp.Orders.Domain;
+
+            public interface IOrderRepository { }
+            """);
+
+        var validator = new SourceValidator();
+        var result = validator.Validate(CreateTestPackWithRoles(), _tempDir);
+
+        result.Violations.Where(v => v.ViolationType == "MissingInterface").Should().BeEmpty();
     }
 }

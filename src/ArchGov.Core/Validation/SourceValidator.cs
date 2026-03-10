@@ -20,10 +20,17 @@ public sealed class SourceValidator : ISourceValidator
 
         var allowedDependencies = BuildAllowedDependencies(resolvedPack);
 
+        // Collect matched roles across files (for interface requirement checks)
+        var matchedRoles = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var filePath in csFiles)
         {
-            ValidateFile(filePath, knownLayers, allowedDependencies, resolvedPack.ComponentRoles, violations);
+            ValidateFile(filePath, knownLayers, allowedDependencies,
+                resolvedPack.ComponentRoles, violations, matchedRoles);
         }
+
+        // Second pass: check interface requirements
+        CheckInterfaceRequirements(resolvedPack.ComponentRoles, matchedRoles, violations);
 
         return new SourceValidationResult
         {
@@ -49,7 +56,8 @@ public sealed class SourceValidator : ISourceValidator
         HashSet<string> knownLayers,
         Dictionary<string, HashSet<string>> allowedDependencies,
         IList<ComponentRoleDefinition> roles,
-        List<SourceViolation> violations)
+        List<SourceViolation> violations,
+        Dictionary<string, List<string>> matchedRoles)
     {
         var sourceText = File.ReadAllText(filePath);
         var tree = CSharpSyntaxTree.ParseText(sourceText);
@@ -92,7 +100,7 @@ public sealed class SourceValidator : ISourceValidator
             }
         }
 
-        ValidateTypeDeclarations(root, sourceLayer, roles, filePath, violations);
+        ValidateTypeDeclarations(root, sourceLayer, roles, filePath, violations, matchedRoles);
     }
 
     private static void ValidateTypeDeclarations(
@@ -100,7 +108,8 @@ public sealed class SourceValidator : ISourceValidator
         string sourceLayer,
         IList<ComponentRoleDefinition> roles,
         string filePath,
-        List<SourceViolation> violations)
+        List<SourceViolation> violations,
+        Dictionary<string, List<string>> matchedRoles)
     {
         var typeDeclarations = root.DescendantNodes()
             .OfType<TypeDeclarationSyntax>();
@@ -113,6 +122,14 @@ public sealed class SourceValidator : ISourceValidator
             {
                 continue;
             }
+
+            if (!matchedRoles.TryGetValue(matchedRole.Name, out var typeNames))
+            {
+                typeNames = [];
+                matchedRoles[matchedRole.Name] = typeNames;
+            }
+
+            typeNames.Add(typeName);
 
             CheckTypeKind(typeDecl, matchedRole, filePath, violations);
             CheckAccessibility(typeDecl, matchedRole, filePath, violations);
@@ -202,6 +219,43 @@ public sealed class SourceValidator : ISourceValidator
                 ViolationType = "TypeKindMismatch",
                 Message = $"Type '{typeDecl.Identifier.Text}' matches role '{role.Name}' and should be a '{role.TypeKind}' but is declared as a '{actual}'",
             });
+        }
+    }
+
+    private static void CheckInterfaceRequirements(
+        IList<ComponentRoleDefinition> roles,
+        Dictionary<string, List<string>> matchedRoles,
+        List<SourceViolation> violations)
+    {
+        foreach (var role in roles)
+        {
+            if (!role.RequiresInterface || string.IsNullOrEmpty(role.InterfaceRole))
+            {
+                continue;
+            }
+
+            // Check if any types were matched to the implementation role
+            if (!matchedRoles.TryGetValue(role.Name, out var implTypes) || implTypes.Count == 0)
+            {
+                continue;
+            }
+
+            // Check if any types were matched to the interface role
+            var hasInterfaceTypes = matchedRoles.TryGetValue(role.InterfaceRole, out var ifaceTypes)
+                && ifaceTypes.Count > 0;
+
+            if (!hasInterfaceTypes)
+            {
+                foreach (var implType in implTypes)
+                {
+                    violations.Add(new SourceViolation
+                    {
+                        FilePath = "",
+                        ViolationType = "MissingInterface",
+                        Message = $"Type '{implType}' matches role '{role.Name}' which requires interface role '{role.InterfaceRole}', but no matching interface was found",
+                    });
+                }
+            }
         }
     }
 

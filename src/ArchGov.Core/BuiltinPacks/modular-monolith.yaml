@@ -61,6 +61,7 @@ componentRoles:
     layer: Module.Core
     typeKind: Interface
     requiresInterface: false
+    alternativeNames: [ModuleRepository, Repository]
     description: "Repository contract"
   - name: ModuleRegistration
     layer: Host

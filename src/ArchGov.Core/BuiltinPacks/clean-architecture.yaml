@@ -95,6 +95,7 @@ componentRoles:
     layer: Domain
     typeKind: Interface
     requiresInterface: false
+    alternativeNames: [Repository]
     description: "Repository contract (defined in Domain)"
   - name: Repository
     layer: Infrastructure
@@ -107,6 +108,7 @@ componentRoles:
     layer: Application
     typeKind: Interface
     requiresInterface: false
+    alternativeNames: [ExternalService]
     description: "External service contract"
   - name: ExternalService
     layer: Infrastructure
