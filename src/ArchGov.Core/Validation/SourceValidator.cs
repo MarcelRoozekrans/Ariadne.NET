@@ -17,60 +17,11 @@ public sealed class SourceValidator : ISourceValidator
             resolvedPack.Layers.Select(l => l.Name),
             StringComparer.OrdinalIgnoreCase);
 
-        var allowedDependencies = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var layer in resolvedPack.Layers)
-        {
-            allowedDependencies[layer.Name] = new HashSet<string>(layer.AllowedDependencies, StringComparer.OrdinalIgnoreCase);
-        }
+        var allowedDependencies = BuildAllowedDependencies(resolvedPack);
 
         foreach (var filePath in csFiles)
         {
-            var sourceText = File.ReadAllText(filePath);
-            var tree = CSharpSyntaxTree.ParseText(sourceText);
-            var root = tree.GetCompilationUnitRoot();
-
-            var namespaceName = ExtractNamespace(root);
-            if (namespaceName is null)
-            {
-                continue;
-            }
-
-            var sourceLayer = DetectLayer(namespaceName, knownLayers);
-            if (sourceLayer is null)
-            {
-                continue;
-            }
-
-            var usings = root.Usings;
-            foreach (var usingDirective in usings)
-            {
-                var usingName = usingDirective.Name?.ToString();
-                if (usingName is null)
-                {
-                    continue;
-                }
-
-                var targetLayer = DetectLayer(usingName, knownLayers);
-                if (targetLayer is null)
-                {
-                    continue;
-                }
-
-                if (string.Equals(targetLayer, sourceLayer, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                if (!allowedDependencies.TryGetValue(sourceLayer, out var allowed) || !allowed.Contains(targetLayer))
-                {
-                    violations.Add(new SourceViolation
-                    {
-                        FilePath = filePath,
-                        ViolationType = "DependencyViolation",
-                        Message = $"Layer '{sourceLayer}' is not allowed to depend on '{targetLayer}' (via using '{usingName}')",
-                    });
-                }
-            }
+            ValidateFile(filePath, knownLayers, allowedDependencies, violations);
         }
 
         return new SourceValidationResult
@@ -79,6 +30,65 @@ public sealed class SourceValidator : ISourceValidator
             Violations = violations,
             FilesScanned = csFiles.Length,
         };
+    }
+
+    private static Dictionary<string, HashSet<string>> BuildAllowedDependencies(RulePack resolvedPack)
+    {
+        var result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var layer in resolvedPack.Layers)
+        {
+            result[layer.Name] = new HashSet<string>(layer.AllowedDependencies, StringComparer.OrdinalIgnoreCase);
+        }
+
+        return result;
+    }
+
+    private static void ValidateFile(
+        string filePath,
+        HashSet<string> knownLayers,
+        Dictionary<string, HashSet<string>> allowedDependencies,
+        List<SourceViolation> violations)
+    {
+        var sourceText = File.ReadAllText(filePath);
+        var tree = CSharpSyntaxTree.ParseText(sourceText);
+        var root = tree.GetCompilationUnitRoot();
+
+        var namespaceName = ExtractNamespace(root);
+        if (namespaceName is null)
+        {
+            return;
+        }
+
+        var sourceLayer = DetectLayer(namespaceName, knownLayers);
+        if (sourceLayer is null)
+        {
+            return;
+        }
+
+        foreach (var usingDirective in root.Usings)
+        {
+            var usingName = usingDirective.Name?.ToString();
+            if (usingName is null)
+            {
+                continue;
+            }
+
+            var targetLayer = DetectLayer(usingName, knownLayers);
+            if (targetLayer is null || string.Equals(targetLayer, sourceLayer, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (!allowedDependencies.TryGetValue(sourceLayer, out var allowed) || !allowed.Contains(targetLayer))
+            {
+                violations.Add(new SourceViolation
+                {
+                    FilePath = filePath,
+                    ViolationType = "DependencyViolation",
+                    Message = $"Layer '{sourceLayer}' is not allowed to depend on '{targetLayer}' (via using '{usingName}')",
+                });
+            }
+        }
     }
 
     private static string? ExtractNamespace(CompilationUnitSyntax root)
