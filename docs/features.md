@@ -118,10 +118,6 @@ Detected violations:
 ```bash
 # CLI
 arch validate ./src
-
-# API
-POST /v1.0/architecture/validate
-{ "sourceDirectory": "./src", "template": "clean-architecture" }
 ```
 
 ## Linting
@@ -133,21 +129,11 @@ Flags files where the namespace implies one layer but the directory structure im
 ```bash
 # CLI
 arch lint ./src
-
-# API
-POST /v1.0/architecture/lint
-{ "sourceDirectory": "./src", "template": "clean-architecture" }
 ```
 
 ## Workspace Scaffolding
 
-Generates the full project directory and `.csproj` path structure for a solution based on rule pack layers and naming conventions.
-
-```bash
-# API
-POST /v1.0/architecture/generate-workspace
-{ "solutionName": "MyApp", "features": ["Orders", "Customers"] }
-```
+Generates the full project directory and `.csproj` path structure for a solution based on rule pack layers and naming conventions. Available via the `generate_workspace` MCP tool or programmatically via `IWorkspaceOrchestrator`.
 
 Produces paths like:
 - `src/MyApp.Orders.Domain/MyApp.Orders.Domain.csproj`
