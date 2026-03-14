@@ -2,8 +2,11 @@ using ArchGov.Core.RuleSchema;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
+using ZInject;
+
 namespace ArchGov.Core.Validation;
 
+[Singleton]
 public sealed class Linter : ILinter
 {
     public LintResult Lint(RulePack resolvedPack, string sourceDirectory)

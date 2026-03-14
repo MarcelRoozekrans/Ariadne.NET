@@ -1,5 +1,8 @@
+using ZInject;
+
 namespace ArchGov.Core.Sync;
 
+[Singleton]
 public sealed class SyncOrchestrator(IGitSyncProvider gitProvider) : ISyncOrchestrator
 {
     public async Task<IReadOnlyList<SyncResult>> SyncAllAsync(ImportsManifest manifest, string cacheDir, bool noCache, CancellationToken ct = default)

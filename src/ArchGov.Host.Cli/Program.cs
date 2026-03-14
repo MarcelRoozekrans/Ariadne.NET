@@ -1,11 +1,10 @@
 using System.CommandLine;
 using System.CommandLine.Parsing;
-using ArchGov.Core;
 using ArchGov.Host.Cli.Commands;
 using Microsoft.Extensions.DependencyInjection;
 
 var services = new ServiceCollection();
-services.AddArchGovCore();
+services.AddArchGovCoreServices();
 using var provider = services.BuildServiceProvider();
 
 var rootCommand = new RootCommand("Architecture Governance Engine CLI");

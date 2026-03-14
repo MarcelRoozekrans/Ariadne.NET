@@ -1,7 +1,10 @@
 using ArchGov.Core.RuleSchema;
 
+using ZInject;
+
 namespace ArchGov.Core.RuleEngine;
 
+[Singleton]
 public sealed class RulePackMerger : IRulePackMerger
 {
     public RulePack Merge(IReadOnlyList<RulePack> packs)

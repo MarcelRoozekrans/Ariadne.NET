@@ -2,8 +2,11 @@ using ArchGov.Core.CodeGeneration;
 using ArchGov.Core.RuleEngine;
 using ArchGov.Core.RuleSchema;
 
+using ZInject;
+
 namespace ArchGov.Core.Orchestration;
 
+[Singleton]
 public sealed class GenerateOrchestrator : IGenerateOrchestrator
 {
     private readonly ILayerInferenceEngine _inferenceEngine;

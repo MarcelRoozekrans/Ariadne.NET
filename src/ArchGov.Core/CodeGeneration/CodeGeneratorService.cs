@@ -4,8 +4,11 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Formatting;
 
+using ZInject;
+
 namespace ArchGov.Core.CodeGeneration;
 
+[Singleton]
 public sealed class CodeGeneratorService : ICodeGeneratorService
 {
     public CodeGenerationResult Generate(RulePack resolvedPack, CodeGenerationRequest request)

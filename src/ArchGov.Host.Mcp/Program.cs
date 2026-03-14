@@ -1,4 +1,3 @@
-using ArchGov.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -10,8 +9,8 @@ builder.Logging.AddConsole(options =>
     options.LogToStandardErrorThreshold = LogLevel.Trace;
 });
 
-builder.Services.AddArchGovCore();
-builder.Services.AddSingleton<ArchGov.Host.Mcp.RuleResolutionHelper>();
+builder.Services.AddArchGovCoreServices();
+builder.Services.AddArchGovHostMcpServices();
 builder.Services
     .AddMcpServer()
     .WithStdioServerTransport()

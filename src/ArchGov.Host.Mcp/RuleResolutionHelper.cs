@@ -1,8 +1,11 @@
 using ArchGov.Core.RuleLoader;
 using ArchGov.Core.RuleSchema;
 
+using ZInject;
+
 namespace ArchGov.Host.Mcp;
 
+[Singleton]
 public sealed class RuleResolutionHelper
 {
     private readonly IBuiltinPackRegistry _registry;

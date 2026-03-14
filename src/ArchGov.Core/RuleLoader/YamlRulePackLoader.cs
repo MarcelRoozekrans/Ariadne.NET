@@ -2,8 +2,11 @@ using ArchGov.Core.RuleSchema;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
+using ZInject;
+
 namespace ArchGov.Core.RuleLoader;
 
+[Singleton]
 public sealed class YamlRulePackLoader : IRulePackLoader
 {
     private readonly IDeserializer _deserializer = new DeserializerBuilder()

@@ -1,8 +1,11 @@
 using System.Reflection;
 using ArchGov.Core.RuleSchema;
 
+using ZInject;
+
 namespace ArchGov.Core.RuleLoader;
 
+[Singleton]
 public sealed class BuiltinPackRegistry : IBuiltinPackRegistry
 {
     private readonly IRulePackLoader _loader;

@@ -1,7 +1,10 @@
 using ArchGov.Core.RuleSchema;
 
+using ZInject;
+
 namespace ArchGov.Core.RuleEngine;
 
+[Singleton]
 public sealed class DependencyValidator : IDependencyValidator
 {
     public IReadOnlyList<DependencyViolation> Validate(RulePack resolvedPack, string sourceLayer, IReadOnlyList<string> dependsOnLayers)

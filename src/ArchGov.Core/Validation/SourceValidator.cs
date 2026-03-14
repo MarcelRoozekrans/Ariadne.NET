@@ -3,8 +3,11 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
+using ZInject;
+
 namespace ArchGov.Core.Validation;
 
+[Singleton]
 public sealed class SourceValidator : ISourceValidator
 {
     public SourceValidationResult Validate(RulePack resolvedPack, string sourceDirectory)

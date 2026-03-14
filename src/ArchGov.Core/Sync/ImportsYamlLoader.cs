@@ -1,8 +1,11 @@
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
+using ZInject;
+
 namespace ArchGov.Core.Sync;
 
+[Singleton]
 public sealed class ImportsYamlLoader : IImportsLoader
 {
     private readonly IDeserializer _deserializer = new DeserializerBuilder()

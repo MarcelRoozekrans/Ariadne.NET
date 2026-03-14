@@ -1,10 +1,9 @@
-using ArchGov.Core;
 using ModelContextProtocol.Server;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddArchGovCore();
-builder.Services.AddSingleton<ArchGov.Host.Mcp.RuleResolutionHelper>();
+builder.Services.AddArchGovCoreServices();
+builder.Services.AddArchGovHostMcpServices();
 builder.Services
     .AddMcpServer()
     .WithHttpTransport()

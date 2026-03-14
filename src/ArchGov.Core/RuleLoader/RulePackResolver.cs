@@ -1,8 +1,11 @@
 using ArchGov.Core.RuleEngine;
 using ArchGov.Core.RuleSchema;
 
+using ZInject;
+
 namespace ArchGov.Core.RuleLoader;
 
+[Singleton]
 public sealed class RulePackResolver : IRulePackResolver
 {
     private const string BuiltinPrefix = "builtin://";

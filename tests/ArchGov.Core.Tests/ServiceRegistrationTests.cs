@@ -11,10 +11,10 @@ namespace ArchGov.Core.Tests;
 public class ServiceRegistrationTests
 {
     [Fact]
-    public void AddArchGovCore_ShouldRegisterAllServices()
+    public void AddArchGovCoreServices_ShouldRegisterAllServices()
     {
         var services = new ServiceCollection();
-        services.AddArchGovCore();
+        services.AddArchGovCoreServices();
         using var provider = services.BuildServiceProvider();
 
         provider.GetService<IRulePackLoader>().Should().NotBeNull();

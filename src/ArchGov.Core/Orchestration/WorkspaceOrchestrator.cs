@@ -1,7 +1,10 @@
 using ArchGov.Core.RuleSchema;
 
+using ZInject;
+
 namespace ArchGov.Core.Orchestration;
 
+[Singleton]
 public sealed class WorkspaceOrchestrator : IWorkspaceOrchestrator
 {
     public WorkspaceGenerateResult GenerateWorkspace(RulePack resolvedPack, WorkspaceGenerateRequest request)

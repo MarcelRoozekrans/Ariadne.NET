@@ -2,8 +2,11 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 
+using ZInject;
+
 namespace ArchGov.Core.Sync;
 
+[Singleton]
 public sealed class GitCliSyncProvider : IGitSyncProvider
 {
     public async Task<SyncResult> SyncAsync(

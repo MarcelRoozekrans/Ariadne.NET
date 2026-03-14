@@ -1,7 +1,10 @@
 using ArchGov.Core.RuleSchema;
 
+using ZInject;
+
 namespace ArchGov.Core.RuleEngine;
 
+[Singleton]
 public sealed class LayerInferenceEngine : ILayerInferenceEngine
 {
     public LayerInferenceResult Infer(RulePack resolvedPack, string roleName)
