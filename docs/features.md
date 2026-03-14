@@ -219,6 +219,7 @@ The engine exposes its full capability set as MCP tools and resources for AI age
 | `get_component_roles` | `template?` | Get available component roles |
 | `get_rules` | `template?` | Get code feature rules |
 | `generate_component` | `role`, `name`, `solution`, `feature`, `template?` | Generate a C# component file |
+| `generate_workspace` | `solution`, `features`, `template?` | Scaffold project structure |
 | `validate_source` | `sourceDirectory`, `template?` | Validate source against architecture rules |
 | `lint_source` | `sourceDirectory`, `template?` | Lint for namespace-layer mismatches |
 
@@ -240,10 +241,10 @@ All tools auto-detect `.architecture/rules.yaml` in the working directory. Pass 
 | Host | Use Case | Protocol |
 |------|----------|----------|
 | **CLI** (`ArchGov.Host.Cli`) | Developer workflow, CI/CD pipelines | Terminal |
-| **API** (`ArchGov.Host.Api`) | Team tooling, dashboards, remote access | REST (versioned v1.0) + MCP HTTP |
-| **MCP** (`ArchGov.Host.Mcp`) | AI agent integration (Claude Code, Cursor) | MCP stdio |
+| **MCP stdio** (`ArchGov.Host.Mcp`) | Local AI agent integration (Claude Code, Cursor) | MCP stdio |
+| **MCP HTTP** (`ArchGov.Host.Api`) | Remote/team AI agent access | MCP over HTTP |
 
-All three hosts share the same core engine via `services.AddArchGovCore()`.
+All three hosts share the same core engine via `services.AddArchGovCore()`. The two MCP hosts expose identical tools and resources — stdio for local use, HTTP for remote.
 
 ## Extensibility
 

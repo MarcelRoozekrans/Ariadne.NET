@@ -11,6 +11,7 @@ public class GenerateToolsTests
 {
     private readonly RuleResolutionHelper _helper;
     private readonly GenerateOrchestrator _orchestrator;
+    private readonly WorkspaceOrchestrator _workspaceOrchestrator;
 
     public GenerateToolsTests()
     {
@@ -23,6 +24,7 @@ public class GenerateToolsTests
         _orchestrator = new GenerateOrchestrator(
             new LayerInferenceEngine(),
             new CodeGeneratorService());
+        _workspaceOrchestrator = new WorkspaceOrchestrator();
     }
 
     [Fact]
@@ -139,5 +141,32 @@ public class GenerateToolsTests
         result.Success.Should().BeTrue($"role '{role}' on template '{template}' should generate");
         result.GeneratedFiles.Should().HaveCount(1);
         result.GeneratedFiles[0].Code.Should().Contain(name);
+    }
+
+    [Fact]
+    public void GenerateWorkspace_ShouldReturnProjectPaths()
+    {
+        var result = GenerateTools.GenerateWorkspace(
+            _helper, _workspaceOrchestrator,
+            solution: "MyApp", features: "Orders",
+            template: "clean-architecture");
+
+        result.ProjectPaths.Should().NotBeEmpty();
+        result.Directories.Should().NotBeEmpty();
+        result.ProjectPaths.Should().Contain(p => p.Contains("MyApp.Orders.Domain"));
+    }
+
+    [Fact]
+    public void GenerateWorkspace_MultipleFeatures_ShouldReturnAllProjects()
+    {
+        var result = GenerateTools.GenerateWorkspace(
+            _helper, _workspaceOrchestrator,
+            solution: "MyApp", features: "Orders, Users",
+            template: "clean-architecture");
+
+        result.ProjectPaths.Should().Contain(p => p.Contains("MyApp.Orders.Domain"));
+        result.ProjectPaths.Should().Contain(p => p.Contains("MyApp.Users.Domain"));
+        result.ProjectPaths.Should().Contain(p => p.Contains("MyApp.Orders.Application"));
+        result.ProjectPaths.Should().Contain(p => p.Contains("MyApp.Users.Application"));
     }
 }

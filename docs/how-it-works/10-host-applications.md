@@ -102,56 +102,22 @@ All commands that need rules use `RulesCommand.ResolveRulesFromFile()`:
 4. Resolve with `IRulePackResolver`
 5. Return resolved `RulePack`
 
-## REST API (ArchGov.Host.Api)
+## MCP HTTP Host (ArchGov.Host.Api)
 
-Built with **ASP.NET Core** with API versioning (Asp.Versioning, default v1.0) and Swagger.
+A thin ASP.NET Core host that exposes the MCP server over HTTP for remote/team access. No REST controllers — all capabilities are served via the MCP protocol at `/mcp`.
 
-**Middleware stack (Program.cs):**
+```csharp
+builder.Services.AddArchGovCore();
+builder.Services.AddSingleton<RuleResolutionHelper>();
+builder.Services.AddMcpServer()
+    .WithHttpTransport()
+    .WithToolsFromAssembly(typeof(TemplateTools).Assembly)
+    .WithResourcesFromAssembly(typeof(PackResources).Assembly);
 
-```mermaid
-graph TD
-    WA["WebApplication"] --> A["AddArchGovCore()<br/><i>Core services</i>"]
-    WA --> B["AddApiVersioning()<br/><i>Default v1.0</i>"]
-    WA --> C["AddControllers()<br/><i>StringEnumConverter</i>"]
-    WA --> D["AddSwaggerGen()<br/><i>API documentation</i>"]
-    WA --> E["AddCors()<br/><i>Cross-origin support</i>"]
-    WA --> F["AddMcpServer()<br/><i>MCP HTTP transport</i>"]
-    WA --> G["MapMcp('/mcp')<br/><i>MCP endpoint</i>"]
+app.MapMcp();
 ```
 
-**Endpoints (ArchitectureController + TemplatesController):**
-
-| Method | Route | Query/Body | Returns |
-|--------|-------|-----------|---------|
-| GET | `/v1.0/architecture/templates` | — | `IEnumerable<string>` |
-| GET | `/v1.0/architecture/layers` | `?template=clean-architecture` | `IList<LayerDefinition>` |
-| GET | `/v1.0/architecture/component-roles` | `?template=clean-architecture` | `IList<ComponentRoleDefinition>` |
-| GET | `/v1.0/architecture/rules` | `?template=clean-architecture` | `IList<CodeFeatureRuleDefinition>` |
-| POST | `/v1.0/architecture/generate` | `ApiGenerateRequest` body | `GenerateResult` |
-| POST | `/v1.0/architecture/validate` | `ApiValidateRequest` body | `SourceValidationResult` |
-| POST | `/v1.0/architecture/lint` | `ApiValidateRequest` body | `LintResult` |
-| POST | `/v1.0/architecture/generate-workspace` | `ApiWorkspaceRequest` body | `WorkspaceGenerateResult` |
-
-**API request models:**
-
-```
-ApiGenerateRequest
-  ├── SolutionName: string          (required)
-  ├── Template: string?             (optional — defaults to clean-architecture)
-  ├── Features: IList<string>?      (optional)
-  └── Components: IList<ApiComponentRequest>  (required)
-        ├── ComponentRole: string   (required)
-        └── Name: string           (required)
-
-ApiValidateRequest
-  ├── SourceDirectory: string       (required)
-  └── Template: string?             (optional)
-
-ApiWorkspaceRequest
-  ├── SolutionName: string          (required)
-  ├── Template: string?             (optional)
-  └── Features: IReadOnlyList<string>  (required)
-```
+The same MCP tools and resources available via stdio are available over HTTP — zero duplication between hosts.
 
 ## MCP Server (ArchGov.Host.Mcp)
 
@@ -181,6 +147,7 @@ flowchart TD
 | `get_component_roles` | `template?` | `IList<ComponentRoleDefinition>` | Available roles for code generation |
 | `get_rules` | `template?` | `IList<CodeFeatureRuleDefinition>` | Structural enforcement rules |
 | `generate_component` | `role`, `name`, `solution`, `feature`, `template?` | `GenerateResult` | Generate a C# component |
+| `generate_workspace` | `solution`, `features`, `template?` | `WorkspaceGenerateResult` | Scaffold project structure |
 | `validate_source` | `sourceDirectory`, `template?` | `SourceValidationResult` | Validate against rules |
 | `lint_source` | `sourceDirectory`, `template?` | `LintResult` | Lint for mismatches |
 
