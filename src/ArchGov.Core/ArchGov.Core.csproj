@@ -11,8 +11,8 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.3" />
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
-    <PackageReference Include="ZInject" Version="0.10.3" />
-    <PackageReference Include="ZInject.Generator" Version="0.10.3" />
+    <PackageReference Include="ZInject" Version="0.10.5" />
+    <PackageReference Include="ZInject.Generator" Version="0.10.5" />
   </ItemGroup>
 
   <ItemGroup>
