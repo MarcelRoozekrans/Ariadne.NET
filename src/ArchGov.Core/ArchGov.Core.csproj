@@ -4,6 +4,12 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageId>ArchGov.Core</PackageId>
+    <Description>Pluggable, pattern-agnostic architecture governance engine. Enforces structural rules for AI code generation via declarative YAML rule packs.</Description>
+    <Authors>Marcel Roozekrans</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/MarcelRoozekrans/architecture-governance-engine</RepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,6 +23,10 @@
 
   <ItemGroup>
     <EmbeddedResource Include="BuiltinPacks\*.yaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>
