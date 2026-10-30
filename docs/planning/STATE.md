@@ -30,4 +30,4 @@ None for Phase 1.1. **GitHub Actions are disabled on the repo** on purpose: `pub
 
 ## Recommended Next Step
 
-Run `start-next-phase`: Phase 1.1 is `pending` with no design spec, so it routes to brainstorming at phase scope, then — because `Surface: Refactor` — to `refactor-analysis` before `writing-plans`. Key inputs for the rename: product name `Ariadne.NET`, CLI/tool command `ariadne`, nothing published under the old names (no NuGet package, no GitHub repo), historical `docs/plans/*` keep the old name.
+Run `start-next-phase`: Phase 1.1 is `pending` with no design spec, so it routes to brainstorming at phase scope, then — because `Surface: Refactor` — to `refactor-analysis` before `writing-plans`. Key inputs for the rename: product name `Ariadne.NET`, CLI/tool command `ariadne`, nothing published under the old names (no NuGet package; the GitHub repo is private and gets renamed in Phase 1.4), historical `docs/plans/*` keep the old name.
