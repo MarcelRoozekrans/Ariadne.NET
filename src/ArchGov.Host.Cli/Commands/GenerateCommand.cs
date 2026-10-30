@@ -49,6 +49,7 @@ public static class GenerateCommand
 
             var result = ExecuteGeneration(provider, role, name, solution, feature);
             PrintResult(result);
+            return result.Success ? ExitCodes.Success : ExitCodes.Error;
         });
 
         return command;

@@ -28,8 +28,8 @@ public static class ValidateCommand
             var fullPath = Path.GetFullPath(path);
             if (!Directory.Exists(fullPath))
             {
-                Console.WriteLine($"Error: Directory '{fullPath}' does not exist.");
-                return;
+                Console.Error.WriteLine($"Error: Directory '{fullPath}' does not exist.");
+                return ExitCodes.Error;
             }
 
             Console.WriteLine($"Validating source files in: {fullPath}");
@@ -42,6 +42,7 @@ public static class ValidateCommand
             if (result.IsValid)
             {
                 Console.WriteLine("Result: PASS - No violations found.");
+                return ExitCodes.Success;
             }
             else
             {
@@ -53,6 +54,8 @@ public static class ValidateCommand
                     Console.WriteLine($"  [{violation.ViolationType}] {violation.FilePath}");
                     Console.WriteLine($"    {violation.Message}");
                 }
+
+                return ExitCodes.Violations;
             }
         });
 

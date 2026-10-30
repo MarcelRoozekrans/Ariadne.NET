@@ -321,6 +321,8 @@ This registers:
 | `arch lint <path>` | Lint source files for namespace-layer mismatches |
 | `arch sync` | Sync rule packs from git repositories defined in imports.yaml |
 
+Exit codes: `0` success, `1` violations or lint issues found, `2` error (missing files or directories, failed generation or sync). CI pipelines can fail on any non-zero code, or treat `1` and `2` differently.
+
 ## Building
 
 ```bash

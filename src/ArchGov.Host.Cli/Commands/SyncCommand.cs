@@ -31,13 +31,13 @@ internal static class SyncCommand
         {
             var noCache = parseResult.GetValue(noCacheOption);
             var name = parseResult.GetValue(nameOption);
-            await ExecuteAsync(provider, name, noCache, ct).ConfigureAwait(false);
+            return await ExecuteAsync(provider, name, noCache, ct).ConfigureAwait(false);
         });
 
         return command;
     }
 
-    private static async Task ExecuteAsync(
+    private static async Task<int> ExecuteAsync(
         IServiceProvider provider, string? name, bool noCache, CancellationToken ct)
     {
         var workingDir = Directory.GetCurrentDirectory();
@@ -47,7 +47,7 @@ internal static class SyncCommand
         {
             Console.Error.WriteLine($"No imports file found at {importsPath}");
             Console.Error.WriteLine("Create .architecture/imports.yaml to define external rule packs.");
-            return;
+            return ExitCodes.Error;
         }
 
         var loader = provider.GetRequiredService<IImportsLoader>();
@@ -58,7 +58,7 @@ internal static class SyncCommand
         if (manifest.Imports.Count == 0)
         {
             Console.WriteLine("No imports defined in imports.yaml.");
-            return;
+            return ExitCodes.Success;
         }
 
         var cacheDir = Path.Combine(workingDir, DefaultCacheDir);
@@ -80,6 +80,7 @@ internal static class SyncCommand
         }
 
         PrintResults(results);
+        return results.All(r => r.Success) ? ExitCodes.Success : ExitCodes.Error;
     }
 
     private static void PrintResults(IReadOnlyList<SyncResult> results)

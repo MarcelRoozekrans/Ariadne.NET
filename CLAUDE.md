@@ -35,7 +35,7 @@ CI (`.github/workflows/ci.yml`) runs restore → build → test → pack in Rele
 ### Projects
 
 - `ArchGov.Core` — the whole engine; the only packable project (published to NuGet). Must have no host dependencies.
-- `ArchGov.Host.Cli` — System.CommandLine 3.0 (preview) CLI; one static `XxxCommand.Create(IServiceProvider)` per command in `Commands/`.
+- `ArchGov.Host.Cli` — System.CommandLine 3.0 (preview) CLI; one static `XxxCommand.Create(IServiceProvider)` per command in `Commands/`, wired in `CliRootCommand`. Commands return `ExitCodes` (0 success, 1 violations, 2 error); `CliRootCommand.Invoke` turns uncaught exceptions into 2. `tests/ArchGov.Host.Cli.Tests` changes the process working directory, so it runs without test parallelization.
 - `ArchGov.Host.Mcp` — MCP stdio server. Tools are static methods on `[McpServerToolType]` classes in `Tools/`; resources in `Resources/` (`archgov://packs/{name}`). Services are injected as method parameters.
 - `ArchGov.Host.Api` — **not a REST API anymore** (the REST controllers were removed). It is only the HTTP transport for the MCP tools, reusing the tool/resource assemblies from `ArchGov.Host.Mcp`.
 

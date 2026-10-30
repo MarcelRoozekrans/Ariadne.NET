@@ -28,8 +28,8 @@ public static class LintCommand
             var fullPath = Path.GetFullPath(path);
             if (!Directory.Exists(fullPath))
             {
-                Console.WriteLine($"Error: Directory '{fullPath}' does not exist.");
-                return;
+                Console.Error.WriteLine($"Error: Directory '{fullPath}' does not exist.");
+                return ExitCodes.Error;
             }
 
             Console.WriteLine($"Linting source files in: {fullPath}");
@@ -38,6 +38,7 @@ public static class LintCommand
             var result = linter.Lint(resolvedPack, fullPath);
 
             PrintResult(result);
+            return result.IsClean ? ExitCodes.Success : ExitCodes.Violations;
         });
 
         return command;
