@@ -29,7 +29,7 @@ public sealed class RuleResolutionHelper
             var userPack = new RulePack
             {
                 Name = template,
-                Extends = [$"builtin://{template}"],
+                Extends = TemplateReference.ToExtends(template),
             };
             return _resolver.Resolve(userPack);
         }

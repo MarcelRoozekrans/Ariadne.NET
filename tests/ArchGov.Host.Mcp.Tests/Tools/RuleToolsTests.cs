@@ -29,6 +29,15 @@ public class RuleToolsTests
     }
 
     [Fact]
+    public void GetComponentRoles_CompositeTemplate_ShouldMergeRolesFromEachPack()
+    {
+        var result = RuleTools.GetComponentRoles(_helper, "clean-architecture+cqrs");
+
+        result.Should().Contain(r => r.Name == "Entity");
+        result.Should().Contain(r => r.Name == "Command");
+    }
+
+    [Fact]
     public void GetRules_ShouldReturnCodeFeatureRules()
     {
         var result = RuleTools.GetRules(_helper, "clean-architecture");

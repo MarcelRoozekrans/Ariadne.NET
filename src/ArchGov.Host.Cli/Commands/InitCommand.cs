@@ -26,15 +26,13 @@ public static class InitCommand
             var template = parseResult.GetValue(templateOption)!;
             var registry = provider.GetRequiredService<IBuiltinPackRegistry>();
 
-            var templates = template.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
             // Validate all templates exist
-            foreach (var t in templates)
+            foreach (var name in TemplateReference.ParseNames(template))
             {
-                registry.GetPack(t); // throws if not found
+                registry.GetPack(name); // throws if not found
             }
 
-            var extendsList = templates.Select(t => $"builtin://{t}").ToArray();
+            var extendsList = TemplateReference.ToExtends(template);
 
             var rulesContent = new Dictionary<string, object>(StringComparer.Ordinal)
             {
