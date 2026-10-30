@@ -3,8 +3,10 @@
 All core services are registered with a single extension method call:
 
 ```csharp
-services.AddArchGovCore();
+services.AddArchGovCoreServices();
 ```
+
+The method is generated at compile time by [ZInject](https://www.nuget.org/packages/ZInject): every service class carries a `[Singleton]` attribute, and the source generator emits the registrations. The MCP host project gets its own `AddArchGovHostMcpServices()` the same way, which registers `RuleResolutionHelper`. Adding a service means adding the attribute; there is no registration list to maintain.
 
 ## Registration Table
 

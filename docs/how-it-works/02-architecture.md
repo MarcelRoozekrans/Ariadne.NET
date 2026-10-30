@@ -15,14 +15,13 @@ graph TD
             Sync["Sync<br/><i>Git sync, semver, caching</i>"]
             BuiltinPacks["BuiltinPacks<br/><i>10 embedded YAML templates</i>"]
         end
-        HostApi["ArchGov.Host.Api<br/><i>REST API + MCP HTTP</i>"]
+        HostApi["ArchGov.Host.Api<br/><i>MCP over HTTP</i>"]
         HostCli["ArchGov.Host.Cli<br/><i>CLI (System.CommandLine 3.0)</i>"]
         HostMcp["ArchGov.Host.Mcp<br/><i>MCP stdio server</i>"]
     end
 
     subgraph tests
         CoreTests["ArchGov.Core.Tests<br/><i>Unit + integration tests</i>"]
-        ApiTests["ArchGov.Host.Api.Tests<br/><i>API integration tests</i>"]
         McpTests["ArchGov.Host.Mcp.Tests<br/><i>MCP tool + resource tests</i>"]
     end
 ```
@@ -48,11 +47,12 @@ flowchart TD
 
 ## Dependency Flow
 
-All three host applications depend only on `ArchGov.Core`. They never depend on each other.
+All three host applications depend on `ArchGov.Core`. The only host-to-host dependency is `ArchGov.Host.Api` → `ArchGov.Host.Mcp`, so the HTTP transport serves the same MCP tools and resources as stdio.
 
 ```mermaid
 graph LR
     Api["ArchGov.Host.Api"] --> Core["ArchGov.Core"]
+    Api --> Mcp
     Cli["ArchGov.Host.Cli"] --> Core
     Mcp["ArchGov.Host.Mcp"] --> Core
 ```

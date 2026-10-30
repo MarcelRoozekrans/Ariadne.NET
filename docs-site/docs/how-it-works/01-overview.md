@@ -16,7 +16,7 @@ AI coding agents generate behavior effectively but are unreliable at structural 
 4. **Validates existing code** against architecture rules (dependency analysis, type checking, interface requirements)
 5. **Lints** for namespace-vs-directory mismatches
 6. **Syncs rule packs** from git repositories with semver-aware version resolution
-7. **Exposes all capabilities** via CLI, REST API, and MCP server for AI agent integration
+7. **Exposes all capabilities** via CLI and an MCP server (stdio and HTTP) for AI agent integration
 
 ## What the Engine Does Not Do
 

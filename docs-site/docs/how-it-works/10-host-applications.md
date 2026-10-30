@@ -4,7 +4,7 @@ sidebar_position: 10
 
 # Host Applications
 
-The engine ships with three host applications, each targeting a different use case. All share the same core engine via `services.AddArchGovCore()`.
+The engine ships with three host applications, each targeting a different use case. All share the same core engine via `services.AddArchGovCoreServices()`.
 
 ## CLI (ArchGov.Host.Cli)
 
@@ -111,8 +111,8 @@ All commands that need rules use `RulesCommand.ResolveRulesFromFile()`:
 A thin ASP.NET Core host that exposes the MCP server over HTTP for remote/team access. No REST controllers — all capabilities are served via the MCP protocol at `/mcp`.
 
 ```csharp
-builder.Services.AddArchGovCore();
-builder.Services.AddSingleton<RuleResolutionHelper>();
+builder.Services.AddArchGovCoreServices();
+builder.Services.AddArchGovHostMcpServices();   // registers RuleResolutionHelper
 builder.Services.AddMcpServer()
     .WithHttpTransport()
     .WithToolsFromAssembly(typeof(TemplateTools).Assembly)
@@ -136,7 +136,7 @@ Built with the **ModelContextProtocol SDK** for AI agent integration.
 ```mermaid
 flowchart TD
     A["Resolve(template?)"] --> B{"template<br/>provided?"}
-    B -->|Yes| C["Create pack extending<br/>builtin://template<br/>→ Resolve"]
+    B -->|Yes| C["Split template on '+'<br/>extend builtin:// per name<br/>→ Resolve"]
     B -->|No| D{".architecture/rules.yaml<br/>exists?"}
     D -->|Yes| E["Load and resolve<br/>rules.yaml"]
     D -->|No| F["Default to<br/>builtin://clean-architecture"]

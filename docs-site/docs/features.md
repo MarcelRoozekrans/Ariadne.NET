@@ -234,7 +234,7 @@ All tools auto-detect `.architecture/rules.yaml` in the working directory. Pass 
 | **MCP stdio** (`ArchGov.Host.Mcp`) | Local AI agent integration (Claude Code, Cursor) | MCP stdio |
 | **MCP HTTP** (`ArchGov.Host.Api`) | Remote/team AI agent access | MCP over HTTP |
 
-All three hosts share the same core engine via `services.AddArchGovCore()`. The two MCP hosts expose identical tools and resources — stdio for local use, HTTP for remote.
+All three hosts share the same core engine via `services.AddArchGovCoreServices()`, generated at compile time by ZInject. The two MCP hosts expose identical tools and resources — stdio for local use, HTTP for remote.
 
 ## Extensibility
 

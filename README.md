@@ -30,33 +30,6 @@ dotnet run --project src/ArchGov.Host.Cli -- generate \
   --role Entity --name Order --solution MyApp --feature Orders
 ```
 
-### API
-
-```bash
-# Start the API server
-dotnet run --project src/ArchGov.Host.Api
-
-# List available templates
-curl http://localhost:5000/v1.0/architecture/templates
-
-# Get layer definitions
-curl http://localhost:5000/v1.0/architecture/layers
-
-# Get component roles
-curl http://localhost:5000/v1.0/architecture/component-roles
-
-# Generate components
-curl -X POST http://localhost:5000/v1.0/architecture/generate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "solutionName": "MyApp",
-    "components": [
-      { "componentRole": "Entity", "name": "Order" },
-      { "componentRole": "Repository", "name": "OrderRepository" }
-    ]
-  }'
-```
-
 ### MCP Server
 
 The engine runs as an MCP server for AI agent integration (Claude Code, Cursor, etc.):
@@ -89,6 +62,7 @@ dotnet run --project src/ArchGov.Host.Api
 | `get_component_roles` | Get available component roles |
 | `get_rules` | Get code feature rules |
 | `generate_component` | Generate a C# component |
+| `generate_workspace` | Scaffold the project structure for a solution |
 | `validate_source` | Validate source files against rules |
 | `lint_source` | Lint for namespace-layer mismatches |
 
@@ -98,7 +72,7 @@ dotnet run --project src/ArchGov.Host.Api
 |----------|-------------|
 | `archgov://packs/{name}` | Full YAML content of a built-in rule pack |
 
-All tools auto-detect `.architecture/rules.yaml` in the working directory. Pass an explicit `template` parameter to override.
+All tools auto-detect `.architecture/rules.yaml` in the working directory. Pass an explicit `template` parameter to override; composite templates such as `clean-architecture+cqrs` work here as well.
 
 ## How It Works
 
@@ -201,7 +175,7 @@ extends:
 
 Private repos work out of the box — the engine uses your existing git credentials (SSH keys, credential managers). Versions are resolved against git tags using semver ranges (`^2.0`, `~1.3`, or exact `1.0.0`). Packs are cached locally in `.architecture/.cache/` so validation works offline.
 
-### 5. Composability & Merge Semantics
+### 4. Composability & Merge Semantics
 
 Multiple rule packs can be composed together:
 
@@ -226,7 +200,7 @@ Merge rules:
 
 Use `MergeWithDiagnostics` to get warnings when locked rules are skipped during merging.
 
-### 6. Code Generation
+### 5. Code Generation
 
 The engine uses Roslyn to generate correctly structured C# code based on rule pack definitions:
 
@@ -247,37 +221,31 @@ The generated code respects:
 - **Interface inheritance** when `requiresInterface` is set
 - **Namespace** and **file path** from naming conventions
 
-### 7. Source Validation
+### 6. Source Validation
 
 The engine validates existing source code against architecture rules using Roslyn parsing:
 
 ```bash
 # CLI
 dotnet run --project src/ArchGov.Host.Cli -- validate ./src
-
-# API
-curl -X POST http://localhost:5000/v1.0/architecture/validate \
-  -H "Content-Type: application/json" \
-  -d '{"sourceDirectory": "./src", "template": "clean-architecture"}'
 ```
+
+Over MCP, use the `validate_source` tool.
 
 Checks performed:
 - **Dependency validation**: verifies `using` directives comply with layer dependency rules (e.g. Domain cannot reference Infrastructure)
 - **Lint**: checks namespace segments match directory-based layer structure
 
-### 8. Lint
+### 7. Lint
 
 A lighter check that detects namespace-vs-directory layer mismatches:
 
 ```bash
 # CLI
 dotnet run --project src/ArchGov.Host.Cli -- lint ./src
-
-# API
-curl -X POST http://localhost:5000/v1.0/architecture/lint \
-  -H "Content-Type: application/json" \
-  -d '{"sourceDirectory": "./src", "template": "clean-architecture"}'
 ```
+
+Over MCP, use the `lint_source` tool.
 
 ## Architecture
 
@@ -293,14 +261,13 @@ src/
     Sync/                     # Git-based sync: imports, semver, caching
     BuiltinPacks/             # Embedded YAML templates
 
-  ArchGov.Host.Api/           # ASP.NET REST API + MCP HTTP transport
+  ArchGov.Host.Api/           # MCP HTTP transport (reuses the ArchGov.Host.Mcp tools)
   ArchGov.Host.Cli/           # CLI tool (System.CommandLine)
   ArchGov.Host.Mcp/           # MCP stdio server for AI agents
 
 tests/
-  ArchGov.Core.Tests/         # 218 unit + integration tests
-  ArchGov.Host.Mcp.Tests/     # 22 MCP tool + resource tests
-  ArchGov.Host.Api.Tests/     # 12 integration tests
+  ArchGov.Core.Tests/         # Unit + integration tests
+  ArchGov.Host.Mcp.Tests/     # MCP tool + resource tests
 ```
 
 ### Core Pipeline
@@ -319,8 +286,10 @@ User Request
 All core services are registered with a single call:
 
 ```csharp
-services.AddArchGovCore();
+services.AddArchGovCoreServices();
 ```
+
+The method is generated at compile time by ZInject from the `[Singleton]` attribute on each service class.
 
 This registers:
 | Interface | Implementation | Lifetime |
@@ -340,22 +309,7 @@ This registers:
 | `IGitSyncProvider` | `GitCliSyncProvider` | Singleton |
 | `ISyncOrchestrator` | `SyncOrchestrator` | Singleton |
 
-## API Reference
-
-### REST Endpoints
-
-| Route | Method | Description |
-|-------|--------|-------------|
-| `/v1.0/architecture/templates` | GET | List available built-in templates |
-| `/v1.0/architecture/layers` | GET | Get layer definitions (query: `?template=`) |
-| `/v1.0/architecture/component-roles` | GET | Get component roles (query: `?template=`) |
-| `/v1.0/architecture/rules` | GET | Get code feature rules (query: `?template=`) |
-| `/v1.0/architecture/generate` | POST | Generate component code |
-| `/v1.0/architecture/generate-workspace` | POST | Scaffold solution project structure |
-| `/v1.0/architecture/validate` | POST | Validate source files against rules |
-| `/v1.0/architecture/lint` | POST | Lint source files for layer mismatches |
-
-### CLI Commands
+## CLI Reference
 
 | Command | Description |
 |---------|-------------|
@@ -380,6 +334,7 @@ dotnet test src/ArchGov.slnx
 - **YamlDotNet** — YAML parsing
 - **Microsoft.CodeAnalysis.CSharp** (Roslyn) — Code generation
 - **System.CommandLine** — CLI framework
-- **ASP.NET Core** — API host with API versioning + Swagger
+- **ASP.NET Core** — HTTP host for the MCP server
+- **ZInject** — compile-time DI registration
 - **ModelContextProtocol** — MCP server SDK (stdio + HTTP)
 - **xUnit + FluentAssertions** — Testing
