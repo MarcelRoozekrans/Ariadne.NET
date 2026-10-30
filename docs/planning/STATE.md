@@ -1,7 +1,7 @@
 # Session State
 
 **Last session:** 2026-10-30
-**Branch:** `fix/mcp-composite-template` (local only — this clone has no git remote and no local `main`; Phase 1.4 creates the GitHub repo)
+**Branch:** `fix/mcp-composite-template`, pushed to the private repo `MarcelRoozekrans/architecture-governance-engine` (created 2026-10-30; `main` holds the pre-session state)
 
 ## Current Position
 
@@ -26,7 +26,7 @@ Recorded in the roadmap design's Open Questions — none block Phase 1.1:
 
 ## Blockers
 
-None for Phase 1.1. Phase 1.4 needs a GitHub repo to be created, which is outward-facing — confirm with the user first.
+None for Phase 1.1. **GitHub Actions are disabled on the repo** on purpose: `publish.yml` would otherwise publish `ArchGov.Core` to GitHub Packages under the old name on every push to `main`. Phase 1.4 re-enables them after the rename, and makes the repo public (confirm with the user first). No PR has been opened for the branch yet.
 
 ## Recommended Next Step
 
