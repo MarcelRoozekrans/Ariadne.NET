@@ -1,0 +1,38 @@
+# Project Conventions
+
+> Written by `init-conventions`. Do not hand-edit — re-run the sub-skill instead; the Commit & Release Protocol reads these fields.
+
+**Established:** 2026-10-30
+
+## Stack
+
+**Language / runtime:** C#, .NET 10
+**Package manager:** NuGet (dotnet CLI)
+**Framework:** ASP.NET Core, System.CommandLine, ModelContextProtocol SDK
+**Datastore:** n/a
+
+## Commits
+
+**Format:** conventional
+**Scopes:** free
+**Scope source:** n/a
+**Fallback when scope not allowed:** omit scope
+
+## Branching
+
+**Model:** feature-branch
+**PR required:** yes (confirmed by user; no remote to detect from)
+**Protected branches:** main
+
+## Versioning & Release
+
+**Scheme:** semver (no tags yet; release-please produces vX.Y.Z)
+**Released by:** release-please
+**Milestone completion tags a release:** no
+**Changelog:** auto
+
+## Deployment
+
+**Deploy target:** NuGet.org and GitHub Packages for ArchGov.Core, GitHub Pages for docs
+**Environments:** github-pages
+**Deployed by:** GitHub Actions
