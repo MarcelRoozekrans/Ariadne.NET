@@ -11,11 +11,12 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 - [ ] Public engine APIs return ZeroAlloc Results instead of throwing for expected failures
 - [ ] GitHub repo exists with CI, codecov and docs site, and a first version is released by release-please
 
-### Phase 1.1: Rename to Ariadne.NET [status: pending]
+### Phase 1.1: Rename to Ariadne.NET [status: active]
 **Goal:** Rename solution, namespaces, packages, CLI and docs from ArchGov to Ariadne.NET.
 **Surface:** Refactor
 **HelpWanted:** no
-**Plan:** _to be written_
+**Design:** `docs/superpowers/specs/2026-10-31-phase-1.1-rename-design.md`
+**Plan:** `docs/superpowers/plans/2026-10-31-phase-1.1-rename.md`
 
 ### Phase 1.2: Package split [status: pending]
 **Goal:** Split into `Ariadne.NET.Abstractions` (schema and loader), `Ariadne.NET` (engine) and the surfaces.
