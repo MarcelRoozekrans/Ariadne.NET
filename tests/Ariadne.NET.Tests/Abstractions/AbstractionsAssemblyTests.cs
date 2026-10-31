@@ -23,11 +23,17 @@ public class AbstractionsAssemblyTests
     }
 
     [Fact]
-    public void References_only_framework_assemblies()
+    public void References_only_framework_and_allow_listed_assemblies()
     {
-        var referenced = typeof(RulePack).Assembly.GetReferencedAssemblies().Select(a => a.Name!);
+        var allowedPackages = new HashSet<string>(StringComparer.Ordinal) { "ZeroAlloc.Results" };
+        var frameworkNames = new HashSet<string>(StringComparer.Ordinal) { "netstandard", "mscorlib", "System" };
 
-        referenced.Should().OnlyContain(n => n.StartsWith("System", StringComparison.Ordinal)
-            || n == "netstandard" || n == "mscorlib" || n == "ZeroAlloc.Results");
+        var unexpected = typeof(RulePack).Assembly.GetReferencedAssemblies()
+            .Select(a => a.Name!)
+            .Where(n => !n.StartsWith("System.", StringComparison.Ordinal)
+                && !frameworkNames.Contains(n) && !allowedPackages.Contains(n))
+            .ToList();
+
+        unexpected.Should().BeEmpty("Abstractions may only reference the framework and {0}", string.Join(", ", allowedPackages));
     }
 }

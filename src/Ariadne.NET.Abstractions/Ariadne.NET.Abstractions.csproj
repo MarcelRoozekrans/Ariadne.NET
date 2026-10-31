@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <IsAotCompatible>true</IsAotCompatible>
     <PackageId>Ariadne.NET.Abstractions</PackageId>
-    <Description>Rule-pack schema and contracts for Ariadne.NET architecture governance. Dependency-free and Native AOT compatible.</Description>
+    <Description>Rule-pack schema and contracts for Ariadne.NET architecture governance. Native AOT compatible; depends only on ZeroAlloc.Results.</Description>
     <Authors>Marcel Roozekrans</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/MarcelRoozekrans/architecture-governance-engine</RepositoryUrl>
