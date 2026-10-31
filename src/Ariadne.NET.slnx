@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="../tests/Ariadne.NET.AotSmoke/Ariadne.NET.AotSmoke.csproj" />
   <Project Path="../tests/Ariadne.NET.Tests/Ariadne.NET.Tests.csproj" />
   <Project Path="../tests/Ariadne.NET.Cli.Tests/Ariadne.NET.Cli.Tests.csproj" />
   <Project Path="../tests/Ariadne.NET.Mcp.Tests/Ariadne.NET.Mcp.Tests.csproj" />
