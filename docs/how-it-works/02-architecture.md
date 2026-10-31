@@ -5,9 +5,9 @@
 ```mermaid
 graph TD
     subgraph src
+        Abstractions["Ariadne.NET.Abstractions<br/><i>Rule-pack schema + contracts<br/>no dependencies, Native AOT</i>"]
         subgraph Ariadne.NET["Ariadne.NET (Rule engine library)"]
-            RuleSchema["RuleSchema<br/><i>Domain models</i>"]
-            RuleLoader["RuleLoader<br/><i>YAML parsing, registry, resolver</i>"]
+            RuleLoader["RuleLoader<br/><i>YAML loading, registry, extends resolution</i>"]
             RuleEngine["RuleEngine<br/><i>Merger, validator, inference</i>"]
             CodeGeneration["CodeGeneration<br/><i>Roslyn C# generator</i>"]
             Orchestration["Orchestration<br/><i>Generate + workspace</i>"]
@@ -24,6 +24,7 @@ graph TD
         CoreTests["Ariadne.NET.Tests<br/><i>Unit + integration tests</i>"]
         CliTests["Ariadne.NET.Cli.Tests<br/><i>CLI exit-code tests</i>"]
         McpTests["Ariadne.NET.Mcp.Tests<br/><i>MCP tool + resource tests</i>"]
+        AotSmoke["Ariadne.NET.AotSmoke<br/><i>Native AOT publish check</i>"]
     end
 ```
 
@@ -48,7 +49,7 @@ flowchart TD
 
 ## Dependency Flow
 
-All three host applications depend on `Ariadne.NET`. The only host-to-host dependency is `Ariadne.NET.Mcp.Http` → `Ariadne.NET.Mcp`, so the HTTP transport serves the same MCP tools and resources as stdio.
+All three host applications depend on `Ariadne.NET`, which depends on `Ariadne.NET.Abstractions`. Abstractions holds the rule-pack schema and the loader, resolver and registry contracts, and depends on nothing, so other tools can reference it without pulling in Roslyn or YamlDotNet. The only host-to-host dependency is `Ariadne.NET.Mcp.Http` → `Ariadne.NET.Mcp`, so the HTTP transport serves the same MCP tools and resources as stdio.
 
 ```mermaid
 graph LR
@@ -56,6 +57,7 @@ graph LR
     Api --> Mcp
     Cli["Ariadne.NET.Cli"] --> Core
     Mcp["Ariadne.NET.Mcp"] --> Core
+    Core --> Abs["Ariadne.NET.Abstractions"]
 ```
 
 Within `Ariadne.NET`, dependencies flow strictly top-down:
@@ -68,7 +70,7 @@ graph TD
     CodeGeneration --> RuleEngine
     Validation --> RuleEngine
     RuleEngine --> RuleLoader
-    RuleLoader --> RuleSchema["RuleSchema<br/><i>(leaf — no dependencies)</i>"]
+    RuleLoader --> Abstractions["Ariadne.NET.Abstractions<br/><i>(separate package — no dependencies)</i>"]
     Sync["Sync<br/><i>(independent module)</i>"]
 ```
 

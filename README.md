@@ -251,9 +251,9 @@ Over MCP, use the `lint_source` tool.
 
 ```
 src/
+  Ariadne.NET.Abstractions/   # Rule-pack schema and contracts (no dependencies, AOT)
   Ariadne.NET/                # Rule engine library (zero host dependencies)
-    RuleSchema/               # Models: RulePack, LayerDefinition, ComponentRoleDefinition
-    RuleLoader/               # YAML parsing, built-in pack registry, resolver
+    RuleLoader/               # YAML loading, built-in pack registry, extends resolution
     RuleEngine/               # Merger, dependency validator, layer inference
     CodeGeneration/           # Roslyn-based code generator
     Orchestration/            # Wires inference + validation + generation + workspace
@@ -269,6 +269,7 @@ tests/
   Ariadne.NET.Tests/          # Unit + integration tests
   Ariadne.NET.Cli.Tests/      # CLI exit-code tests
   Ariadne.NET.Mcp.Tests/      # MCP tool + resource tests
+  Ariadne.NET.AotSmoke/       # Native AOT publish check for Abstractions
 ```
 
 ### Core Pipeline

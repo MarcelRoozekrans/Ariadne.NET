@@ -24,6 +24,9 @@ dotnet run --project src/Ariadne.NET.Cli -- <init|rules|roles|generate|validate|
 dotnet run --project src/Ariadne.NET.Mcp        # MCP over stdio
 dotnet run --project src/Ariadne.NET.Mcp.Http   # MCP over HTTP at /mcp
 
+# Native AOT check for Ariadne.NET.Abstractions: fails on any trim or AOT warning
+dotnet publish tests/Ariadne.NET.AotSmoke -c Release -r linux-x64 -p:PublishAot=true -warnaserror
+
 # Docs site (Docusaurus, deployed to GitHub Pages)
 cd docs-site && npm ci && npm run start
 ```
@@ -34,7 +37,8 @@ CI (`.github/workflows/ci.yml`) runs restore → build → test → pack in Rele
 
 ### Projects
 
-- `Ariadne.NET` — the whole engine; the only packable project (published to NuGet). Must have no host dependencies.
+- `Ariadne.NET.Abstractions` — the rule-pack schema (`RulePack`, `LayerDefinition`, `ComponentRoleDefinition`, …) and the pack contracts `IRulePackLoader`, `IRulePackResolver`, `IBuiltinPackRegistry`, all in the one flat namespace `Ariadne.NET.Abstractions`. Packable. No package dependencies and `IsAotCompatible`; `tests/Ariadne.NET.AotSmoke` proves it publishes with Native AOT. Keep it that way: no ZInject, no YamlDotNet, no loading logic. The validation contracts stay in the engine until M2 settles their shape.
+- `Ariadne.NET` — the engine: YAML loading, `extends` resolution, merging, built-in packs, validation, sync and code generation. Packable; depends on Abstractions. Must have no host dependencies.
 - `Ariadne.NET.Cli` — System.CommandLine 3.0 (preview) CLI; one static `XxxCommand.Create(IServiceProvider)` per command in `Commands/`, wired in `CliRootCommand`. Commands return `ExitCodes` (0 success, 1 violations, 2 error); `CliRootCommand.Invoke` turns uncaught exceptions into 2. `tests/Ariadne.NET.Cli.Tests` changes the process working directory, so it runs without test parallelization.
 - `Ariadne.NET.Mcp` — MCP stdio server. Tools are static methods on `[McpServerToolType]` classes in `Tools/`; resources in `Resources/` (`ariadne://packs/{name}`). Services are injected as method parameters.
 - `Ariadne.NET.Mcp.Http` — **not a REST API anymore** (the REST controllers were removed). It is only the HTTP transport for the MCP tools, reusing the tool/resource assemblies from `Ariadne.NET.Mcp`.
@@ -61,7 +65,7 @@ Registration is compile-time via **ZInject**: classes are annotated `[Singleton]
 - String-keyed dictionaries and string comparisons need an explicit `StringComparer`/`StringComparison` (MA0002 etc.); the engine uses `OrdinalIgnoreCase` for names.
 - One type per file (MA0048) — this is why records/enums each have their own file.
 - `ConfigureAwait(false)` on awaits.
-- Tests: xUnit + FluentAssertions (+ NSubstitute in `Ariadne.NET.Tests`). Test folders mirror the `src/Ariadne.NET` namespaces; MCP tool tests construct the real services directly rather than via DI.
+- Tests: xUnit + FluentAssertions (+ NSubstitute in `Ariadne.NET.Tests`). Test folders mirror the source namespaces (Abstractions types are tested under `tests/Ariadne.NET.Tests/Abstractions/`); MCP tool tests construct the real services directly rather than via DI.
 
 ## Docs
 
