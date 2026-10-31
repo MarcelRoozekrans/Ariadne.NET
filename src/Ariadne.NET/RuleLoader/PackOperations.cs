@@ -1,6 +1,5 @@
 using Ariadne.NET.Abstractions;
 using Ariadne.NET.RuleEngine;
-using Ariadne.NET.Sync;
 using Ariadne.NET.Telemetry;
 
 using ZeroAlloc.Results;
@@ -130,11 +129,11 @@ internal sealed class PackOperations : IPackOperations
 
         // Sync refuses the same names, so a name that leaves the cache can only be a hand-written reference.
         var cacheRoot = Path.Combine(workingDirectory, ".architecture", ".cache", "git");
-        if (!ImportDefinitionCheck.IsSingleDirectoryName(importName, cacheRoot))
+        if (!ImportNameRule.IsSingleDirectoryName(importName, cacheRoot))
         {
             return Result<RulePack, AriadneError>.Failure(new AriadneError(
                 AriadneErrorCode.Invalid,
-                ImportDefinitionCheck.BadNameMessage(importName)));
+                ImportNameRule.BadNameMessage(importName)));
         }
 
         var cacheDir = Path.Combine(cacheRoot, importName);
