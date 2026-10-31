@@ -65,7 +65,7 @@ Expected failures are values, not exceptions. The loader, resolver, registry, `T
 
 ### Repo's own rules
 
-`.architecture/rules.yaml` governs this repo itself (Core / Host / Tests layers on top of `builtin://clean-architecture`): Core depends on nothing, hosts only orchestrate. Rule-pack models are validated by the five `*Validator` types that ZeroAlloc.Validation generates in Abstractions; a role-only pack (`cqrs`, `ddd-tactical`) has no layers and must be combined with a base pack that declares them.
+`.architecture/rules.yaml` governs this repo itself (Core / Host / Tests layers on top of `builtin://clean-architecture`): Core depends on nothing, hosts only orchestrate. Rule-pack models are validated by the five `*Validator` types that ZeroAlloc.Validation generates in Abstractions; a role-only pack (`cqrs`, `ddd-tactical`) has no layers and resolves on its own, but should be combined with a base pack that declares the layers its roles name; when the merged pack declares at least one layer, a role naming an undeclared layer is an `Invalid` error.
 
 ## Conventions enforced by analyzers
 
