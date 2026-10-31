@@ -19,9 +19,10 @@ IRulePackLoader
 - `CamelCaseNamingConvention` — maps `camelCase` YAML keys to `PascalCase` C# properties
 - `IgnoreUnmatchedProperties()` — extra YAML keys don't cause errors (forward-compatible)
 
-**Failures** come back as an `AriadneError`, never as an exception:
-- malformed YAML, or YAML of the wrong shape: `Invalid`, with Detail `line {n}, column {n}`
-- an empty document: `Invalid` ("rules file is empty")
+**Failures** come back as an `AriadneError`, never as an exception. `LoadFromFile` names the file in the message:
+- malformed YAML: `Invalid`, with the parser's reason in the message and Detail `line {n}, column {n}`
+- YAML of the wrong shape: `Invalid` ("… does not match the rule pack schema."), with the location in Detail
+- an empty document: `Invalid` ("Rule pack YAML is empty." or "Rule pack file '{path}' is empty.")
 - a missing file: `NotFound`, with the path in Detail
 - a file that cannot be read: `Unavailable`, with the OS message in Detail
 

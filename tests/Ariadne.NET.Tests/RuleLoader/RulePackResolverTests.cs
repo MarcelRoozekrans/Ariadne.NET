@@ -177,7 +177,7 @@ public class RulePackResolverTests
     }
 
     [Fact]
-    public void Resolve_ImportedPackIsMalformed_ReturnsLoaderError()
+    public void Resolve_ImportedPackIsMalformed_ReturnsErrorNamingTheCacheFile()
     {
         var tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-resolver-{Guid.NewGuid():N}");
         var cacheDir = Path.Combine(tempDir, ".architecture", ".cache", "git", "bad-pack");
@@ -185,7 +185,8 @@ public class RulePackResolverTests
 
         try
         {
-            File.WriteAllText(Path.Combine(cacheDir, "bad-pack.yaml"), "name: x\nlayers: [unclosed");
+            var packFile = Path.Combine(cacheDir, "bad-pack.yaml");
+            File.WriteAllText(packFile, "name: x\nlayers: [unclosed");
 
             var result = CreateResolver().Resolve(
                 new RulePack { Name = "user-rules", Extends = ["import://bad-pack"] },
@@ -193,6 +194,8 @@ public class RulePackResolverTests
 
             result.IsFailure.Should().BeTrue();
             result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+            result.Error.Message.Should().StartWith($"Rule pack file '{packFile}' could not be parsed: ");
+            result.Error.Detail.Should().Be("line 3, column 1");
         }
         finally
         {

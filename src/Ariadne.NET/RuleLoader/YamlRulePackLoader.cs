@@ -11,8 +11,6 @@ namespace Ariadne.NET.RuleLoader;
 [Singleton]
 public sealed class YamlRulePackLoader : IRulePackLoader
 {
-    private const string EmptyMessage = "rules file is empty";
-
     private readonly IDeserializer _deserializer = new DeserializerBuilder()
         .WithNamingConvention(CamelCaseNamingConvention.Instance)
         .IgnoreUnmatchedProperties()
@@ -22,26 +20,7 @@ public sealed class YamlRulePackLoader : IRulePackLoader
     {
         ArgumentNullException.ThrowIfNull(yaml);
 
-        if (string.IsNullOrWhiteSpace(yaml))
-        {
-            return Empty();
-        }
-
-        RulePack? pack;
-        try
-        {
-            pack = _deserializer.Deserialize<RulePack?>(yaml);
-        }
-        catch (YamlException ex)
-        {
-            // Covers malformed YAML and YAML of the wrong shape, such as a sequence where a mapping belongs.
-            return Result<RulePack, AriadneError>.Failure(new AriadneError(
-                AriadneErrorCode.Invalid,
-                $"Rule pack YAML is invalid: {Reason(ex)}",
-                $"line {ex.Start.Line}, column {ex.Start.Column}"));
-        }
-
-        return pack is null ? Empty() : Result<RulePack, AriadneError>.Success(pack);
+        return Parse(yaml, "Rule pack YAML");
     }
 
     public Result<RulePack, AriadneError> LoadFromFile(string filePath)
@@ -61,43 +40,58 @@ public sealed class YamlRulePackLoader : IRulePackLoader
         {
             return NotFound(filePath);
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return Unreadable(filePath, ex);
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            // On Linux a path that names a directory also lands here.
-            return Unreadable(filePath, ex);
+            // On Linux a path that names a directory, or a file without read permission, lands here.
+            return Result<RulePack, AriadneError>.Failure(new AriadneError(
+                AriadneErrorCode.Unavailable,
+                $"Rule pack file '{filePath}' could not be read.",
+                ex.Message));
         }
 
-        return LoadFromString(yaml);
+        return Parse(yaml, $"Rule pack file '{filePath}'");
     }
+
+    /// <summary>Deserialises <paramref name="yaml"/>; <paramref name="subject"/> starts every error message.</summary>
+    private Result<RulePack, AriadneError> Parse(string yaml, string subject)
+    {
+        if (string.IsNullOrWhiteSpace(yaml))
+        {
+            return Empty(subject);
+        }
+
+        RulePack? pack;
+        try
+        {
+            pack = _deserializer.Deserialize<RulePack?>(yaml);
+        }
+        catch (YamlException ex) when (ex is SyntaxErrorException or SemanticErrorException)
+        {
+            // The parser rejected the text itself; its message is a readable reason with no CLR type names.
+            return Invalid($"{subject} could not be parsed: {ex.Message}", ex);
+        }
+        catch (YamlException ex)
+        {
+            // YamlDotNet wraps exceptions raised while converting nodes to the schema types, so YAML of the wrong
+            // shape arrives here too. Their text names CLR types, so the message is fixed and only the location shows.
+            return Invalid($"{subject} does not match the rule pack schema.", ex);
+        }
+
+        return pack is null ? Empty(subject) : Result<RulePack, AriadneError>.Success(pack);
+    }
+
+    private static Result<RulePack, AriadneError> Invalid(string message, YamlException ex) =>
+        Result<RulePack, AriadneError>.Failure(new AriadneError(
+            AriadneErrorCode.Invalid,
+            message,
+            $"line {ex.Start.Line}, column {ex.Start.Column}"));
+
+    private static Result<RulePack, AriadneError> Empty(string subject) =>
+        Result<RulePack, AriadneError>.Failure(new AriadneError(AriadneErrorCode.Invalid, $"{subject} is empty."));
 
     private static Result<RulePack, AriadneError> NotFound(string filePath) =>
         Result<RulePack, AriadneError>.Failure(new AriadneError(
             AriadneErrorCode.NotFound,
-            "Rule pack file not found.",
+            $"Rule pack file '{filePath}' not found.",
             filePath));
-
-    private static Result<RulePack, AriadneError> Unreadable(string filePath, Exception ex) =>
-        Result<RulePack, AriadneError>.Failure(new AriadneError(
-            AriadneErrorCode.Unavailable,
-            $"Rule pack file '{filePath}' could not be read.",
-            ex.Message));
-
-    private static Result<RulePack, AriadneError> Empty() =>
-        Result<RulePack, AriadneError>.Failure(new AriadneError(AriadneErrorCode.Invalid, EmptyMessage));
-
-    private static string Reason(YamlException ex)
-    {
-        // YamlDotNet wraps the parser or conversion failure; the innermost exception names the problem.
-        Exception innermost = ex;
-        while (innermost.InnerException is not null)
-        {
-            innermost = innermost.InnerException;
-        }
-
-        return innermost.Message;
-    }
 }

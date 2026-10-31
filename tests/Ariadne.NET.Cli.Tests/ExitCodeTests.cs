@@ -1,3 +1,4 @@
+using System.Runtime.Versioning;
 using Ariadne.NET.Cli;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
@@ -220,8 +221,34 @@ public sealed class ExitCodeTests : IDisposable
             Console.SetError(originalError);
         }
 
-        error.ToString().Should().StartWith("Error: ").And.Contain("line");
+        error.ToString().Should().StartWith("Error: Rule pack file '.architecture/rules.yaml' could not be parsed: ")
+            .And.Contain("line");
         error.ToString().Should().NotContain(" at ", "an expected failure prints no stack trace");
+    }
+
+    [UnixNonRootFact]
+    [UnsupportedOSPlatform("windows")]
+    public void Validate_UnreadableRules_ShouldReturnErrorAndWriteStderr()
+    {
+        var rulesPath = Path.Combine(_tempDir, ".architecture", "rules.yaml");
+        File.SetUnixFileMode(rulesPath, UnixFileMode.None);
+        var originalError = Console.Error;
+        using var error = new StringWriter();
+        Console.SetError(error);
+
+        try
+        {
+            Run("validate", "src").Should().Be(ExitCodes.Error);
+        }
+        finally
+        {
+            Console.SetError(originalError);
+            File.SetUnixFileMode(rulesPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+
+        var lines = error.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        lines.Should().HaveCount(2, "an expected failure prints the message and the OS reason, not a stack trace");
+        lines[0].Should().Be("Error: Rule pack file '.architecture/rules.yaml' could not be read.");
     }
 
     [Fact]

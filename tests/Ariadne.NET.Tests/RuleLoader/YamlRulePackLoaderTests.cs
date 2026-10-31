@@ -1,3 +1,4 @@
+using System.Runtime.Versioning;
 using FluentAssertions;
 using Ariadne.NET.Abstractions;
 using Ariadne.NET.RuleLoader;
@@ -67,7 +68,7 @@ public class YamlRulePackLoaderTests
 
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
-        result.Error.Message.Should().Contain("did not find expected ',' or ']'");
+        result.Error.Message.Should().Be("Rule pack YAML could not be parsed: While parsing a flow sequence, did not find expected ',' or ']'.");
         result.Error.Detail.Should().Be("line 2, column 19");
     }
 
@@ -85,13 +86,16 @@ public class YamlRulePackLoaderTests
     [Theory]
     [InlineData("- a\n- b")]
     [InlineData("just a scalar")]
+    [InlineData("layers: \"text\"")]
     public void LoadFromString_WrongShape_ReturnsInvalid(string yaml)
     {
         var result = new YamlRulePackLoader().LoadFromString(yaml);
 
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
-        result.Error.Detail.Should().StartWith("line ");
+        result.Error.Message.Should().Be("Rule pack YAML does not match the rule pack schema.");
+        result.Error.Message.Should().NotContain("Version=");
+        result.Error.Detail.Should().MatchRegex(@"^line \d+, column \d+$");
     }
 
     [Theory]
@@ -104,7 +108,88 @@ public class YamlRulePackLoaderTests
 
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
-        result.Error.Message.Should().Be("rules file is empty");
+        result.Error.Message.Should().Be("Rule pack YAML is empty.");
+    }
+
+    [Fact]
+    public void LoadFromFile_Empty_NamesTheFile()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"ariadne-empty-{Guid.NewGuid():N}.yaml");
+        File.WriteAllText(path, "");
+
+        try
+        {
+            var result = new YamlRulePackLoader().LoadFromFile(path);
+
+            result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+            result.Error.Message.Should().Be($"Rule pack file '{path}' is empty.");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void LoadFromFile_Malformed_NamesTheFileAndKeepsLocationInDetail()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"ariadne-bad-{Guid.NewGuid():N}.yaml");
+        File.WriteAllText(path, "name: x\nlayers: [{name: a}}");
+
+        try
+        {
+            var result = new YamlRulePackLoader().LoadFromFile(path);
+
+            result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+            result.Error.Message.Should().StartWith($"Rule pack file '{path}' could not be parsed: ");
+            result.Error.Detail.Should().Be("line 2, column 19");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void LoadFromFile_WrongShape_NamesTheFile()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"ariadne-shape-{Guid.NewGuid():N}.yaml");
+        File.WriteAllText(path, "- a\n- b");
+
+        try
+        {
+            var result = new YamlRulePackLoader().LoadFromFile(path);
+
+            result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+            result.Error.Message.Should().Be($"Rule pack file '{path}' does not match the rule pack schema.");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [UnixNonRootFact]
+    [UnsupportedOSPlatform("windows")]
+    public void LoadFromFile_AccessDenied_ReturnsUnavailable()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"ariadne-denied-{Guid.NewGuid():N}.yaml");
+        File.WriteAllText(path, "name: x");
+        File.SetUnixFileMode(path, UnixFileMode.None);
+
+        try
+        {
+            var result = new YamlRulePackLoader().LoadFromFile(path);
+
+            result.Error.Code.Should().Be(AriadneErrorCode.Unavailable);
+            result.Error.Message.Should().Be($"Rule pack file '{path}' could not be read.");
+            result.Error.Detail.Should().NotBeNullOrEmpty();
+        }
+        finally
+        {
+            File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            File.Delete(path);
+        }
     }
 
     [Fact]
@@ -116,6 +201,7 @@ public class YamlRulePackLoaderTests
 
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be(AriadneErrorCode.NotFound);
+        result.Error.Message.Should().Be($"Rule pack file '{path}' not found.");
         result.Error.Detail.Should().Be(path);
     }
 
