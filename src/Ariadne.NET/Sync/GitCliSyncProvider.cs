@@ -28,7 +28,7 @@ internal sealed class GitCliSyncProvider : IGitSyncProvider
         ArgumentNullException.ThrowIfNull(import);
         ArgumentNullException.ThrowIfNull(cacheDir);
 
-        var checkedImport = ImportDefinitionCheck.Check(import);
+        var checkedImport = ImportDefinitionCheck.Check(import, cacheDir);
         if (checkedImport.IsFailure)
         {
             return Failure(checkedImport.Error);
@@ -47,7 +47,8 @@ internal sealed class GitCliSyncProvider : IGitSyncProvider
             return Success(new SyncedImport(import.Name, cachedInfo.ResolvedTag, WasCached: true, importCacheDir));
         }
 
-        var lsRemote = await _git.RunAsync($"ls-remote --tags {import.Url}", ct).ConfigureAwait(false);
+        // "--" ends git's options, so the url is read as the repository even if it looks like an option.
+        var lsRemote = await _git.RunAsync(["ls-remote", "--tags", "--", import.Url], ct).ConfigureAwait(false);
         if (lsRemote.IsFailure)
         {
             return Failure(GitUnavailable(import, lsRemote.Error));
@@ -58,29 +59,54 @@ internal sealed class GitCliSyncProvider : IGitSyncProvider
         {
             return Failure(new AriadneError(
                 AriadneErrorCode.NotFound,
-                $"No tag satisfying '{import.Version}' found in {import.Url}"));
+                $"No tag satisfying '{import.Version}' found in {UrlRedaction.Redact(import.Url)}"));
         }
 
         var commitSha = ParseCommitFromLsRemote(lsRemote.Value, bestTag);
-        var fetched = await FetchIntoCacheAsync(import, bestTag, commitSha, importCacheDir, ct).ConfigureAwait(false);
+        var fetched = await FetchIntoCacheAsync(import, bestTag, commitSha, cacheDir, ct).ConfigureAwait(false);
         return fetched.IsFailure
             ? Failure(fetched.Error)
             : Success(new SyncedImport(import.Name, bestTag, WasCached: false, importCacheDir));
     }
 
-    /// <summary>Clones <paramref name="tag"/> into the cache and records it; an IO failure is Unavailable for this import only.</summary>
+    /// <summary>
+    /// Clones <paramref name="tag"/> and builds the cache entry in a staging directory beside it, then swaps it in.
+    /// A failed fetch leaves the previous cache entry as it was. An IO failure is Unavailable for this import only.
+    /// </summary>
     private async Task<UnitResult<AriadneError>> FetchIntoCacheAsync(
-        ImportDefinition import, string tag, string? commitSha, string importCacheDir, CancellationToken ct)
+        ImportDefinition import, string tag, string? commitSha, string cacheDir, CancellationToken ct)
     {
+        var importCacheDir = Path.Combine(cacheDir, import.Name);
+        var stagingDir = Path.Combine(cacheDir, $".{import.Name}.staging-{Guid.NewGuid():N}");
+        var cloneDir = Path.Combine(stagingDir, "clone");
+        var packDir = Path.Combine(stagingDir, "pack");
+
+        var checkedPath = ImportDefinitionCheck.CheckPath(import, cloneDir);
+        if (checkedPath.IsFailure)
+        {
+            return checkedPath;
+        }
+
         try
         {
-            var cloned = await CloneIntoCacheAsync(import, tag, importCacheDir, ct).ConfigureAwait(false);
+            Directory.CreateDirectory(stagingDir);
+            var cloned = await _git.RunAsync(
+                ["clone", "--depth", "1", "--branch", tag, "--single-branch", "--", import.Url, cloneDir],
+                ct).ConfigureAwait(false);
             if (cloned.IsFailure)
             {
                 return UnitResult<AriadneError>.Failure(GitUnavailable(import, cloned.Error));
             }
 
-            await WriteGitInfoAsync(import.Url, tag, commitSha, importCacheDir, ct).ConfigureAwait(false);
+            CopyPackFiles(string.IsNullOrEmpty(import.Path) ? cloneDir : Path.Combine(cloneDir, import.Path), packDir);
+            await WriteGitInfoAsync(import.Url, tag, commitSha, packDir, ct).ConfigureAwait(false);
+
+            if (Directory.Exists(importCacheDir))
+            {
+                Directory.Delete(importCacheDir, recursive: true);
+            }
+
+            Directory.Move(packDir, importCacheDir);
             return UnitResult<AriadneError>.Success();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -90,43 +116,25 @@ internal sealed class GitCliSyncProvider : IGitSyncProvider
                 $"Import '{import.Name}' could not be written to the cache at '{importCacheDir}'.",
                 ex.Message));
         }
-    }
-
-    private async Task<UnitResult<ResilienceError>> CloneIntoCacheAsync(
-        ImportDefinition import, string tag, string importCacheDir, CancellationToken ct)
-    {
-        if (Directory.Exists(importCacheDir))
-        {
-            Directory.Delete(importCacheDir, recursive: true);
-        }
-
-        Directory.CreateDirectory(importCacheDir);
-
-        var cloneTarget = Path.Combine(importCacheDir, ".clone-temp");
-
-        try
-        {
-            var cloned = await _git.RunAsync(
-                $"clone --depth 1 --branch {tag} --single-branch {import.Url} \"{cloneTarget}\"",
-                ct).ConfigureAwait(false);
-            if (cloned.IsFailure)
-            {
-                return UnitResult<ResilienceError>.Failure(cloned.Error);
-            }
-
-            var sourceDir = string.IsNullOrEmpty(import.Path)
-                ? cloneTarget
-                : Path.Combine(cloneTarget, import.Path);
-
-            CopyPackFiles(sourceDir, importCacheDir);
-            return UnitResult<ResilienceError>.Success();
-        }
         finally
         {
-            if (Directory.Exists(cloneTarget))
+            TryDeleteDirectory(stagingDir);
+        }
+    }
+
+    /// <summary>Removes the staging directory; one that cannot be removed is left behind rather than hiding the outcome.</summary>
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
             {
-                Directory.Delete(cloneTarget, recursive: true);
+                Directory.Delete(path, recursive: true);
             }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // A leftover staging directory is harmless: its name is unique and nothing reads it.
         }
     }
 
@@ -137,7 +145,7 @@ internal sealed class GitCliSyncProvider : IGitSyncProvider
     private static AriadneError GitUnavailable(ImportDefinition import, ResilienceError error) =>
         new(
             AriadneErrorCode.Unavailable,
-            $"git failed for import '{import.Name}' at {import.Url}.",
+            $"git failed for import '{import.Name}' at {UrlRedaction.Redact(import.Url)}.",
             error.InnerException is OperationCanceledException ? "git did not finish before the timeout." : error.Reason);
 
     private static Result<SyncedImport, AriadneError> Success(SyncedImport synced) =>
@@ -283,6 +291,8 @@ internal sealed class GitCliSyncProvider : IGitSyncProvider
 
     private static void CopyPackFiles(string sourceDir, string targetDir)
     {
+        Directory.CreateDirectory(targetDir);
+
         foreach (var dirPath in Directory.GetDirectories(sourceDir, "*", SearchOption.AllDirectories))
         {
             var relativePath = Path.GetRelativePath(sourceDir, dirPath);

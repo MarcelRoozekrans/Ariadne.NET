@@ -86,6 +86,7 @@ IGitSyncProvider
 | Failure | Code |
 |---|---|
 | Missing or unusable name, url or version, or a bad semver range | Invalid |
+| A name that is not a plain directory name, or a `path` that leaves the repository | Invalid |
 | No tag satisfies the version range | NotFound |
 | git fails, times out or exhausts its retries | Unavailable, with git's stderr or the policy failure as Detail |
 | Reading or writing the cache fails | Unavailable, with the IO error as Detail |
@@ -101,10 +102,10 @@ flowchart TD
     E --> F{"Match found?"}
     F -->|No| G["Return NotFound"]
     F -->|Yes| H["Step 4: Get commit SHA<br/><i>Prefer annotated ^{} tag</i>"]
-    H --> I["Step 5: Shallow clone<br/><i>git clone --depth 1<br/>--branch tag --single-branch</i>"]
+    H --> I["Step 5: Shallow clone into a staging directory<br/><i>git clone --depth 1<br/>--branch tag --single-branch -- url</i>"]
     I --> J["Step 6: Copy pack files<br/><i>Exclude .git/ directories<br/>Preserve structure</i>"]
     J --> K["Step 7: Write .git-info.json<br/><i>url, resolvedTag, commitSha, syncedAt</i>"]
-    K --> L["Step 8: Cleanup<br/><i>Delete temp clone (finally block)</i>"]
+    K --> L["Step 8: Swap the staged pack in for the old cache entry<br/>Delete the staging directory (finally block)<br/><i>A failed fetch keeps the old cache entry</i>"]
     L --> M["Return SyncedImport<br/><i>WasCached=false</i>"]
 ```
 
@@ -120,7 +121,9 @@ flowchart TD
 **Git command execution (internal `IGitClient`):**
 
 - `GitCliClient` uses `System.Diagnostics.Process` with `UseShellExecute=false`, `CreateNoWindow=true`
+- Passes every argument separately through `ProcessStartInfo.ArgumentList`, with `--` before the url, so a url with spaces, quotes or a leading `-` cannot add git options
 - Redirects stdout and stderr and reads both streams at once
+- Replaces the userinfo of any url in its error text with `***`, so `https://token@host/x` is reported as `https://***@host/x`
 - Throws `InvalidOperationException` on a non-zero exit code, with git's stderr in the message
 - Kills git when the call is cancelled or times out
 - Uses the caller's git credentials (SSH keys, credential managers)

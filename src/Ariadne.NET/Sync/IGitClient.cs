@@ -8,5 +8,9 @@ namespace Ariadne.NET.Sync;
 [Timeout(Ms = 60_000)]
 internal interface IGitClient
 {
-    ValueTask<Result<string, ResilienceError>> RunAsync(string arguments, CancellationToken ct);
+    /// <summary>
+    /// Runs git with <paramref name="arguments"/> as its argv, one element per argument, so a value such as a url
+    /// stays one argument whatever spaces or quotes it holds.
+    /// </summary>
+    ValueTask<Result<string, ResilienceError>> RunAsync(IReadOnlyList<string> arguments, CancellationToken ct);
 }

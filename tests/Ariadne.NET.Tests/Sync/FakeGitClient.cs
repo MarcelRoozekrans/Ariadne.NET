@@ -10,6 +10,6 @@ namespace Ariadne.NET.Tests.Sync;
 /// </summary>
 internal sealed class FakeGitClient(FakeGitScript script) : IGitClient
 {
-    public ValueTask<Result<string, ResilienceError>> RunAsync(string arguments, CancellationToken ct) =>
+    public ValueTask<Result<string, ResilienceError>> RunAsync(IReadOnlyList<string> arguments, CancellationToken ct) =>
         script.RunAsync(arguments, ct);
 }

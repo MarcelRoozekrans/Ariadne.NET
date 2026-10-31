@@ -235,6 +235,9 @@ public class GitCliSyncProviderTests
         result.Error.Message.Should().Be("Invalid semver range: 'not-valid'");
     }
 
+    private static string BadName(string name) =>
+        $"Import name '{name}' must be a plain directory name: no path separators, drive, '.' or '..', or characters such as ':' or '*'.";
+
     public static TheoryData<string?, string?, string?, string> IncompleteImports => new()
     {
         { null, "https://example.com/a.git", "^1.0", "An import has no name; give every import in imports.yaml a name." },
@@ -243,9 +246,18 @@ public class GitCliSyncProviderTests
         { "pack", "", "^1.0", "Import 'pack' has no url." },
         { "pack", "https://example.com/a.git", null, "Import 'pack' has no version." },
         { "pack", "https://example.com/a.git", "", "Import 'pack' has no version." },
-        { "..", "https://example.com/a.git", "^1.0", "Import name '..' must not contain path separators or be '.' or '..'." },
-        { "../src", "https://example.com/a.git", "^1.0", "Import name '../src' must not contain path separators or be '.' or '..'." },
+        { ".", "https://example.com/a.git", "^1.0", BadName(".") },
+        { "..", "https://example.com/a.git", "^1.0", BadName("..") },
+        { "../src", "https://example.com/a.git", "^1.0", BadName("../src") },
+        { "a/../..", "https://example.com/a.git", "^1.0", BadName("a/../..") },
+        { "/abs", "https://example.com/a.git", "^1.0", BadName("/abs") },
+        { "C:", "https://example.com/a.git", "^1.0", BadName("C:") },
+        { "C:foo", "https://example.com/a.git", "^1.0", BadName("C:foo") },
+        { "a\\b", "https://example.com/a.git", "^1.0", BadName("a\\b") },
+        { "a*b", "https://example.com/a.git", "^1.0", BadName("a*b") },
+        { "a\0b", "https://example.com/a.git", "^1.0", BadName("a\0b") },
         { "pack", "--upload-pack=touch x", "^1.0", "Import 'pack' has url '--upload-pack=touch x', which must not start with '-'." },
+        { "pack", "-u https://token@example.com/a.git", "^1.0", "Import 'pack' has url '-u https://***@example.com/a.git', which must not start with '-'." },
     };
 
     [Theory]
@@ -323,6 +335,133 @@ public class GitCliSyncProviderTests
         finally
         {
             Directory.Delete(cacheDir, recursive: true);
+        }
+    }
+
+    public static TheoryData<string> EscapingPaths => new() { "/etc", "..", "../..", "packs/../../x", "../pack" };
+
+    [Theory]
+    [MemberData(nameof(EscapingPaths))]
+    public async Task SyncAsync_PathOutsideTheRepository_IsInvalid_AndCopiesNothing(string path)
+    {
+        var cacheDir = NewCacheDir();
+        var import = new ImportDefinition { Name = "pack", Type = "git", Url = "https://example.com/a.git", Version = "^1.0", Path = path };
+
+        try
+        {
+            var result = await new GitCliSyncProvider(new FakeGitClient(new FakeGitScript())).SyncAsync(import, cacheDir, noCache: true);
+
+            result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+            result.Error.Message.Should().Be($"Import 'pack' has path '{path}', which must be a relative folder inside the repository.");
+            Directory.Exists(Path.Combine(cacheDir, "pack")).Should().BeFalse();
+        }
+        finally
+        {
+            DeleteDir(cacheDir);
+        }
+    }
+
+    [Fact]
+    public async Task SyncAsync_PathInsideTheRepository_CopiesOnlyThatFolder()
+    {
+        var cacheDir = NewCacheDir();
+        var import = new ImportDefinition { Name = "pack", Type = "git", Url = "https://example.com/a.git", Version = "^1.0", Path = "packs" };
+
+        try
+        {
+            var result = await new GitCliSyncProvider(new FakeGitClient(new FakeGitScript())).SyncAsync(import, cacheDir, noCache: true);
+
+            result.IsSuccess.Should().BeTrue();
+            File.Exists(Path.Combine(cacheDir, "pack", "core.yaml")).Should().BeTrue();
+            File.Exists(Path.Combine(cacheDir, "pack", "pack.yaml")).Should().BeFalse();
+        }
+        finally
+        {
+            DeleteDir(cacheDir);
+        }
+    }
+
+    [Theory]
+    [InlineData("/srv/rules repo --template /tmp/evil")]
+    [InlineData("/srv/rules \"quoted\" repo")]
+    public async Task SyncAsync_UrlWithSpaceOrQuote_ReachesGitAsOneArgument(string url)
+    {
+        var cacheDir = NewCacheDir();
+        var git = new FakeGitScript();
+        var import = new ImportDefinition { Name = "pack", Type = "git", Url = url, Version = "^1.0" };
+
+        try
+        {
+            var result = await new GitCliSyncProvider(new FakeGitClient(git)).SyncAsync(import, cacheDir, noCache: true);
+
+            result.IsSuccess.Should().BeTrue();
+            git.Invocations.Should().HaveCount(2);
+            git.Invocations[0].Should().Equal("ls-remote", "--tags", "--", url);
+            git.Invocations[1].Take(8).Should().Equal("clone", "--depth", "1", "--branch", "v1.0.0", "--single-branch", "--", url);
+            git.Invocations[1].Should().HaveCount(9, "the clone target is the only argument after the url");
+        }
+        finally
+        {
+            DeleteDir(cacheDir);
+        }
+    }
+
+    [Fact]
+    public async Task SyncAsync_CloneFails_KeepsTheExistingCache_AndLeavesNoStaging()
+    {
+        var cacheDir = NewCacheDir();
+        var git = new FakeGitScript();
+        var sut = new GitCliSyncProvider(new FakeGitClient(git));
+        var import = new ImportDefinition { Name = "pack", Type = "git", Url = "https://example.com/a.git", Version = "^1.0" };
+
+        try
+        {
+            (await sut.SyncAsync(import, cacheDir, noCache: false)).IsSuccess.Should().BeTrue();
+            git.CloneFails = true;
+
+            var result = await sut.SyncAsync(import, cacheDir, noCache: true);
+
+            result.Error.Code.Should().Be(AriadneErrorCode.Unavailable);
+            result.Error.Detail.Should().Be("fatal: clone failed");
+            File.Exists(Path.Combine(cacheDir, "pack", "pack.yaml")).Should().BeTrue();
+            File.Exists(Path.Combine(cacheDir, "pack", ".git-info.json")).Should().BeTrue();
+            Directory.GetFileSystemEntries(cacheDir).Should().Equal(Path.Combine(cacheDir, "pack"));
+        }
+        finally
+        {
+            DeleteDir(cacheDir);
+        }
+    }
+
+    [Fact]
+    public async Task SyncAsync_UrlWithCredentials_IsRedactedInMessages()
+    {
+        var import = new ImportDefinition { Name = "pack", Type = "git", Url = "https://user:s3cret@example.com/a.git", Version = "^2.0" };
+
+        var result = await new GitCliSyncProvider(new FakeGitClient(new FakeGitScript()))
+            .SyncAsync(import, Path.GetTempPath(), noCache: true);
+
+        result.Error.Message.Should().Be("No tag satisfying '^2.0' found in https://***@example.com/a.git");
+    }
+
+    [Theory]
+    [InlineData("https://token@host/x", "https://***@host/x")]
+    [InlineData("git ls-remote --tags -- https://u:p@host/x failed: fatal: 'https://u:p@host/x' not found", "git ls-remote --tags -- https://***@host/x failed: fatal: 'https://***@host/x' not found")]
+    [InlineData("https://host/x", "https://host/x")]
+    [InlineData("git@github.com:org/repo.git", "git@github.com:org/repo.git")]
+    [InlineData("ssh://git@host/x", "ssh://***@host/x")]
+    public void UrlRedaction_HidesUserInfo(string text, string expected)
+    {
+        UrlRedaction.Redact(text).Should().Be(expected);
+    }
+
+    private static string NewCacheDir() => Path.Combine(Path.GetTempPath(), $"ariadne-provider-{Guid.NewGuid():N}");
+
+    private static void DeleteDir(string dir)
+    {
+        if (Directory.Exists(dir))
+        {
+            Directory.Delete(dir, recursive: true);
         }
     }
 }

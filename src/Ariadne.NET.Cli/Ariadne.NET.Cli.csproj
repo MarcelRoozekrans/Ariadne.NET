@@ -17,4 +17,8 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ariadne.NET.Cli.Tests" />
+  </ItemGroup>
+
 </Project>

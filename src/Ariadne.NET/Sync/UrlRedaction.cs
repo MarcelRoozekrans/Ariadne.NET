@@ -1,0 +1,14 @@
+using System.Text.RegularExpressions;
+
+namespace Ariadne.NET.Sync;
+
+/// <summary>Hides credentials in urls before they reach a message: <c>https://token@host/x</c> becomes <c>https://***@host/x</c>.</summary>
+internal static partial class UrlRedaction
+{
+    public static string Redact(string? text) =>
+        string.IsNullOrEmpty(text) ? text ?? string.Empty : UserInfo().Replace(text, "://***@");
+
+    // The userinfo of a url: everything between "://" and the first "@" before the host's path.
+    [GeneratedRegex(@"://[^/?#@\s]+@", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex UserInfo();
+}

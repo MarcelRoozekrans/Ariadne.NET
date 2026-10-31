@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Ariadne.NET.Abstractions;
 using Ariadne.NET.Sync;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -62,7 +63,17 @@ internal static class SyncCommand
         }
 
         var cacheDir = Path.Combine(workingDir, DefaultCacheDir);
-        Directory.CreateDirectory(cacheDir);
+        try
+        {
+            Directory.CreateDirectory(cacheDir);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return ErrorOutput.Report(new AriadneError(
+                AriadneErrorCode.Unavailable,
+                $"Import cache directory '{cacheDir}' could not be created.",
+                ex.Message));
+        }
 
         IReadOnlyList<ImportSyncOutcome> outcomes;
 
@@ -103,7 +114,7 @@ internal static class SyncCommand
                 Console.Error.WriteLine($"  {outcome.ImportName,-30} FAILED: {error.Message}");
                 if (error.Detail is not null)
                 {
-                    Console.Error.WriteLine($"    {error.Detail}");
+                    WriteIndented(Console.Error, error.Detail);
                 }
 
                 failCount++;
@@ -118,6 +129,15 @@ internal static class SyncCommand
         else
         {
             Console.Error.WriteLine($"Done. {successCount} synced, {failCount} failed.");
+        }
+    }
+
+    /// <summary>Writes every line of <paramref name="detail"/> indented under its FAILED line; git's stderr often spans several.</summary>
+    internal static void WriteIndented(TextWriter writer, string detail)
+    {
+        foreach (var line in detail.ReplaceLineEndings("\n").Split('\n'))
+        {
+            writer.WriteLine(line.Length == 0 ? string.Empty : $"    {line}");
         }
     }
 }

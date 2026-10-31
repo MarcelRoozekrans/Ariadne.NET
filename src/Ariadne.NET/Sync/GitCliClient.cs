@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 
@@ -12,18 +13,25 @@ namespace Ariadne.NET.Sync;
 /// </summary>
 internal sealed class GitCliClient : IGitClient
 {
-    public async ValueTask<Result<string, ResilienceError>> RunAsync(string arguments, CancellationToken ct)
+    public async ValueTask<Result<string, ResilienceError>> RunAsync(IReadOnlyList<string> arguments, CancellationToken ct)
     {
+        ArgumentNullException.ThrowIfNull(arguments);
+
         using var process = new Process();
         process.StartInfo = new ProcessStartInfo
         {
             FileName = "git",
-            Arguments = arguments,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true,
         };
+
+        // ArgumentList passes each element as one argument, with no splitting or quote parsing.
+        foreach (var argument in arguments)
+        {
+            process.StartInfo.ArgumentList.Add(argument);
+        }
 
         // A missing git binary throws Win32Exception here; the proxy reports it like any other failure.
         process.Start();
@@ -39,13 +47,13 @@ internal sealed class GitCliClient : IGitClient
 
             if (process.ExitCode != 0)
             {
-                throw new InvalidOperationException(
+                throw new InvalidOperationException(UrlRedaction.Redact(
                     string.Format(
                         CultureInfo.InvariantCulture,
                         "git {0} failed with exit code {1}: {2}",
-                        arguments,
+                        string.Join(' ', arguments),
                         process.ExitCode,
-                        stderr.Trim()));
+                        stderr.Trim())));
             }
 
             return Result<string, ResilienceError>.Success(stdout);
@@ -53,8 +61,21 @@ internal sealed class GitCliClient : IGitClient
         catch (OperationCanceledException)
         {
             // Cancellation or the policy timeout: do not leave git running behind us.
-            process.Kill(entireProcessTree: true);
+            TryKill(process);
             throw;
+        }
+    }
+
+    /// <summary>Kills git and its children; a failure to kill must not hide the cancellation that asked for it.</summary>
+    private static void TryKill(Process process)
+    {
+        try
+        {
+            process.Kill(entireProcessTree: true);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or Win32Exception or AggregateException or NotSupportedException)
+        {
+            // The process exited on its own, or could not be killed; either way the cancellation still stands.
         }
     }
 }

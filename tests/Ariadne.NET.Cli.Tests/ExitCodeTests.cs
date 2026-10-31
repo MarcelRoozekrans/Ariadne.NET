@@ -1,5 +1,6 @@
 using System.Runtime.Versioning;
 using Ariadne.NET.Cli;
+using Ariadne.NET.Cli.Commands;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -305,6 +306,42 @@ public sealed class ExitCodeTests : IDisposable
         var lines = stderr.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
         lines[0].Should().MatchRegex(@"^  nuget-pack +FAILED: Unsupported import type 'nuget'\. Only 'git' is currently supported\.$");
         lines[^1].Should().Be("Done. 0 synced, 1 failed.");
+    }
+
+    [Fact]
+    public void Sync_CacheDirectoryCannotBeCreated_ReportsUnavailableAndReturnsError()
+    {
+        File.WriteAllText(
+            Path.Combine(_tempDir, ".architecture", "imports.yaml"),
+            """
+            imports:
+              - name: pack
+                type: git
+                url: https://example.com/pack.git
+                version: ^1.0
+            """);
+
+        // A file where the cache directory's parent should be makes creating the cache fail.
+        File.WriteAllText(Path.Combine(_tempDir, ".architecture", ".cache"), "not a directory");
+
+        var (exitCode, stderr) = RunCapturingStderr("sync");
+
+        exitCode.Should().Be(ExitCodes.Error);
+        var lines = stderr.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        lines.Should().HaveCount(2, "an expected failure prints the message and the OS reason, not a stack trace");
+        lines[0].Should().Be($"Error: Import cache directory '{Path.Combine(_tempDir, ".architecture/.cache/git")}' could not be created.");
+    }
+
+    [Fact]
+    public void Sync_MultiLineDetail_IsIndentedOnEveryLine()
+    {
+        using var writer = new StringWriter();
+
+        SyncCommand.WriteIndented(writer, "fatal: not a repository\r\nfatal: Could not read\n\nPlease check");
+
+        var nl = Environment.NewLine;
+        writer.ToString().Should().Be(
+            $"    fatal: not a repository{nl}    fatal: Could not read{nl}{nl}    Please check{nl}");
     }
 
     private (int ExitCode, string Stderr) RunCapturingStderr(params string[] args)
