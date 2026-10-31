@@ -276,9 +276,50 @@ public sealed class ExitCodeTests : IDisposable
     }
 
     [Fact]
-    public void Sync_MissingImportsFile_ShouldReturnError()
+    public void Sync_MissingImportsFile_ReportsNotFoundWithThePath()
     {
-        Run("sync").Should().Be(ExitCodes.Error);
+        var importsPath = Path.Combine(_tempDir, ".architecture", "imports.yaml");
+        var (exitCode, stderr) = RunCapturingStderr("sync");
+
+        exitCode.Should().Be(ExitCodes.Error);
+        var lines = stderr.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        lines.Should().Equal($"Error: Imports file '{importsPath}' not found.", importsPath);
+    }
+
+    [Fact]
+    public void Sync_OneImportFails_PrintsFailedLineToStderrAndReturnsError()
+    {
+        File.WriteAllText(
+            Path.Combine(_tempDir, ".architecture", "imports.yaml"),
+            """
+            imports:
+              - name: nuget-pack
+                type: nuget
+                url: https://example.com/pkg
+                version: 1.0.0
+            """);
+
+        var (exitCode, stderr) = RunCapturingStderr("sync");
+
+        exitCode.Should().Be(ExitCodes.Error);
+        var lines = stderr.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        lines[0].Should().MatchRegex(@"^  nuget-pack +FAILED: Unsupported import type 'nuget'\. Only 'git' is currently supported\.$");
+        lines[^1].Should().Be("Done. 0 synced, 1 failed.");
+    }
+
+    private (int ExitCode, string Stderr) RunCapturingStderr(params string[] args)
+    {
+        var originalError = Console.Error;
+        using var error = new StringWriter();
+        Console.SetError(error);
+        try
+        {
+            return (Run(args), error.ToString());
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
     }
 
     [Fact]

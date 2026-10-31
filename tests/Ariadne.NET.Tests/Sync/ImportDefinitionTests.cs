@@ -1,5 +1,7 @@
-using FluentAssertions;
+using Ariadne.NET.Abstractions;
 using Ariadne.NET.Sync;
+using FluentAssertions;
+using ZeroAlloc.Results;
 
 namespace Ariadne.NET.Tests.Sync;
 
@@ -66,36 +68,26 @@ public class ImportDefinitionTests
     }
 
     [Fact]
-    public void SyncResult_ShouldCaptureOutcome_SuccessDefaultsToTrue()
+    public void SyncedImport_ShouldCaptureOutcome()
     {
-        var result = new SyncResult
-        {
-            ImportName = "shared-rules",
-            ResolvedVersion = "1.2.3",
-            WasCached = true,
-            CachePath = "/tmp/cache/shared-rules",
-        };
+        var synced = new SyncedImport("shared-rules", "1.2.3", WasCached: true, "/tmp/cache/shared-rules");
 
-        result.Success.Should().BeTrue();
-        result.ImportName.Should().Be("shared-rules");
-        result.ResolvedVersion.Should().Be("1.2.3");
-        result.WasCached.Should().BeTrue();
-        result.CachePath.Should().Be("/tmp/cache/shared-rules");
-        result.Error.Should().BeNull();
+        synced.ImportName.Should().Be("shared-rules");
+        synced.ResolvedVersion.Should().Be("1.2.3");
+        synced.WasCached.Should().BeTrue();
+        synced.CachePath.Should().Be("/tmp/cache/shared-rules");
     }
 
     [Fact]
-    public void SyncResult_WithError_ShouldNotBeSuccess()
+    public void ImportSyncOutcome_PairsTheNameWithAFailure()
     {
-        var result = new SyncResult
-        {
-            ImportName = "broken-rules",
-            Success = false,
-            Error = "Repository not found",
-        };
+        var outcome = new ImportSyncOutcome(
+            "broken-rules",
+            Result<SyncedImport, AriadneError>.Failure(new AriadneError(AriadneErrorCode.Unavailable, "Repository not found")));
 
-        result.Success.Should().BeFalse();
-        result.Error.Should().Be("Repository not found");
+        outcome.ImportName.Should().Be("broken-rules");
+        outcome.Result.IsFailure.Should().BeTrue();
+        outcome.Result.Error.Message.Should().Be("Repository not found");
     }
 
     [Fact]

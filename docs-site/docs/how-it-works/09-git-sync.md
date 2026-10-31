@@ -78,25 +78,34 @@ Performs the actual git operations to fetch and cache rule packs.
 ```
 IGitSyncProvider
   └── SyncAsync(ImportDefinition import, string cacheDir, bool noCache, CancellationToken ct)
-        → Task<SyncResult>
+        → Task<Result<SyncedImport, AriadneError>>
 ```
+
+`SyncedImport` holds `ImportName`, `ResolvedVersion`, `WasCached` and `CachePath`. A failure is an `AriadneError`:
+
+| Failure | Code |
+|---|---|
+| Missing or unusable name, url or version, or a bad semver range | Invalid |
+| No tag satisfies the version range | NotFound |
+| git fails, times out or exhausts its retries | Unavailable, with git's stderr or the policy failure as Detail |
+| Reading or writing the cache fails | Unavailable, with the IO error as Detail |
 
 **Full sync workflow:**
 
 ```mermaid
 flowchart TD
     A["SyncAsync(import, cacheDir, noCache)"] --> B{"!noCache AND<br/>cache valid?"}
-    B -->|Yes| C["Read .git-info.json<br/>Verify URL + version range<br/>→ Return SyncResult(WasCached=true)"]
+    B -->|Yes| C["Read .git-info.json<br/>Verify URL + version range<br/>→ Return SyncedImport(WasCached=true)"]
     B -->|No| D["Step 2: Fetch remote tags<br/><i>git ls-remote --tags URL</i><br/>Parse + filter valid semver"]
     D --> E["Step 3: Find best match<br/><i>SemVerRange.FindBestMatch(tags)</i>"]
     E --> F{"Match found?"}
-    F -->|No| G["Return error SyncResult"]
+    F -->|No| G["Return NotFound"]
     F -->|Yes| H["Step 4: Get commit SHA<br/><i>Prefer annotated ^{} tag</i>"]
     H --> I["Step 5: Shallow clone<br/><i>git clone --depth 1<br/>--branch tag --single-branch</i>"]
     I --> J["Step 6: Copy pack files<br/><i>Exclude .git/ directories<br/>Preserve structure</i>"]
     J --> K["Step 7: Write .git-info.json<br/><i>url, resolvedTag, commitSha, syncedAt</i>"]
     K --> L["Step 8: Cleanup<br/><i>Delete temp clone (finally block)</i>"]
-    L --> M["Return SyncResult<br/><i>Success=true, WasCached=false</i>"]
+    L --> M["Return SyncedImport<br/><i>WasCached=false</i>"]
 ```
 
 **Cache validation (IsCacheValid):**
@@ -108,13 +117,14 @@ flowchart TD
 5. Check version still satisfies the requested range
 6. Returns `false` if any check fails (graceful degradation)
 
-**Git command execution (RunGitAsync):**
+**Git command execution (internal `IGitClient`):**
 
-- Uses `System.Diagnostics.Process` with `UseShellExecute=false`, `CreateNoWindow=true`
-- Redirects stdout and stderr
-- Reads both streams asynchronously
-- Throws `InvalidOperationException` on non-zero exit code with stderr details
+- `GitCliClient` uses `System.Diagnostics.Process` with `UseShellExecute=false`, `CreateNoWindow=true`
+- Redirects stdout and stderr and reads both streams at once
+- Throws `InvalidOperationException` on a non-zero exit code, with git's stderr in the message
+- Kills git when the call is cancelled or times out
 - Uses the caller's git credentials (SSH keys, credential managers)
+- The container hands `GitCliSyncProvider` the generated ZeroAlloc.Resilience proxy around `GitCliClient`: up to 3 attempts with a 500 ms exponential backoff, and a 60 s timeout over the whole command. The proxy returns a thrown exception, a timeout or exhausted retries as a `ResilienceError`, which the provider reports as Unavailable. A caller's cancellation propagates as `OperationCanceledException` and is not retried.
 
 ## SyncOrchestrator
 
@@ -125,13 +135,15 @@ Orchestrates syncing of all or specific imports from the manifest.
 
 ```
 ISyncOrchestrator
-  ├── SyncAllAsync(manifest, cacheDir, noCache, ct) → Task<IReadOnlyList<SyncResult>>
-  └── SyncByNameAsync(manifest, name, cacheDir, noCache, ct) → Task<IReadOnlyList<SyncResult>>
+  ├── SyncAllAsync(manifest, cacheDir, noCache, ct) → Task<IReadOnlyList<ImportSyncOutcome>>
+  └── SyncByNameAsync(manifest, name, cacheDir, noCache, ct) → Task<IReadOnlyList<ImportSyncOutcome>>
 ```
 
-**Type routing:** Only `"git"` type is supported. Other types return an error `SyncResult`.
+Each `ImportSyncOutcome` pairs an import name with its `Result<SyncedImport, AriadneError>`. One import failing does not stop the others.
 
-**SyncByNameAsync:** Finds the import by name (case-insensitive), returns error if not found.
+**Type routing:** Only `"git"` type is supported. Other types give an Invalid outcome.
+
+**SyncByNameAsync:** Finds the import by name (case-insensitive), and returns a single NotFound outcome if there is none.
 
 ---
 

@@ -43,16 +43,10 @@ internal static class SyncCommand
         var workingDir = Directory.GetCurrentDirectory();
         var importsPath = Path.Combine(workingDir, DefaultImportsPath);
 
-        if (!File.Exists(importsPath))
-        {
-            Console.Error.WriteLine($"No imports file found at {importsPath}");
-            Console.Error.WriteLine("Create .architecture/imports.yaml to define external rule packs.");
-            return ExitCodes.Error;
-        }
-
         var loader = provider.GetRequiredService<IImportsLoader>();
         var orchestrator = provider.GetRequiredService<ISyncOrchestrator>();
 
+        // A missing file is the loader's NotFound, with the path as Detail.
         var loaded = loader.LoadFromFile(importsPath);
         if (loaded.IsFailure)
         {
@@ -70,41 +64,48 @@ internal static class SyncCommand
         var cacheDir = Path.Combine(workingDir, DefaultCacheDir);
         Directory.CreateDirectory(cacheDir);
 
-        IReadOnlyList<SyncResult> results;
+        IReadOnlyList<ImportSyncOutcome> outcomes;
 
         if (!string.IsNullOrEmpty(name))
         {
             Console.WriteLine($"Syncing import '{name}'...");
-            results = await orchestrator.SyncByNameAsync(manifest, name, cacheDir, noCache, ct)
+            outcomes = await orchestrator.SyncByNameAsync(manifest, name, cacheDir, noCache, ct)
                 .ConfigureAwait(false);
         }
         else
         {
             Console.WriteLine($"Syncing {manifest.Imports.Count} import(s)...");
-            results = await orchestrator.SyncAllAsync(manifest, cacheDir, noCache, ct)
+            outcomes = await orchestrator.SyncAllAsync(manifest, cacheDir, noCache, ct)
                 .ConfigureAwait(false);
         }
 
-        PrintResults(results);
-        return results.All(r => r.Success) ? ExitCodes.Success : ExitCodes.Error;
+        PrintOutcomes(outcomes);
+        return outcomes.All(o => o.Result.IsSuccess) ? ExitCodes.Success : ExitCodes.Error;
     }
 
-    private static void PrintResults(IReadOnlyList<SyncResult> results)
+    private static void PrintOutcomes(IReadOnlyList<ImportSyncOutcome> outcomes)
     {
         var successCount = 0;
         var failCount = 0;
 
-        foreach (var result in results)
+        foreach (var outcome in outcomes)
         {
-            if (result.Success)
+            if (outcome.Result.IsSuccess)
             {
-                var status = result.WasCached ? "cached" : "fetched";
-                Console.WriteLine($"  {result.ImportName,-30} {result.ResolvedVersion,-12} ({status})");
+                var synced = outcome.Result.Value;
+                var status = synced.WasCached ? "cached" : "fetched";
+                Console.WriteLine($"  {synced.ImportName,-30} {synced.ResolvedVersion,-12} ({status})");
                 successCount++;
             }
             else
             {
-                Console.Error.WriteLine($"  {result.ImportName,-30} FAILED: {result.Error}");
+                var error = outcome.Result.Error;
+                Console.Error.WriteLine($"  {outcome.ImportName,-30} FAILED: {error.Message}");
+                if (error.Detail is not null)
+                {
+                    Console.Error.WriteLine($"    {error.Detail}");
+                }
+
                 failCount++;
             }
         }

@@ -1,9 +1,11 @@
 using System.Text.Json;
+using Ariadne.NET.Abstractions;
 using FluentAssertions;
 using NSubstitute;
 using Ariadne.NET.RuleEngine;
 using Ariadne.NET.RuleLoader;
 using Ariadne.NET.Sync;
+using ZeroAlloc.Results;
 
 namespace Ariadne.NET.Tests.Sync;
 
@@ -122,12 +124,8 @@ public sealed class GitSyncIntegrationTests : IDisposable
                 Arg.Any<string>(),
                 Arg.Any<bool>(),
                 Arg.Any<CancellationToken>())
-            .Returns(callInfo => new SyncResult
-            {
-                ImportName = callInfo.ArgAt<ImportDefinition>(0).Name,
-                Success = true,
-                ResolvedVersion = "v2.1.0",
-            });
+            .Returns(callInfo => Result<SyncedImport, AriadneError>.Success(new SyncedImport(
+                callInfo.ArgAt<ImportDefinition>(0).Name, "v2.1.0", WasCached: false, "/tmp/cache")));
 
         // 2. Create manifest with 2 imports
         var manifest = new ImportsManifest
@@ -145,11 +143,7 @@ public sealed class GitSyncIntegrationTests : IDisposable
 
         // 4. Assert 2 results, all success, all with version "v2.1.0"
         results.Should().HaveCount(2);
-        results.Should().AllSatisfy(r =>
-        {
-            r.Success.Should().BeTrue();
-            r.ResolvedVersion.Should().Be("v2.1.0");
-        });
+        results.Should().AllSatisfy(r => r.Result.Value.ResolvedVersion.Should().Be("v2.1.0"));
     }
 
     [Fact]

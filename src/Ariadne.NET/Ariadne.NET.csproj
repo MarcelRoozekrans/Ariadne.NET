@@ -10,7 +10,13 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/MarcelRoozekrans/architecture-governance-engine</RepositoryUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- The generated registration is internal; the public AddAriadneNETServices wraps it and adds the git client proxy. -->
+    <ZeroAllocGeneratedAccessibility>Internal</ZeroAllocGeneratedAccessibility>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ariadne.NET.Tests" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Ariadne.NET.Abstractions\Ariadne.NET.Abstractions.csproj" />
@@ -19,10 +25,11 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.13" />
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
     <PackageReference Include="ZeroAlloc.Inject" Version="1.11.6" />
     <PackageReference Include="ZeroAlloc.Inject.Generator" Version="1.11.6" />
+    <PackageReference Include="ZeroAlloc.Resilience" Version="3.4.0" />
   </ItemGroup>
 
   <ItemGroup>

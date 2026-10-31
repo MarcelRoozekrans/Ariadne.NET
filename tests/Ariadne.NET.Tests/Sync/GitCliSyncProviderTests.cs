@@ -1,6 +1,7 @@
 using System.Text.Json;
-using FluentAssertions;
+using Ariadne.NET.Abstractions;
 using Ariadne.NET.Sync;
+using FluentAssertions;
 
 namespace Ariadne.NET.Tests.Sync;
 
@@ -217,7 +218,7 @@ public class GitCliSyncProviderTests
     }
 
     [Fact]
-    public async Task SyncAsync_InvalidVersionRange_ReturnsFailedResultWithMessage()
+    public async Task SyncAsync_InvalidVersionRange_IsInvalid()
     {
         var import = new ImportDefinition
         {
@@ -227,10 +228,101 @@ public class GitCliSyncProviderTests
             Version = "not-valid",
         };
 
-        var result = await new GitCliSyncProvider().SyncAsync(import, Path.GetTempPath(), noCache: true);
+        var result = await new GitCliSyncProvider(new FakeGitClient(new FakeGitScript()))
+            .SyncAsync(import, Path.GetTempPath(), noCache: true);
 
-        result.Success.Should().BeFalse();
-        result.ImportName.Should().Be("bad-range");
-        result.Error.Should().Be("Invalid semver range: 'not-valid'");
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().Be("Invalid semver range: 'not-valid'");
+    }
+
+    public static TheoryData<string?, string?, string?, string> IncompleteImports => new()
+    {
+        { null, "https://example.com/a.git", "^1.0", "An import has no name; give every import in imports.yaml a name." },
+        { "", "https://example.com/a.git", "^1.0", "An import has no name; give every import in imports.yaml a name." },
+        { "pack", null, "^1.0", "Import 'pack' has no url." },
+        { "pack", "", "^1.0", "Import 'pack' has no url." },
+        { "pack", "https://example.com/a.git", null, "Import 'pack' has no version." },
+        { "pack", "https://example.com/a.git", "", "Import 'pack' has no version." },
+        { "..", "https://example.com/a.git", "^1.0", "Import name '..' must not contain path separators or be '.' or '..'." },
+        { "../src", "https://example.com/a.git", "^1.0", "Import name '../src' must not contain path separators or be '.' or '..'." },
+        { "pack", "--upload-pack=touch x", "^1.0", "Import 'pack' has url '--upload-pack=touch x', which must not start with '-'." },
+    };
+
+    [Theory]
+    [MemberData(nameof(IncompleteImports))]
+    public async Task SyncAsync_IncompleteImport_IsInvalid_AndRunsNoGit(string? name, string? url, string? version, string message)
+    {
+        var git = new FakeGitScript();
+        var import = new ImportDefinition { Name = name!, Type = "git", Url = url!, Version = version! };
+
+        var result = await new GitCliSyncProvider(new FakeGitClient(git)).SyncAsync(import, Path.GetTempPath(), noCache: true);
+
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().Be(message);
+        git.LsRemoteCalls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task SyncAsync_NoTagSatisfiesRange_IsNotFound()
+    {
+        var import = new ImportDefinition { Name = "pack", Type = "git", Url = "https://example.com/a.git", Version = "^2.0" };
+
+        var result = await new GitCliSyncProvider(new FakeGitClient(new FakeGitScript()))
+            .SyncAsync(import, Path.GetTempPath(), noCache: true);
+
+        result.Error.Code.Should().Be(AriadneErrorCode.NotFound);
+        result.Error.Message.Should().Be("No tag satisfying '^2.0' found in https://example.com/a.git");
+    }
+
+    [Fact]
+    public async Task SyncAsync_FetchesThenServesFromCache()
+    {
+        var cacheDir = Path.Combine(Path.GetTempPath(), $"ariadne-provider-{Guid.NewGuid():N}");
+        var git = new FakeGitScript();
+        var sut = new GitCliSyncProvider(new FakeGitClient(git));
+        var import = new ImportDefinition { Name = "pack", Type = "git", Url = "https://example.com/a.git", Version = "^1.0" };
+
+        try
+        {
+            var fetched = await sut.SyncAsync(import, cacheDir, noCache: false);
+            var cached = await sut.SyncAsync(import, cacheDir, noCache: false);
+
+            fetched.Value.Should().Be(new SyncedImport("pack", "v1.0.0", WasCached: false, Path.Combine(cacheDir, "pack")));
+            cached.Value.Should().Be(new SyncedImport("pack", "v1.0.0", WasCached: true, Path.Combine(cacheDir, "pack")));
+            File.Exists(Path.Combine(cacheDir, "pack", "pack.yaml")).Should().BeTrue();
+            git.LsRemoteCalls.Should().Be(1);
+        }
+        finally
+        {
+            if (Directory.Exists(cacheDir))
+            {
+                Directory.Delete(cacheDir, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task SyncAsync_CacheCannotBeWritten_IsUnavailable()
+    {
+        var cacheDir = Path.Combine(Path.GetTempPath(), $"ariadne-provider-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(cacheDir);
+
+        // A file where the import's cache directory should go makes creating that directory fail.
+        File.WriteAllText(Path.Combine(cacheDir, "pack"), "not a directory");
+        var import = new ImportDefinition { Name = "pack", Type = "git", Url = "https://example.com/a.git", Version = "^1.0" };
+
+        try
+        {
+            var result = await new GitCliSyncProvider(new FakeGitClient(new FakeGitScript()))
+                .SyncAsync(import, cacheDir, noCache: true);
+
+            result.Error.Code.Should().Be(AriadneErrorCode.Unavailable);
+            result.Error.Message.Should().Be($"Import 'pack' could not be written to the cache at '{Path.Combine(cacheDir, "pack")}'.");
+            result.Error.Detail.Should().NotBeNullOrEmpty();
+        }
+        finally
+        {
+            Directory.Delete(cacheDir, recursive: true);
+        }
     }
 }

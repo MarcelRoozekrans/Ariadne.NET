@@ -1,52 +1,58 @@
+using Ariadne.NET.Abstractions;
 using ZeroAlloc.Inject;
+using ZeroAlloc.Results;
 
 namespace Ariadne.NET.Sync;
 
 [Singleton]
 public sealed class SyncOrchestrator(IGitSyncProvider gitProvider) : ISyncOrchestrator
 {
-    public async Task<IReadOnlyList<SyncResult>> SyncAllAsync(ImportsManifest manifest, string cacheDir, bool noCache, CancellationToken ct = default)
+    public async Task<IReadOnlyList<ImportSyncOutcome>> SyncAllAsync(ImportsManifest manifest, string cacheDir, bool noCache, CancellationToken ct = default)
     {
-        var results = new List<SyncResult>();
+        ArgumentNullException.ThrowIfNull(manifest);
+
+        var outcomes = new List<ImportSyncOutcome>(manifest.Imports.Count);
         foreach (var import in manifest.Imports)
         {
-            results.Add(await SyncSingleAsync(import, cacheDir, noCache, ct).ConfigureAwait(false));
+            outcomes.Add(await SyncSingleAsync(import, cacheDir, noCache, ct).ConfigureAwait(false));
         }
-        return results;
+
+        return outcomes;
     }
 
-    public async Task<IReadOnlyList<SyncResult>> SyncByNameAsync(ImportsManifest manifest, string name, string cacheDir, bool noCache, CancellationToken ct = default)
+    public async Task<IReadOnlyList<ImportSyncOutcome>> SyncByNameAsync(ImportsManifest manifest, string name, string cacheDir, bool noCache, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(manifest);
+
         var import = manifest.Imports.FirstOrDefault(i => string.Equals(i.Name, name, StringComparison.OrdinalIgnoreCase));
         if (import is null)
         {
             return
             [
-                new SyncResult
-                {
-                    ImportName = name,
-                    Success = false,
-                    Error = $"Import '{name}' not found in manifest."
-                }
+                new ImportSyncOutcome(
+                    name,
+                    Result<SyncedImport, AriadneError>.Failure(new AriadneError(
+                        AriadneErrorCode.NotFound,
+                        $"Import '{name}' not found in manifest."))),
             ];
         }
 
-        var result = await SyncSingleAsync(import, cacheDir, noCache, ct).ConfigureAwait(false);
-        return [result];
+        return [await SyncSingleAsync(import, cacheDir, noCache, ct).ConfigureAwait(false)];
     }
 
-    private async Task<SyncResult> SyncSingleAsync(ImportDefinition import, string cacheDir, bool noCache, CancellationToken ct)
+    private async Task<ImportSyncOutcome> SyncSingleAsync(ImportDefinition import, string cacheDir, bool noCache, CancellationToken ct)
     {
+        var importName = import.Name ?? string.Empty;
         if (!string.Equals(import.Type, "git", StringComparison.OrdinalIgnoreCase))
         {
-            return new SyncResult
-            {
-                ImportName = import.Name,
-                Success = false,
-                Error = $"Unsupported import type '{import.Type}'. Only 'git' is currently supported."
-            };
+            return new ImportSyncOutcome(
+                importName,
+                Result<SyncedImport, AriadneError>.Failure(new AriadneError(
+                    AriadneErrorCode.Invalid,
+                    $"Unsupported import type '{import.Type}'. Only 'git' is currently supported.")));
         }
 
-        return await gitProvider.SyncAsync(import, cacheDir, noCache, ct).ConfigureAwait(false);
+        var result = await gitProvider.SyncAsync(import, cacheDir, noCache, ct).ConfigureAwait(false);
+        return new ImportSyncOutcome(importName, result);
     }
 }

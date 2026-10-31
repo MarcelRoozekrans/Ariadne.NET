@@ -1,75 +1,99 @@
-using System.Diagnostics;
-using System.Globalization;
 using System.Text.Json;
 
+using Ariadne.NET.Abstractions;
 using ZeroAlloc.Inject;
+using ZeroAlloc.Resilience;
+using ZeroAlloc.Results;
 
 namespace Ariadne.NET.Sync;
 
 [Singleton]
-public sealed class GitCliSyncProvider : IGitSyncProvider
+internal sealed class GitCliSyncProvider : IGitSyncProvider
 {
-    public async Task<SyncResult> SyncAsync(
+    private readonly IGitClient _git;
+
+    /// <summary>Takes the git client the container builds: the resilience proxy around <see cref="GitCliClient"/>.</summary>
+    public GitCliSyncProvider(IGitClient git)
+    {
+        ArgumentNullException.ThrowIfNull(git);
+        _git = git;
+    }
+
+    public async Task<Result<SyncedImport, AriadneError>> SyncAsync(
         ImportDefinition import,
         string cacheDir,
         bool noCache,
         CancellationToken ct = default)
     {
-        var importCacheDir = Path.Combine(cacheDir, import.Name);
+        ArgumentNullException.ThrowIfNull(import);
+        ArgumentNullException.ThrowIfNull(cacheDir);
+
+        var checkedImport = ImportDefinitionCheck.Check(import);
+        if (checkedImport.IsFailure)
+        {
+            return Failure(checkedImport.Error);
+        }
+
         var parsedRange = SemVerRange.Parse(import.Version);
         if (parsedRange.IsFailure)
         {
-            return new SyncResult
-            {
-                ImportName = import.Name,
-                Success = false,
-                Error = parsedRange.Error.Message,
-            };
+            return Failure(parsedRange.Error);
         }
 
-        var versionRange = parsedRange.Value;
-
-        if (!noCache && IsCacheValid(importCacheDir, import.Url, versionRange))
+        var importCacheDir = Path.Combine(cacheDir, import.Name);
+        if (!noCache && IsCacheValid(importCacheDir, import.Url, parsedRange.Value))
         {
             var cachedInfo = ReadGitInfo(importCacheDir)!;
-            return new SyncResult
-            {
-                ImportName = import.Name,
-                ResolvedVersion = cachedInfo.ResolvedTag,
-                WasCached = true,
-                CachePath = importCacheDir,
-            };
+            return Success(new SyncedImport(import.Name, cachedInfo.ResolvedTag, WasCached: true, importCacheDir));
         }
 
-        var lsRemoteOutput = await RunGitAsync($"ls-remote --tags {import.Url}", ct).ConfigureAwait(false);
-        var tags = ParseTagsFromLsRemote(lsRemoteOutput);
-        var bestTag = versionRange.FindBestMatch(tags);
+        var lsRemote = await _git.RunAsync($"ls-remote --tags {import.Url}", ct).ConfigureAwait(false);
+        if (lsRemote.IsFailure)
+        {
+            return Failure(GitUnavailable(import, lsRemote.Error));
+        }
 
+        var bestTag = parsedRange.Value.FindBestMatch(ParseTagsFromLsRemote(lsRemote.Value));
         if (bestTag is null)
         {
-            return new SyncResult
-            {
-                ImportName = import.Name,
-                Success = false,
-                Error = $"No tag satisfying '{import.Version}' found in {import.Url}",
-            };
+            return Failure(new AriadneError(
+                AriadneErrorCode.NotFound,
+                $"No tag satisfying '{import.Version}' found in {import.Url}"));
         }
 
-        var commitSha = ParseCommitFromLsRemote(lsRemoteOutput, bestTag);
-
-        await CloneIntoCacheAsync(import, bestTag, importCacheDir, ct).ConfigureAwait(false);
-        await WriteGitInfoAsync(import.Url, bestTag, commitSha, importCacheDir, ct).ConfigureAwait(false);
-
-        return new SyncResult
-        {
-            ImportName = import.Name,
-            ResolvedVersion = bestTag,
-            WasCached = false,
-            CachePath = importCacheDir,
-        };
+        var commitSha = ParseCommitFromLsRemote(lsRemote.Value, bestTag);
+        var fetched = await FetchIntoCacheAsync(import, bestTag, commitSha, importCacheDir, ct).ConfigureAwait(false);
+        return fetched.IsFailure
+            ? Failure(fetched.Error)
+            : Success(new SyncedImport(import.Name, bestTag, WasCached: false, importCacheDir));
     }
 
-    private static async Task CloneIntoCacheAsync(ImportDefinition import, string tag, string importCacheDir, CancellationToken ct)
+    /// <summary>Clones <paramref name="tag"/> into the cache and records it; an IO failure is Unavailable for this import only.</summary>
+    private async Task<UnitResult<AriadneError>> FetchIntoCacheAsync(
+        ImportDefinition import, string tag, string? commitSha, string importCacheDir, CancellationToken ct)
+    {
+        try
+        {
+            var cloned = await CloneIntoCacheAsync(import, tag, importCacheDir, ct).ConfigureAwait(false);
+            if (cloned.IsFailure)
+            {
+                return UnitResult<AriadneError>.Failure(GitUnavailable(import, cloned.Error));
+            }
+
+            await WriteGitInfoAsync(import.Url, tag, commitSha, importCacheDir, ct).ConfigureAwait(false);
+            return UnitResult<AriadneError>.Success();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return UnitResult<AriadneError>.Failure(new AriadneError(
+                AriadneErrorCode.Unavailable,
+                $"Import '{import.Name}' could not be written to the cache at '{importCacheDir}'.",
+                ex.Message));
+        }
+    }
+
+    private async Task<UnitResult<ResilienceError>> CloneIntoCacheAsync(
+        ImportDefinition import, string tag, string importCacheDir, CancellationToken ct)
     {
         if (Directory.Exists(importCacheDir))
         {
@@ -82,15 +106,20 @@ public sealed class GitCliSyncProvider : IGitSyncProvider
 
         try
         {
-            await RunGitAsync(
+            var cloned = await _git.RunAsync(
                 $"clone --depth 1 --branch {tag} --single-branch {import.Url} \"{cloneTarget}\"",
                 ct).ConfigureAwait(false);
+            if (cloned.IsFailure)
+            {
+                return UnitResult<ResilienceError>.Failure(cloned.Error);
+            }
 
             var sourceDir = string.IsNullOrEmpty(import.Path)
                 ? cloneTarget
                 : Path.Combine(cloneTarget, import.Path);
 
             CopyPackFiles(sourceDir, importCacheDir);
+            return UnitResult<ResilienceError>.Success();
         }
         finally
         {
@@ -100,6 +129,22 @@ public sealed class GitCliSyncProvider : IGitSyncProvider
             }
         }
     }
+
+    /// <summary>
+    /// The proxy reports a timeout as the cancellation it caused, whose message says nothing about git;
+    /// a caller's own cancellation never gets here, because the proxy rethrows it.
+    /// </summary>
+    private static AriadneError GitUnavailable(ImportDefinition import, ResilienceError error) =>
+        new(
+            AriadneErrorCode.Unavailable,
+            $"git failed for import '{import.Name}' at {import.Url}.",
+            error.InnerException is OperationCanceledException ? "git did not finish before the timeout." : error.Reason);
+
+    private static Result<SyncedImport, AriadneError> Success(SyncedImport synced) =>
+        Result<SyncedImport, AriadneError>.Success(synced);
+
+    private static Result<SyncedImport, AriadneError> Failure(AriadneError error) =>
+        Result<SyncedImport, AriadneError>.Failure(error);
 
     private static async Task WriteGitInfoAsync(string url, string tag, string? commitSha, string importCacheDir, CancellationToken ct)
     {
@@ -229,6 +274,11 @@ public sealed class GitCliSyncProvider : IGitSyncProvider
         {
             return null;
         }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // An unreadable record counts as no cache; the fetch that follows reports any IO failure.
+            return null;
+        }
     }
 
     private static void CopyPackFiles(string sourceDir, string targetDir)
@@ -269,39 +319,5 @@ public sealed class GitCliSyncProvider : IGitSyncProvider
 
             File.Copy(filePath, destPath, overwrite: true);
         }
-    }
-
-    private static async Task<string> RunGitAsync(string arguments, CancellationToken ct)
-    {
-        using var process = new Process();
-        process.StartInfo = new ProcessStartInfo
-        {
-            FileName = "git",
-            Arguments = arguments,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-        };
-
-        process.Start();
-
-        var stdout = await process.StandardOutput.ReadToEndAsync(ct).ConfigureAwait(false);
-        var stderr = await process.StandardError.ReadToEndAsync(ct).ConfigureAwait(false);
-
-        await process.WaitForExitAsync(ct).ConfigureAwait(false);
-
-        if (process.ExitCode != 0)
-        {
-            throw new InvalidOperationException(
-                string.Format(
-                    CultureInfo.InvariantCulture,
-                    "git {0} failed with exit code {1}: {2}",
-                    arguments,
-                    process.ExitCode,
-                    stderr));
-        }
-
-        return stdout;
     }
 }
