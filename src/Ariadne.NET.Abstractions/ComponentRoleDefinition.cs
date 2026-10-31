@@ -10,7 +10,9 @@ public sealed class ComponentRoleDefinition
     public CSharpTypeKind TypeKind { get; init; } = CSharpTypeKind.Class;
     public bool RequiresInterface { get; init; }
     public string? InterfaceRole { get; init; }
-    public string Accessibility { get; init; } = "public";
+    [NotNull] public string Accessibility { get; init; } = "public";
     public string Description { get; init; } = "";
-    public IList<string> AlternativeNames { get; init; } = [];
+    [NotNull, Must(nameof(HasNoNullEntries))] public IList<string> AlternativeNames { get; init; } = [];
+
+    internal bool HasNoNullEntries<T>(IList<T>? items) => items is null || !items.Any(static i => i is null);
 }

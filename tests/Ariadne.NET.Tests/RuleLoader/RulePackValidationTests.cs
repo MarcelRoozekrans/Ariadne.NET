@@ -248,19 +248,39 @@ public class RulePackValidationTests
     }
 
     [Theory]
-    [InlineData("name: p\nlayers: ~\n")]
-    [InlineData("name: p\nlayers:\n  - ~\n")]
-    [InlineData("name: p\ncomponentRoles: ~\n")]
-    [InlineData("name: p\ncomponentRoles:\n  - ~\n")]
-    [InlineData("name: p\ncodeFeatureRules:\n  - ~\n")]
-    [InlineData("name: p\nlayers:\n  - name: A\n    allowedDependencies:\n      - ~\n")]
-    public void Null_yaml_entries_are_invalid_and_never_throw(string yaml)
+    [InlineData("name: p\nextends: ~\n", "Extends: Extends must not be null.")]
+    [InlineData("name: p\nextends:\n  - ~\n", "Extends: Extends is invalid.")]
+    [InlineData("name: p\nlayers: ~\n", "Layers: Layers must not be null.")]
+    [InlineData("name: p\nlayers:\n  - ~\n", "Layers: Layers is invalid.")]
+    [InlineData("name: p\ncomponentRoles: ~\n", "ComponentRoles: ComponentRoles must not be null.")]
+    [InlineData("name: p\ncomponentRoles:\n  - ~\n", "ComponentRoles: ComponentRoles is invalid.")]
+    [InlineData("name: p\ncodeFeatureRules: ~\n", "CodeFeatureRules: CodeFeatureRules must not be null.")]
+    [InlineData("name: p\ncodeFeatureRules:\n  - ~\n", "CodeFeatureRules: CodeFeatureRules is invalid.")]
+    [InlineData("name: p\nnamingConventions: ~\n", "NamingConventions: NamingConventions must not be null.")]
+    [InlineData("name: p\nlayers:\n  - name: A\n    allowedDependencies: ~\n", "Layers[0].AllowedDependencies: AllowedDependencies must not be null.")]
+    [InlineData("name: p\nlayers:\n  - name: A\n    allowedDependencies:\n      - ~\n", "Layers[0].AllowedDependencies: AllowedDependencies is invalid.")]
+    [InlineData("name: p\ncomponentRoles:\n  - name: R\n    layer: L\n    alternativeNames: ~\n", "ComponentRoles[0].AlternativeNames: AlternativeNames must not be null.")]
+    [InlineData("name: p\ncomponentRoles:\n  - name: R\n    layer: L\n    alternativeNames:\n      - ~\n", "ComponentRoles[0].AlternativeNames: AlternativeNames is invalid.")]
+    [InlineData("name: p\ncomponentRoles:\n  - name: R\n    layer: L\n    accessibility: ~\n", "ComponentRoles[0].Accessibility: Accessibility must not be null.")]
+    [InlineData("name: p\nnamingConventions:\n  namespace: ~\n", "NamingConventions.Namespace: Namespace must not be empty.")]
+    [InlineData("name: p\nnamingConventions:\n  filePath: ~\n", "NamingConventions.FilePath: FilePath must not be empty.")]
+    public void Null_yaml_members_are_invalid_and_never_throw(string yaml, string expectedLine)
     {
         var loaded = _loader.LoadFromString(yaml);
 
         loaded.IsFailure.Should().BeTrue();
         loaded.Error.Code.Should().Be(AriadneErrorCode.Invalid);
-        loaded.Error.Detail.Should().Contain(": must not be null.");
+        loaded.Error.Message.Should().Be("Rule pack 'p' is invalid.");
+        loaded.Error.Detail!.Split('\n').Should().Contain(expectedLine);
+    }
+
+    [Fact]
+    public void Null_and_member_failures_come_back_in_one_error()
+    {
+        var result = _loader.LoadFromString("name: p\nlayers:\n  - name: \"\"\ncomponentRoles: ~\n");
+
+        result.Error.Detail!.Split('\n').Should().HaveCount(2);
+        result.Error.Detail.Should().Contain("Layers[0].Name").And.Contain("ComponentRoles");
     }
 
     [Fact]
