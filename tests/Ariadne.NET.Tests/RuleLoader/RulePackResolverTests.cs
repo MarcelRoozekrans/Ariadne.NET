@@ -1,3 +1,4 @@
+using System.Runtime.Versioning;
 using FluentAssertions;
 using Ariadne.NET.Abstractions;
 using Ariadne.NET.RuleEngine;
@@ -207,5 +208,68 @@ public class RulePackResolverTests
     {
         var loader = new YamlRulePackLoader();
         return new RulePackResolver(new BuiltinPackRegistry(loader), loader, new RulePackMerger());
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("..")]
+    [InlineData("../../x")]
+    [InlineData("/abs")]
+    [InlineData("a/b")]
+    [InlineData("a\\b")]
+    [InlineData("a\0b")]
+    public void Resolve_ImportNameThatIsNotOneDirectory_ReturnsInvalid_AndReadsNothing(string importName)
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-resolver-{Guid.NewGuid():N}");
+
+        // A pack outside the cache that '../../x' would reach if the name were not checked.
+        var outside = Path.Combine(tempDir, ".architecture", "x");
+        Directory.CreateDirectory(outside);
+        File.WriteAllText(Path.Combine(outside, "x.yaml"), "name: outside\n");
+        Directory.CreateDirectory(Path.Combine(tempDir, ".architecture", ".cache", "git"));
+
+        try
+        {
+            var result = CreateResolver().Resolve(
+                new RulePack { Name = "user-rules", Extends = [$"import://{importName}"] },
+                tempDir);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+            result.Error.Message.Should().Be(
+                $"Import name '{importName}' must be a plain directory name: no path separators, drive, '.' or '..', or characters such as ':' or '*'.");
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [UnixNonRootFact]
+    [UnsupportedOSPlatform("windows")]
+    public void Resolve_ImportCacheDirCannotBeRead_ReturnsUnavailable()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-resolver-{Guid.NewGuid():N}");
+        var cacheDir = Path.Combine(tempDir, ".architecture", ".cache", "git", "locked");
+        Directory.CreateDirectory(cacheDir);
+        File.WriteAllText(Path.Combine(cacheDir, "locked.yaml"), "name: locked\n");
+        File.SetUnixFileMode(cacheDir, UnixFileMode.None);
+
+        try
+        {
+            var result = CreateResolver().Resolve(
+                new RulePack { Name = "user-rules", Extends = ["import://locked"] },
+                tempDir);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be(AriadneErrorCode.Unavailable);
+            result.Error.Message.Should().Be($"Cache directory for import 'locked' could not be read at '{cacheDir}'.");
+            result.Error.Detail.Should().NotBeNullOrEmpty();
+        }
+        finally
+        {
+            File.SetUnixFileMode(cacheDir, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            Directory.Delete(tempDir, true);
+        }
     }
 }

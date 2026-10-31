@@ -7,7 +7,7 @@ public sealed class ComponentRoleDefinition
 {
     [NotEmpty] public required string Name { get; init; }
     [NotEmpty] public required string Layer { get; init; }
-    public CSharpTypeKind TypeKind { get; init; } = CSharpTypeKind.Class;
+    [IsInEnum] public CSharpTypeKind TypeKind { get; init; } = CSharpTypeKind.Class;
     public bool RequiresInterface { get; init; }
     public string? InterfaceRole { get; init; }
     [NotNull] public string Accessibility { get; init; } = "public";

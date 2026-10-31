@@ -1,5 +1,6 @@
 using Ariadne.NET.Abstractions;
 using Ariadne.NET.RuleEngine;
+using Ariadne.NET.Sync;
 using Ariadne.NET.Telemetry;
 
 using ZeroAlloc.Results;
@@ -127,7 +128,16 @@ internal sealed class PackOperations : IPackOperations
                 $"Cannot resolve import '{importName}' without a working directory. Run 'ariadne sync' first to fetch imported packs."));
         }
 
-        var cacheDir = Path.Combine(workingDirectory, ".architecture", ".cache", "git", importName);
+        // Sync refuses the same names, so a name that leaves the cache can only be a hand-written reference.
+        var cacheRoot = Path.Combine(workingDirectory, ".architecture", ".cache", "git");
+        if (!ImportDefinitionCheck.IsSingleDirectoryName(importName, cacheRoot))
+        {
+            return Result<RulePack, AriadneError>.Failure(new AriadneError(
+                AriadneErrorCode.Invalid,
+                ImportDefinitionCheck.BadNameMessage(importName)));
+        }
+
+        var cacheDir = Path.Combine(cacheRoot, importName);
 
         if (!Directory.Exists(cacheDir))
         {
@@ -137,7 +147,19 @@ internal sealed class PackOperations : IPackOperations
                 cacheDir));
         }
 
-        var yamlFiles = Directory.GetFiles(cacheDir, "*.yaml", SearchOption.TopDirectoryOnly);
+        string[] yamlFiles;
+        try
+        {
+            yamlFiles = Directory.GetFiles(cacheDir, "*.yaml", SearchOption.TopDirectoryOnly);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // A directory without read permission, or one removed since the check above, lands here.
+            return Result<RulePack, AriadneError>.Failure(new AriadneError(
+                AriadneErrorCode.Unavailable,
+                $"Cache directory for import '{importName}' could not be read at '{cacheDir}'.",
+                ex.Message));
+        }
 
         if (yamlFiles.Length == 0)
         {

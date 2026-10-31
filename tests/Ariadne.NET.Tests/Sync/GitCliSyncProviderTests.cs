@@ -739,4 +739,26 @@ public class GitCliSyncProviderTests
             Directory.Delete(cacheDir, recursive: true);
         }
     }
+
+    [Theory]
+    [InlineData("a\0b")]
+    [InlineData("\0")]
+    public async Task SyncAsync_PathWithANulCharacter_IsInvalid_AndCopiesNothing(string path)
+    {
+        var cacheDir = NewCacheDir();
+        var import = new ImportDefinition { Name = "pack", Type = "git", Url = "https://example.com/a.git", Version = "^1.0", Path = path };
+
+        try
+        {
+            var result = await new GitCliSyncProvider(new FakeGitClient(new FakeGitScript())).SyncAsync(import, cacheDir, noCache: true);
+
+            result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+            result.Error.Message.Should().Be($"Import 'pack' has path '{path}', which contains a character that is not allowed in a path.");
+            Directory.Exists(Path.Combine(cacheDir, "pack")).Should().BeFalse();
+        }
+        finally
+        {
+            DeleteDir(cacheDir);
+        }
+    }
 }

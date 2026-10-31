@@ -16,6 +16,9 @@ internal static partial class ImportDefinitionCheck
     private static readonly char[] InvalidNameChars =
         [.. Path.GetInvalidFileNameChars().Union(['/', '\\', ':', '*', '?', '"', '<', '>', '|'])];
 
+    // The platform's invalid path characters, plus NUL, which Path.GetFullPath rejects on every platform.
+    private static readonly char[] InvalidPathChars = [.. Path.GetInvalidPathChars().Union(['\0'])];
+
     public static UnitResult<AriadneError> Check(ImportDefinition import, string cacheDir)
     {
         if (string.IsNullOrWhiteSpace(import.Name))
@@ -25,8 +28,7 @@ internal static partial class ImportDefinitionCheck
 
         if (!IsSingleDirectoryName(import.Name, cacheDir))
         {
-            return Invalid(
-                $"Import name '{import.Name}' must be a plain directory name: no path separators, drive, '.' or '..', or characters such as ':' or '*'.");
+            return Invalid(BadNameMessage(import.Name));
         }
 
         if (string.IsNullOrWhiteSpace(import.Url))
@@ -59,6 +61,12 @@ internal static partial class ImportDefinitionCheck
             return UnitResult<AriadneError>.Success();
         }
 
+        // Path.GetFullPath throws on these, so they are refused before it runs.
+        if (import.Path.IndexOfAny(InvalidPathChars) >= 0)
+        {
+            return Invalid($"Import '{import.Name}' has path '{import.Path}', which contains a character that is not allowed in a path.");
+        }
+
         var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(cloneDir));
         var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.Combine(root, import.Path)));
         var inside = !Path.IsPathRooted(import.Path)
@@ -78,8 +86,15 @@ internal static partial class ImportDefinitionCheck
             : UnitResult<AriadneError>.Success();
     }
 
-    // The name becomes a directory directly under the cache, which sync deletes and recreates.
-    private static bool IsSingleDirectoryName(string name, string cacheDir)
+    /// <summary>The message for an import name that <see cref="IsSingleDirectoryName"/> refuses.</summary>
+    internal static string BadNameMessage(string name) =>
+        $"Import name '{name}' must be a plain directory name: no path separators, drive, '.' or '..', or characters such as ':' or '*'.";
+
+    /// <summary>
+    /// Whether <paramref name="name"/> names one directory directly under <paramref name="cacheDir"/>. Sync deletes and
+    /// recreates that directory, and the resolver reads <c>import://</c> packs from it, so neither may leave the cache.
+    /// </summary>
+    internal static bool IsSingleDirectoryName(string name, string cacheDir)
     {
         if (name is "." or ".." || Path.IsPathRooted(name) || name.IndexOfAny(InvalidNameChars) >= 0)
         {

@@ -294,4 +294,35 @@ public class RulePackValidationTests
 
         result.IsSuccess.Should().BeTrue(result.IsFailure ? $"{result.Error.Message} {result.Error.Detail}" : "");
     }
+
+    [Fact]
+    public void Role_with_a_named_type_kind_loads()
+    {
+        var result = _loader.LoadFromString("""
+            name: p
+            componentRoles:
+              - name: Command
+                layer: Application
+                typeKind: RecordStruct
+            """);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.ComponentRoles[0].TypeKind.Should().Be(CSharpTypeKind.RecordStruct);
+    }
+
+    [Fact]
+    public void Role_with_an_undefined_type_kind_is_invalid()
+    {
+        var result = _loader.LoadFromString("""
+            name: p
+            componentRoles:
+              - name: Command
+                layer: Application
+                typeKind: 99
+            """);
+
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().Be("Rule pack 'p' is invalid.");
+        result.Error.Detail.Should().StartWith("ComponentRoles[0].TypeKind: ");
+    }
 }
