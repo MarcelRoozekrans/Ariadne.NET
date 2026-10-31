@@ -47,7 +47,7 @@ public static class RulesCommand
         if (!File.Exists(rulesPath))
         {
             throw new FileNotFoundException(
-                "No .architecture/rules.yaml found. Run 'arch init' first.",
+                "No .architecture/rules.yaml found. Run 'ariadne init' first.",
                 rulesPath);
         }
 

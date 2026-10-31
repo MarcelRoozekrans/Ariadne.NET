@@ -1,3 +1,4 @@
+using System.Reflection;
 using FluentAssertions;
 using Ariadne.NET.RuleLoader;
 using Ariadne.NET.Mcp.Resources;
@@ -19,9 +20,7 @@ public class PackResourcesTests
     {
         var attribute = typeof(PackResources)
             .GetMethod(nameof(PackResources.GetPackContent))!
-            .GetCustomAttributes(typeof(McpServerResourceAttribute), inherit: false)
-            .Cast<McpServerResourceAttribute>()
-            .Single();
+            .GetCustomAttribute<McpServerResourceAttribute>()!;
 
         attribute.UriTemplate.Should().Be("ariadne://packs/{name}");
     }

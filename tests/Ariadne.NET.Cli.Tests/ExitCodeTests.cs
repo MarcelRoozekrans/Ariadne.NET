@@ -116,6 +116,26 @@ public sealed class ExitCodeTests : IDisposable
     }
 
     [Fact]
+    public void Rules_MissingRulesFile_TellsUserToRunAriadneInit()
+    {
+        File.Delete(Path.Combine(_tempDir, ".architecture", "rules.yaml"));
+        var originalError = Console.Error;
+        using var error = new StringWriter();
+        Console.SetError(error);
+
+        try
+        {
+            Run("rules");
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
+
+        error.ToString().Should().Contain("Run 'ariadne init'");
+    }
+
+    [Fact]
     public void Sync_MissingImportsFile_ShouldReturnError()
     {
         Run("sync").Should().Be(ExitCodes.Error);

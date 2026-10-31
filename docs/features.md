@@ -115,6 +115,8 @@ Detected violations:
 - **AccessibilityMismatch** — a type's accessibility modifier doesn't match the role definition
 - **MissingInterface** — a role requires an interface but none was found
 
+> Until the `ariadne` dotnet tool ships, run these commands as `dotnet run --project src/Ariadne.NET.Cli -- <command>`.
+
 ```bash
 # CLI
 ariadne validate ./src

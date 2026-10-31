@@ -4,7 +4,7 @@ slug: /
 title: Introduction
 ---
 
-# Architecture Governance Engine
+# Ariadne.NET
 
 A pluggable, pattern-agnostic architecture governance engine that enforces structural rules for AI code generation via declarative YAML rule packs.
 
@@ -17,6 +17,8 @@ AI coding agents generate behavior effectively but are unreliable at structural 
 ## Quick Start
 
 ### CLI
+
+> Until the `ariadne` dotnet tool ships, run these commands as `dotnet run --project src/Ariadne.NET.Cli -- <command>`.
 
 ```bash
 # Initialize a project with clean architecture rules

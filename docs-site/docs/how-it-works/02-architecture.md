@@ -26,6 +26,7 @@ graph TD
 
     subgraph tests
         CoreTests["Ariadne.NET.Tests<br/><i>Unit + integration tests</i>"]
+        CliTests["Ariadne.NET.Cli.Tests<br/><i>CLI exit-code tests</i>"]
         McpTests["Ariadne.NET.Mcp.Tests<br/><i>MCP tool + resource tests</i>"]
     end
 ```

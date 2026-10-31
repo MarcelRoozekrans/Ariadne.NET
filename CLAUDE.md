@@ -21,8 +21,8 @@ dotnet test src/Ariadne.NET.slnx --filter "FullyQualifiedName=Ariadne.NET.Tests.
 
 # Run hosts
 dotnet run --project src/Ariadne.NET.Cli -- <init|rules|roles|generate|validate|lint|sync> [...]
-dotnet run --project src/Ariadne.NET.Mcp      # MCP over stdio
-dotnet run --project src/Ariadne.NET.Mcp.Http      # MCP over HTTP at /mcp
+dotnet run --project src/Ariadne.NET.Mcp        # MCP over stdio
+dotnet run --project src/Ariadne.NET.Mcp.Http   # MCP over HTTP at /mcp
 
 # Docs site (Docusaurus, deployed to GitHub Pages)
 cd docs-site && npm ci && npm run start
