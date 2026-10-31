@@ -7,7 +7,9 @@ namespace Ariadne.NET.Telemetry;
 /// <remarks>
 /// The spans are <c>ariadne.load</c>, <c>ariadne.resolve</c>, <c>ariadne.get_pack</c> and <c>ariadne.sync_import</c>. A span
 /// whose operation returns a failed Result has the Error status and carries <see cref="ErrorCode"/>. Tags carry pack and
-/// import names, never file contents, YAML text or urls.
+/// import names, never file contents, YAML text or urls. The generator adds two more things on its own. An operation
+/// that throws, which only a bug does, gets an <c>error.type</c> tag and the exception message as its status description.
+/// A call the caller cancels gets a <c>cancelled</c> tag and is not an error.
 /// </remarks>
 public static class AriadneTelemetry
 {

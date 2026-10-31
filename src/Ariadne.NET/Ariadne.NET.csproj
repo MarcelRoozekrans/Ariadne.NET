@@ -30,7 +30,12 @@
     <PackageReference Include="ZeroAlloc.Inject" Version="1.11.6" />
     <PackageReference Include="ZeroAlloc.Inject.Generator" Version="1.11.6" />
     <PackageReference Include="ZeroAlloc.Resilience" Version="3.4.0" />
-    <PackageReference Include="ZeroAlloc.Telemetry" Version="1.12.7" />
+    <!--
+      The [Instrument] attributes are needed at run time, so the library flows to consumers. The bundled proxy generator
+      runs for this library only: PrivateAssets keeps its analyzer and build assets out of consumers' builds, as Minos.NET
+      does. NuGet may still flow the analyzer, NuGet/Home#6720, where it stays inert without [Instrument].
+    -->
+    <PackageReference Include="ZeroAlloc.Telemetry" Version="1.12.7" PrivateAssets="analyzers;build;buildtransitive" />
   </ItemGroup>
 
   <ItemGroup>

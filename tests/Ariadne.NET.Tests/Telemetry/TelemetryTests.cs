@@ -165,11 +165,20 @@ public sealed class TelemetryTests : IDisposable
         var span = capture.Spans(SyncImportSpan).Should().ContainSingle().Subject;
         span.Status.Should().NotBe(ActivityStatusCode.Error);
         span.GetTagItem("error.type").Should().BeNull();
+
+        var point = capture.Points(AriadneTelemetry.OperationDuration).Should().ContainSingle().Subject;
+        point.HasTag(AriadneTelemetry.ErrorCode).Should().BeFalse();
+        point.HasTag("error.type").Should().BeFalse();
     }
 
     [Fact]
     public async Task WithoutAListener_TheResultsAreTheSame()
     {
+        using (var probe = new ActivitySource(AriadneTelemetry.SourceName))
+        {
+            probe.HasListeners().Should().BeFalse("the first run must take the proxies' no-listener path");
+        }
+
         var unlistened = await RunEveryOperationAsync();
 
         Snapshot listened;

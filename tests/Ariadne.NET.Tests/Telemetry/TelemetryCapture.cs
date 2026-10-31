@@ -85,8 +85,14 @@ internal sealed class TelemetryCapture : IDisposable
             return ActivitySamplingResult.AllDataAndRecorded;
         }
 
-        // An engine span belongs to this test only if it runs under the test's root span. Until the root has started,
-        // the trace id is the default one, which no real span has.
+        // An engine span belongs to this test only if it runs under the test's root span. A span with no parent, such as
+        // one from a test on another thread, is never this test's; checking that first also covers the moment before the
+        // root has started, when _traceId is still the default that a parent-less span's parent has.
+        if (options.Parent == default)
+        {
+            return ActivitySamplingResult.None;
+        }
+
         return options.Parent.TraceId == _traceId
             ? ActivitySamplingResult.AllDataAndRecorded
             : ActivitySamplingResult.None;
