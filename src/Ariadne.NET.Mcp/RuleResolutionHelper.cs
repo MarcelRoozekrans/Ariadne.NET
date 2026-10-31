@@ -6,7 +6,7 @@ using ZeroAlloc.Inject;
 namespace Ariadne.NET.Mcp;
 
 [Singleton]
-public sealed class RuleResolutionHelper
+public sealed class RuleResolutionHelper : IRuleResolutionHelper
 {
     private readonly IBuiltinPackRegistry _registry;
     private readonly IRulePackResolver _resolver;

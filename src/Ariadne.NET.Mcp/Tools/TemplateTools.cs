@@ -17,7 +17,7 @@ public static class TemplateTools
     [McpServerTool(Name = "get_layers")]
     [Description("Get architecture layer definitions with allowed dependencies. If no template specified, uses .architecture/rules.yaml or defaults to clean-architecture.")]
     public static IList<LayerDefinition> GetLayers(
-        RuleResolutionHelper helper,
+        IRuleResolutionHelper helper,
         [Description("Template name (e.g. 'clean-architecture'). Optional - auto-detects from .architecture/rules.yaml if omitted.")]
         string? template = null)
     {

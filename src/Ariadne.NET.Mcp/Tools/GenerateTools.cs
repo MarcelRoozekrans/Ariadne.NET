@@ -10,7 +10,7 @@ public static class GenerateTools
     [McpServerTool(Name = "generate_component")]
     [Description("Generate a C# component (class, interface, record, etc.) that conforms to architecture rules. Returns the file path and generated source code.")]
     public static GenerateResult GenerateComponent(
-        RuleResolutionHelper helper,
+        IRuleResolutionHelper helper,
         IGenerateOrchestrator orchestrator,
         [Description("Component role (e.g. Entity, Repository, Controller, CommandHandler). Use get_component_roles to see available roles.")]
         string role,
@@ -41,7 +41,7 @@ public static class GenerateTools
     [McpServerTool(Name = "generate_workspace")]
     [Description("Scaffold the full project directory and .csproj path structure for a solution based on architecture layers and naming conventions.")]
     public static WorkspaceGenerateResult GenerateWorkspace(
-        RuleResolutionHelper helper,
+        IRuleResolutionHelper helper,
         IWorkspaceOrchestrator orchestrator,
         [Description("Solution name (e.g. MyApp). Used for project naming.")]
         string solution,

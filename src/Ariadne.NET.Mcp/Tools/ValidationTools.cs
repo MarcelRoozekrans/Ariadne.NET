@@ -10,7 +10,7 @@ public static class ValidationTools
     [McpServerTool(Name = "validate_source")]
     [Description("Validate existing source files against architecture dependency rules. Checks that using directives comply with layer dependency constraints (e.g. Domain cannot reference Infrastructure).")]
     public static SourceValidationResult ValidateSource(
-        RuleResolutionHelper helper,
+        IRuleResolutionHelper helper,
         ISourceValidator validator,
         [Description("Absolute or relative path to the source directory to validate.")]
         string sourceDirectory,
@@ -24,7 +24,7 @@ public static class ValidationTools
     [McpServerTool(Name = "lint_source")]
     [Description("Lint source files for namespace-vs-directory layer mismatches. Lighter than validate - checks that namespace segments match the directory-based layer structure.")]
     public static LintResult LintSource(
-        RuleResolutionHelper helper,
+        IRuleResolutionHelper helper,
         ILinter linter,
         [Description("Absolute or relative path to the source directory to lint.")]
         string sourceDirectory,
