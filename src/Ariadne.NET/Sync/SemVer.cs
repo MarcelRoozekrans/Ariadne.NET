@@ -16,24 +16,41 @@ public sealed partial class SemVer : IComparable<SemVer>, IEquatable<SemVer>
         Patch = patch;
     }
 
-    public static bool TryParse(string input, out SemVer? version)
+    /// <summary>
+    /// Parses <c>[v]major.minor[.patch]</c> with ASCII digits. Null, any other text and a part above
+    /// <see cref="int.MaxValue"/> return <see langword="false"/>; nothing throws.
+    /// </summary>
+    public static bool TryParse(string? input, out SemVer? version)
     {
         version = null;
-
-        var match = VersionRegex().Match(input);
-        if (!match.Success)
+        if (input is null)
         {
             return false;
         }
 
-        var major = int.Parse(match.Groups["major"].Value, CultureInfo.InvariantCulture);
-        var minor = int.Parse(match.Groups["minor"].Value, CultureInfo.InvariantCulture);
-        var patch = match.Groups["patch"].Success
-            ? int.Parse(match.Groups["patch"].Value, CultureInfo.InvariantCulture)
-            : 0;
+        var match = VersionRegex().Match(input);
+        if (!match.Success
+            || !TryParsePart(match.Groups["major"], out var major)
+            || !TryParsePart(match.Groups["minor"], out var minor)
+            || !TryParsePart(match.Groups["patch"], out var patch))
+        {
+            return false;
+        }
 
         version = new SemVer(major, minor, patch);
         return true;
+    }
+
+    /// <summary>An absent group is 0, as for a missing patch; a value that does not fit an int fails.</summary>
+    private static bool TryParsePart(Group group, out int value)
+    {
+        if (!group.Success)
+        {
+            value = 0;
+            return true;
+        }
+
+        return int.TryParse(group.ValueSpan, NumberStyles.None, CultureInfo.InvariantCulture, out value);
     }
 
     public int CompareTo(SemVer? other)
@@ -76,6 +93,6 @@ public sealed partial class SemVer : IComparable<SemVer>, IEquatable<SemVer>
 
     public static bool operator >=(SemVer? left, SemVer? right) => left is null ? right is null : left.CompareTo(right) >= 0;
 
-    [GeneratedRegex(@"^v?(?<major>\d+)\.(?<minor>\d+)(?:\.(?<patch>\d+))?$", RegexOptions.ExplicitCapture, matchTimeoutMilliseconds: 1000)]
+    [GeneratedRegex(@"^v?(?<major>[0-9]+)\.(?<minor>[0-9]+)(?:\.(?<patch>[0-9]+))?$", RegexOptions.ExplicitCapture, matchTimeoutMilliseconds: 1000)]
     private static partial Regex VersionRegex();
 }

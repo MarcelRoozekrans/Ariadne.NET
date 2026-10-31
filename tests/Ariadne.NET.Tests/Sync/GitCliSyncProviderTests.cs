@@ -682,4 +682,61 @@ public class GitCliSyncProviderTests
             Directory.Delete(dir, recursive: true);
         }
     }
+
+    [Fact]
+    public void ParseTagsFromLsRemote_OverflowingTag_IsIgnored()
+    {
+        var output = string.Join("\n", new[]
+        {
+            "aaa1234567890123456789012345678901234567\trefs/tags/v99999999999.0.0",
+            "bbb1234567890123456789012345678901234567\trefs/tags/v1.1.0",
+        });
+
+        SyncOperations.ParseTagsFromLsRemote(output).Should().Equal("v1.1.0");
+    }
+
+    [Fact]
+    public void IsCacheValid_NullCachedTag_ShouldReturnFalse()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        try
+        {
+            Directory.CreateDirectory(tempDir);
+            File.WriteAllText(
+                Path.Combine(tempDir, ".git-info.json"),
+                """{ "url": "https://example.com/repo.git", "resolvedTag": null, "commitSha": "abc", "syncedAt": "2026-01-01T00:00:00Z" }""");
+
+            SyncOperations.IsCacheValid(tempDir, "https://example.com/repo.git", SemVerRange.Parse("^1.0").Value)
+                .Should().BeFalse();
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task SyncAsync_NullCachedTag_RefetchesTheImport()
+    {
+        var cacheDir = Path.Combine(Path.GetTempPath(), $"ariadne-provider-{Guid.NewGuid():N}");
+        var importDir = Path.Combine(cacheDir, "pack");
+        Directory.CreateDirectory(importDir);
+        File.WriteAllText(
+            Path.Combine(importDir, ".git-info.json"),
+            """{ "url": "https://example.com/a.git", "resolvedTag": null, "commitSha": "abc", "syncedAt": "2026-01-01T00:00:00Z" }""");
+        var git = new FakeGitScript();
+        var import = new ImportDefinition { Name = "pack", Type = "git", Url = "https://example.com/a.git", Version = "^1.0" };
+
+        try
+        {
+            var result = await new GitCliSyncProvider(new FakeGitClient(git)).SyncAsync(import, cacheDir, noCache: false);
+
+            result.Value.Should().Be(new SyncedImport("pack", "v1.0.0", WasCached: false, importDir));
+            git.CloneCalls.Should().Be(1);
+        }
+        finally
+        {
+            Directory.Delete(cacheDir, recursive: true);
+        }
+    }
 }

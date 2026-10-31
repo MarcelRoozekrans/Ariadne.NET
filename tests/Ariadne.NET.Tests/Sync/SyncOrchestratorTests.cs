@@ -185,4 +185,41 @@ public class SyncOrchestratorTests
 
         outcomes.Should().ContainSingle(o => o.ImportName == "pack-b" && o.Result.IsSuccess);
     }
+
+    [Fact]
+    public async Task SyncAllAsync_OverflowingRemoteTag_FailsOnlyThatImport()
+    {
+        var cacheDir = Path.Combine(Path.GetTempPath(), $"ariadne-orchestrator-{Guid.NewGuid():N}");
+
+        // The first import's remote has only an out-of-range tag; the second has a normal one.
+        var git = new FakeGitScript
+        {
+            LsRemote = (call, _) => call == 1 ? "abc123\trefs/tags/v99999999999.0.0\n" : FakeGitScript.Tags,
+        };
+        var sut = new SyncOrchestrator(new GitCliSyncProvider(new FakeGitClient(git)));
+        var manifest = new ImportsManifest
+        {
+            Imports =
+            [
+                new ImportDefinition { Name = "odd", Type = "git", Url = "https://example.com/odd.git", Version = "^1.0" },
+                new ImportDefinition { Name = "pack", Type = "git", Url = "https://example.com/a.git", Version = "^1.0" },
+            ],
+        };
+
+        try
+        {
+            var outcomes = await sut.SyncAllAsync(manifest, cacheDir, noCache: true);
+
+            outcomes.Should().HaveCount(2);
+            outcomes[0].Result.Error.Code.Should().Be(AriadneErrorCode.NotFound);
+            outcomes[1].Result.Value.ResolvedVersion.Should().Be("v1.0.0");
+        }
+        finally
+        {
+            if (Directory.Exists(cacheDir))
+            {
+                Directory.Delete(cacheDir, recursive: true);
+            }
+        }
+    }
 }

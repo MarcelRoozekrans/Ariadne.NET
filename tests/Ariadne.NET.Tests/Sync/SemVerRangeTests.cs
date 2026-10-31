@@ -156,4 +156,35 @@ public class SemVerRangeTests
 
         range.FindBestMatch(tags).Should().BeNull();
     }
+
+    [Theory]
+    [InlineData("^99999999999.0.0")]
+    [InlineData("~1.99999999999")]
+    [InlineData("1.0.99999999999")]
+    [InlineData("^١.٠.٠")]
+    public void Parse_OutOfRangeOrNonAsciiNumbers_ReturnsInvalid(string range)
+    {
+        var result = SemVerRange.Parse(range);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("v99999999999.0.0")]
+    [InlineData("v1.2147483648.0")]
+    [InlineData("v١.٠.٠")]
+    public void TryParse_NullOverflowOrNonAsciiDigits_ReturnsFalse(string? input)
+    {
+        SemVer.TryParse(input, out var version).Should().BeFalse();
+        version.Should().BeNull();
+    }
+
+    [Fact]
+    public void TryParse_IntMaxValue_StillParses()
+    {
+        SemVer.TryParse("v2147483647.0.0", out var version).Should().BeTrue();
+        version!.Major.Should().Be(int.MaxValue);
+    }
 }
