@@ -5,6 +5,7 @@ using NSubstitute;
 using Ariadne.NET.RuleEngine;
 using Ariadne.NET.RuleLoader;
 using Ariadne.NET.Sync;
+using Ariadne.NET.Telemetry;
 using ZeroAlloc.Results;
 
 namespace Ariadne.NET.Tests.Sync;
@@ -166,15 +167,15 @@ public sealed class GitSyncIntegrationTests : IDisposable
         const string url = "https://github.com/test.git";
 
         // 2. ^1.0 should match v1.2.0 (same major, >= 1.0.0)
-        GitCliSyncProvider.IsCacheValid(cacheDir, url, SemVerRange.Parse("^1.0").Value).Should().BeTrue();
+        SyncOperations.IsCacheValid(cacheDir, url, SemVerRange.Parse("^1.0").Value).Should().BeTrue();
 
         // 3. ^2.0 should NOT match v1.2.0 (different major)
-        GitCliSyncProvider.IsCacheValid(cacheDir, url, SemVerRange.Parse("^2.0").Value).Should().BeFalse();
+        SyncOperations.IsCacheValid(cacheDir, url, SemVerRange.Parse("^2.0").Value).Should().BeFalse();
 
         // 4. ~1.2 should match v1.2.0 (same major.minor, patch >= 0)
-        GitCliSyncProvider.IsCacheValid(cacheDir, url, SemVerRange.Parse("~1.2").Value).Should().BeTrue();
+        SyncOperations.IsCacheValid(cacheDir, url, SemVerRange.Parse("~1.2").Value).Should().BeTrue();
 
         // 5. ~1.3 should NOT match v1.2.0 (different minor)
-        GitCliSyncProvider.IsCacheValid(cacheDir, url, SemVerRange.Parse("~1.3").Value).Should().BeFalse();
+        SyncOperations.IsCacheValid(cacheDir, url, SemVerRange.Parse("~1.3").Value).Should().BeFalse();
     }
 }

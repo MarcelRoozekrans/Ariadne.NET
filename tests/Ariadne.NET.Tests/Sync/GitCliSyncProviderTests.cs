@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Ariadne.NET.Abstractions;
 using Ariadne.NET.Sync;
+using Ariadne.NET.Telemetry;
 using FluentAssertions;
 
 namespace Ariadne.NET.Tests.Sync;
@@ -19,7 +20,7 @@ public class GitCliSyncProviderTests
             "eee1234567890123456789012345678901234567\trefs/tags/not-semver",
         });
 
-        var tags = GitCliSyncProvider.ParseTagsFromLsRemote(output);
+        var tags = SyncOperations.ParseTagsFromLsRemote(output);
 
         tags.Should().BeEquivalentTo(["v1.0.0", "v1.1.0", "v2.0.0"]);
     }
@@ -27,7 +28,7 @@ public class GitCliSyncProviderTests
     [Fact]
     public void ParseTagsFromLsRemote_EmptyOutput_ShouldReturnEmptyList()
     {
-        var tags = GitCliSyncProvider.ParseTagsFromLsRemote("");
+        var tags = SyncOperations.ParseTagsFromLsRemote("");
 
         tags.Should().BeEmpty();
     }
@@ -42,7 +43,7 @@ public class GitCliSyncProviderTests
             "ccc1234567890123456789012345678901234567\trefs/tags/v2.0.0",
         });
 
-        var sha = GitCliSyncProvider.ParseCommitFromLsRemote(output, "v2.0.0");
+        var sha = SyncOperations.ParseCommitFromLsRemote(output, "v2.0.0");
 
         sha.Should().Be("ccc1234567890123456789012345678901234567");
     }
@@ -56,7 +57,7 @@ public class GitCliSyncProviderTests
             "bcd1234567890123456789012345678901234567\trefs/tags/v1.0.0^{}",
         });
 
-        var sha = GitCliSyncProvider.ParseCommitFromLsRemote(output, "v1.0.0");
+        var sha = SyncOperations.ParseCommitFromLsRemote(output, "v1.0.0");
 
         sha.Should().Be("bcd1234567890123456789012345678901234567");
     }
@@ -64,7 +65,7 @@ public class GitCliSyncProviderTests
     [Fact]
     public void IsCacheValid_NoCacheDir_ShouldReturnFalse()
     {
-        var result = GitCliSyncProvider.IsCacheValid(
+        var result = SyncOperations.IsCacheValid(
             Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()),
             "https://example.com/repo.git",
             SemVerRange.Parse("^1.0").Value);
@@ -90,7 +91,7 @@ public class GitCliSyncProviderTests
                 Path.Combine(tempDir, ".git-info.json"),
                 JsonSerializer.Serialize(gitInfo));
 
-            var result = GitCliSyncProvider.IsCacheValid(
+            var result = SyncOperations.IsCacheValid(
                 tempDir,
                 "https://example.com/repo.git",
                 SemVerRange.Parse("^1.0").Value);
@@ -124,7 +125,7 @@ public class GitCliSyncProviderTests
                 Path.Combine(tempDir, ".git-info.json"),
                 JsonSerializer.Serialize(gitInfo));
 
-            var result = GitCliSyncProvider.IsCacheValid(
+            var result = SyncOperations.IsCacheValid(
                 tempDir,
                 "https://example.com/repo.git",
                 SemVerRange.Parse("^1.0").Value);
@@ -151,7 +152,7 @@ public class GitCliSyncProviderTests
             "ddd1234567890123456789012345678901234567\trefs/tags/v2.0.0",
         });
 
-        var tags = GitCliSyncProvider.ParseTagsFromLsRemote(output);
+        var tags = SyncOperations.ParseTagsFromLsRemote(output);
 
         tags.Should().BeEquivalentTo(["v1.0.0", "v2.0.0"]);
     }
@@ -167,7 +168,7 @@ public class GitCliSyncProviderTests
                 Path.Combine(tempDir, ".git-info.json"),
                 "{ this is not valid json }");
 
-            var result = GitCliSyncProvider.IsCacheValid(
+            var result = SyncOperations.IsCacheValid(
                 tempDir,
                 "https://example.com/repo.git",
                 SemVerRange.Parse("^1.0").Value);
@@ -201,7 +202,7 @@ public class GitCliSyncProviderTests
                 Path.Combine(tempDir, ".git-info.json"),
                 JsonSerializer.Serialize(gitInfo));
 
-            var result = GitCliSyncProvider.IsCacheValid(
+            var result = SyncOperations.IsCacheValid(
                 tempDir,
                 "https://example.com/repo.git",
                 SemVerRange.Parse("^2.0").Value);
@@ -595,9 +596,9 @@ public class GitCliSyncProviderTests
 
         try
         {
-            GitCliSyncProvider.IsCacheValid(cacheDir, "https://user:s3cret@example.com/a.git", SemVerRange.Parse("^1.0").Value)
+            SyncOperations.IsCacheValid(cacheDir, "https://user:s3cret@example.com/a.git", SemVerRange.Parse("^1.0").Value)
                 .Should().BeTrue();
-            GitCliSyncProvider.IsCacheValid(cacheDir, "https://example.com/other.git", SemVerRange.Parse("^1.0").Value)
+            SyncOperations.IsCacheValid(cacheDir, "https://example.com/other.git", SemVerRange.Parse("^1.0").Value)
                 .Should().BeFalse();
         }
         finally

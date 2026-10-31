@@ -1,86 +1,23 @@
-using System.Reflection;
 using Ariadne.NET.Abstractions;
+using Ariadne.NET.Telemetry;
 
 using ZeroAlloc.Inject;
 using ZeroAlloc.Results;
 
 namespace Ariadne.NET.RuleLoader;
 
+/// <summary>Serves the embedded built-in packs; each <see cref="GetPack"/> call opens an <c>ariadne.get_pack</c> span.</summary>
 [Singleton]
 public sealed class BuiltinPackRegistry : IBuiltinPackRegistry
 {
-    private readonly IRulePackLoader _loader;
-    private readonly Dictionary<string, string> _resourceMap;
-    private readonly Dictionary<string, RulePack> _cache = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Lock _lock = new();
+    private readonly BuiltinPackCatalog _catalog;
 
     public BuiltinPackRegistry(IRulePackLoader loader)
     {
-        _loader = loader;
-
-        var assembly = typeof(BuiltinPackRegistry).Assembly;
-        var resourceNames = assembly.GetManifestResourceNames();
-
-        _resourceMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var resourceName in resourceNames)
-        {
-            if (!resourceName.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase)
-                || !resourceName.Contains("BuiltinPacks", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            var packName = ExtractPackName(resourceName);
-            _resourceMap[packName] = resourceName;
-        }
+        _catalog = new BuiltinPackCatalog(loader);
     }
 
-    public IReadOnlyList<string> GetAvailablePackNames()
-    {
-        return _resourceMap.Keys.Order(StringComparer.OrdinalIgnoreCase).ToList();
-    }
+    public IReadOnlyList<string> GetAvailablePackNames() => BuiltinPackCatalog.Names;
 
-    public Result<RulePack, AriadneError> GetPack(string name)
-    {
-        lock (_lock)
-        {
-            if (_cache.TryGetValue(name, out var cached))
-            {
-                return Result<RulePack, AriadneError>.Success(cached);
-            }
-
-            if (!_resourceMap.TryGetValue(name, out var resourceName))
-            {
-                return Result<RulePack, AriadneError>.Failure(new AriadneError(
-                    AriadneErrorCode.NotFound,
-                    $"Built-in pack '{name}' not found.",
-                    $"Available packs: {string.Join(", ", GetAvailablePackNames())}"));
-            }
-
-            var assembly = typeof(BuiltinPackRegistry).Assembly;
-            using var stream = assembly.GetManifestResourceStream(resourceName)
-                ?? throw new InvalidOperationException($"Embedded resource '{resourceName}' could not be loaded.");
-
-            using var reader = new StreamReader(stream);
-            var yaml = reader.ReadToEnd();
-            var pack = _loader.LoadFromString(yaml);
-            if (pack.IsSuccess)
-            {
-                _cache[name] = pack.Value;
-            }
-
-            return pack;
-        }
-    }
-
-    private static string ExtractPackName(string resourceName)
-    {
-        // Resource names are like: Ariadne.NET.BuiltinPacks.clean-architecture.yaml
-        // We need to extract "clean-architecture"
-        var lastDotYaml = resourceName.LastIndexOf(".yaml", StringComparison.OrdinalIgnoreCase);
-        var withoutExtension = resourceName[..lastDotYaml];
-        var lastDot = withoutExtension.LastIndexOf('.');
-        return withoutExtension[(lastDot + 1)..];
-    }
+    public Result<RulePack, AriadneError> GetPack(string name) => PackOperations.Instrumented.GetPack(name, _catalog);
 }
