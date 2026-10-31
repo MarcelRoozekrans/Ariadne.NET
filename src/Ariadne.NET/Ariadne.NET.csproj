@@ -28,7 +28,7 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.13" />
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
     <PackageReference Include="ZeroAlloc.Inject" Version="1.11.6" />
-    <PackageReference Include="ZeroAlloc.Inject.Generator" Version="1.11.6" />
+    <PackageReference Include="ZeroAlloc.Inject.Generator" Version="1.11.6" PrivateAssets="all" />
     <PackageReference Include="ZeroAlloc.Resilience" Version="3.4.0" />
     <!--
       The [Instrument] attributes are needed at run time, so the library flows to consumers. The bundled proxy generator
