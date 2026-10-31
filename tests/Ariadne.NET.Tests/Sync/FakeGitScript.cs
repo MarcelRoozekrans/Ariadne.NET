@@ -16,6 +16,9 @@ internal sealed class FakeGitScript
 
     public bool CloneFails { get; set; }
 
+    /// <summary>Runs after a successful clone with the clone target, to add files such as links.</summary>
+    public Action<string>? OnClone { get; set; }
+
     public List<IReadOnlyList<string>> Invocations { get; } = [];
 
     public int LsRemoteCalls { get; private set; }
@@ -42,6 +45,7 @@ internal sealed class FakeGitScript
         Directory.CreateDirectory(Path.Combine(target, "packs"));
         File.WriteAllText(Path.Combine(target, "pack.yaml"), "name: pack\n");
         File.WriteAllText(Path.Combine(target, "packs", "core.yaml"), "name: core\n");
+        OnClone?.Invoke(target);
         return ValueTask.FromResult(Result<string, ResilienceError>.Success(string.Empty));
     }
 }

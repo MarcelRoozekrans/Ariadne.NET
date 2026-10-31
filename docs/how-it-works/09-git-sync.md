@@ -83,6 +83,7 @@ IGitSyncProvider
 |---|---|
 | Missing or unusable name, url or version, or a bad semver range | Invalid |
 | A name that is not a plain directory name, or a `path` that leaves the repository | Invalid |
+| A symbolic link in the part of the repository that is copied, or on the way to `path` | Invalid |
 | No tag satisfies the version range | NotFound |
 | git fails, times out or exhausts its retries | Unavailable, with git's stderr or the policy failure as Detail |
 | Reading or writing the cache fails | Unavailable, with the IO error as Detail |

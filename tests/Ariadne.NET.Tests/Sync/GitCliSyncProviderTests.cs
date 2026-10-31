@@ -455,6 +455,66 @@ public class GitCliSyncProviderTests
         UrlRedaction.Redact(text).Should().Be(expected);
     }
 
+    [UnixFact]
+    public async Task SyncAsync_SymlinkedFileOutsideTheClone_IsInvalid_AndCopiesNothing()
+    {
+        var root = NewCacheDir();
+        var outside = Path.Combine(root, "outside.yaml");
+        Directory.CreateDirectory(root);
+        File.WriteAllText(outside, "secret: true\n");
+        var git = new FakeGitScript { OnClone = target => File.CreateSymbolicLink(Path.Combine(target, "secret.yaml"), outside) };
+
+        await AssertLinkIsRefusedAsync(git, root, path: "", expectedLink: "secret.yaml");
+    }
+
+    [UnixFact]
+    public async Task SyncAsync_SymlinkedDirectoryOutsideTheClone_IsInvalid_AndCopiesNothing()
+    {
+        var root = NewCacheDir();
+        var outside = Path.Combine(root, "outside");
+        Directory.CreateDirectory(outside);
+        File.WriteAllText(Path.Combine(outside, "secret.yaml"), "secret: true\n");
+        var git = new FakeGitScript
+        {
+            OnClone = target => Directory.CreateSymbolicLink(Path.Combine(target, "packs", "linked"), outside),
+        };
+
+        await AssertLinkIsRefusedAsync(git, root, path: "", expectedLink: Path.Combine("packs", "linked"));
+    }
+
+    [UnixFact]
+    public async Task SyncAsync_ImportPathThroughASymlink_IsInvalid_AndCopiesNothing()
+    {
+        var root = NewCacheDir();
+        var outside = Path.Combine(root, "outside");
+        Directory.CreateDirectory(outside);
+        File.WriteAllText(Path.Combine(outside, "secret.yaml"), "secret: true\n");
+        var git = new FakeGitScript { OnClone = target => Directory.CreateSymbolicLink(Path.Combine(target, "rules"), outside) };
+
+        await AssertLinkIsRefusedAsync(git, root, path: "rules", expectedLink: "rules");
+    }
+
+    private static async Task AssertLinkIsRefusedAsync(FakeGitScript git, string root, string path, string expectedLink)
+    {
+        var cacheDir = Path.Combine(root, "cache");
+        var import = new ImportDefinition { Name = "pack", Type = "git", Url = "https://example.com/a.git", Version = "^1.0", Path = path };
+
+        try
+        {
+            var result = await new GitCliSyncProvider(new FakeGitClient(git)).SyncAsync(import, cacheDir, noCache: true).ConfigureAwait(false);
+
+            result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+            result.Error.Message.Should().Be(
+                $"Import 'pack' contains a symbolic link at '{expectedLink}'; pack files must be regular files inside the repository.");
+            Directory.Exists(Path.Combine(cacheDir, "pack")).Should().BeFalse();
+            Directory.GetFileSystemEntries(cacheDir).Should().BeEmpty("the staging directory is removed");
+        }
+        finally
+        {
+            DeleteDir(root);
+        }
+    }
+
     private static string NewCacheDir() => Path.Combine(Path.GetTempPath(), $"ariadne-provider-{Guid.NewGuid():N}");
 
     private static void DeleteDir(string dir)

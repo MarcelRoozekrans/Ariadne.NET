@@ -98,7 +98,16 @@ internal sealed class GitCliSyncProvider : IGitSyncProvider
                 return UnitResult<AriadneError>.Failure(GitUnavailable(import, cloned.Error));
             }
 
-            CopyPackFiles(string.IsNullOrEmpty(import.Path) ? cloneDir : Path.Combine(cloneDir, import.Path), packDir);
+            var sourceDir = string.IsNullOrEmpty(import.Path) ? cloneDir : Path.Combine(cloneDir, import.Path);
+            var link = CloneLinkCheck.FindLink(cloneDir, sourceDir);
+            if (link is not null)
+            {
+                return UnitResult<AriadneError>.Failure(new AriadneError(
+                    AriadneErrorCode.Invalid,
+                    $"Import '{import.Name}' contains a symbolic link at '{link}'; pack files must be regular files inside the repository."));
+            }
+
+            CopyPackFiles(sourceDir, packDir);
             await WriteGitInfoAsync(import.Url, tag, commitSha, packDir, ct).ConfigureAwait(false);
 
             if (Directory.Exists(importCacheDir))
