@@ -1,6 +1,6 @@
 using Ariadne.NET.Abstractions;
 using Ariadne.NET.RuleEngine;
-using Ariadne.NET.RuleLoader;
+using Ariadne.NET.Telemetry;
 
 using YamlDotNet.Core;
 using YamlDotNet.Serialization;
@@ -8,7 +8,7 @@ using YamlDotNet.Serialization.NamingConventions;
 
 using ZeroAlloc.Results;
 
-namespace Ariadne.NET.Telemetry;
+namespace Ariadne.NET.RuleLoader;
 
 /// <summary>
 /// The one implementation of the pack operations. <see cref="Instrumented"/> wraps it in the generated proxy; the public

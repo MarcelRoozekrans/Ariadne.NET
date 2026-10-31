@@ -5,7 +5,6 @@ using NSubstitute;
 using Ariadne.NET.RuleEngine;
 using Ariadne.NET.RuleLoader;
 using Ariadne.NET.Sync;
-using Ariadne.NET.Telemetry;
 using ZeroAlloc.Results;
 
 namespace Ariadne.NET.Tests.Sync;

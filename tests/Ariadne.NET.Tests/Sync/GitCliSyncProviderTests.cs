@@ -1,7 +1,6 @@
 using System.Text.Json;
 using Ariadne.NET.Abstractions;
 using Ariadne.NET.Sync;
-using Ariadne.NET.Telemetry;
 using FluentAssertions;
 
 namespace Ariadne.NET.Tests.Sync;

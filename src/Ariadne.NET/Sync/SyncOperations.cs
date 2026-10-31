@@ -1,12 +1,12 @@
 using System.Text.Json;
 
 using Ariadne.NET.Abstractions;
-using Ariadne.NET.Sync;
+using Ariadne.NET.Telemetry;
 
 using ZeroAlloc.Resilience;
 using ZeroAlloc.Results;
 
-namespace Ariadne.NET.Telemetry;
+namespace Ariadne.NET.Sync;
 
 /// <summary>
 /// The one implementation of syncing an import. <see cref="Instrumented"/> wraps it in the generated proxy, which

@@ -1,5 +1,4 @@
 using Ariadne.NET.Abstractions;
-using Ariadne.NET.Telemetry;
 
 using ZeroAlloc.Inject;
 using ZeroAlloc.Results;
