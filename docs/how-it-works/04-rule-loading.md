@@ -11,13 +11,19 @@ Deserializes YAML into `RulePack` instances using YamlDotNet.
 
 ```
 IRulePackLoader
-  ├── LoadFromString(string yaml) → RulePack
-  └── LoadFromFile(string filePath) → RulePack
+  ├── LoadFromString(string yaml) → Result<RulePack, AriadneError>
+  └── LoadFromFile(string filePath) → Result<RulePack, AriadneError>
 ```
 
 **Deserialization configuration:**
 - `CamelCaseNamingConvention` — maps `camelCase` YAML keys to `PascalCase` C# properties
 - `IgnoreUnmatchedProperties()` — extra YAML keys don't cause errors (forward-compatible)
+
+**Failures** come back as an `AriadneError`, never as an exception:
+- malformed YAML, or YAML of the wrong shape: `Invalid`, with Detail `line {n}, column {n}`
+- an empty document: `Invalid` ("rules file is empty")
+- a missing file: `NotFound`, with the path in Detail
+- a file that cannot be read: `Unavailable`, with the OS message in Detail
 
 **Flow:**
 
@@ -57,7 +63,7 @@ IBuiltinPackRegistry
 4. Read the stream as a UTF-8 string
 5. Deserialize via `YamlRulePackLoader.LoadFromString()`
 6. Store in cache and return
-7. Throws `KeyNotFoundException` if pack name is unknown
+7. Returns a `NotFound` error naming the pack, with the available packs in Detail, if the name is unknown
 
 **Thread safety:** Uses .NET 9+ `Lock` type (not `object` + `Monitor`) for the cache dictionary.
 
@@ -70,8 +76,8 @@ Resolves `extends` references in a user pack, loads all referenced packs, and me
 
 ```
 IRulePackResolver
-  ├── Resolve(RulePack userPack) → RulePack
-  └── Resolve(RulePack userPack, string? workingDirectory) → RulePack
+  ├── Resolve(RulePack userPack) → Result<RulePack, AriadneError>
+  └── Resolve(RulePack userPack, string? workingDirectory) → Result<RulePack, AriadneError>
 ```
 
 **Reference schemes:**
@@ -80,6 +86,8 @@ IRulePackResolver
 |--------|---------|------------|
 | `builtin://` | `builtin://clean-architecture` | Loaded from `IBuiltinPackRegistry` |
 | `import://` | `import://company-standards` | Loaded from `.architecture/.cache/git/{name}/` |
+
+Any other scheme returns an `Invalid` error. Resolution stops at the first reference that fails and returns its error.
 
 **Resolution algorithm:**
 
@@ -99,9 +107,9 @@ flowchart TD
 
 **Import loading (LoadImportedPack):**
 
-1. Requires a working directory (throws `InvalidOperationException` if null)
+1. Requires a working directory (an `Invalid` error if null)
 2. Constructs cache path: `{workingDirectory}/.architecture/.cache/git/{importName}/`
-3. Validates the cache directory exists (throws if missing — user must run `sync` first)
+3. Validates the cache directory exists and holds a YAML file (a `NotFound` error telling the user to run `ariadne sync` if not)
 4. Finds the first `.yaml` file in the cache directory
 5. Loads via `_loader.LoadFromFile()`
 

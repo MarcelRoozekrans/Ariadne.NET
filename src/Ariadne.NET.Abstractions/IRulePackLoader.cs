@@ -1,7 +1,9 @@
+using ZeroAlloc.Results;
+
 namespace Ariadne.NET.Abstractions;
 
 public interface IRulePackLoader
 {
-    RulePack LoadFromString(string yaml);
-    RulePack LoadFromFile(string filePath);
+    Result<RulePack, AriadneError> LoadFromString(string yaml);
+    Result<RulePack, AriadneError> LoadFromFile(string filePath);
 }

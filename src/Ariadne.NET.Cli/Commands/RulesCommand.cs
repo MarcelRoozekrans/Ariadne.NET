@@ -1,6 +1,7 @@
 using System.CommandLine;
 using Ariadne.NET.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
+using ZeroAlloc.Results;
 
 namespace Ariadne.NET.Cli.Commands;
 
@@ -12,7 +13,13 @@ public static class RulesCommand
 
         command.SetAction(_ =>
         {
-            var pack = ResolveRulesFromFile(provider);
+            var resolved = ResolveRulesFromFile(provider);
+            if (resolved.IsFailure)
+            {
+                return ErrorOutput.Report(resolved.Error);
+            }
+
+            var pack = resolved.Value;
 
             Console.WriteLine("Resolved Architecture Rules");
             Console.WriteLine(new string('=', 50));
@@ -34,26 +41,33 @@ public static class RulesCommand
             Console.WriteLine($"Component Roles: {pack.ComponentRoles.Count}");
             Console.WriteLine($"Naming - Namespace: {pack.NamingConventions.Namespace}");
             Console.WriteLine($"Naming - FilePath:  {pack.NamingConventions.FilePath}");
+            return ExitCodes.Success;
         });
 
         return command;
     }
 
-    internal static RulePack ResolveRulesFromFile(IServiceProvider provider)
+    internal static Result<RulePack, AriadneError> ResolveRulesFromFile(IServiceProvider provider)
     {
         const string rulesPath = ".architecture/rules.yaml";
 
         if (!File.Exists(rulesPath))
         {
-            throw new FileNotFoundException(
+            return Result<RulePack, AriadneError>.Failure(new AriadneError(
+                AriadneErrorCode.NotFound,
                 "No .architecture/rules.yaml found. Run 'ariadne init' first.",
-                rulesPath);
+                rulesPath));
         }
 
         var loader = provider.GetRequiredService<IRulePackLoader>();
         var resolver = provider.GetRequiredService<IRulePackResolver>();
 
         var userPack = loader.LoadFromFile(rulesPath);
-        return resolver.Resolve(userPack, Directory.GetCurrentDirectory());
+        if (userPack.IsFailure)
+        {
+            return userPack;
+        }
+
+        return resolver.Resolve(userPack.Value, Directory.GetCurrentDirectory());
     }
 }

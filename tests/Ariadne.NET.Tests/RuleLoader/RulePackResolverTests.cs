@@ -20,7 +20,7 @@ public class RulePackResolverTests
             Extends = ["builtin://clean-architecture", "builtin://cqrs"],
         };
 
-        var resolved = resolver.Resolve(userPack);
+        var resolved = resolver.Resolve(userPack).Value;
 
         resolved.Layers.Should().NotBeEmpty();
         resolved.ComponentRoles.Select(r => r.Name).Should().Contain("Command");
@@ -58,7 +58,7 @@ public class RulePackResolverTests
                 Extends = ["import://my-pack"],
             };
 
-            var result = resolver.Resolve(userPack, tempDir);
+            var result = resolver.Resolve(userPack, tempDir).Value;
 
             result.Layers.Should().Contain(l => l.Name == "Domain");
             result.Layers.Should().Contain(l => l.Name == "Application");
@@ -81,14 +81,15 @@ public class RulePackResolverTests
             Extends = ["import://team-rules"],
         };
 
-        var act = () => resolver.Resolve(userPack);
+        var result = resolver.Resolve(userPack);
 
-        act.Should().Throw<InvalidOperationException>()
-            .Which.Message.Should().Contain("Run 'ariadne sync'");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().Contain("Run 'ariadne sync'");
     }
 
     [Fact]
-    public void Resolve_ImportProtocol_NoCacheDir_ShouldThrow()
+    public void Resolve_ImportProtocol_NoCacheDir_ReturnsNotFound()
     {
         var tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-resolver-{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
@@ -106,14 +107,102 @@ public class RulePackResolverTests
                 Extends = ["import://nonexistent"],
             };
 
-            var act = () => resolver.Resolve(userPack, tempDir);
+            var result = resolver.Resolve(userPack, tempDir);
 
-            act.Should().Throw<InvalidOperationException>()
-                .WithMessage("*sync*");
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be(AriadneErrorCode.NotFound);
+            result.Error.Message.Should().Contain("ariadne sync");
         }
         finally
         {
             Directory.Delete(tempDir, true);
         }
+    }
+
+    [Fact]
+    public void Resolve_ImportProtocol_CacheDirWithoutYaml_ReturnsNotFound()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-resolver-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(tempDir, ".architecture", ".cache", "git", "empty-pack"));
+
+        try
+        {
+            var result = CreateResolver().Resolve(
+                new RulePack { Name = "user-rules", Extends = ["import://empty-pack"] },
+                tempDir);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be(AriadneErrorCode.NotFound);
+            result.Error.Message.Should().Contain("ariadne sync");
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
+    public void Resolve_UnsupportedScheme_ReturnsInvalid()
+    {
+        var result = CreateResolver().Resolve(new RulePack { Name = "user-rules", Extends = ["http://x"] });
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().Contain("http://x");
+    }
+
+    [Fact]
+    public void Resolve_UnknownBuiltin_ReturnsNotFound()
+    {
+        var result = CreateResolver().Resolve(new RulePack { Name = "user-rules", Extends = ["builtin://nope"] });
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.NotFound);
+        result.Error.Message.Should().Be("Built-in pack 'nope' not found.");
+        result.Error.Detail.Should().Contain("clean-architecture");
+    }
+
+    [Fact]
+    public void Resolve_StopsAtFirstFailingReference()
+    {
+        var result = CreateResolver().Resolve(new RulePack
+        {
+            Name = "user-rules",
+            Extends = ["builtin://clean-architecture", "builtin://first-bad", "builtin://second-bad"],
+        });
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("first-bad");
+        result.Error.Message.Should().NotContain("second-bad");
+    }
+
+    [Fact]
+    public void Resolve_ImportedPackIsMalformed_ReturnsLoaderError()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-resolver-{Guid.NewGuid():N}");
+        var cacheDir = Path.Combine(tempDir, ".architecture", ".cache", "git", "bad-pack");
+        Directory.CreateDirectory(cacheDir);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(cacheDir, "bad-pack.yaml"), "name: x\nlayers: [unclosed");
+
+            var result = CreateResolver().Resolve(
+                new RulePack { Name = "user-rules", Extends = ["import://bad-pack"] },
+                tempDir);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    private static RulePackResolver CreateResolver()
+    {
+        var loader = new YamlRulePackLoader();
+        return new RulePackResolver(new BuiltinPackRegistry(loader), loader, new RulePackMerger());
     }
 }

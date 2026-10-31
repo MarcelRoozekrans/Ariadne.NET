@@ -23,7 +23,7 @@ public static class GenerateTools
         [Description("Template name. Optional - auto-detects from .architecture/rules.yaml.")]
         string? template = null)
     {
-        var resolved = helper.Resolve(template);
+        var resolved = ToolError.ValueOrToolError(helper.Resolve(template));
 
         var request = new GenerateRequest
         {
@@ -50,7 +50,7 @@ public static class GenerateTools
         [Description("Template name. Optional - auto-detects from .architecture/rules.yaml.")]
         string? template = null)
     {
-        var resolved = helper.Resolve(template);
+        var resolved = ToolError.ValueOrToolError(helper.Resolve(template));
 
         var request = new WorkspaceGenerateRequest
         {

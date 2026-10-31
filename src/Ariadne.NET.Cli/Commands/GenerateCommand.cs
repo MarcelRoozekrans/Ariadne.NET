@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Ariadne.NET.Abstractions;
 using Ariadne.NET.Orchestration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -47,7 +48,13 @@ public static class GenerateCommand
             var solution = parseResult.GetValue(solutionOption)!;
             var feature = parseResult.GetValue(featureOption)!;
 
-            var result = ExecuteGeneration(provider, role, name, solution, feature);
+            var pack = RulesCommand.ResolveRulesFromFile(provider);
+            if (pack.IsFailure)
+            {
+                return ErrorOutput.Report(pack.Error);
+            }
+
+            var result = ExecuteGeneration(provider, pack.Value, role, name, solution, feature);
             PrintResult(result);
             return result.Success ? ExitCodes.Success : ExitCodes.Error;
         });
@@ -57,12 +64,12 @@ public static class GenerateCommand
 
     private static GenerateResult ExecuteGeneration(
         IServiceProvider provider,
+        RulePack pack,
         string role,
         string name,
         string solution,
         string feature)
     {
-        var pack = RulesCommand.ResolveRulesFromFile(provider);
         var orchestrator = provider.GetRequiredService<IGenerateOrchestrator>();
 
         var request = new GenerateRequest

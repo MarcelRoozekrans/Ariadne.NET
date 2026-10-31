@@ -22,7 +22,13 @@ public static class ValidateCommand
         command.SetAction(parseResult =>
         {
             var path = parseResult.GetValue(pathArgument)!;
-            var resolvedPack = RulesCommand.ResolveRulesFromFile(provider);
+            var resolved = RulesCommand.ResolveRulesFromFile(provider);
+            if (resolved.IsFailure)
+            {
+                return ErrorOutput.Report(resolved.Error);
+            }
+
+            var resolvedPack = resolved.Value;
             var validator = provider.GetRequiredService<ISourceValidator>();
 
             var fullPath = Path.GetFullPath(path);

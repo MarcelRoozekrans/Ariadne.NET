@@ -21,7 +21,7 @@ public static class TemplateTools
         [Description("Template name (e.g. 'clean-architecture'). Optional - auto-detects from .architecture/rules.yaml if omitted.")]
         string? template = null)
     {
-        var resolved = helper.Resolve(template);
+        var resolved = ToolError.ValueOrToolError(helper.Resolve(template));
         return resolved.Layers;
     }
 }

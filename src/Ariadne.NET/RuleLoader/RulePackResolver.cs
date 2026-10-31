@@ -2,6 +2,7 @@ using Ariadne.NET.Abstractions;
 using Ariadne.NET.RuleEngine;
 
 using ZeroAlloc.Inject;
+using ZeroAlloc.Results;
 
 namespace Ariadne.NET.RuleLoader;
 
@@ -22,72 +23,80 @@ public sealed class RulePackResolver : IRulePackResolver
         _merger = merger;
     }
 
-    public RulePack Resolve(RulePack userPack) => Resolve(userPack, workingDirectory: null);
+    public Result<RulePack, AriadneError> Resolve(RulePack userPack) => Resolve(userPack, workingDirectory: null);
 
-    public RulePack Resolve(RulePack userPack, string? workingDirectory)
+    public Result<RulePack, AriadneError> Resolve(RulePack userPack, string? workingDirectory)
     {
         ArgumentNullException.ThrowIfNull(userPack);
 
         if (userPack.Extends.Count == 0)
         {
-            return userPack;
+            return Result<RulePack, AriadneError>.Success(userPack);
         }
 
         var packs = new List<RulePack>();
 
+        // Stop at the first reference that fails: the user fixes it and runs again.
         foreach (var reference in userPack.Extends)
         {
-            if (reference.StartsWith(BuiltinPrefix, StringComparison.OrdinalIgnoreCase))
+            var pack = LoadReference(reference, workingDirectory);
+            if (pack.IsFailure)
             {
-                var packName = reference[BuiltinPrefix.Length..];
-                var pack = _registry.GetPack(packName);
-                if (pack.IsFailure)
-                {
-                    // Task 6 replaces this with a Result
-                    throw new KeyNotFoundException($"{pack.Error.Message} {pack.Error.Detail}");
-                }
+                return pack;
+            }
 
-                packs.Add(pack.Value);
-            }
-            else if (reference.StartsWith(ImportPrefix, StringComparison.OrdinalIgnoreCase))
-            {
-                var importName = reference[ImportPrefix.Length..];
-                var pack = LoadImportedPack(importName, workingDirectory);
-                packs.Add(pack);
-            }
-            else
-            {
-                throw new NotSupportedException($"Unsupported extends reference: '{reference}'. Only 'builtin://' and 'import://' references are currently supported.");
-            }
+            packs.Add(pack.Value);
         }
 
         packs.Add(userPack);
 
-        return _merger.Merge(packs);
+        return Result<RulePack, AriadneError>.Success(_merger.Merge(packs));
     }
 
-    private RulePack LoadImportedPack(string importName, string? workingDirectory)
+    private Result<RulePack, AriadneError> LoadReference(string reference, string? workingDirectory)
+    {
+        if (reference.StartsWith(BuiltinPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return _registry.GetPack(reference[BuiltinPrefix.Length..]);
+        }
+
+        if (reference.StartsWith(ImportPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return LoadImportedPack(reference[ImportPrefix.Length..], workingDirectory);
+        }
+
+        return Result<RulePack, AriadneError>.Failure(new AriadneError(
+            AriadneErrorCode.Invalid,
+            $"Unsupported extends reference: '{reference}'. Only 'builtin://' and 'import://' references are currently supported."));
+    }
+
+    private Result<RulePack, AriadneError> LoadImportedPack(string importName, string? workingDirectory)
     {
         if (string.IsNullOrEmpty(workingDirectory))
         {
-            throw new InvalidOperationException(
-                $"Cannot resolve import '{importName}' without a working directory. Run 'ariadne sync' first to fetch imported packs.");
+            return Result<RulePack, AriadneError>.Failure(new AriadneError(
+                AriadneErrorCode.Invalid,
+                $"Cannot resolve import '{importName}' without a working directory. Run 'ariadne sync' first to fetch imported packs."));
         }
 
         var cacheDir = Path.Combine(workingDirectory, ".architecture", ".cache", "git", importName);
 
         if (!Directory.Exists(cacheDir))
         {
-            throw new InvalidOperationException(
-                $"Cache directory for import '{importName}' not found at '{cacheDir}'. Run 'ariadne sync' to fetch imported packs.");
+            return Result<RulePack, AriadneError>.Failure(new AriadneError(
+                AriadneErrorCode.NotFound,
+                $"Cache directory for import '{importName}' not found. Run 'ariadne sync' to fetch imported packs.",
+                cacheDir));
         }
 
         var yamlFiles = Directory.GetFiles(cacheDir, "*.yaml", SearchOption.TopDirectoryOnly);
 
         if (yamlFiles.Length == 0)
         {
-            throw new InvalidOperationException(
-                $"No YAML files found in cache directory '{cacheDir}' for import '{importName}'. Run 'ariadne sync' to fetch imported packs.");
+            return Result<RulePack, AriadneError>.Failure(new AriadneError(
+                AriadneErrorCode.NotFound,
+                $"No YAML files found in the cache directory for import '{importName}'. Run 'ariadne sync' to fetch imported packs.",
+                cacheDir));
         }
 
         return _loader.LoadFromFile(yamlFiles[0]);

@@ -40,6 +40,9 @@ public sealed class ExitCodeTests : IDisposable
 
     private int Run(params string[] args) => CliRootCommand.Invoke(_provider, args);
 
+    private void WriteRules(string content) =>
+        File.WriteAllText(Path.Combine(_tempDir, ".architecture", "rules.yaml"), content);
+
     private void WriteSource(string project, string fileName, string content)
     {
         var dir = Path.Combine(_tempDir, "src", project);
@@ -162,14 +165,63 @@ public sealed class ExitCodeTests : IDisposable
 
         try
         {
-            Run("rules");
+            Run("rules").Should().Be(ExitCodes.Error);
         }
         finally
         {
             Console.SetError(originalError);
         }
 
-        error.ToString().Should().Contain("Run 'ariadne init'");
+        var lines = error.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        lines.Should().HaveCount(2, "an expected failure prints the message and the path, not a stack trace");
+        lines[0].Should().Be("Error: No .architecture/rules.yaml found. Run 'ariadne init' first.");
+        lines[1].Should().Be(".architecture/rules.yaml");
+    }
+
+    [Fact]
+    public void Validate_RulesExtendUnknownBuiltin_ShouldReturnErrorAndWriteStderr()
+    {
+        WriteRules("""
+            extends:
+              - builtin://nope
+            """);
+        var originalError = Console.Error;
+        using var error = new StringWriter();
+        Console.SetError(error);
+
+        try
+        {
+            Run("validate", "src").Should().Be(ExitCodes.Error);
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
+
+        var lines = error.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        lines[0].Should().Be("Error: Built-in pack 'nope' not found.");
+        lines[1].Should().StartWith("Available packs: ");
+    }
+
+    [Fact]
+    public void Validate_MalformedRules_ShouldReturnErrorWithLine()
+    {
+        WriteRules("name: x\nlayers: [unclosed");
+        var originalError = Console.Error;
+        using var error = new StringWriter();
+        Console.SetError(error);
+
+        try
+        {
+            Run("validate", "src").Should().Be(ExitCodes.Error);
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
+
+        error.ToString().Should().StartWith("Error: ").And.Contain("line");
+        error.ToString().Should().NotContain(" at ", "an expected failure prints no stack trace");
     }
 
     [Fact]

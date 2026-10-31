@@ -65,9 +65,12 @@ public sealed class BuiltinPackRegistry : IBuiltinPackRegistry
             using var reader = new StreamReader(stream);
             var yaml = reader.ReadToEnd();
             var pack = _loader.LoadFromString(yaml);
+            if (pack.IsSuccess)
+            {
+                _cache[name] = pack.Value;
+            }
 
-            _cache[name] = pack;
-            return Result<RulePack, AriadneError>.Success(pack);
+            return pack;
         }
     }
 

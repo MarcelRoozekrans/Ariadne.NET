@@ -30,7 +30,7 @@ public static class InitCommand
             var extends = TemplateReference.ToExtends(template);
             if (extends.IsFailure)
             {
-                return ReportError(extends.Error);
+                return ErrorOutput.Report(extends.Error);
             }
 
             // ToExtends succeeded, so the template has at least one name and ParseNames cannot fail.
@@ -39,7 +39,7 @@ public static class InitCommand
                 var pack = registry.GetPack(name);
                 if (pack.IsFailure)
                 {
-                    return ReportError(pack.Error);
+                    return ErrorOutput.Report(pack.Error);
                 }
             }
 
@@ -64,16 +64,5 @@ public static class InitCommand
         });
 
         return command;
-    }
-
-    private static int ReportError(AriadneError error)
-    {
-        Console.Error.WriteLine($"Error: {error.Message}");
-        if (error.Detail is not null)
-        {
-            Console.Error.WriteLine(error.Detail);
-        }
-
-        return ExitCodes.Error;
     }
 }

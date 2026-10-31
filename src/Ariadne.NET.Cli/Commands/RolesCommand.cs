@@ -10,7 +10,13 @@ public static class RolesCommand
 
         command.SetAction(_ =>
         {
-            var pack = RulesCommand.ResolveRulesFromFile(provider);
+            var resolved = RulesCommand.ResolveRulesFromFile(provider);
+            if (resolved.IsFailure)
+            {
+                return ErrorOutput.Report(resolved.Error);
+            }
+
+            var pack = resolved.Value;
 
             Console.WriteLine("Component Roles");
             Console.WriteLine(new string('=', 80));
@@ -23,6 +29,8 @@ public static class RolesCommand
                 Console.WriteLine(
                     $"  {role.Name,-20} {role.Layer,-20} {role.TypeKind,-10} {(role.RequiresInterface ? "Yes" : "No"),-10} {role.Description}");
             }
+
+            return ExitCodes.Success;
         });
 
         return command;

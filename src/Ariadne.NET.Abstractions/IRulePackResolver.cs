@@ -1,8 +1,10 @@
+using ZeroAlloc.Results;
+
 namespace Ariadne.NET.Abstractions;
 
 public interface IRulePackResolver
 {
-    RulePack Resolve(RulePack userPack);
+    Result<RulePack, AriadneError> Resolve(RulePack userPack);
 
-    RulePack Resolve(RulePack userPack, string? workingDirectory);
+    Result<RulePack, AriadneError> Resolve(RulePack userPack, string? workingDirectory);
 }

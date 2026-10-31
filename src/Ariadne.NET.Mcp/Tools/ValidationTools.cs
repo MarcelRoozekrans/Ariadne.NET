@@ -17,7 +17,7 @@ public static class ValidationTools
         [Description("Template name. Optional - auto-detects from .architecture/rules.yaml.")]
         string? template = null)
     {
-        var resolved = helper.Resolve(template);
+        var resolved = ToolError.ValueOrToolError(helper.Resolve(template));
         return validator.Validate(resolved, sourceDirectory);
     }
 
@@ -31,7 +31,7 @@ public static class ValidationTools
         [Description("Template name. Optional - auto-detects from .architecture/rules.yaml.")]
         string? template = null)
     {
-        var resolved = helper.Resolve(template);
+        var resolved = ToolError.ValueOrToolError(helper.Resolve(template));
         return linter.Lint(resolved, sourceDirectory);
     }
 }

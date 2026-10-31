@@ -2,6 +2,7 @@ using Ariadne.NET.Abstractions;
 using Ariadne.NET.RuleLoader;
 
 using ZeroAlloc.Inject;
+using ZeroAlloc.Results;
 
 namespace Ariadne.NET.Mcp;
 
@@ -22,15 +23,17 @@ public sealed class RuleResolutionHelper : IRuleResolutionHelper
         _loader = loader;
     }
 
-    public RulePack Resolve(string? template)
+    public Result<RulePack, AriadneError> Resolve(string? template)
     {
+        // Every path passes the working directory, so an import:// reference resolves from the local cache.
+        var workingDirectory = Directory.GetCurrentDirectory();
+
         if (template is not null)
         {
             var extends = TemplateReference.ToExtends(template);
             if (extends.IsFailure)
             {
-                // Task 6 replaces this with a Result
-                throw new ArgumentException(extends.Error.Message, nameof(template));
+                return Result<RulePack, AriadneError>.Failure(extends.Error);
             }
 
             var userPack = new RulePack
@@ -38,18 +41,20 @@ public sealed class RuleResolutionHelper : IRuleResolutionHelper
                 Name = template,
                 Extends = extends.Value,
             };
-            return _resolver.Resolve(userPack);
+            return _resolver.Resolve(userPack, workingDirectory);
         }
 
-        var rulesPath = Path.Combine(
-            Directory.GetCurrentDirectory(),
-            ".architecture",
-            "rules.yaml");
+        var rulesPath = Path.Combine(workingDirectory, ".architecture", "rules.yaml");
 
         if (File.Exists(rulesPath))
         {
             var pack = _loader.LoadFromFile(rulesPath);
-            return _resolver.Resolve(pack);
+            if (pack.IsFailure)
+            {
+                return pack;
+            }
+
+            return _resolver.Resolve(pack.Value, workingDirectory);
         }
 
         var defaultPack = new RulePack
@@ -57,6 +62,6 @@ public sealed class RuleResolutionHelper : IRuleResolutionHelper
             Name = "clean-architecture",
             Extends = ["builtin://clean-architecture"],
         };
-        return _resolver.Resolve(defaultPack);
+        return _resolver.Resolve(defaultPack, workingDirectory);
     }
 }

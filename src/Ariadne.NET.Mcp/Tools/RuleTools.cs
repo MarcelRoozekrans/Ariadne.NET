@@ -14,7 +14,7 @@ public static class RuleTools
         [Description("Template name. Optional - auto-detects from .architecture/rules.yaml.")]
         string? template = null)
     {
-        var resolved = helper.Resolve(template);
+        var resolved = ToolError.ValueOrToolError(helper.Resolve(template));
         return resolved.ComponentRoles;
     }
 
@@ -25,7 +25,7 @@ public static class RuleTools
         [Description("Template name. Optional - auto-detects from .architecture/rules.yaml.")]
         string? template = null)
     {
-        var resolved = helper.Resolve(template);
+        var resolved = ToolError.ValueOrToolError(helper.Resolve(template));
         return resolved.CodeFeatureRules;
     }
 }

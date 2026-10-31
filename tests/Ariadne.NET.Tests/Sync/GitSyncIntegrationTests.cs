@@ -60,13 +60,13 @@ public sealed class GitSyncIntegrationTests : IDisposable
 
         // 5. Load user pack, resolve with RulePackResolver
         var yamlLoader = new YamlRulePackLoader();
-        var userPack = yamlLoader.LoadFromFile(Path.Combine(archDir, "rules.yaml"));
+        var userPack = yamlLoader.LoadFromFile(Path.Combine(archDir, "rules.yaml")).Value;
 
         var registry = new BuiltinPackRegistry(yamlLoader);
         var merger = new RulePackMerger();
         var resolver = new RulePackResolver(registry, yamlLoader, merger);
 
-        var resolvedPack = resolver.Resolve(userPack, _tempDir);
+        var resolvedPack = resolver.Resolve(userPack, _tempDir).Value;
 
         // 6. Assert resolved pack has Domain + Application layers and Entity role
         resolvedPack.Layers.Should().HaveCount(2);
