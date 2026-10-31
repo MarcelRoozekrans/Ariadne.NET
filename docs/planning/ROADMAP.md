@@ -27,7 +27,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Plan:** `docs/superpowers/plans/2026-10-31-phase-1.2-package-split.md`
 **Completed:** 2026-10-31
 
-### Phase 1.3: Family conventions [status: pending]
+### Phase 1.3: Family conventions [status: active]
 **Goal:** Adopt ZeroAlloc Results instead of exceptions, get the ZeroAlloc analyzers clean, and support AOT where the dependencies allow it.
 **Surface:** Refactor
 **HelpWanted:** no
