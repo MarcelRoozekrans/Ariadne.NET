@@ -27,22 +27,16 @@ public static class InitCommand
             var template = parseResult.GetValue(templateOption)!;
             var registry = provider.GetRequiredService<IBuiltinPackRegistry>();
 
-            var names = TemplateReference.ParseNames(template);
-            if (names.IsFailure)
-            {
-                return ReportError(names.Error);
-            }
-
-            // Validate all templates exist
-            foreach (var name in names.Value)
-            {
-                registry.GetPack(name); // throws if not found
-            }
-
             var extends = TemplateReference.ToExtends(template);
             if (extends.IsFailure)
             {
                 return ReportError(extends.Error);
+            }
+
+            // ToExtends succeeded, so the template has at least one name and ParseNames cannot fail.
+            foreach (var name in TemplateReference.ParseNames(template).Value)
+            {
+                registry.GetPack(name); // throws if not found
             }
 
             var extendsList = extends.Value;
