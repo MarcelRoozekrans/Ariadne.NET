@@ -1,7 +1,7 @@
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
-using ZInject;
+using ZeroAlloc.Inject;
 
 namespace Ariadne.NET.Sync;
 

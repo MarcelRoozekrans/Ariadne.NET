@@ -2,7 +2,7 @@ using Ariadne.NET.Abstractions;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-using ZInject;
+using ZeroAlloc.Inject;
 
 namespace Ariadne.NET.Validation;
 

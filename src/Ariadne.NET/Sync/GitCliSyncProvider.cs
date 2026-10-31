@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 
-using ZInject;
+using ZeroAlloc.Inject;
 
 namespace Ariadne.NET.Sync;
 

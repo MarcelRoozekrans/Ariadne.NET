@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Formatting;
 
-using ZInject;
+using ZeroAlloc.Inject;
 
 namespace Ariadne.NET.CodeGeneration;
 

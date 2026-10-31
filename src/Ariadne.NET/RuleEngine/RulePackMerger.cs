@@ -1,6 +1,6 @@
 using Ariadne.NET.Abstractions;
 
-using ZInject;
+using ZeroAlloc.Inject;
 
 namespace Ariadne.NET.RuleEngine;
 

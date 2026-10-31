@@ -1,7 +1,7 @@
 using System.Reflection;
 using Ariadne.NET.Abstractions;
 
-using ZInject;
+using ZeroAlloc.Inject;
 
 namespace Ariadne.NET.RuleLoader;
 

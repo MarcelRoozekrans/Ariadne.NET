@@ -1,4 +1,4 @@
-using ZInject;
+using ZeroAlloc.Inject;
 
 namespace Ariadne.NET.Sync;
 
