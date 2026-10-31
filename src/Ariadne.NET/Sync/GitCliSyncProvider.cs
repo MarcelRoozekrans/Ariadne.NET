@@ -44,6 +44,7 @@ internal sealed class GitCliSyncProvider : IGitSyncProvider
         if (!noCache && IsCacheValid(importCacheDir, import.Url, parsedRange.Value))
         {
             var cachedInfo = ReadGitInfo(importCacheDir)!;
+            await RedactLegacyGitInfoAsync(cachedInfo, importCacheDir, ct).ConfigureAwait(false);
             return Success(new SyncedImport(import.Name, cachedInfo.ResolvedTag, WasCached: true, importCacheDir));
         }
 
@@ -181,19 +182,52 @@ internal sealed class GitCliSyncProvider : IGitSyncProvider
     private static Result<SyncedImport, AriadneError> Failure(AriadneError error) =>
         Result<SyncedImport, AriadneError>.Failure(error);
 
-    private static async Task WriteGitInfoAsync(string url, string tag, string? commitSha, string importCacheDir, CancellationToken ct)
+    private static Task WriteGitInfoAsync(string url, string tag, string? commitSha, string importCacheDir, CancellationToken ct) =>
+        WriteGitInfoAsync(
+            new GitInfo
+            {
+                Url = url,
+                ResolvedTag = tag,
+                CommitSha = commitSha ?? string.Empty,
+                SyncedAt = DateTimeOffset.UtcNow,
+            },
+            importCacheDir,
+            ct);
+
+    private static async Task WriteGitInfoAsync(GitInfo gitInfo, string importCacheDir, CancellationToken ct)
     {
-        var gitInfo = new GitInfo
+        // Never store credentials; the cache check compares redacted urls.
+        var redacted = new GitInfo
         {
-            // Never store credentials; the cache check compares redacted urls.
-            Url = UrlRedaction.Redact(url),
-            ResolvedTag = tag,
-            CommitSha = commitSha ?? string.Empty,
-            SyncedAt = DateTimeOffset.UtcNow,
+            Url = UrlRedaction.Redact(gitInfo.Url),
+            ResolvedTag = gitInfo.ResolvedTag,
+            CommitSha = gitInfo.CommitSha,
+            SyncedAt = gitInfo.SyncedAt,
         };
 
-        var json = JsonSerializer.Serialize(gitInfo, new JsonSerializerOptions { WriteIndented = true });
+        var json = JsonSerializer.Serialize(redacted, new JsonSerializerOptions { WriteIndented = true });
         await File.WriteAllTextAsync(Path.Combine(importCacheDir, ".git-info.json"), json, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Rewrites a record written before urls were redacted, so its credentials do not stay on disk until the next
+    /// fetch. The cache is still valid, so a failed rewrite leaves the record as it was and the sync succeeds.
+    /// </summary>
+    private static async Task RedactLegacyGitInfoAsync(GitInfo cachedInfo, string importCacheDir, CancellationToken ct)
+    {
+        if (string.Equals(cachedInfo.Url, UrlRedaction.Redact(cachedInfo.Url), StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        try
+        {
+            await WriteGitInfoAsync(cachedInfo, importCacheDir, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The next fetch writes a redacted record; serving the valid cache matters more.
+        }
     }
 
     public static IReadOnlyList<string> ParseTagsFromLsRemote(string output)

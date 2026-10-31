@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 using Ariadne.NET.Abstractions;
 using ZeroAlloc.Results;
 
@@ -7,7 +9,7 @@ namespace Ariadne.NET.Sync;
 /// Checks the fields sync relies on before any of them reaches git or the file system. YAML does not enforce
 /// <c>required</c>, so a missing name, url or version arrives as null.
 /// </summary>
-internal static class ImportDefinitionCheck
+internal static partial class ImportDefinitionCheck
 {
     // Invalid in a file name on any platform, so an imports.yaml behaves the same on Linux and Windows:
     // the current platform's set, plus the separators, the drive colon and the Windows wildcards.
@@ -68,9 +70,10 @@ internal static class ImportDefinitionCheck
             return Invalid($"Import '{import.Name}' has path '{import.Path}', which must be a relative folder inside the repository.");
         }
 
-        // git's own data, including .git/config with any credentials, is never a pack folder.
+        // git's own data, including .git/config with any credentials, is never a pack folder. On NTFS the 8.3 short
+        // name GIT~1 also reaches .git, so it is refused as git's core.protectNTFS does.
         var firstSegment = Path.GetRelativePath(root, full).Split(Path.DirectorySeparatorChar)[0];
-        return string.Equals(firstSegment, ".git", StringComparison.OrdinalIgnoreCase)
+        return string.Equals(firstSegment, ".git", StringComparison.OrdinalIgnoreCase) || GitShortName().IsMatch(firstSegment)
             ? Invalid($"Import '{import.Name}' has path '{import.Path}', which points into the repository's .git folder.")
             : UnitResult<AriadneError>.Success();
     }
@@ -90,4 +93,7 @@ internal static class ImportDefinitionCheck
 
     private static UnitResult<AriadneError> Invalid(string message) =>
         UnitResult<AriadneError>.Failure(new AriadneError(AriadneErrorCode.Invalid, message));
+
+    [GeneratedRegex(@"^git~[0-9]+$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex GitShortName();
 }

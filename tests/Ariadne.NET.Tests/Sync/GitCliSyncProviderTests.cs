@@ -543,6 +543,8 @@ public class GitCliSyncProviderTests
     [InlineData(".git/hooks")]
     [InlineData("./.git")]
     [InlineData("packs/../.Git")]
+    [InlineData("GIT~1")]
+    [InlineData("git~12/hooks")]
     public async Task SyncAsync_PathIntoTheGitFolder_IsInvalid(string path)
     {
         var git = new FakeGitScript();
@@ -602,6 +604,73 @@ public class GitCliSyncProviderTests
         {
             DeleteDir(cacheDir);
         }
+    }
+
+    [Fact]
+    public async Task SyncAsync_CacheHitOnLegacyRecordWithCredentials_RewritesItRedacted()
+    {
+        var cacheDir = NewCacheDir();
+        var syncedAt = new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.Zero);
+        var recordPath = WriteLegacyCache(cacheDir, syncedAt);
+        var git = new FakeGitScript();
+        var import = new ImportDefinition { Name = "pack", Type = "git", Url = "https://user:s3cret@example.com/a.git", Version = "^1.0" };
+
+        try
+        {
+            var result = await new GitCliSyncProvider(new FakeGitClient(git)).SyncAsync(import, cacheDir, noCache: false);
+
+            result.Value.WasCached.Should().BeTrue();
+            git.Invocations.Should().BeEmpty();
+            var record = JsonSerializer.Deserialize<GitInfo>(await File.ReadAllTextAsync(recordPath))!;
+            record.Url.Should().Be("https://***@example.com/a.git");
+            record.ResolvedTag.Should().Be("v1.0.0");
+            record.CommitSha.Should().Be("abc");
+            record.SyncedAt.Should().Be(syncedAt);
+        }
+        finally
+        {
+            DeleteDir(cacheDir);
+        }
+    }
+
+    [UnixNonRootFact]
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
+    public async Task SyncAsync_LegacyRecordCannotBeRewritten_StillServesTheCache()
+    {
+        var cacheDir = NewCacheDir();
+        var recordPath = WriteLegacyCache(cacheDir, DateTimeOffset.UtcNow);
+        File.SetUnixFileMode(recordPath, UnixFileMode.UserRead);
+        var import = new ImportDefinition { Name = "pack", Type = "git", Url = "https://user:s3cret@example.com/a.git", Version = "^1.0" };
+
+        try
+        {
+            var result = await new GitCliSyncProvider(new FakeGitClient(new FakeGitScript())).SyncAsync(import, cacheDir, noCache: false);
+
+            result.Value.WasCached.Should().BeTrue();
+            (await File.ReadAllTextAsync(recordPath)).Should().Contain("s3cret", "the read-only record could not be rewritten");
+        }
+        finally
+        {
+            File.SetUnixFileMode(recordPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            DeleteDir(cacheDir);
+        }
+    }
+
+    /// <summary>Writes a cache entry for 'pack' whose record still holds the raw url, as before urls were redacted.</summary>
+    private static string WriteLegacyCache(string cacheDir, DateTimeOffset syncedAt)
+    {
+        var packDir = Path.Combine(cacheDir, "pack");
+        Directory.CreateDirectory(packDir);
+        File.WriteAllText(Path.Combine(packDir, "pack.yaml"), "name: pack\n");
+        var recordPath = Path.Combine(packDir, ".git-info.json");
+        File.WriteAllText(recordPath, JsonSerializer.Serialize(new GitInfo
+        {
+            Url = "https://user:s3cret@example.com/a.git",
+            ResolvedTag = "v1.0.0",
+            CommitSha = "abc",
+            SyncedAt = syncedAt,
+        }));
+        return recordPath;
     }
 
     private static string NewCacheDir() => Path.Combine(Path.GetTempPath(), $"ariadne-provider-{Guid.NewGuid():N}");

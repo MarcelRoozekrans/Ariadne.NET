@@ -50,9 +50,10 @@ public sealed class GitCliClientTests : IDisposable
     }
 
     /// <summary>
-    /// Proves git received the whole url, option text included, as one repository argument: git names that exact
-    /// string in its error. When the url was split into words, git saw a different repository and '--template'
-    /// as separate arguments, and this message never quoted the full url.
+    /// Proves the whole url, option text included, went to git as one argument right after "--": the argv echo in
+    /// the error quotes each argument that holds spaces, so a split url would show up as separate words. The check
+    /// does not depend on git's own, possibly translated, messages. The absent hook marker shows the template
+    /// option never took effect.
     /// </summary>
     [Fact]
     public async Task UrlCarryingATemplateOption_ReachesGitAsOneRepositoryArgument_AndRunsNoHook()
@@ -72,7 +73,7 @@ public sealed class GitCliClientTests : IDisposable
         var outcome = await SyncAsync(url);
 
         outcome.Result.Error.Code.Should().Be(AriadneErrorCode.Unavailable);
-        outcome.Result.Error.Detail.Should().Contain($"'{url}' does not appear to be a git repository");
+        outcome.Result.Error.Detail.Should().StartWith($"git ls-remote --tags -- \"{url}\" failed with exit code ");
         File.Exists(marker).Should().BeFalse("the template option must never reach git as an option");
     }
 

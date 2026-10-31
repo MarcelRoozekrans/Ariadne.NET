@@ -51,7 +51,7 @@ internal sealed class GitCliClient : IGitClient
                     string.Format(
                         CultureInfo.InvariantCulture,
                         "git {0} failed with exit code {1}: {2}",
-                        string.Join(' ', arguments),
+                        string.Join(' ', arguments.Select(Quote)),
                         process.ExitCode,
                         stderr.Trim())));
             }
@@ -78,4 +78,10 @@ internal sealed class GitCliClient : IGitClient
             // The process exited on its own, or could not be killed; either way the cancellation still stands.
         }
     }
+
+    /// <summary>Quotes an argument that holds whitespace or quotes, so the echoed command shows where each argument ends.</summary>
+    private static string Quote(string argument) =>
+        argument.Length > 0 && !argument.Any(c => char.IsWhiteSpace(c) || c is '"' or '\'')
+            ? argument
+            : $"\"{argument.Replace("\"", "\\\"", StringComparison.Ordinal)}\"";
 }

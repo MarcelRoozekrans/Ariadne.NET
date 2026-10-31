@@ -86,7 +86,7 @@ IGitSyncProvider
 | Failure | Code |
 |---|---|
 | Missing or unusable name, url or version, or a bad semver range | Invalid |
-| A name that is not a plain directory name, or a `path` that leaves the repository or points into its `.git` folder | Invalid |
+| A name that is not a plain directory name, or a `path` that leaves the repository or points into its `.git` folder, including through the NTFS short name `GIT~1` | Invalid |
 | A `path` that does not exist in the repository at the resolved tag | NotFound |
 | A symbolic link in the part of the repository that is copied, or on the way to `path` | Invalid |
 | No tag satisfies the version range | NotFound |
@@ -115,7 +115,7 @@ flowchart TD
 
 1. Check cache directory exists
 2. Read and parse `.git-info.json`
-3. Verify URL matches exactly (Ordinal comparison of the urls with credentials redacted; `.git-info.json` never stores credentials)
+3. Verify URL matches exactly (Ordinal comparison of the urls with credentials redacted; `.git-info.json` never stores credentials, and a record written before redaction is rewritten redacted on a cache hit)
 4. Parse cached version as SemVer
 5. Check version still satisfies the requested range
 6. Returns `false` if any check fails (graceful degradation)
