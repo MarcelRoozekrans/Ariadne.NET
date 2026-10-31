@@ -12,7 +12,7 @@ The rule schema defines the domain model for architecture governance. All models
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `Name` | `string` | *(required)* | Unique identifier for the pack (e.g., `"clean-architecture"`) |
+| `Name` | `string` | *(optional)* | Identifier for the pack (e.g., `"clean-architecture"`). A file that only lists `extends` may leave it out; errors then name the file instead |
 | `Version` | `string` | `"1.0.0"` | Semantic version of the pack |
 | `Author` | `string` | `""` | Pack author or maintainer |
 | `Extends` | `IList<string>` | `[]` | Parent pack references (`builtin://name` or `import://name`) |
@@ -95,7 +95,7 @@ Defines a component archetype — a stereotype that maps a role name to a specif
 |----------|------|---------|-------------|
 | `Name` | `string` | *(required)* | Role identifier (e.g., `"Entity"`, `"Repository"`) |
 | `Layer` | `string` | *(required)* | The architectural layer this role belongs to |
-| `TypeKind` | `CSharpTypeKind` | `Class` | C# type: `Class`, `Interface`, `Record`, `Struct`, `RecordStruct` |
+| `TypeKind` | `CSharpTypeKind` | `Class` | C# type: `Class`, `Interface`, `Record`, `Struct`, `RecordStruct`; any other value is invalid at load |
 | `RequiresInterface` | `bool` | `false` | Whether the implementation must have a corresponding interface |
 | `InterfaceRole` | `string?` | `null` | Name of the paired interface role definition |
 | `Accessibility` | `string` | `"public"` | Access modifier: `public`, `internal`, `private`, `protected`, `protected internal`, `private protected` |

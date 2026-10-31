@@ -82,7 +82,7 @@ IGitSyncProvider
 | Failure | Code |
 |---|---|
 | Missing or unusable name, url or version, or a bad semver range | Invalid |
-| A name that is not a plain directory name, or a `path` that leaves the repository or points into its `.git` folder, including through the NTFS short name `GIT~1` | Invalid |
+| A name that is not a plain directory name, or a `path` that holds a NUL or other invalid path character, leaves the repository or points into its `.git` folder, including through the NTFS short name `GIT~1` | Invalid |
 | A `path` that does not exist in the repository at the resolved tag | NotFound |
 | A symbolic link in the part of the repository that is copied, or on the way to `path` | Invalid |
 | No tag satisfies the version range | NotFound |

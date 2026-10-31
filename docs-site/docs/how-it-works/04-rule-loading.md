@@ -29,6 +29,9 @@ IRulePackLoader
 - an empty document: `Invalid` ("Rule pack YAML is empty." or "Rule pack file '{path}' is empty.")
 - a missing file: `NotFound`, with the path in Detail
 - a file that cannot be read: `Unavailable`, with the OS message in Detail
+- a pack that breaks a member rule: `Invalid` ("Rule pack '{name}' is invalid."), with one `path: reason` line per failure in Detail, such as `Layers[0].Name: …`. A pack without a name is named by its source instead: "Rule pack YAML is invalid." or "Rule pack file '{path}' is invalid."
+
+**Member rules** are checked at load, on each pack on its own: a layer, role and code feature rule needs a non-empty name, layer or id; a role's `typeKind` must be one of the `CSharpTypeKind` values; the naming templates must not be empty; and no list may hold a null entry. Every broken rule is listed, not only the first. `name` itself is optional, so a file that only lists `extends` loads.
 
 **Flow:**
 
@@ -99,7 +102,7 @@ Any other scheme returns an `Invalid` error. Resolution stops at the first refer
 ```mermaid
 flowchart TD
     A["UserPack with extends:<br/>[builtin://clean-architecture, builtin://cqrs]"] --> B{extends empty?}
-    B -->|Yes| C["Return userPack unchanged"]
+    B -->|Yes| C["Check references of userPack"]
     B -->|No| D["For each reference in extends"]
     D --> E["builtin://clean-architecture<br/>→ registry.GetPack()"]
     D --> F["builtin://cqrs<br/>→ registry.GetPack()"]
@@ -108,15 +111,25 @@ flowchart TD
     F --> H
     G --> H
     H --> I["merger.Merge(packList)<br/>→ single resolved RulePack"]
+    I --> J["Check references of the merged pack"]
 ```
+
+**Reference rules** run on the result of every resolve, the merged pack or a user pack without `extends`, because a lone pack may rely on `extends` for the layers its roles name. Names compare case-insensitively:
+- no two layers, and no two roles, share a name
+- every name in a layer's `allowedDependencies` is a declared layer
+- a role's `layer` is a declared layer, once the pack declares at least one layer; a role-only pack such as `cqrs` has none and resolves on its own
+- a role's `interfaceRole`, when set, is a declared role
+
+A broken rule gives the same `Invalid` error as a member rule: "Rule pack '{name}' is invalid." with one `path: reason` line per failure in Detail, such as `ComponentRoles[2].Layer: refers to unknown layer 'Api'.` A merged pack is named by its non-empty parts, joined with `+`.
 
 **Import loading (LoadImportedPack):**
 
 1. Requires a working directory (an `Invalid` error if null)
-2. Constructs cache path: `{workingDirectory}/.architecture/.cache/git/{importName}/`
-3. Validates the cache directory exists and holds a YAML file (a `NotFound` error telling the user to run `ariadne sync` if not)
-4. Finds the first `.yaml` file in the cache directory
-5. Loads via `_loader.LoadFromFile()`
+2. Checks the import name is one plain directory name, as `ariadne sync` does: a name such as `../x` or `/abs` is an `Invalid` error and nothing is read
+3. Constructs cache path: `{workingDirectory}/.architecture/.cache/git/{importName}/`
+4. Validates the cache directory exists and holds a YAML file (a `NotFound` error telling the user to run `ariadne sync` if not); a directory that cannot be listed is `Unavailable`, with the OS message in Detail
+5. Finds the first `.yaml` file in the cache directory
+6. Loads via `_loader.LoadFromFile()`
 
 ---
 

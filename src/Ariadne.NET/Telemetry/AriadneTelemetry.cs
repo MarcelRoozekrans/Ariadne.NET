@@ -45,8 +45,9 @@ public static class AriadneTelemetry
 
     /// <summary>
     /// Gets the bucket boundaries of <see cref="OperationDuration"/>, in seconds: a pack loads in milliseconds, and a sync
-    /// can take up to three git attempts of a minute each. The instrumented interfaces repeat them as literals, since an
-    /// attribute argument cannot read a property; a test checks the instruments' advice against these.
+    /// runs two git commands, each with a one-minute timeout that covers all its retry attempts together. The
+    /// instrumented interfaces repeat them as literals, since an attribute argument cannot read a property; a test checks
+    /// the instruments' advice against these.
     /// </summary>
     internal static ReadOnlySpan<double> DurationBuckets => [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 180];
 }
