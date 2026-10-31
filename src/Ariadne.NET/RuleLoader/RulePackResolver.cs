@@ -41,7 +41,13 @@ public sealed class RulePackResolver : IRulePackResolver
             {
                 var packName = reference[BuiltinPrefix.Length..];
                 var pack = _registry.GetPack(packName);
-                packs.Add(pack);
+                if (pack.IsFailure)
+                {
+                    // Task 6 replaces this with a Result
+                    throw new KeyNotFoundException($"{pack.Error.Message} {pack.Error.Detail}");
+                }
+
+                packs.Add(pack.Value);
             }
             else if (reference.StartsWith(ImportPrefix, StringComparison.OrdinalIgnoreCase))
             {

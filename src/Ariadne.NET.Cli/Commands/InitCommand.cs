@@ -36,7 +36,11 @@ public static class InitCommand
             // ToExtends succeeded, so the template has at least one name and ParseNames cannot fail.
             foreach (var name in TemplateReference.ParseNames(template).Value)
             {
-                registry.GetPack(name); // throws if not found
+                var pack = registry.GetPack(name);
+                if (pack.IsFailure)
+                {
+                    return ReportError(pack.Error);
+                }
             }
 
             var extendsList = extends.Value;

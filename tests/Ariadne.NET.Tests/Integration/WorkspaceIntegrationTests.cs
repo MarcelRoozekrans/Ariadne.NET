@@ -46,7 +46,7 @@ public sealed class WorkspaceIntegrationTests : IDisposable
     [Fact]
     public void ScaffoldThenGenerate_CleanArchitecture_ShouldProduceValidStructure()
     {
-        var pack = _registry.GetPack("clean-architecture");
+        var pack = _registry.GetPack("clean-architecture").Value;
 
         // Step 1: Scaffold workspace
         var workspace = _workspaceOrchestrator.GenerateWorkspace(pack, new WorkspaceGenerateRequest
@@ -90,7 +90,7 @@ public sealed class WorkspaceIntegrationTests : IDisposable
     [Fact]
     public void ScaffoldThenGenerate_MultipleFeatures_ShouldScaffoldAllFeatureLayers()
     {
-        var pack = _registry.GetPack("clean-architecture");
+        var pack = _registry.GetPack("clean-architecture").Value;
 
         var workspace = _workspaceOrchestrator.GenerateWorkspace(pack, new WorkspaceGenerateRequest
         {
@@ -131,7 +131,7 @@ public sealed class WorkspaceIntegrationTests : IDisposable
     [Fact]
     public void ScaffoldThenLint_GeneratedCode_ShouldPassLint()
     {
-        var pack = _registry.GetPack("clean-architecture");
+        var pack = _registry.GetPack("clean-architecture").Value;
 
         var generateResult = _generateOrchestrator.Generate(pack, new GenerateRequest
         {
@@ -158,8 +158,8 @@ public sealed class WorkspaceIntegrationTests : IDisposable
     public void ScaffoldThenGenerate_WithComposablePack_ShouldProduceCorrectStructure()
     {
         var merger = new RulePackMerger();
-        var basePack = _registry.GetPack("clean-architecture");
-        var cqrsPack = _registry.GetPack("cqrs");
+        var basePack = _registry.GetPack("clean-architecture").Value;
+        var cqrsPack = _registry.GetPack("cqrs").Value;
         var merged = merger.Merge([basePack, cqrsPack]);
 
         // Workspace with merged pack should include layers from both packs
@@ -204,7 +204,7 @@ public sealed class WorkspaceIntegrationTests : IDisposable
     [InlineData("microservice")]
     public void ScaffoldWorkspace_AllTemplates_ShouldProduceConsistentStructure(string templateName)
     {
-        var pack = _registry.GetPack(templateName);
+        var pack = _registry.GetPack(templateName).Value;
 
         var workspace = _workspaceOrchestrator.GenerateWorkspace(pack, new WorkspaceGenerateRequest
         {

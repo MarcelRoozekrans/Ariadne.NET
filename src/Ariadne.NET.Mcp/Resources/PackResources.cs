@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using Ariadne.NET.Abstractions;
 using Ariadne.NET.RuleLoader;
+using ModelContextProtocol;
 using ModelContextProtocol.Server;
 
 namespace Ariadne.NET.Mcp.Resources;
@@ -15,8 +16,14 @@ public static class PackResources
         [Description("Pack name (e.g. clean-architecture, hexagonal-architecture, cqrs)")]
         string name)
     {
-        // Validate pack exists (throws KeyNotFoundException if not found)
-        registry.GetPack(name);
+        var pack = registry.GetPack(name);
+        if (pack.IsFailure)
+        {
+            // A resource cannot return an error value; the SDK turns this into a JSON-RPC ResourceNotFound error.
+            throw new McpProtocolException(
+                $"{pack.Error.Message} {pack.Error.Detail}",
+                McpErrorCode.ResourceNotFound);
+        }
 
         // Read raw YAML from embedded resource
         var assembly = typeof(BuiltinPackRegistry).Assembly;

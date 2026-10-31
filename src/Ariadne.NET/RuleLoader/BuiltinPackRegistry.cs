@@ -2,6 +2,7 @@ using System.Reflection;
 using Ariadne.NET.Abstractions;
 
 using ZeroAlloc.Inject;
+using ZeroAlloc.Results;
 
 namespace Ariadne.NET.RuleLoader;
 
@@ -40,18 +41,21 @@ public sealed class BuiltinPackRegistry : IBuiltinPackRegistry
         return _resourceMap.Keys.Order(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
-    public RulePack GetPack(string name)
+    public Result<RulePack, AriadneError> GetPack(string name)
     {
         lock (_lock)
         {
             if (_cache.TryGetValue(name, out var cached))
             {
-                return cached;
+                return Result<RulePack, AriadneError>.Success(cached);
             }
 
             if (!_resourceMap.TryGetValue(name, out var resourceName))
             {
-                throw new KeyNotFoundException($"Built-in pack '{name}' not found. Available packs: {string.Join(", ", _resourceMap.Keys)}");
+                return Result<RulePack, AriadneError>.Failure(new AriadneError(
+                    AriadneErrorCode.NotFound,
+                    $"Built-in pack '{name}' not found.",
+                    $"Available packs: {string.Join(", ", GetAvailablePackNames())}"));
             }
 
             var assembly = typeof(BuiltinPackRegistry).Assembly;
@@ -63,7 +67,7 @@ public sealed class BuiltinPackRegistry : IBuiltinPackRegistry
             var pack = _loader.LoadFromString(yaml);
 
             _cache[name] = pack;
-            return pack;
+            return Result<RulePack, AriadneError>.Success(pack);
         }
     }
 

@@ -1,3 +1,4 @@
+using Ariadne.NET.Abstractions;
 using FluentAssertions;
 using Ariadne.NET.RuleLoader;
 
@@ -28,7 +29,7 @@ public class BuiltinPackRegistryTests
     public void GetPack_ShouldReturnCleanArchitecturePack()
     {
         var registry = new BuiltinPackRegistry(new YamlRulePackLoader());
-        var pack = registry.GetPack("clean-architecture");
+        var pack = registry.GetPack("clean-architecture").Value;
 
         pack.Should().NotBeNull();
         pack.Layers.Should().HaveCount(4);
@@ -46,7 +47,7 @@ public class BuiltinPackRegistryTests
     public void GetPack_ShouldReturnNewPack(string packName)
     {
         var registry = new BuiltinPackRegistry(new YamlRulePackLoader());
-        var pack = registry.GetPack(packName);
+        var pack = registry.GetPack(packName).Value;
 
         pack.Should().NotBeNull();
         pack.Name.Should().Be(packName);
@@ -54,11 +55,34 @@ public class BuiltinPackRegistryTests
     }
 
     [Fact]
-    public void GetPack_UnknownName_ShouldThrow()
+    public void GetPack_UnknownName_ShouldReturnNotFound()
     {
         var registry = new BuiltinPackRegistry(new YamlRulePackLoader());
-        var act = () => registry.GetPack("nonexistent");
+        var result = registry.GetPack("nonexistent");
 
-        act.Should().Throw<KeyNotFoundException>();
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.NotFound);
+        result.Error.Message.Should().Be("Built-in pack 'nonexistent' not found.");
+        result.Error.Detail.Should().Contain("clean-architecture");
+        result.Error.Detail.Should().StartWith("Available packs: ");
+    }
+
+    [Fact]
+    public void GetPack_UnknownNameTwice_ShouldReturnNotFoundBothTimes()
+    {
+        var registry = new BuiltinPackRegistry(new YamlRulePackLoader());
+
+        registry.GetPack("nonexistent").Error.Code.Should().Be(AriadneErrorCode.NotFound);
+        registry.GetPack("nonexistent").Error.Code.Should().Be(AriadneErrorCode.NotFound);
+    }
+
+    [Fact]
+    public void GetPack_DifferentCase_ShouldReturnPack()
+    {
+        var registry = new BuiltinPackRegistry(new YamlRulePackLoader());
+        var result = registry.GetPack("Clean-Architecture");
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Name.Should().Be("clean-architecture");
     }
 }

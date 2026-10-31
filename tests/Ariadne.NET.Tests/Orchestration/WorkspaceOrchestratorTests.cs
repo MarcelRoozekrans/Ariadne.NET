@@ -127,7 +127,7 @@ public class WorkspaceOrchestratorTests
     {
         var loader = new YamlRulePackLoader();
         var registry = new BuiltinPackRegistry(loader);
-        var pack = registry.GetPack("hexagonal-architecture");
+        var pack = registry.GetPack("hexagonal-architecture").Value;
 
         var request = new WorkspaceGenerateRequest
         {
@@ -146,7 +146,7 @@ public class WorkspaceOrchestratorTests
     {
         var loader = new YamlRulePackLoader();
         var registry = new BuiltinPackRegistry(loader);
-        var pack = registry.GetPack("event-driven");
+        var pack = registry.GetPack("event-driven").Value;
 
         var request = new WorkspaceGenerateRequest
         {

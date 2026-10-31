@@ -56,7 +56,7 @@ public class BuiltinPackIntegrationTests
     public void Generate_WithBuiltinPack_ShouldProduceValidCode(
         string packName, string roleName, string componentName)
     {
-        var pack = _registry.GetPack(packName);
+        var pack = _registry.GetPack(packName).Value;
 
         var request = new GenerateRequest
         {
@@ -87,8 +87,8 @@ public class BuiltinPackIntegrationTests
     {
         // Composable packs (like ddd-tactical, cqrs) need a base pack with layers
         var merger = new RulePackMerger();
-        var basePack = _registry.GetPack("clean-architecture");
-        var addOnPack = _registry.GetPack(packName);
+        var basePack = _registry.GetPack("clean-architecture").Value;
+        var addOnPack = _registry.GetPack(packName).Value;
         var merged = merger.Merge([basePack, addOnPack]);
 
         var request = new GenerateRequest
@@ -119,8 +119,8 @@ public class BuiltinPackIntegrationTests
         string roleName, string componentName)
     {
         var merger = new RulePackMerger();
-        var basePack = _registry.GetPack("clean-architecture");
-        var cqrsPack = _registry.GetPack("cqrs");
+        var basePack = _registry.GetPack("clean-architecture").Value;
+        var cqrsPack = _registry.GetPack("cqrs").Value;
         var merged = merger.Merge([basePack, cqrsPack]);
 
         var request = new GenerateRequest
@@ -151,7 +151,7 @@ public class BuiltinPackIntegrationTests
     [InlineData("microservice")]
     public void Pack_ShouldHaveLayersAndRoles(string packName)
     {
-        var pack = _registry.GetPack(packName);
+        var pack = _registry.GetPack(packName).Value;
 
         pack.Name.Should().Be(packName);
         pack.Layers.Should().NotBeEmpty($"pack '{packName}' should define layers");
@@ -166,7 +166,7 @@ public class BuiltinPackIntegrationTests
     [InlineData("ddd-tactical")]
     public void ComposablePack_ShouldHaveRolesButNoLayers(string packName)
     {
-        var pack = _registry.GetPack(packName);
+        var pack = _registry.GetPack(packName).Value;
 
         pack.Name.Should().Be(packName);
         pack.Layers.Should().BeEmpty($"composable pack '{packName}' should not define its own layers");
@@ -176,7 +176,7 @@ public class BuiltinPackIntegrationTests
     [Fact]
     public void OnionArchitecture_ShouldHaveFiveLayers()
     {
-        var pack = _registry.GetPack("onion-architecture");
+        var pack = _registry.GetPack("onion-architecture").Value;
 
         pack.Layers.Should().HaveCount(5);
         pack.Layers.Select(l => l.Name).Should().BeEquivalentTo(
@@ -189,7 +189,7 @@ public class BuiltinPackIntegrationTests
     [Fact]
     public void OnionArchitecture_DomainModel_ShouldHaveNoDependencies()
     {
-        var pack = _registry.GetPack("onion-architecture");
+        var pack = _registry.GetPack("onion-architecture").Value;
         var domainModel = Layer(pack, "DomainModel");
 
         domainModel.AllowedDependencies.Should().BeEmpty();
@@ -198,7 +198,7 @@ public class BuiltinPackIntegrationTests
     [Fact]
     public void OnionArchitecture_Presentation_ShouldNotDependOnInfrastructure()
     {
-        var pack = _registry.GetPack("onion-architecture");
+        var pack = _registry.GetPack("onion-architecture").Value;
         var presentation = Layer(pack, "Presentation");
 
         presentation.AllowedDependencies.Should().NotContain("Infrastructure");
@@ -207,7 +207,7 @@ public class BuiltinPackIntegrationTests
     [Fact]
     public void Layered_ShouldHaveThreeLayers()
     {
-        var pack = _registry.GetPack("layered");
+        var pack = _registry.GetPack("layered").Value;
 
         pack.Layers.Should().HaveCount(3);
         pack.Layers.Select(l => l.Name).Should().BeEquivalentTo(
@@ -217,7 +217,7 @@ public class BuiltinPackIntegrationTests
     [Fact]
     public void Layered_ShouldEnforceTopDownDependencies()
     {
-        var pack = _registry.GetPack("layered");
+        var pack = _registry.GetPack("layered").Value;
 
         var presentation = Layer(pack, "Presentation");
         var business = Layer(pack, "Business");
@@ -232,7 +232,7 @@ public class BuiltinPackIntegrationTests
     [Fact]
     public void Microservice_ShouldHaveFiveLayers()
     {
-        var pack = _registry.GetPack("microservice");
+        var pack = _registry.GetPack("microservice").Value;
 
         pack.Layers.Should().HaveCount(5);
         pack.Layers.Select(l => l.Name).Should().BeEquivalentTo(
@@ -242,7 +242,7 @@ public class BuiltinPackIntegrationTests
     [Fact]
     public void Microservice_Contracts_ShouldHaveNoDependencies()
     {
-        var pack = _registry.GetPack("microservice");
+        var pack = _registry.GetPack("microservice").Value;
         var contracts = Layer(pack, "Contracts");
 
         contracts.AllowedDependencies.Should().BeEmpty(
@@ -252,7 +252,7 @@ public class BuiltinPackIntegrationTests
     [Fact]
     public void Microservice_Domain_ShouldNotDependOnContracts()
     {
-        var pack = _registry.GetPack("microservice");
+        var pack = _registry.GetPack("microservice").Value;
         var domain = Layer(pack, "Domain");
 
         domain.AllowedDependencies.Should().BeEmpty(

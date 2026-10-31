@@ -2,6 +2,7 @@ using System.Reflection;
 using FluentAssertions;
 using Ariadne.NET.RuleLoader;
 using Ariadne.NET.Mcp.Resources;
+using ModelContextProtocol;
 using ModelContextProtocol.Server;
 
 namespace Ariadne.NET.Mcp.Tests.Resources;
@@ -36,10 +37,13 @@ public class PackResourcesTests
     }
 
     [Fact]
-    public void GetPackContent_UnknownPack_ShouldThrow()
+    public void GetPackContent_UnknownPack_ShouldThrowResourceNotFound()
     {
         var act = () => PackResources.GetPackContent(_registry, "nonexistent");
 
-        act.Should().Throw<KeyNotFoundException>();
+        var exception = act.Should().Throw<McpProtocolException>().Which;
+        exception.ErrorCode.Should().Be(McpErrorCode.ResourceNotFound);
+        exception.Message.Should().Contain("Built-in pack 'nonexistent' not found.");
+        exception.Message.Should().Contain("clean-architecture");
     }
 }

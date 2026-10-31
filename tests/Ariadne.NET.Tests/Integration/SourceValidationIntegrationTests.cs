@@ -83,7 +83,7 @@ public sealed class SourceValidationIntegrationTests : IDisposable
             }
             """);
 
-        var pack = _registry.GetPack("clean-architecture");
+        var pack = _registry.GetPack("clean-architecture").Value;
         var result = _validator.Validate(pack, _tempDir);
 
         result.IsValid.Should().BeTrue();
@@ -108,7 +108,7 @@ public sealed class SourceValidationIntegrationTests : IDisposable
             public class OrderDbContext { }
             """);
 
-        var pack = _registry.GetPack("clean-architecture");
+        var pack = _registry.GetPack("clean-architecture").Value;
         var result = _validator.Validate(pack, _tempDir);
 
         result.IsValid.Should().BeFalse();
@@ -131,7 +131,7 @@ public sealed class SourceValidationIntegrationTests : IDisposable
             }
             """);
 
-        var pack = _registry.GetPack("clean-architecture");
+        var pack = _registry.GetPack("clean-architecture").Value;
         var result = _validator.Validate(pack, _tempDir);
 
         result.Violations.Should().Contain(v =>
@@ -158,7 +158,7 @@ public sealed class SourceValidationIntegrationTests : IDisposable
             public class OrderRepository : IOrderRepository { }
             """);
 
-        var pack = _registry.GetPack("clean-architecture");
+        var pack = _registry.GetPack("clean-architecture").Value;
         var result = _validator.Validate(pack, _tempDir);
 
         result.Violations.Should().Contain(v =>
@@ -177,7 +177,7 @@ public sealed class SourceValidationIntegrationTests : IDisposable
             internal class OrderRepository { }
             """);
 
-        var pack = _registry.GetPack("clean-architecture");
+        var pack = _registry.GetPack("clean-architecture").Value;
         var result = _validator.Validate(pack, _tempDir);
 
         result.Violations.Should().Contain(v =>
@@ -202,7 +202,7 @@ public sealed class SourceValidationIntegrationTests : IDisposable
             public class OrderRepository { }
             """);
 
-        var pack = _registry.GetPack("clean-architecture");
+        var pack = _registry.GetPack("clean-architecture").Value;
         var result = _validator.Validate(pack, _tempDir);
 
         result.IsValid.Should().BeFalse();
@@ -235,7 +235,7 @@ public sealed class SourceValidationIntegrationTests : IDisposable
             }
             """);
 
-        var pack = _registry.GetPack("clean-architecture");
+        var pack = _registry.GetPack("clean-architecture").Value;
         var result = _validator.Validate(pack, _tempDir);
 
         // ExternalService role: internal + requiresInterface
@@ -270,7 +270,7 @@ public sealed class SourceValidationIntegrationTests : IDisposable
             }
             """);
 
-        var pack = _registry.GetPack("clean-architecture");
+        var pack = _registry.GetPack("clean-architecture").Value;
         var result = _validator.Validate(pack, _tempDir);
 
         result.IsValid.Should().BeTrue();
