@@ -31,7 +31,7 @@ public class RulePackResolverTests
     public void Resolve_ImportProtocol_ShouldLoadFromCacheDirectory()
     {
         // Create temp dir with cached pack
-        var tempDir = Path.Combine(Path.GetTempPath(), $"archgov-resolver-{Guid.NewGuid():N}");
+        var tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-resolver-{Guid.NewGuid():N}");
         var cacheDir = Path.Combine(tempDir, ".architecture", ".cache", "git", "my-pack");
         Directory.CreateDirectory(cacheDir);
 
@@ -70,9 +70,27 @@ public class RulePackResolverTests
     }
 
     [Fact]
+    public void Resolve_ImportWithoutWorkingDirectory_TellsUserToRunAriadneSync()
+    {
+        var loader = new YamlRulePackLoader();
+        var resolver = new RulePackResolver(new BuiltinPackRegistry(loader), loader, new RulePackMerger());
+
+        var userPack = new RulePack
+        {
+            Name = "user-rules",
+            Extends = ["import://team-rules"],
+        };
+
+        var act = () => resolver.Resolve(userPack);
+
+        act.Should().Throw<InvalidOperationException>()
+            .Which.Message.Should().Contain("Run 'ariadne sync'");
+    }
+
+    [Fact]
     public void Resolve_ImportProtocol_NoCacheDir_ShouldThrow()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"archgov-resolver-{Guid.NewGuid():N}");
+        var tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-resolver-{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
 
         try

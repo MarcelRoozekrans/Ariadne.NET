@@ -22,7 +22,7 @@ public sealed class WorkspaceIntegrationTests : IDisposable
 
     public WorkspaceIntegrationTests()
     {
-        _tempDir = Path.Combine(Path.GetTempPath(), $"archgov-wstest-{Guid.NewGuid():N}");
+        _tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-wstest-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
 
         var loader = new YamlRulePackLoader();

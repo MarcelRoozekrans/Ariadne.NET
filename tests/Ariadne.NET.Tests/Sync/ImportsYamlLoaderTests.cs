@@ -10,7 +10,7 @@ public class ImportsYamlLoaderTests : IDisposable
 
     public ImportsYamlLoaderTests()
     {
-        _tempDir = Path.Combine(Path.GetTempPath(), $"archgov-tests-{Guid.NewGuid():N}");
+        _tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-tests-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
     }
 

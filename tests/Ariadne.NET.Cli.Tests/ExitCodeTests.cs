@@ -13,7 +13,7 @@ public sealed class ExitCodeTests : IDisposable
     public ExitCodeTests()
     {
         _originalDirectory = Directory.GetCurrentDirectory();
-        _tempDir = Path.Combine(Path.GetTempPath(), $"archgov-cli-{Guid.NewGuid():N}");
+        _tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-cli-{Guid.NewGuid():N}");
         Directory.CreateDirectory(Path.Combine(_tempDir, ".architecture"));
         File.WriteAllText(
             Path.Combine(_tempDir, ".architecture", "rules.yaml"),

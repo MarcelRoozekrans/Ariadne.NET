@@ -1,6 +1,9 @@
 @Ariadne.NET.Mcp.Http_HostAddress = http://localhost:5279
 
-GET {{Ariadne.NET.Mcp.Http_HostAddress}}/weatherforecast/
-Accept: application/json
+POST {{Ariadne.NET.Mcp.Http_HostAddress}}/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"http-file","version":"1.0"}}}
 
 ###

@@ -17,7 +17,7 @@ public sealed class SourceValidationIntegrationTests : IDisposable
 
     public SourceValidationIntegrationTests()
     {
-        _tempDir = Path.Combine(Path.GetTempPath(), $"archgov-inttest-{Guid.NewGuid():N}");
+        _tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-inttest-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
         _validator = new SourceValidator();
         _registry = new BuiltinPackRegistry(new YamlRulePackLoader());

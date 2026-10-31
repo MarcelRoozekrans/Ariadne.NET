@@ -70,7 +70,7 @@ public class ValidationToolsTests
     [Fact]
     public void ValidateSource_DependencyViolation_ShouldReturnInvalid()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"archgov-mcp-{Guid.NewGuid():N}");
+        var tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-mcp-{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
 
         try
@@ -114,7 +114,7 @@ public class ValidationToolsTests
     [Fact]
     public void ValidateSource_CorrectStructure_ShouldReturnValid()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"archgov-mcp-{Guid.NewGuid():N}");
+        var tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-mcp-{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
 
         try
@@ -157,7 +157,7 @@ public class ValidationToolsTests
     [Fact]
     public void LintSource_NamespaceMismatch_ShouldReturnViolation()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"archgov-mcp-{Guid.NewGuid():N}");
+        var tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-mcp-{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
 
         try
@@ -189,7 +189,7 @@ public class ValidationToolsTests
     [Fact]
     public void ValidateSource_WithHexagonalTemplate_ShouldUseCorrectRules()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"archgov-mcp-{Guid.NewGuid():N}");
+        var tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-mcp-{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
 
         try

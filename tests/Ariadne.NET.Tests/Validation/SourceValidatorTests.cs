@@ -10,7 +10,7 @@ public sealed class SourceValidatorTests : IDisposable
 
     public SourceValidatorTests()
     {
-        _tempDir = Path.Combine(Path.GetTempPath(), $"archgov-test-{Guid.NewGuid():N}");
+        _tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-test-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
     }
 

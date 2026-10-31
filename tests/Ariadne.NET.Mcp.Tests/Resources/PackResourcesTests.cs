@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Ariadne.NET.RuleLoader;
 using Ariadne.NET.Mcp.Resources;
+using ModelContextProtocol.Server;
 
 namespace Ariadne.NET.Mcp.Tests.Resources;
 
@@ -11,6 +12,18 @@ public class PackResourcesTests
     public PackResourcesTests()
     {
         _registry = new BuiltinPackRegistry(new YamlRulePackLoader());
+    }
+
+    [Fact]
+    public void GetPackContent_IsExposedUnderAriadneUriScheme()
+    {
+        var attribute = typeof(PackResources)
+            .GetMethod(nameof(PackResources.GetPackContent))!
+            .GetCustomAttributes(typeof(McpServerResourceAttribute), inherit: false)
+            .Cast<McpServerResourceAttribute>()
+            .Single();
+
+        attribute.UriTemplate.Should().Be("ariadne://packs/{name}");
     }
 
     [Fact]

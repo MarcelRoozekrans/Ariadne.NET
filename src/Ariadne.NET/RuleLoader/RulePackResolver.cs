@@ -65,7 +65,7 @@ public sealed class RulePackResolver : IRulePackResolver
         if (string.IsNullOrEmpty(workingDirectory))
         {
             throw new InvalidOperationException(
-                $"Cannot resolve import '{importName}' without a working directory. Run 'archgov sync' first to fetch imported packs.");
+                $"Cannot resolve import '{importName}' without a working directory. Run 'ariadne sync' first to fetch imported packs.");
         }
 
         var cacheDir = Path.Combine(workingDirectory, ".architecture", ".cache", "git", importName);
@@ -73,7 +73,7 @@ public sealed class RulePackResolver : IRulePackResolver
         if (!Directory.Exists(cacheDir))
         {
             throw new InvalidOperationException(
-                $"Cache directory for import '{importName}' not found at '{cacheDir}'. Run 'archgov sync' to fetch imported packs.");
+                $"Cache directory for import '{importName}' not found at '{cacheDir}'. Run 'ariadne sync' to fetch imported packs.");
         }
 
         var yamlFiles = Directory.GetFiles(cacheDir, "*.yaml", SearchOption.TopDirectoryOnly);
@@ -81,7 +81,7 @@ public sealed class RulePackResolver : IRulePackResolver
         if (yamlFiles.Length == 0)
         {
             throw new InvalidOperationException(
-                $"No YAML files found in cache directory '{cacheDir}' for import '{importName}'. Run 'archgov sync' to fetch imported packs.");
+                $"No YAML files found in cache directory '{cacheDir}' for import '{importName}'. Run 'ariadne sync' to fetch imported packs.");
         }
 
         return _loader.LoadFromFile(yamlFiles[0]);

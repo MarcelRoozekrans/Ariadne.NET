@@ -10,7 +10,7 @@ public sealed class LinterTests : IDisposable
 
     public LinterTests()
     {
-        _tempDir = Path.Combine(Path.GetTempPath(), $"archgov-lint-{Guid.NewGuid():N}");
+        _tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-lint-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
     }
 

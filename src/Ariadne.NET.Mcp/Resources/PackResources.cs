@@ -7,7 +7,7 @@ namespace Ariadne.NET.Mcp.Resources;
 [McpServerResourceType]
 public static class PackResources
 {
-    [McpServerResource(UriTemplate = "archgov://packs/{name}")]
+    [McpServerResource(UriTemplate = "ariadne://packs/{name}")]
     [Description("Get the full YAML content of a built-in architecture rule pack.")]
     public static string GetPackContent(
         IBuiltinPackRegistry registry,

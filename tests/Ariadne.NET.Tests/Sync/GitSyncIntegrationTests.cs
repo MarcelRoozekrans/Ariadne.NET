@@ -13,7 +13,7 @@ public sealed class GitSyncIntegrationTests : IDisposable
 
     public GitSyncIntegrationTests()
     {
-        _tempDir = Path.Combine(Path.GetTempPath(), $"archgov-test-{Guid.NewGuid():N}");
+        _tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-test-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
     }
 
