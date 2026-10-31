@@ -19,7 +19,7 @@ Rename the architecture governance engine to Ariadne.NET and give it the shape o
 ## Phases
 
 1. Phase 1.1 — Rename to Ariadne.NET [complete]
-2. Phase 1.2 — Package split [pending]
+2. Phase 1.2 — Package split [complete]
 3. Phase 1.3 — Family conventions [pending]
 4. Phase 1.4 — Publish [pending]
 

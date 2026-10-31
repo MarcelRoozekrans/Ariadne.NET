@@ -19,12 +19,13 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Plan:** `docs/superpowers/plans/2026-10-31-phase-1.1-rename.md`
 **Completed:** 2026-10-31
 
-### Phase 1.2: Package split [status: pending]
+### Phase 1.2: Package split [status: complete]
 **Goal:** Split into `Ariadne.NET.Abstractions` (schema and pack contracts), `Ariadne.NET` (engine) and the surfaces.
 **Surface:** Refactor
 **HelpWanted:** no
 **Design:** `docs/superpowers/specs/2026-10-31-phase-1.2-package-split-design.md`
 **Plan:** `docs/superpowers/plans/2026-10-31-phase-1.2-package-split.md`
+**Completed:** 2026-10-31
 
 ### Phase 1.3: Family conventions [status: pending]
 **Goal:** Adopt ZeroAlloc Results instead of exceptions, get the ZeroAlloc analyzers clean, and support AOT where the dependencies allow it.
