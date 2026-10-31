@@ -140,4 +140,32 @@ public sealed class ExitCodeTests : IDisposable
     {
         Run("sync").Should().Be(ExitCodes.Error);
     }
+
+    [Fact]
+    public void UnexpectedException_ReportsMessageThenStackTraceAndReturnsError()
+    {
+        var originalError = Console.Error;
+        using var error = new StringWriter();
+        Console.SetError(error);
+
+        int exitCode;
+        try
+        {
+            exitCode = CliRootCommand.Invoke(new ThrowingServiceProvider(), ["rules"]);
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
+
+        exitCode.Should().Be(ExitCodes.Error);
+        var lines = error.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        lines[0].Should().Be("Error: boom");
+        error.ToString().Should().Contain("System.InvalidOperationException: boom").And.Contain(" at ");
+    }
+
+    private sealed class ThrowingServiceProvider : IServiceProvider
+    {
+        public object? GetService(Type serviceType) => throw new InvalidOperationException("boom");
+    }
 }
