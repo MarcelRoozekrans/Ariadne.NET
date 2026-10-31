@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Ariadne.NET.Abstractions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -195,7 +196,7 @@ public sealed class SourceValidator : ISourceValidator
             return;
         }
 
-        var isInternal = typeDecl.Modifiers.Any(m => m.IsKind(SyntaxKind.InternalKeyword));
+        var isInternal = typeDecl.Modifiers.Any(SyntaxKind.InternalKeyword);
         if (string.Equals(expectedAccessibility, "internal", StringComparison.OrdinalIgnoreCase) && !isInternal)
         {
             violations.Add(new SourceViolation
@@ -249,7 +250,7 @@ public sealed class SourceValidator : ISourceValidator
 
             if (!hasInterfaceTypes)
             {
-                foreach (var implType in implTypes)
+                foreach (ref readonly var implType in CollectionsMarshal.AsSpan(implTypes))
                 {
                     violations.Add(new SourceViolation
                     {

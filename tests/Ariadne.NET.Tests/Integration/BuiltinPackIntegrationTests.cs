@@ -1,3 +1,4 @@
+using Ariadne.NET.Abstractions;
 using FluentAssertions;
 using Ariadne.NET.CodeGeneration;
 using Ariadne.NET.Orchestration;
@@ -182,11 +183,14 @@ public class BuiltinPackIntegrationTests
             ["DomainModel", "DomainServices", "ApplicationServices", "Infrastructure", "Presentation"]);
     }
 
+    private static LayerDefinition Layer(RulePack pack, string name) =>
+        pack.Layers.Should().ContainSingle(l => string.Equals(l.Name, name, StringComparison.Ordinal)).Subject;
+
     [Fact]
     public void OnionArchitecture_DomainModel_ShouldHaveNoDependencies()
     {
         var pack = _registry.GetPack("onion-architecture");
-        var domainModel = pack.Layers.Single(l => l.Name == "DomainModel");
+        var domainModel = Layer(pack, "DomainModel");
 
         domainModel.AllowedDependencies.Should().BeEmpty();
     }
@@ -195,7 +199,7 @@ public class BuiltinPackIntegrationTests
     public void OnionArchitecture_Presentation_ShouldNotDependOnInfrastructure()
     {
         var pack = _registry.GetPack("onion-architecture");
-        var presentation = pack.Layers.Single(l => l.Name == "Presentation");
+        var presentation = Layer(pack, "Presentation");
 
         presentation.AllowedDependencies.Should().NotContain("Infrastructure");
     }
@@ -215,9 +219,9 @@ public class BuiltinPackIntegrationTests
     {
         var pack = _registry.GetPack("layered");
 
-        var presentation = pack.Layers.Single(l => l.Name == "Presentation");
-        var business = pack.Layers.Single(l => l.Name == "Business");
-        var dataAccess = pack.Layers.Single(l => l.Name == "DataAccess");
+        var presentation = Layer(pack, "Presentation");
+        var business = Layer(pack, "Business");
+        var dataAccess = Layer(pack, "DataAccess");
 
         // Top-down only: Presentation -> Business -> DataAccess
         presentation.AllowedDependencies.Should().BeEquivalentTo(["Business"]);
@@ -239,7 +243,7 @@ public class BuiltinPackIntegrationTests
     public void Microservice_Contracts_ShouldHaveNoDependencies()
     {
         var pack = _registry.GetPack("microservice");
-        var contracts = pack.Layers.Single(l => l.Name == "Contracts");
+        var contracts = Layer(pack, "Contracts");
 
         contracts.AllowedDependencies.Should().BeEmpty(
             "Contracts is the public API surface — it must not depend on internal layers");
@@ -249,7 +253,7 @@ public class BuiltinPackIntegrationTests
     public void Microservice_Domain_ShouldNotDependOnContracts()
     {
         var pack = _registry.GetPack("microservice");
-        var domain = pack.Layers.Single(l => l.Name == "Domain");
+        var domain = Layer(pack, "Domain");
 
         domain.AllowedDependencies.Should().BeEmpty(
             "Domain is the innermost layer and should have no dependencies");

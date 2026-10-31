@@ -46,6 +46,20 @@ public sealed class GitCliSyncProvider : IGitSyncProvider
 
         var commitSha = ParseCommitFromLsRemote(lsRemoteOutput, bestTag);
 
+        await CloneIntoCacheAsync(import, bestTag, importCacheDir, ct).ConfigureAwait(false);
+        await WriteGitInfoAsync(import.Url, bestTag, commitSha, importCacheDir, ct).ConfigureAwait(false);
+
+        return new SyncResult
+        {
+            ImportName = import.Name,
+            ResolvedVersion = bestTag,
+            WasCached = false,
+            CachePath = importCacheDir,
+        };
+    }
+
+    private static async Task CloneIntoCacheAsync(ImportDefinition import, string tag, string importCacheDir, CancellationToken ct)
+    {
         if (Directory.Exists(importCacheDir))
         {
             Directory.Delete(importCacheDir, recursive: true);
@@ -58,7 +72,7 @@ public sealed class GitCliSyncProvider : IGitSyncProvider
         try
         {
             await RunGitAsync(
-                $"clone --depth 1 --branch {bestTag} --single-branch {import.Url} \"{cloneTarget}\"",
+                $"clone --depth 1 --branch {tag} --single-branch {import.Url} \"{cloneTarget}\"",
                 ct).ConfigureAwait(false);
 
             var sourceDir = string.IsNullOrEmpty(import.Path)
@@ -74,25 +88,20 @@ public sealed class GitCliSyncProvider : IGitSyncProvider
                 Directory.Delete(cloneTarget, recursive: true);
             }
         }
+    }
 
+    private static async Task WriteGitInfoAsync(string url, string tag, string? commitSha, string importCacheDir, CancellationToken ct)
+    {
         var gitInfo = new GitInfo
         {
-            Url = import.Url,
-            ResolvedTag = bestTag,
+            Url = url,
+            ResolvedTag = tag,
             CommitSha = commitSha ?? string.Empty,
             SyncedAt = DateTimeOffset.UtcNow,
         };
 
         var json = JsonSerializer.Serialize(gitInfo, new JsonSerializerOptions { WriteIndented = true });
         await File.WriteAllTextAsync(Path.Combine(importCacheDir, ".git-info.json"), json, ct).ConfigureAwait(false);
-
-        return new SyncResult
-        {
-            ImportName = import.Name,
-            ResolvedVersion = bestTag,
-            WasCached = false,
-            CachePath = importCacheDir,
-        };
     }
 
     public static IReadOnlyList<string> ParseTagsFromLsRemote(string output)

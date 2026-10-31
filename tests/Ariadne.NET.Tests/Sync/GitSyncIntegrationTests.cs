@@ -48,6 +48,34 @@ public sealed class GitSyncIntegrationTests : IDisposable
         manifest.Imports[0].Name.Should().Be("shared-rules");
 
         // 3. Simulate cache: create .architecture/.cache/git/shared-rules/ with pack yaml and .git-info.json
+        WriteSharedRulesCache(archDir);
+
+        // 4. Create .architecture/rules.yaml with extends: [import://shared-rules]
+        var rulesYaml = """
+            name: my-project
+            extends:
+              - import://shared-rules
+            """;
+        File.WriteAllText(Path.Combine(archDir, "rules.yaml"), rulesYaml);
+
+        // 5. Load user pack, resolve with RulePackResolver
+        var yamlLoader = new YamlRulePackLoader();
+        var userPack = yamlLoader.LoadFromFile(Path.Combine(archDir, "rules.yaml"));
+
+        var registry = new BuiltinPackRegistry(yamlLoader);
+        var merger = new RulePackMerger();
+        var resolver = new RulePackResolver(registry, yamlLoader, merger);
+
+        var resolvedPack = resolver.Resolve(userPack, _tempDir);
+
+        // 6. Assert resolved pack has Domain + Application layers and Entity role
+        resolvedPack.Layers.Should().HaveCount(2);
+        resolvedPack.Layers.Select(l => l.Name).Should().BeEquivalentTo(["Domain", "Application"]);
+        resolvedPack.ComponentRoles.Should().ContainSingle(r => r.Name == "Entity");
+    }
+
+    private static void WriteSharedRulesCache(string archDir)
+    {
         var cacheDir = Path.Combine(archDir, ".cache", "git", "shared-rules");
         Directory.CreateDirectory(cacheDir);
 
@@ -82,29 +110,6 @@ public sealed class GitSyncIntegrationTests : IDisposable
         };
         var gitInfoJson = JsonSerializer.Serialize(gitInfo, new JsonSerializerOptions { WriteIndented = true });
         File.WriteAllText(Path.Combine(cacheDir, ".git-info.json"), gitInfoJson);
-
-        // 4. Create .architecture/rules.yaml with extends: [import://shared-rules]
-        var rulesYaml = """
-            name: my-project
-            extends:
-              - import://shared-rules
-            """;
-        File.WriteAllText(Path.Combine(archDir, "rules.yaml"), rulesYaml);
-
-        // 5. Load user pack, resolve with RulePackResolver
-        var yamlLoader = new YamlRulePackLoader();
-        var userPack = yamlLoader.LoadFromFile(Path.Combine(archDir, "rules.yaml"));
-
-        var registry = new BuiltinPackRegistry(yamlLoader);
-        var merger = new RulePackMerger();
-        var resolver = new RulePackResolver(registry, yamlLoader, merger);
-
-        var resolvedPack = resolver.Resolve(userPack, _tempDir);
-
-        // 6. Assert resolved pack has Domain + Application layers and Entity role
-        resolvedPack.Layers.Should().HaveCount(2);
-        resolvedPack.Layers.Select(l => l.Name).Should().BeEquivalentTo(["Domain", "Application"]);
-        resolvedPack.ComponentRoles.Should().ContainSingle(r => r.Name == "Entity");
     }
 
     [Fact]

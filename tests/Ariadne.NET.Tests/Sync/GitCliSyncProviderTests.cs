@@ -9,12 +9,14 @@ public class GitCliSyncProviderTests
     [Fact]
     public void ParseTagsFromLsRemote_ShouldExtractTagNames()
     {
-        var output = string.Join('\n',
+        var output = string.Join("\n", new[]
+        {
             "aaa1234567890123456789012345678901234567\trefs/tags/v1.0.0",
             "bbb1234567890123456789012345678901234567\trefs/tags/v1.1.0",
             "ccc1234567890123456789012345678901234567\trefs/tags/v2.0.0",
             "ddd1234567890123456789012345678901234567\trefs/tags/v2.0.0^{}",
-            "eee1234567890123456789012345678901234567\trefs/tags/not-semver");
+            "eee1234567890123456789012345678901234567\trefs/tags/not-semver",
+        });
 
         var tags = GitCliSyncProvider.ParseTagsFromLsRemote(output);
 
@@ -32,10 +34,12 @@ public class GitCliSyncProviderTests
     [Fact]
     public void ParseCommitFromLsRemote_ShouldExtractShaForTag()
     {
-        var output = string.Join('\n',
+        var output = string.Join("\n", new[]
+        {
             "aaa1234567890123456789012345678901234567\trefs/tags/v1.0.0",
             "bbb1234567890123456789012345678901234567\trefs/tags/v1.1.0",
-            "ccc1234567890123456789012345678901234567\trefs/tags/v2.0.0");
+            "ccc1234567890123456789012345678901234567\trefs/tags/v2.0.0",
+        });
 
         var sha = GitCliSyncProvider.ParseCommitFromLsRemote(output, "v2.0.0");
 
@@ -45,9 +49,11 @@ public class GitCliSyncProviderTests
     [Fact]
     public void ParseCommitFromLsRemote_DereferencedTag_ShouldPreferDereferenced()
     {
-        var output = string.Join('\n',
+        var output = string.Join("\n", new[]
+        {
             "abc1234567890123456789012345678901234567\trefs/tags/v1.0.0",
-            "bcd1234567890123456789012345678901234567\trefs/tags/v1.0.0^{}");
+            "bcd1234567890123456789012345678901234567\trefs/tags/v1.0.0^{}",
+        });
 
         var sha = GitCliSyncProvider.ParseCommitFromLsRemote(output, "v1.0.0");
 
@@ -136,11 +142,13 @@ public class GitCliSyncProviderTests
     [Fact]
     public void ParseTagsFromLsRemote_ShouldIgnorePreReleaseTags()
     {
-        var output = string.Join('\n',
+        var output = string.Join("\n", new[]
+        {
             "aaa1234567890123456789012345678901234567\trefs/tags/v1.0.0",
             "bbb1234567890123456789012345678901234567\trefs/tags/v1.1.0-beta",
             "ccc1234567890123456789012345678901234567\trefs/tags/v2.0.0-rc.1",
-            "ddd1234567890123456789012345678901234567\trefs/tags/v2.0.0");
+            "ddd1234567890123456789012345678901234567\trefs/tags/v2.0.0",
+        });
 
         var tags = GitCliSyncProvider.ParseTagsFromLsRemote(output);
 

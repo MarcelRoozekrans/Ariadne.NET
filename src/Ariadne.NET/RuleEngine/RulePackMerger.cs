@@ -79,7 +79,7 @@ public sealed class RulePackMerger : IRulePackMerger
         {
             Name = kvp.Key,
             Description = layerDescriptions[kvp.Key],
-            AllowedDependencies = kvp.Value.ToList(),
+            AllowedDependencies = kvp.Value,
         }).ToList();
     }
 

@@ -179,7 +179,7 @@ public sealed class SourceValidatorTests : IDisposable
         var validator = new SourceValidator();
         var result = validator.Validate(CreateTestPackWithRoles(), _tempDir);
 
-        result.Violations.Where(v => v.ViolationType == "TypeKindMismatch").Should().BeEmpty();
+        result.Violations.Where(v => string.Equals(v.ViolationType, "TypeKindMismatch", StringComparison.Ordinal)).Should().BeEmpty();
     }
 
     [Fact]
@@ -217,7 +217,7 @@ public sealed class SourceValidatorTests : IDisposable
         var validator = new SourceValidator();
         var result = validator.Validate(CreateTestPackWithRoles(), _tempDir);
 
-        result.Violations.Where(v => v.ViolationType == "AccessibilityMismatch").Should().BeEmpty();
+        result.Violations.Where(v => string.Equals(v.ViolationType, "AccessibilityMismatch", StringComparison.Ordinal)).Should().BeEmpty();
     }
 
     [Fact]
@@ -267,6 +267,6 @@ public sealed class SourceValidatorTests : IDisposable
         var validator = new SourceValidator();
         var result = validator.Validate(CreateTestPackWithRoles(), _tempDir);
 
-        result.Violations.Where(v => v.ViolationType == "MissingInterface").Should().BeEmpty();
+        result.Violations.Where(v => string.Equals(v.ViolationType, "MissingInterface", StringComparison.Ordinal)).Should().BeEmpty();
     }
 }

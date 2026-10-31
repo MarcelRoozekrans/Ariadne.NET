@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.CommandLine;
 using System.CommandLine.Parsing;
 using Ariadne.NET.Cli.Commands;
@@ -33,6 +34,7 @@ public static class CliRootCommand
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Error: {ex.Message}");
+            Debug.WriteLine(ex);
             return ExitCodes.Error;
         }
     }
