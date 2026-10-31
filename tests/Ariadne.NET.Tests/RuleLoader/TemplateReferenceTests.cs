@@ -1,3 +1,4 @@
+using Ariadne.NET.Abstractions;
 using FluentAssertions;
 using Ariadne.NET.RuleLoader;
 
@@ -10,7 +11,8 @@ public class TemplateReferenceTests
     {
         var result = TemplateReference.ParseNames("clean-architecture+cqrs");
 
-        result.Should().Equal("clean-architecture", "cqrs");
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().Equal("clean-architecture", "cqrs");
     }
 
     [Fact]
@@ -18,7 +20,7 @@ public class TemplateReferenceTests
     {
         var result = TemplateReference.ToExtends("clean-architecture");
 
-        result.Should().Equal("builtin://clean-architecture");
+        result.Value.Should().Equal("builtin://clean-architecture");
     }
 
     [Fact]
@@ -26,7 +28,7 @@ public class TemplateReferenceTests
     {
         var result = TemplateReference.ToExtends("clean-architecture+cqrs");
 
-        result.Should().Equal("builtin://clean-architecture", "builtin://cqrs");
+        result.Value.Should().Equal("builtin://clean-architecture", "builtin://cqrs");
     }
 
     [Fact]
@@ -34,16 +36,18 @@ public class TemplateReferenceTests
     {
         var result = TemplateReference.ToExtends(" clean-architecture + +cqrs ");
 
-        result.Should().Equal("builtin://clean-architecture", "builtin://cqrs");
+        result.Value.Should().Equal("builtin://clean-architecture", "builtin://cqrs");
     }
 
     [Theory]
     [InlineData("")]
     [InlineData(" + ")]
-    public void ToExtends_WithoutTemplateNames_ShouldThrow(string template)
+    public void ToExtends_WithoutTemplateNames_ShouldReturnInvalid(string template)
     {
-        var act = () => TemplateReference.ToExtends(template);
+        var result = TemplateReference.ToExtends(template);
 
-        act.Should().Throw<ArgumentException>();
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().Contain($"'{template}'");
     }
 }

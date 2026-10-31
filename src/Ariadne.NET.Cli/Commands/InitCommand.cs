@@ -27,13 +27,25 @@ public static class InitCommand
             var template = parseResult.GetValue(templateOption)!;
             var registry = provider.GetRequiredService<IBuiltinPackRegistry>();
 
+            var names = TemplateReference.ParseNames(template);
+            if (names.IsFailure)
+            {
+                return ReportError(names.Error);
+            }
+
             // Validate all templates exist
-            foreach (var name in TemplateReference.ParseNames(template))
+            foreach (var name in names.Value)
             {
                 registry.GetPack(name); // throws if not found
             }
 
-            var extendsList = TemplateReference.ToExtends(template);
+            var extends = TemplateReference.ToExtends(template);
+            if (extends.IsFailure)
+            {
+                return ReportError(extends.Error);
+            }
+
+            var extendsList = extends.Value;
 
             var rulesContent = new Dictionary<string, object>(StringComparer.Ordinal)
             {
@@ -50,8 +62,20 @@ public static class InitCommand
                 serializer.Serialize(rulesContent));
 
             Console.WriteLine($"Initialized .architecture/rules.yaml with template: {template}");
+            return ExitCodes.Success;
         });
 
         return command;
+    }
+
+    private static int ReportError(AriadneError error)
+    {
+        Console.Error.WriteLine($"Error: {error.Message}");
+        if (error.Detail is not null)
+        {
+            Console.Error.WriteLine(error.Detail);
+        }
+
+        return ExitCodes.Error;
     }
 }

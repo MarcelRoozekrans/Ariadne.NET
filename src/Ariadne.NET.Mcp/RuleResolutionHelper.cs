@@ -26,10 +26,17 @@ public sealed class RuleResolutionHelper : IRuleResolutionHelper
     {
         if (template is not null)
         {
+            var extends = TemplateReference.ToExtends(template);
+            if (extends.IsFailure)
+            {
+                // Task 6 replaces this with a Result
+                throw new ArgumentException(extends.Error.Message, nameof(template));
+            }
+
             var userPack = new RulePack
             {
                 Name = template,
-                Extends = TemplateReference.ToExtends(template),
+                Extends = extends.Value,
             };
             return _resolver.Resolve(userPack);
         }

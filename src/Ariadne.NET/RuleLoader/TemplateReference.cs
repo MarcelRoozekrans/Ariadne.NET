@@ -1,3 +1,6 @@
+using Ariadne.NET.Abstractions;
+using ZeroAlloc.Results;
+
 namespace Ariadne.NET.RuleLoader;
 
 /// <summary>
@@ -7,7 +10,7 @@ public static class TemplateReference
 {
     private const string BuiltinPrefix = "builtin://";
 
-    public static IList<string> ParseNames(string template)
+    public static Result<IList<string>, AriadneError> ParseNames(string template)
     {
         ArgumentNullException.ThrowIfNull(template);
 
@@ -15,14 +18,23 @@ public static class TemplateReference
 
         if (names.Length == 0)
         {
-            throw new ArgumentException($"Template expression '{template}' contains no template names.", nameof(template));
+            return Result<IList<string>, AriadneError>.Failure(new AriadneError(
+                AriadneErrorCode.Invalid,
+                $"Template expression '{template}' contains no template names."));
         }
 
-        return names;
+        return Result<IList<string>, AriadneError>.Success(names);
     }
 
-    public static IList<string> ToExtends(string template)
+    public static Result<IList<string>, AriadneError> ToExtends(string template)
     {
-        return ParseNames(template).Select(name => BuiltinPrefix + name).ToList();
+        var names = ParseNames(template);
+        if (names.IsFailure)
+        {
+            return names;
+        }
+
+        return Result<IList<string>, AriadneError>.Success(
+            names.Value.Select(name => BuiltinPrefix + name).ToList());
     }
 }

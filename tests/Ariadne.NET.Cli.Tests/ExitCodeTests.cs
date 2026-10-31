@@ -77,6 +77,24 @@ public sealed class ExitCodeTests : IDisposable
     }
 
     [Fact]
+    public void Init_TemplateWithoutNames_ShouldReturnErrorAndWriteStderr()
+    {
+        var originalError = Console.Error;
+        using var error = new StringWriter();
+        Console.SetError(error);
+        try
+        {
+            Run("init", "--template", " + ").Should().Be(ExitCodes.Error);
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
+
+        error.ToString().Should().Contain("Error: Template expression ' + ' contains no template names.");
+    }
+
+    [Fact]
     public void Lint_NamespaceMismatch_ShouldReturnViolations()
     {
         WriteSource("MyApp.Orders.Domain", "Order.cs", """
