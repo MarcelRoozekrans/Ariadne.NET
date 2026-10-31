@@ -46,7 +46,10 @@ public sealed class GenerateOrchestrator : IGenerateOrchestrator
                 SolutionName = request.SolutionName,
                 Feature = request.Feature,
                 ComponentName = component.Name,
-                RoleName = component.RoleName,
+
+                // The role inference found, which differs from the request when it matched an alternative name.
+                // An Ok result always carries it.
+                RoleName = inference.RoleName!,
             };
 
             var result = _codeGenerator.Generate(resolvedPack, codeRequest);

@@ -104,4 +104,37 @@ public class GenerateOrchestratorTests
         result.GeneratedFiles[0].Namespace.Should().Be("MyApp.Orders.Domain");
         result.GeneratedFiles[0].Code.Should().Contain("MyApp.Orders.Domain");
     }
+
+    [Fact]
+    public void Generate_RoleRequestedByAlternativeName_UsesTheInferredRole()
+    {
+        // 'Aggregate' is an alternative name only: no role carries it as its name.
+        var pack = new RulePack
+        {
+            Name = "custom",
+            Layers = [new LayerDefinition { Name = "Domain", AllowedDependencies = [] }],
+            ComponentRoles =
+            [
+                new ComponentRoleDefinition { Name = "Entity", Layer = "Domain", TypeKind = CSharpTypeKind.Record, AlternativeNames = ["Aggregate"] },
+            ],
+            NamingConventions = new NamingConventions
+            {
+                Namespace = "{SolutionName}.{Feature}.{Layer}",
+                FilePath = "src/{SolutionName}.{Feature}.{Layer}/{ComponentName}.cs",
+            },
+        };
+        var orchestrator = new GenerateOrchestrator(new LayerInferenceEngine(), new CodeGeneratorService());
+
+        var result = orchestrator.Generate(pack, new GenerateRequest
+        {
+            SolutionName = "MyApp",
+            Feature = "Orders",
+            Components = [new ComponentRequest { RoleName = "Aggregate", Name = "Order" }],
+        });
+
+        result.Success.Should().BeTrue();
+        result.GeneratedFiles.Should().ContainSingle();
+        result.GeneratedFiles[0].Namespace.Should().Be("MyApp.Orders.Domain");
+        result.GeneratedFiles[0].Code.Should().Contain("record Order");
+    }
 }
