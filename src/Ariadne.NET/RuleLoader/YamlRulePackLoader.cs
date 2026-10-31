@@ -11,6 +11,14 @@ namespace Ariadne.NET.RuleLoader;
 [Singleton]
 public sealed class YamlRulePackLoader : IRulePackLoader
 {
+    // The generated validator composes the nested validators, so they are built here instead of resolved from DI:
+    // ZeroAlloc.Validation.Inject would add a package and a constructor parameter for four stateless objects.
+    private static readonly RulePackValidator Validator = new(
+        new LayerDefinitionValidator(),
+        new ComponentRoleDefinitionValidator(),
+        new CodeFeatureRuleDefinitionValidator(),
+        new NamingConventionsValidator());
+
     private readonly IDeserializer _deserializer = new DeserializerBuilder()
         .WithNamingConvention(CamelCaseNamingConvention.Instance)
         .IgnoreUnmatchedProperties()
@@ -77,7 +85,29 @@ public sealed class YamlRulePackLoader : IRulePackLoader
             return Invalid($"{subject} does not match the rule pack schema.", ex);
         }
 
-        return pack is null ? Empty(subject) : Result<RulePack, AriadneError>.Success(pack);
+        return pack is null ? Empty(subject) : CheckMembers(pack);
+    }
+
+    /// <summary>Runs the member rules declared on the schema types; cross-references are the resolver's job.</summary>
+    private static Result<RulePack, AriadneError> CheckMembers(RulePack pack)
+    {
+        var result = Validator.Validate(pack);
+        if (result.IsValid)
+        {
+            return Result<RulePack, AriadneError>.Success(pack);
+        }
+
+        var lines = new List<string>(result.Failures.Length);
+        foreach (ref readonly var failure in result.Failures)
+        {
+            // EPS06 is wrong here: ValidationFailure is a readonly struct, so reading its members copies nothing.
+            // ZeroAlloc.Validation suppresses the same finding in its own generated code, citing its issue 213.
+#pragma warning disable EPS06
+            lines.Add($"{failure.PropertyName}: {failure.ErrorMessage}");
+#pragma warning restore EPS06
+        }
+
+        return Result<RulePack, AriadneError>.Failure(RulePackReferenceCheck.Invalid(pack.Name, lines));
     }
 
     private static Result<RulePack, AriadneError> Invalid(string message, YamlException ex) =>

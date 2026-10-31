@@ -25,7 +25,7 @@ public class AbstractionsAssemblyTests
     [Fact]
     public void References_only_framework_and_allow_listed_assemblies()
     {
-        var allowedPackages = new HashSet<string>(StringComparer.Ordinal) { "ZeroAlloc.Results" };
+        var allowedPackages = new HashSet<string>(StringComparer.Ordinal) { "ZeroAlloc.Results", "ZeroAlloc.Validation" };
         var frameworkNames = new HashSet<string>(StringComparer.Ordinal) { "netstandard", "mscorlib", "System" };
 
         var unexpected = typeof(RulePack).Assembly.GetReferencedAssemblies()

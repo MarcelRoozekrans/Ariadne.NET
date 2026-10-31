@@ -1,4 +1,5 @@
 using Ariadne.NET.Abstractions;
+using ZeroAlloc.Results;
 
 // Roots Ariadne.NET.Abstractions in a Native AOT publish: any trim or AOT warning fails the build.
 var pack = new RulePack
@@ -8,5 +9,16 @@ var pack = new RulePack
     ComponentRoles = [new ComponentRoleDefinition { Name = "Entity", Layer = "Domain" }],
 };
 
-Console.WriteLine($"{pack.Name}: {pack.Layers.Count} layer(s), {pack.ComponentRoles.Count} role(s)");
-return 0;
+var validator = new RulePackValidator(
+    new LayerDefinitionValidator(),
+    new ComponentRoleDefinitionValidator(),
+    new CodeFeatureRuleDefinitionValidator(),
+    new NamingConventionsValidator());
+var validation = validator.Validate(pack);
+
+var result = validation.IsValid
+    ? Result<RulePack, AriadneError>.Success(pack)
+    : Result<RulePack, AriadneError>.Failure(new AriadneError(AriadneErrorCode.Invalid, "Rule pack 'aot-smoke' is invalid."));
+
+Console.WriteLine($"{pack.Name}: {pack.Layers.Count} layer(s), {pack.ComponentRoles.Count} role(s), valid: {validation.IsValid}, success: {result.IsSuccess}");
+return result.IsSuccess ? 0 : 1;

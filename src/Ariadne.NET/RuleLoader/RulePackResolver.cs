@@ -31,7 +31,7 @@ public sealed class RulePackResolver : IRulePackResolver
 
         if (userPack.Extends.Count == 0)
         {
-            return Result<RulePack, AriadneError>.Success(userPack);
+            return RulePackReferenceCheck.Check(userPack);
         }
 
         var packs = new List<RulePack>();
@@ -50,7 +50,7 @@ public sealed class RulePackResolver : IRulePackResolver
 
         packs.Add(userPack);
 
-        return Result<RulePack, AriadneError>.Success(_merger.Merge(packs));
+        return RulePackReferenceCheck.Check(_merger.Merge(packs));
     }
 
     private Result<RulePack, AriadneError> LoadReference(string reference, string? workingDirectory)

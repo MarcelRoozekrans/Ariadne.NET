@@ -1,5 +1,8 @@
+using ZeroAlloc.Validation;
+
 namespace Ariadne.NET.Abstractions;
 
+[Validate]
 public sealed class RulePack
 {
     public required string Name { get; init; }
