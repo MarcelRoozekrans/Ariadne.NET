@@ -1,9 +1,0 @@
-<Solution>
-  <Project Path="../tests/ArchGov.Core.Tests/ArchGov.Core.Tests.csproj" />
-  <Project Path="../tests/ArchGov.Host.Cli.Tests/ArchGov.Host.Cli.Tests.csproj" />
-  <Project Path="../tests/ArchGov.Host.Mcp.Tests/ArchGov.Host.Mcp.Tests.csproj" />
-  <Project Path="ArchGov.Core/ArchGov.Core.csproj" />
-  <Project Path="ArchGov.Host.Api/ArchGov.Host.Api.csproj" />
-  <Project Path="ArchGov.Host.Cli/ArchGov.Host.Cli.csproj" />
-  <Project Path="ArchGov.Host.Mcp/ArchGov.Host.Mcp.csproj" />
-</Solution>

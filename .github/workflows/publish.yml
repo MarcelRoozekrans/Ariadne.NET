@@ -32,13 +32,13 @@ jobs:
         uses: gittools/actions/gitversion/execute@v3
 
       - name: Build
-        run: dotnet build src/ArchGov.slnx --configuration Release -p:Version=${{ steps.gitversion.outputs.semVer }}
+        run: dotnet build src/Ariadne.NET.slnx --configuration Release -p:Version=${{ steps.gitversion.outputs.semVer }}
 
       - name: Test
-        run: dotnet test src/ArchGov.slnx --configuration Release --no-build --verbosity normal
+        run: dotnet test src/Ariadne.NET.slnx --configuration Release --no-build --verbosity normal
 
       - name: Pack
-        run: dotnet pack src/ArchGov.slnx --configuration Release --no-build --output ./artifacts -p:Version=${{ steps.gitversion.outputs.semVer }}
+        run: dotnet pack src/Ariadne.NET.slnx --configuration Release --no-build --output ./artifacts -p:Version=${{ steps.gitversion.outputs.semVer }}
 
       - name: Push to NuGet
         run: dotnet nuget push ./artifacts/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate

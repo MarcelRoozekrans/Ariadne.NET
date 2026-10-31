@@ -1,0 +1,6 @@
+@Ariadne.NET.Mcp.Http_HostAddress = http://localhost:5279
+
+GET {{Ariadne.NET.Mcp.Http_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
