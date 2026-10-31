@@ -49,8 +49,13 @@ public sealed class GitCliClientTests : IDisposable
         File.Exists(Path.Combine(_root, "cache", "pack", "pack.yaml")).Should().BeTrue();
     }
 
+    /// <summary>
+    /// Proves git received the whole url, option text included, as one repository argument: git names that exact
+    /// string in its error. When the url was split into words, git saw a different repository and '--template'
+    /// as separate arguments, and this message never quoted the full url.
+    /// </summary>
     [Fact]
-    public async Task UrlCarryingATemplateOption_RunsNoHook_AndIsUnavailable()
+    public async Task UrlCarryingATemplateOption_ReachesGitAsOneRepositoryArgument_AndRunsNoHook()
     {
         var repo = CreateTaggedRepository("src");
         var marker = Path.Combine(_root, "hook-ran");
@@ -63,10 +68,12 @@ public sealed class GitCliClientTests : IDisposable
             File.SetUnixFileMode(hook, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         }
 
-        var outcome = await SyncAsync($"{repo} --template {template}");
+        var url = $"{repo} --template {template}";
+        var outcome = await SyncAsync(url);
 
         outcome.Result.Error.Code.Should().Be(AriadneErrorCode.Unavailable);
-        File.Exists(marker).Should().BeFalse("the whole url must reach git as the repository, not as options");
+        outcome.Result.Error.Detail.Should().Contain($"'{url}' does not appear to be a git repository");
+        File.Exists(marker).Should().BeFalse("the template option must never reach git as an option");
     }
 
     private async Task<ImportSyncOutcome> SyncAsync(string url)

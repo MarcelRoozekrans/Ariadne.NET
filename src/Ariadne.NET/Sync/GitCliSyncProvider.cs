@@ -99,12 +99,10 @@ internal sealed class GitCliSyncProvider : IGitSyncProvider
             }
 
             var sourceDir = string.IsNullOrEmpty(import.Path) ? cloneDir : Path.Combine(cloneDir, import.Path);
-            var link = CloneLinkCheck.FindLink(cloneDir, sourceDir);
-            if (link is not null)
+            var checkedSource = CheckSource(import, tag, cloneDir, sourceDir);
+            if (checkedSource.IsFailure)
             {
-                return UnitResult<AriadneError>.Failure(new AriadneError(
-                    AriadneErrorCode.Invalid,
-                    $"Import '{import.Name}' contains a symbolic link at '{link}'; pack files must be regular files inside the repository."));
+                return checkedSource;
             }
 
             CopyPackFiles(sourceDir, packDir);
@@ -129,6 +127,26 @@ internal sealed class GitCliSyncProvider : IGitSyncProvider
         {
             TryDeleteDirectory(stagingDir);
         }
+    }
+
+    /// <summary>
+    /// Checks the cloned folder that will be copied: it must exist, and neither it nor the way to it may hold a link.
+    /// </summary>
+    private static UnitResult<AriadneError> CheckSource(ImportDefinition import, string tag, string cloneDir, string sourceDir)
+    {
+        if (!Directory.Exists(sourceDir))
+        {
+            return UnitResult<AriadneError>.Failure(new AriadneError(
+                AriadneErrorCode.NotFound,
+                $"Import '{import.Name}' has path '{import.Path}', which does not exist in the repository at {tag}."));
+        }
+
+        var link = CloneLinkCheck.FindLink(cloneDir, sourceDir);
+        return link is null
+            ? UnitResult<AriadneError>.Success()
+            : UnitResult<AriadneError>.Failure(new AriadneError(
+                AriadneErrorCode.Invalid,
+                $"Import '{import.Name}' contains a symbolic link at '{link}'; pack files must be regular files inside the repository."));
     }
 
     /// <summary>Removes the staging directory; one that cannot be removed is left behind rather than hiding the outcome.</summary>
@@ -167,7 +185,8 @@ internal sealed class GitCliSyncProvider : IGitSyncProvider
     {
         var gitInfo = new GitInfo
         {
-            Url = url,
+            // Never store credentials; the cache check compares redacted urls.
+            Url = UrlRedaction.Redact(url),
             ResolvedTag = tag,
             CommitSha = commitSha ?? string.Empty,
             SyncedAt = DateTimeOffset.UtcNow,
@@ -261,7 +280,8 @@ internal sealed class GitCliSyncProvider : IGitSyncProvider
             return false;
         }
 
-        if (!string.Equals(gitInfo.Url, expectedUrl, StringComparison.Ordinal))
+        // Redacted on both sides: the record holds no credentials, and a cache written before redaction still matches.
+        if (!string.Equals(UrlRedaction.Redact(gitInfo.Url), UrlRedaction.Redact(expectedUrl), StringComparison.Ordinal))
         {
             return false;
         }

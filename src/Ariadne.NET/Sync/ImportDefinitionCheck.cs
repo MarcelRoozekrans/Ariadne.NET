@@ -63,9 +63,16 @@ internal static class ImportDefinitionCheck
             && (string.Equals(full, root, StringComparison.Ordinal)
                 || full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal));
 
-        return inside
-            ? UnitResult<AriadneError>.Success()
-            : Invalid($"Import '{import.Name}' has path '{import.Path}', which must be a relative folder inside the repository.");
+        if (!inside)
+        {
+            return Invalid($"Import '{import.Name}' has path '{import.Path}', which must be a relative folder inside the repository.");
+        }
+
+        // git's own data, including .git/config with any credentials, is never a pack folder.
+        var firstSegment = Path.GetRelativePath(root, full).Split(Path.DirectorySeparatorChar)[0];
+        return string.Equals(firstSegment, ".git", StringComparison.OrdinalIgnoreCase)
+            ? Invalid($"Import '{import.Name}' has path '{import.Path}', which points into the repository's .git folder.")
+            : UnitResult<AriadneError>.Success();
     }
 
     // The name becomes a directory directly under the cache, which sync deletes and recreates.

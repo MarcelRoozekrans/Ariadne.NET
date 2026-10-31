@@ -447,6 +447,8 @@ public class GitCliSyncProviderTests
     [Theory]
     [InlineData("https://token@host/x", "https://***@host/x")]
     [InlineData("git ls-remote --tags -- https://u:p@host/x failed: fatal: 'https://u:p@host/x' not found", "git ls-remote --tags -- https://***@host/x failed: fatal: 'https://***@host/x' not found")]
+    [InlineData("https://user:p@ss@host/x", "https://***@host/x")]
+    [InlineData("https://user:p@ss@host?x=a@b", "https://***@host?x=a@b")]
     [InlineData("https://host/x", "https://host/x")]
     [InlineData("git@github.com:org/repo.git", "git@github.com:org/repo.git")]
     [InlineData("ssh://git@host/x", "ssh://***@host/x")]
@@ -512,6 +514,93 @@ public class GitCliSyncProviderTests
         finally
         {
             DeleteDir(root);
+        }
+    }
+
+    [Fact]
+    public async Task SyncAsync_PathMissingFromTheRepository_IsNotFound()
+    {
+        var cacheDir = NewCacheDir();
+        var import = new ImportDefinition { Name = "pack", Type = "git", Url = "https://example.com/a.git", Version = "^1.0", Path = "nope" };
+
+        try
+        {
+            var result = await new GitCliSyncProvider(new FakeGitClient(new FakeGitScript())).SyncAsync(import, cacheDir, noCache: true);
+
+            result.Error.Code.Should().Be(AriadneErrorCode.NotFound);
+            result.Error.Message.Should().Be("Import 'pack' has path 'nope', which does not exist in the repository at v1.0.0.");
+            Directory.GetFileSystemEntries(cacheDir).Should().BeEmpty();
+        }
+        finally
+        {
+            DeleteDir(cacheDir);
+        }
+    }
+
+    [Theory]
+    [InlineData(".git")]
+    [InlineData(".GIT")]
+    [InlineData(".git/hooks")]
+    [InlineData("./.git")]
+    [InlineData("packs/../.Git")]
+    public async Task SyncAsync_PathIntoTheGitFolder_IsInvalid(string path)
+    {
+        var git = new FakeGitScript();
+        var import = new ImportDefinition { Name = "pack", Type = "git", Url = "https://example.com/a.git", Version = "^1.0", Path = path };
+
+        var result = await new GitCliSyncProvider(new FakeGitClient(git)).SyncAsync(import, NewCacheDir(), noCache: true);
+
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().Be($"Import 'pack' has path '{path}', which points into the repository's .git folder.");
+        git.CloneCalls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task SyncAsync_UrlWithCredentials_IsStoredRedacted_AndStillServesTheCache()
+    {
+        var cacheDir = NewCacheDir();
+        var sut = new GitCliSyncProvider(new FakeGitClient(new FakeGitScript()));
+        var import = new ImportDefinition { Name = "pack", Type = "git", Url = "https://user:s3cret@example.com/a.git", Version = "^1.0" };
+
+        try
+        {
+            (await sut.SyncAsync(import, cacheDir, noCache: false)).IsSuccess.Should().BeTrue();
+            var cached = await sut.SyncAsync(import, cacheDir, noCache: false);
+
+            var record = await File.ReadAllTextAsync(Path.Combine(cacheDir, "pack", ".git-info.json"));
+            record.Should().NotContain("s3cret").And.Contain("https://***@example.com/a.git");
+            cached.Value.WasCached.Should().BeTrue();
+        }
+        finally
+        {
+            DeleteDir(cacheDir);
+        }
+    }
+
+    [Fact]
+    public void IsCacheValid_RecordWithRawCredentials_StillMatches()
+    {
+        var cacheDir = NewCacheDir();
+        Directory.CreateDirectory(cacheDir);
+        var gitInfo = new GitInfo
+        {
+            Url = "https://user:s3cret@example.com/a.git",
+            ResolvedTag = "v1.0.0",
+            CommitSha = "abc",
+            SyncedAt = DateTimeOffset.UtcNow,
+        };
+        File.WriteAllText(Path.Combine(cacheDir, ".git-info.json"), JsonSerializer.Serialize(gitInfo));
+
+        try
+        {
+            GitCliSyncProvider.IsCacheValid(cacheDir, "https://user:s3cret@example.com/a.git", SemVerRange.Parse("^1.0").Value)
+                .Should().BeTrue();
+            GitCliSyncProvider.IsCacheValid(cacheDir, "https://example.com/other.git", SemVerRange.Parse("^1.0").Value)
+                .Should().BeFalse();
+        }
+        finally
+        {
+            DeleteDir(cacheDir);
         }
     }
 

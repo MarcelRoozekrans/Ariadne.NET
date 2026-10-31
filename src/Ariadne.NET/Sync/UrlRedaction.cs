@@ -8,7 +8,8 @@ internal static partial class UrlRedaction
     public static string Redact(string? text) =>
         string.IsNullOrEmpty(text) ? text ?? string.Empty : UserInfo().Replace(text, "://***@");
 
-    // The userinfo of a url: everything between "://" and the first "@" before the host's path.
-    [GeneratedRegex(@"://[^/?#@\s]+@", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
+    // The userinfo of a url: everything from "://" to the last "@" before the first "/", "?" or "#", so a raw "@"
+    // in a password is hidden too. Whitespace ends a url in free text such as git's stderr.
+    [GeneratedRegex(@"://[^/?#\s]*@", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
     private static partial Regex UserInfo();
 }
