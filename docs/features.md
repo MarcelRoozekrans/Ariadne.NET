@@ -52,7 +52,7 @@ Ten templates ship out of the box, covering the most common architectural patter
 | `cqrs` | _(composable)_ | 7 | Add-on |
 | `ddd-tactical` | _(composable)_ | 9 | Add-on |
 
-**Standalone** templates define their own layers and can be used independently. **Add-on** templates define only component roles and are designed to be composed with a standalone template.
+**Standalone** templates define their own layers and can be used independently. **Add-on** templates define only component roles and are designed to be composed with a standalone template: a role-only pack has no layers of its own, so it needs a base pack that declares the layers its roles name (for example Application and Domain). Roles that name an unknown layer are rejected as an Invalid error.
 
 ## Composability & Merge Semantics
 
@@ -72,7 +72,7 @@ Merge rules applied in order (first pack is the base, subsequent packs overlay):
 | Layers | Merged by name (case-insensitive). `allowedDependencies` are unioned. |
 | Component Roles | Merged by name. Later pack overrides earlier. |
 | Code Feature Rules | Merged by ID. **Locked rules cannot be overridden** — attempts produce a warning. |
-| Naming Conventions | Last pack wins. |
+| Naming Conventions | Last pack wins. `Namespace` and `FilePath` are rejected when empty. |
 
 Use `MergeWithDiagnostics` programmatically to inspect merge warnings (e.g., locked rule override attempts).
 
@@ -232,7 +232,7 @@ All tools auto-detect `.architecture/rules.yaml` in the working directory. Pass 
 | **MCP stdio** (`Ariadne.NET.Mcp`) | Local AI agent integration (Claude Code, Cursor) | MCP stdio |
 | **MCP HTTP** (`Ariadne.NET.Mcp.Http`) | Remote/team AI agent access | MCP over HTTP |
 
-All three hosts share the same core engine via `services.AddAriadneNETServices()`, generated at compile time by ZInject. The two MCP hosts expose identical tools and resources — stdio for local use, HTTP for remote.
+All three hosts share the same core engine via `services.AddAriadneNETServices()`, composed from registrations that ZeroAlloc.Inject generates at compile time. The two MCP hosts expose identical tools and resources — stdio for local use, HTTP for remote.
 
 ## Extensibility
 

@@ -251,7 +251,7 @@ Over MCP, use the `lint_source` tool.
 
 ```
 src/
-  Ariadne.NET.Abstractions/   # Rule-pack schema and contracts (no dependencies, AOT)
+  Ariadne.NET.Abstractions/   # Rule-pack schema and contracts (ZeroAlloc.Results and ZeroAlloc.Validation only, AOT)
   Ariadne.NET/                # Rule engine library (zero host dependencies)
     RuleLoader/               # YAML loading, built-in pack registry, extends resolution
     RuleEngine/               # Merger, dependency validator, layer inference
@@ -291,7 +291,7 @@ All core services are registered with a single call:
 services.AddAriadneNETServices();
 ```
 
-The method is generated at compile time by ZInject from the `[Singleton]` attribute on each service class.
+The method is composed from the registrations that ZeroAlloc.Inject generates at compile time from the `[Singleton]` attribute on each service class, plus the ZeroAlloc.Resilience-wrapped git client.
 
 This registers:
 | Interface | Implementation | Lifetime |
@@ -339,6 +339,7 @@ dotnet test src/Ariadne.NET.slnx
 - **Microsoft.CodeAnalysis.CSharp** (Roslyn) — Code generation
 - **System.CommandLine** — CLI framework
 - **ASP.NET Core** — HTTP host for the MCP server
-- **ZInject** — compile-time DI registration
+- **ZeroAlloc.Inject** — compile-time DI registration
+- **ZeroAlloc.Results / Validation / Resilience / Telemetry** — error values, schema validation, git retry and timeout, and tracing
 - **ModelContextProtocol** — MCP server SDK (stdio + HTTP)
 - **xUnit + FluentAssertions** — Testing

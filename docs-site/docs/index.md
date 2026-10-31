@@ -77,5 +77,5 @@ dotnet run --project src/Ariadne.NET.Mcp.Http
 - **Roslyn** — Code generation and source validation
 - **System.CommandLine** — CLI framework
 - **ModelContextProtocol** — MCP server SDK (stdio + HTTP)
-- **ZInject** — Compile-time DI registration
+- **ZeroAlloc.Inject** — Compile-time DI registration
 - **xUnit + FluentAssertions** — Testing

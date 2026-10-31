@@ -9,7 +9,7 @@ sidebar_position: 2
 ```mermaid
 graph TD
     subgraph src
-        Abstractions["Ariadne.NET.Abstractions<br/><i>Rule-pack schema + contracts<br/>no dependencies, Native AOT</i>"]
+        Abstractions["Ariadne.NET.Abstractions<br/><i>Rule-pack schema + contracts<br/>ZeroAlloc.Results + Validation only, Native AOT</i>"]
         subgraph Ariadne.NET["Ariadne.NET (Rule engine library)"]
             RuleLoader["RuleLoader<br/><i>YAML loading, registry, extends resolution</i>"]
             RuleEngine["RuleEngine<br/><i>Merger, validator, inference</i>"]
@@ -74,7 +74,7 @@ graph TD
     CodeGeneration --> RuleEngine
     Validation --> RuleEngine
     RuleEngine --> RuleLoader
-    RuleLoader --> Abstractions["Ariadne.NET.Abstractions<br/><i>(separate package — no dependencies)</i>"]
+    RuleLoader --> Abstractions["Ariadne.NET.Abstractions<br/><i>(separate package — ZeroAlloc.Results + Validation only)</i>"]
     Sync["Sync<br/><i>(independent module)</i>"]
 ```
 

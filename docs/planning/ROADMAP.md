@@ -49,18 +49,21 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 - [ ] Built-in packs are migrated to schema v2 and a JSON Schema is published
 
 ### Phase 2.1: Semantic dependency analysis [status: pending]
+**Note:** Consider ZeroAlloc.TestHelpers allocation budgets for the type-graph hot path; consolidate the two UnixNonRootFactAttribute copies (and UnixFact) into TestHelpers.
 **Goal:** Analyse a Roslyn compilation instead of scanning `using` directives.
 **Surface:** Backend
 **HelpWanted:** no
 **Plan:** _to be written_
 
 ### Phase 2.2: Rule schema v2 [status: pending]
+**Note:** Consider ZeroAlloc.Specification for rule matching; extend the ZeroAlloc.Validation rules from 1.3.
 **Goal:** A versioned schema with `forbid` and `allowOnly` at layer, namespace and type level, exception lists, and a `because` reason on every rule.
 **Surface:** Backend
 **HelpWanted:** no
 **Plan:** _to be written_
 
 ### Phase 2.3: Enforce placement and code-feature rules [status: pending]
+**Note:** Consider ZeroAlloc.Specification for placement and code-feature matching.
 **Goal:** Make YAML-defined placement and code-feature rules actually run.
 **Surface:** Backend
 **HelpWanted:** no
@@ -99,6 +102,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Plan:** _to be written_
 
 ### Phase 3.2: JSON and SARIF reports [status: pending]
+**Note:** Use ZeroAlloc.Serialisation for the JSON and SARIF writers.
 **Goal:** Machine-readable reports from the CLI and the testing package.
 **Surface:** Backend
 **HelpWanted:** no
@@ -198,6 +202,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Plan:** _to be written_
 
 ### Phase 6.2: NuGet pack sharing [status: pending]
+**Note:** Use ZeroAlloc.Cache for the async NuGet pack source; deferred from 1.3 because the built-in registry is synchronous.
 **Goal:** NuGet as a pack-sharing source beside git sync.
 **Surface:** Backend
 **HelpWanted:** no

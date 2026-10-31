@@ -31,13 +31,13 @@ dotnet publish tests/Ariadne.NET.AotSmoke -c Release -r linux-x64 -p:PublishAot=
 cd docs-site && npm ci && npm run start
 ```
 
-CI (`.github/workflows/ci.yml`) runs restore → build → test → pack in Release. There is no separate lint step: analyzers (Meziantou, Roslynator, ErrorProne.NET, NetFabric.Hyperlinq, ZeroAlloc) run during build via `Directory.Build.props`. Warnings are not errors and the build already carries some, so check that a change adds no new ones.
+CI (`.github/workflows/ci.yml`) runs restore → build → test → pack in Release. There is no separate lint step: analyzers (Meziantou, Roslynator, ErrorProne.NET, NetFabric.Hyperlinq, ZeroAlloc) run during build via `Directory.Build.props`. `TreatWarningsAsErrors` is on in `Directory.Build.props`, so the build must stay at zero warnings. ZeroAlloc.Analyzers is pinned to 1.11.x; do not bump it to 1.12 without a decision.
 
 ## Architecture
 
 ### Projects
 
-- `Ariadne.NET.Abstractions` — the rule-pack schema (`RulePack`, `LayerDefinition`, `ComponentRoleDefinition`, …) and the pack contracts `IRulePackLoader`, `IRulePackResolver`, `IBuiltinPackRegistry`, all in the one flat namespace `Ariadne.NET.Abstractions`. Packable. No package dependencies and `IsAotCompatible`; `tests/Ariadne.NET.AotSmoke` proves it publishes with Native AOT. Keep it that way: no ZInject, no YamlDotNet, no loading logic. The validation contracts stay in the engine until M2 settles their shape.
+- `Ariadne.NET.Abstractions` — the rule-pack schema (`RulePack`, `LayerDefinition`, `ComponentRoleDefinition`, …) and the pack contracts `IRulePackLoader`, `IRulePackResolver`, `IBuiltinPackRegistry`, all in the one flat namespace `Ariadne.NET.Abstractions`. Packable. Its only dependencies are `ZeroAlloc.Results` 1.4.5 and `ZeroAlloc.Validation` 2.5.0 (which bundles its generator; there is no separate Generator reference), and it is `IsAotCompatible`; `tests/Ariadne.NET.AotSmoke` proves it publishes with Native AOT. It also holds `AriadneError`. Keep it that way: no ZeroAlloc.Inject, no YamlDotNet, no loading logic. The validation contracts stay in the engine until M2 settles their shape.
 - `Ariadne.NET` — the engine: YAML loading, `extends` resolution, merging, built-in packs, validation, sync and code generation. Packable; depends on Abstractions. Must have no host dependencies.
 - `Ariadne.NET.Cli` — System.CommandLine 3.0 (preview) CLI; one static `XxxCommand.Create(IServiceProvider)` per command in `Commands/`, wired in `CliRootCommand`. Commands return `ExitCodes` (0 success, 1 violations, 2 error); `CliRootCommand.Invoke` turns uncaught exceptions into 2. `tests/Ariadne.NET.Cli.Tests` changes the process working directory, so it runs without test parallelization.
 - `Ariadne.NET.Mcp` — MCP stdio server. Tools are static methods on `[McpServerToolType]` classes in `Tools/`; resources in `Resources/` (`ariadne://packs/{name}`). Services are injected as method parameters.
@@ -47,17 +47,25 @@ CI (`.github/workflows/ci.yml`) runs restore → build → test → pack in Rele
 
 `RulePackResolver` → `RulePackMerger` → `LayerInferenceEngine` → `DependencyValidator` → `CodeGeneratorService`, wired by `GenerateOrchestrator` (components) and `WorkspaceOrchestrator` (solution scaffolding). `Validation/` (`SourceValidator`, `Linter`) parses existing source with Roslyn and checks `using` directives against layer dependencies and namespaces against directory layers.
 
-- **Resolution:** a user pack (usually `.architecture/rules.yaml`) lists `extends:` references. `builtin://<name>` loads an embedded pack from `src/Ariadne.NET/BuiltinPacks/*.yaml` (registered via `EmbeddedResource`; adding a YAML file there adds a template). `import://<name>` loads from `.architecture/.cache/git/<name>/` and requires a working directory — populated by `ariadne sync` from `.architecture/imports.yaml` (`Sync/`: git CLI provider, semver tag ranges). Anything else throws `NotSupportedException`. The user pack is merged last.
+- **Resolution:** a user pack (usually `.architecture/rules.yaml`) lists `extends:` references. `builtin://<name>` loads an embedded pack from `src/Ariadne.NET/BuiltinPacks/*.yaml` (registered via `EmbeddedResource`; adding a YAML file there adds a template). `import://<name>` loads from `.architecture/.cache/git/<name>/` and requires a working directory — populated by `ariadne sync` from `.architecture/imports.yaml` (`Sync/`: git CLI provider, semver tag ranges). Anything else is an `Invalid` Result. The user pack is merged last.
 - **Merge semantics** (`RulePackMerger`): layers merge by name (case-insensitive) with unioned `allowedDependencies`; component roles by name, later wins; code feature rules by id, but a `locked` rule cannot be overridden (emits a `MergeWarning`); naming conventions: last pack wins. Composite template expressions like `clean-architecture+cqrs` are parsed by `TemplateReference` into one `builtin://` reference per name; both `ariadne init` and the MCP `template` parameter use it.
 - **Rule auto-detection in MCP:** `RuleResolutionHelper` uses an explicit `template` argument, else `.architecture/rules.yaml` in the current directory, else falls back to `clean-architecture`. The CLI instead requires `.architecture/rules.yaml` (created by `ariadne init`).
 
 ### Dependency injection
 
-Registration is compile-time via **ZInject**: classes are annotated `[Singleton]` and the generator emits `services.AddAriadneNETServices()` (Core) and `services.AddAriadneNETMcpServices()` (Mcp). A new service only needs the attribute; `ServiceRegistrationTests` asserts the Core services resolve.
+Registration is compile-time via **ZeroAlloc.Inject** 1.11.6: classes are annotated `[Singleton]` and the generator emits the internal `AddAriadneNETGeneratedServices()` (Core). The hand-written public `AddAriadneNETServices()` (`AriadneNETServiceCollectionExtensions.cs`) composes it with the ZeroAlloc.Resilience-generated `AddGitClientResilience<GitCliClient>()`, because Inject cannot see another generator's output. The Mcp project's generated `AddAriadneNETMcpServices()` registers `RuleResolutionHelper` behind `IRuleResolutionHelper`. A new service only needs the attribute; `ServiceRegistrationTests` asserts the Core services resolve.
+
+### Errors
+
+Expected failures are values, not exceptions. The loader, resolver, registry, `TemplateReference`, imports loader, `SemVerRange` and sync all return `Result<T, AriadneError>` (ZeroAlloc.Results). `AriadneError` is a record struct with `Code` (`NotFound`=1, `Invalid`=2, `Unavailable`=3), `Message` and `Detail`. The CLI prints `Error: {Message}` then the indented `Detail` and exits 2. MCP tools surface errors by throwing `McpException`, which the SDK turns into an `IsError` tool result; resources throw `McpProtocolException` with `ResourceNotFound`. Remaining `throw` sites are `ArgumentNullException` guards, embedded-resource packaging bugs, the `GitCliClient` proxy feed and that MCP idiom; anything else is a bug.
+
+### Telemetry and resilience
+
+`Ariadne.NET.Telemetry.AriadneTelemetry.SourceName` is `"Ariadne.NET"`. Spans are `ariadne.load`, `ariadne.resolve`, `ariadne.get_pack` and `ariadne.sync_import`; the histogram is `ariadne.operation.duration`. The ZeroAlloc.Telemetry proxies are built explicitly behind the public facades, not registered in DI. Git access goes through an internal `IGitClient` wrapped by ZeroAlloc.Resilience (Timeout 60 s; Retry 3 attempts, exponential backoff from 500 ms). Git arguments are an argv list with `--`, import names and paths are contained, symlinks are refused, and URL credentials are redacted in messages and `.git-info.json`.
 
 ### Repo's own rules
 
-`.architecture/rules.yaml` governs this repo itself (Core / Host / Tests layers on top of `builtin://clean-architecture`): Core depends on nothing, hosts only orchestrate.
+`.architecture/rules.yaml` governs this repo itself (Core / Host / Tests layers on top of `builtin://clean-architecture`): Core depends on nothing, hosts only orchestrate. Rule-pack models are validated by the five `*Validator` types that ZeroAlloc.Validation generates in Abstractions; a role-only pack (`cqrs`, `ddd-tactical`) has no layers and must be combined with a base pack that declares them.
 
 ## Conventions enforced by analyzers
 
