@@ -232,7 +232,7 @@ public class GitCliSyncProviderTests
             .SyncAsync(import, Path.GetTempPath(), noCache: true);
 
         result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
-        result.Error.Message.Should().Be("Invalid semver range: 'not-valid'");
+        result.Error.Message.Should().Be("Version range 'not-valid' is not a valid semver range.");
     }
 
     private static string BadName(string name) =>
@@ -283,7 +283,7 @@ public class GitCliSyncProviderTests
             .SyncAsync(import, Path.GetTempPath(), noCache: true);
 
         result.Error.Code.Should().Be(AriadneErrorCode.NotFound);
-        result.Error.Message.Should().Be("No tag satisfying '^2.0' found in https://example.com/a.git");
+        result.Error.Message.Should().Be("No tag satisfying '^2.0' found in https://example.com/a.git.");
     }
 
     [Fact]
@@ -441,7 +441,7 @@ public class GitCliSyncProviderTests
         var result = await new GitCliSyncProvider(new FakeGitClient(new FakeGitScript()))
             .SyncAsync(import, Path.GetTempPath(), noCache: true);
 
-        result.Error.Message.Should().Be("No tag satisfying '^2.0' found in https://***@example.com/a.git");
+        result.Error.Message.Should().Be("No tag satisfying '^2.0' found in https://***@example.com/a.git.");
     }
 
     [Theory]

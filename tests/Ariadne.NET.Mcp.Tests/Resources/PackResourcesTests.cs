@@ -43,7 +43,7 @@ public class PackResourcesTests
 
         var exception = act.Should().Throw<McpProtocolException>().Which;
         exception.ErrorCode.Should().Be(McpErrorCode.ResourceNotFound);
-        exception.Message.Should().Contain("Built-in pack 'nonexistent' not found.");
+        exception.Message.Should().StartWith("Built-in pack 'nonexistent' not found.\nAvailable packs: ");
         exception.Message.Should().Contain("clean-architecture");
     }
 }

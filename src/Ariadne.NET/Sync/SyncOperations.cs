@@ -60,7 +60,7 @@ internal sealed class SyncOperations : ISyncOperations
         {
             return Failure(new AriadneError(
                 AriadneErrorCode.NotFound,
-                $"No tag satisfying '{import.Version}' found in {UrlRedaction.Redact(import.Url)}"));
+                $"No tag satisfying '{import.Version}' found in {UrlRedaction.Redact(import.Url)}."));
         }
 
         var commitSha = ParseCommitFromLsRemote(lsRemote.Value, bestTag);

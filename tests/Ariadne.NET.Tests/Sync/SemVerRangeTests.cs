@@ -124,7 +124,7 @@ public class SemVerRangeTests
 
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
-        result.Error.Message.Should().Be($"Invalid semver range: '{range}'");
+        result.Error.Message.Should().Be($"Version range '{range}' is not a valid semver range.");
     }
 
     [Theory]

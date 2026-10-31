@@ -21,7 +21,7 @@ public static class PackResources
         {
             // A resource cannot return an error value; the SDK turns this into a JSON-RPC ResourceNotFound error.
             throw new McpProtocolException(
-                $"{pack.Error.Message} {pack.Error.Detail}",
+                ErrorText.Format(pack.Error),
                 McpErrorCode.ResourceNotFound);
         }
 

@@ -93,5 +93,5 @@ public sealed class SemVerRange
     private static Result<SemVerRange, AriadneError> Invalid(string range) =>
         Result<SemVerRange, AriadneError>.Failure(new AriadneError(
             AriadneErrorCode.Invalid,
-            $"Invalid semver range: '{range}'"));
+            $"Version range '{range}' is not a valid semver range."));
 }

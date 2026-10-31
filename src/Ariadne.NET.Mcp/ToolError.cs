@@ -21,7 +21,6 @@ internal static class ToolError
             return result.Value;
         }
 
-        var error = result.Error;
-        throw new McpException(error.Detail is null ? error.Message : $"{error.Message}\n{error.Detail}");
+        throw new McpException(ErrorText.Format(result.Error));
     }
 }
