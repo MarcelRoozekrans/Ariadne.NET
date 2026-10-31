@@ -28,6 +28,6 @@ public class AbstractionsAssemblyTests
         var referenced = typeof(RulePack).Assembly.GetReferencedAssemblies().Select(a => a.Name!);
 
         referenced.Should().OnlyContain(n => n.StartsWith("System", StringComparison.Ordinal)
-            || n == "netstandard" || n == "mscorlib");
+            || n == "netstandard" || n == "mscorlib" || n == "ZeroAlloc.Results");
     }
 }
