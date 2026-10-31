@@ -31,7 +31,8 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Goal:** Adopt ZeroAlloc Results instead of exceptions, get the ZeroAlloc analyzers clean, and support AOT where the dependencies allow it.
 **Surface:** Refactor
 **HelpWanted:** no
-**Plan:** _to be written_
+**Design:** `docs/superpowers/specs/2026-10-31-phase-1.3-family-conventions-design.md`
+**Plan:** `docs/superpowers/plans/2026-10-31-phase-1.3-family-conventions.md`
 
 ### Phase 1.4: Publish [status: pending]
 **Goal:** Create the GitHub repo, CI with codecov, the first release-please release, the docs site and the Family README section.
