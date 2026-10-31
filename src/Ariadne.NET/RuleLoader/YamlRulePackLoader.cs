@@ -85,12 +85,19 @@ public sealed class YamlRulePackLoader : IRulePackLoader
             return Invalid($"{subject} does not match the rule pack schema.", ex);
         }
 
-        return pack is null ? Empty(subject) : CheckMembers(pack);
+        return pack is null ? Empty(subject) : CheckMembers(pack, subject);
     }
 
     /// <summary>Runs the member rules declared on the schema types; cross-references are the resolver's job.</summary>
-    private static Result<RulePack, AriadneError> CheckMembers(RulePack pack)
+    private static Result<RulePack, AriadneError> CheckMembers(RulePack pack, string subject)
     {
+        // YAML can say "layers: ~" or "- ~", which the typed model cannot express; report those before anything reads them.
+        var nulls = FindNulls(pack);
+        if (nulls.Count > 0)
+        {
+            return Result<RulePack, AriadneError>.Failure(RulePackReferenceCheck.Invalid(pack.Name, nulls, subject));
+        }
+
         var result = Validator.Validate(pack);
         if (result.IsValid)
         {
@@ -107,7 +114,58 @@ public sealed class YamlRulePackLoader : IRulePackLoader
 #pragma warning restore EPS06
         }
 
-        return Result<RulePack, AriadneError>.Failure(RulePackReferenceCheck.Invalid(pack.Name, lines));
+        return Result<RulePack, AriadneError>.Failure(RulePackReferenceCheck.Invalid(pack.Name, lines, subject));
+    }
+
+    private static List<string> FindNulls(RulePack pack)
+    {
+        var nulls = new List<string>();
+
+        AddNulls(nulls, "Extends", pack.Extends);
+        AddNulls(nulls, "Layers", pack.Layers);
+        AddNulls(nulls, "ComponentRoles", pack.ComponentRoles);
+        AddNulls(nulls, "CodeFeatureRules", pack.CodeFeatureRules);
+
+        if (pack.NamingConventions is null)
+        {
+            nulls.Add("NamingConventions: must not be null.");
+        }
+
+        for (var i = 0; pack.Layers is not null && i < pack.Layers.Count; i++)
+        {
+            if (pack.Layers[i] is { } layer)
+            {
+                AddNulls(nulls, $"Layers[{i}].AllowedDependencies", layer.AllowedDependencies);
+            }
+        }
+
+        for (var i = 0; pack.ComponentRoles is not null && i < pack.ComponentRoles.Count; i++)
+        {
+            if (pack.ComponentRoles[i] is { } role)
+            {
+                AddNulls(nulls, $"ComponentRoles[{i}].AlternativeNames", role.AlternativeNames);
+            }
+        }
+
+        return nulls;
+    }
+
+    /// <summary>Flags a null list, or each null entry in a list, as <c>path: reason</c>.</summary>
+    private static void AddNulls<T>(List<string> nulls, string path, IList<T>? items)
+    {
+        if (items is null)
+        {
+            nulls.Add($"{path}: must not be null.");
+            return;
+        }
+
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (items[i] is null)
+            {
+                nulls.Add($"{path}[{i}]: must not be null.");
+            }
+        }
     }
 
     private static Result<RulePack, AriadneError> Invalid(string message, YamlException ex) =>

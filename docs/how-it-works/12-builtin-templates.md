@@ -234,6 +234,8 @@ componentRoles:
     typeKind: Class
 ```
 
+The `cqrs` and `ddd-tactical` roles name the Application and Domain layers but declare no layers of their own, so combine them with a base pack that declares those layers.
+
 The resolved pack will have:
 - **Name:** `"clean-architecture+cqrs+ddd-tactical+my-project"`
 - **Layers:** 4 (from clean-architecture, unmodified since add-ons define no layers)

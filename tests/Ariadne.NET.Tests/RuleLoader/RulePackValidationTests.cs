@@ -140,17 +140,6 @@ public class RulePackValidationTests
         }
     }
 
-    [Fact]
-    public void Built_in_packs_pass_the_member_rules()
-    {
-        var registry = new BuiltinPackRegistry(_loader);
-
-        foreach (var name in registry.GetAvailablePackNames())
-        {
-            registry.GetPack(name).IsSuccess.Should().BeTrue($"built-in pack '{name}' must satisfy the member rules");
-        }
-    }
-
     public static TheoryData<string> BuiltinPackNames()
     {
         var data = new TheoryData<string>();
@@ -201,5 +190,88 @@ public class RulePackValidationTests
 
         loaded.IsSuccess.Should().BeTrue(loaded.IsFailure ? $"{loaded.Error.Message} {loaded.Error.Detail}" : "");
         NewResolver().Resolve(loaded.Value).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Nameless_pack_from_a_file_failing_a_member_rule_names_the_file()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"ariadne-nameless-{Guid.NewGuid():N}.yaml");
+        File.WriteAllText(path, "layers:\n  - name: \"\"\n");
+
+        try
+        {
+            var result = _loader.LoadFromFile(path);
+
+            result.Error.Message.Should().Be($"Rule pack file '{path}' is invalid.");
+            result.Error.Detail.Should().Contain("Layers[0].Name");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Nameless_pack_from_a_string_failing_a_member_rule_says_yaml()
+    {
+        var result = _loader.LoadFromString("layers:\n  - name: \"\"\n");
+
+        result.Error.Message.Should().Be("Rule pack YAML is invalid.");
+    }
+
+    [Fact]
+    public void Nameless_merged_pack_failing_a_reference_rule_has_a_clean_label()
+    {
+        var pack = new RulePack
+        {
+            Name = "",
+            Extends = ["builtin://clean-architecture"],
+            ComponentRoles = [new ComponentRoleDefinition { Name = "X", Layer = "Ghost" }],
+        };
+
+        var result = NewResolver().Resolve(pack);
+
+        result.Error.Message.Should().Be("Rule pack 'clean-architecture' is invalid.")
+            .And.NotContain("''").And.NotContain("+'");
+    }
+
+    [Fact]
+    public void Nameless_pack_without_extends_failing_a_reference_rule_has_no_quoted_name()
+    {
+        var pack = new RulePack
+        {
+            Name = "",
+            Layers = [new LayerDefinition { Name = "A", AllowedDependencies = ["Ghost"] }],
+        };
+
+        NewResolver().Resolve(pack).Error.Message.Should().Be("Rule pack is invalid.");
+    }
+
+    [Theory]
+    [InlineData("name: p\nlayers: ~\n")]
+    [InlineData("name: p\nlayers:\n  - ~\n")]
+    [InlineData("name: p\ncomponentRoles: ~\n")]
+    [InlineData("name: p\ncomponentRoles:\n  - ~\n")]
+    [InlineData("name: p\ncodeFeatureRules:\n  - ~\n")]
+    [InlineData("name: p\nlayers:\n  - name: A\n    allowedDependencies:\n      - ~\n")]
+    public void Null_yaml_entries_are_invalid_and_never_throw(string yaml)
+    {
+        var loaded = _loader.LoadFromString(yaml);
+
+        loaded.IsFailure.Should().BeTrue();
+        loaded.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        loaded.Error.Detail.Should().Contain(": must not be null.");
+    }
+
+    [Fact]
+    public void Clean_architecture_cqrs_and_ddd_tactical_combine()
+    {
+        var result = NewResolver().Resolve(new RulePack
+        {
+            Name = "my-project",
+            Extends = ["builtin://clean-architecture", "builtin://cqrs", "builtin://ddd-tactical"],
+        });
+
+        result.IsSuccess.Should().BeTrue(result.IsFailure ? $"{result.Error.Message} {result.Error.Detail}" : "");
     }
 }
