@@ -12,7 +12,7 @@ public sealed class ComponentRoleDefinition
     public string? InterfaceRole { get; init; }
     [NotNull] public string Accessibility { get; init; } = "public";
     public string Description { get; init; } = "";
-    [NotNull, Must(nameof(HasNoNullEntries))] public IList<string> AlternativeNames { get; init; } = [];
+    [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> AlternativeNames { get; init; } = [];
 
-    internal bool HasNoNullEntries<T>(IList<T>? items) => items is null || !items.Any(static i => i is null);
+    internal bool HasNoNullEntries<T>(IList<T>? items) => NullEntries.None(items);
 }
