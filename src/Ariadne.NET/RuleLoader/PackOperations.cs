@@ -2,10 +2,6 @@ using Ariadne.NET.Abstractions;
 using Ariadne.NET.RuleEngine;
 using Ariadne.NET.Telemetry;
 
-using YamlDotNet.Core;
-using YamlDotNet.Serialization;
-using YamlDotNet.Serialization.NamingConventions;
-
 using ZeroAlloc.Results;
 
 namespace Ariadne.NET.RuleLoader;
@@ -19,6 +15,7 @@ internal sealed class PackOperations : IPackOperations
 {
     private const string BuiltinPrefix = "builtin://";
     private const string ImportPrefix = "import://";
+    private const string SchemaName = "rule pack";
 
     // The generated validator composes the nested validators, so they are built here instead of resolved from DI:
     // ZeroAlloc.Validation.Inject would add a package and a constructor parameter for four stateless objects.
@@ -28,12 +25,6 @@ internal sealed class PackOperations : IPackOperations
         new CodeFeatureRuleDefinitionValidator(),
         new NamingConventionsValidator());
 
-    // A built deserializer holds no per-call state, so every loader shares this one, as the container's singleton did.
-    private static readonly IDeserializer Deserializer = new DeserializerBuilder()
-        .WithNamingConvention(CamelCaseNamingConvention.Instance)
-        .IgnoreUnmatchedProperties()
-        .Build();
-
     private PackOperations()
     {
     }
@@ -41,34 +32,11 @@ internal sealed class PackOperations : IPackOperations
     /// <summary>Gets the instrumented operations the public pack services call.</summary>
     public static IPackOperations Instrumented { get; } = new PackOperationsInstrumented(new PackOperations());
 
-    public Result<RulePack, AriadneError> LoadFromString(string yaml) => Parse(yaml, "Rule pack YAML");
+    public Result<RulePack, AriadneError> LoadFromString(string yaml) => Checked(
+        YamlDocument.Parse<RulePack>(yaml, "Rule pack YAML", SchemaName), "Rule pack YAML");
 
-    public Result<RulePack, AriadneError> LoadFromFile(string filePath)
-    {
-        string yaml;
-        try
-        {
-            yaml = File.ReadAllText(filePath);
-        }
-        catch (FileNotFoundException)
-        {
-            return FileNotFound(filePath);
-        }
-        catch (DirectoryNotFoundException)
-        {
-            return FileNotFound(filePath);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // On Linux a path that names a directory, or a file without read permission, lands here.
-            return Result<RulePack, AriadneError>.Failure(new AriadneError(
-                AriadneErrorCode.Unavailable,
-                $"Rule pack file '{filePath}' could not be read.",
-                ex.Message));
-        }
-
-        return Parse(yaml, $"Rule pack file '{filePath}'");
-    }
+    public Result<RulePack, AriadneError> LoadFromFile(string filePath) => Checked(
+        YamlDocument.ReadFile<RulePack>(filePath, "Rule pack", SchemaName), YamlDocument.FileSubject(filePath, "Rule pack"));
 
     public Result<RulePack, AriadneError> GetPack(string name, BuiltinPackCatalog catalog)
     {
@@ -182,26 +150,9 @@ internal sealed class PackOperations : IPackOperations
         return loader.LoadFromFile(yamlFiles[0]);
     }
 
-    /// <summary>Deserialises <paramref name="yaml"/>; <paramref name="subject"/> starts every error message.</summary>
-    private static Result<RulePack, AriadneError> Parse(string yaml, string subject)
-    {
-        if (string.IsNullOrWhiteSpace(yaml))
-        {
-            return Empty(subject);
-        }
-
-        RulePack? pack;
-        try
-        {
-            pack = Deserializer.Deserialize<RulePack?>(yaml);
-        }
-        catch (YamlException ex)
-        {
-            return Result<RulePack, AriadneError>.Failure(YamlFailure.ToError(ex, subject, "rule pack"));
-        }
-
-        return pack is null ? Empty(subject) : CheckMembers(pack, subject);
-    }
+    /// <summary>Runs the member rules on a parsed pack; <paramref name="subject"/> names a nameless pack.</summary>
+    private static Result<RulePack, AriadneError> Checked(Result<RulePack, AriadneError> parsed, string subject) =>
+        parsed.IsFailure ? parsed : CheckMembers(parsed.Value, subject);
 
     /// <summary>Runs the member rules declared on the schema types; cross-references are the resolver's job.</summary>
     private static Result<RulePack, AriadneError> CheckMembers(RulePack pack, string subject)
@@ -222,15 +173,7 @@ internal sealed class PackOperations : IPackOperations
 #pragma warning restore EPS06
         }
 
-        return Result<RulePack, AriadneError>.Failure(RulePackReferenceCheck.Invalid(pack.Name, lines, subject));
+        return Result<RulePack, AriadneError>.Failure(RulePackError.Invalid(pack.Name, lines, subject));
     }
 
-    private static Result<RulePack, AriadneError> Empty(string subject) =>
-        Result<RulePack, AriadneError>.Failure(new AriadneError(AriadneErrorCode.Invalid, $"{subject} is empty."));
-
-    private static Result<RulePack, AriadneError> FileNotFound(string filePath) =>
-        Result<RulePack, AriadneError>.Failure(new AriadneError(
-            AriadneErrorCode.NotFound,
-            $"Rule pack file '{filePath}' not found.",
-            filePath));
 }
