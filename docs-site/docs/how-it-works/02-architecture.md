@@ -9,7 +9,7 @@ sidebar_position: 2
 ```mermaid
 graph TD
     subgraph src
-        subgraph ArchGov.Core["ArchGov.Core (Rule engine library)"]
+        subgraph Ariadne.NET["Ariadne.NET (Rule engine library)"]
             RuleSchema["RuleSchema<br/><i>Domain models</i>"]
             RuleLoader["RuleLoader<br/><i>YAML parsing, registry, resolver</i>"]
             RuleEngine["RuleEngine<br/><i>Merger, validator, inference</i>"]
@@ -19,14 +19,14 @@ graph TD
             Sync["Sync<br/><i>Git sync, semver, caching</i>"]
             BuiltinPacks["BuiltinPacks<br/><i>10 embedded YAML templates</i>"]
         end
-        HostApi["ArchGov.Host.Api<br/><i>MCP over HTTP</i>"]
-        HostCli["ArchGov.Host.Cli<br/><i>CLI (System.CommandLine 3.0)</i>"]
-        HostMcp["ArchGov.Host.Mcp<br/><i>MCP stdio server</i>"]
+        HostApi["Ariadne.NET.Mcp.Http<br/><i>MCP over HTTP</i>"]
+        HostCli["Ariadne.NET.Cli<br/><i>CLI (System.CommandLine 3.0)</i>"]
+        HostMcp["Ariadne.NET.Mcp<br/><i>MCP stdio server</i>"]
     end
 
     subgraph tests
-        CoreTests["ArchGov.Core.Tests<br/><i>Unit + integration tests</i>"]
-        McpTests["ArchGov.Host.Mcp.Tests<br/><i>MCP tool + resource tests</i>"]
+        CoreTests["Ariadne.NET.Tests<br/><i>Unit + integration tests</i>"]
+        McpTests["Ariadne.NET.Mcp.Tests<br/><i>MCP tool + resource tests</i>"]
     end
 ```
 
@@ -38,7 +38,7 @@ The engine processes a user request through a series of stages:
 flowchart TD
     A["User Request<br/><i>role, name, solution, feature</i>"] --> B
 
-    subgraph Core["ArchGov.Core Pipeline"]
+    subgraph Core["Ariadne.NET Pipeline"]
         B["1. RulePackResolver<br/><i>Parse extends references<br/>(builtin://, import://)<br/>Load referenced packs</i>"]
         B --> C["2. RulePackMerger<br/><i>Combine layers (union deps)<br/>Roles (last wins)<br/>Rules (locked protection)</i>"]
         C --> D["3. LayerInferenceEngine<br/><i>Map role name → layer<br/>Primary + alternative names<br/>Ambiguity detection</i>"]
@@ -51,17 +51,17 @@ flowchart TD
 
 ## Dependency Flow
 
-All three host applications depend on `ArchGov.Core`. The only host-to-host dependency is `ArchGov.Host.Api` → `ArchGov.Host.Mcp`, so the HTTP transport serves the same MCP tools and resources as stdio.
+All three host applications depend on `Ariadne.NET`. The only host-to-host dependency is `Ariadne.NET.Mcp.Http` → `Ariadne.NET.Mcp`, so the HTTP transport serves the same MCP tools and resources as stdio.
 
 ```mermaid
 graph LR
-    Api["ArchGov.Host.Api"] --> Core["ArchGov.Core"]
+    Api["Ariadne.NET.Mcp.Http"] --> Core["Ariadne.NET"]
     Api --> Mcp
-    Cli["ArchGov.Host.Cli"] --> Core
-    Mcp["ArchGov.Host.Mcp"] --> Core
+    Cli["Ariadne.NET.Cli"] --> Core
+    Mcp["Ariadne.NET.Mcp"] --> Core
 ```
 
-Within `ArchGov.Core`, dependencies flow strictly top-down:
+Within `Ariadne.NET`, dependencies flow strictly top-down:
 
 ```mermaid
 graph TD

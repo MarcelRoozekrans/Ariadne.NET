@@ -20,16 +20,16 @@ AI coding agents generate behavior effectively but are unreliable at structural 
 
 ```bash
 # Initialize a project with clean architecture rules
-arch init --template clean-architecture
+ariadne init --template clean-architecture
 
 # Compose multiple patterns
-arch init --template clean-architecture+cqrs
+ariadne init --template clean-architecture+cqrs
 
 # List available component roles
-arch roles
+ariadne roles
 
 # Generate a component
-arch generate --role Entity --name Order --solution MyApp --feature Orders
+ariadne generate --role Entity --name Order --solution MyApp --feature Orders
 ```
 
 ### MCP Server
@@ -41,9 +41,9 @@ The engine runs as an MCP server for AI agent integration (Claude Code, Cursor, 
 ```json
 {
   "mcpServers": {
-    "archgov": {
+    "ariadne": {
       "command": "dotnet",
-      "args": ["run", "--project", "path/to/src/ArchGov.Host.Mcp"]
+      "args": ["run", "--project", "path/to/src/Ariadne.NET.Mcp"]
     }
   }
 }
@@ -52,7 +52,7 @@ The engine runs as an MCP server for AI agent integration (Claude Code, Cursor, 
 **HTTP (remote/team)** — start the API server, MCP endpoint at `/mcp`:
 
 ```bash
-dotnet run --project src/ArchGov.Host.Api
+dotnet run --project src/Ariadne.NET.Mcp.Http
 ```
 
 ## MCP Tools

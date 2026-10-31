@@ -2,7 +2,7 @@ import {themes as prismThemes} from 'prism-react-renderer';
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: 'Architecture Governance Engine',
+  title: 'Ariadne.NET',
   tagline: 'AI generates behavior. The engine governs structure.',
   favicon: 'img/favicon.ico',
 
@@ -56,7 +56,7 @@ const config = {
         respectPrefersColorScheme: true,
       },
       navbar: {
-        title: 'ArchGov',
+        title: 'Ariadne.NET',
         items: [
           {
             type: 'docSidebar',

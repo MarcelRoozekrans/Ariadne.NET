@@ -1,4 +1,4 @@
-# Architecture Governance Engine
+# Ariadne.NET
 
 A pluggable, pattern-agnostic architecture governance engine that enforces structural rules for AI code generation via declarative YAML rule packs.
 
@@ -14,19 +14,19 @@ AI coding agents generate behavior effectively but are unreliable at structural 
 
 ```bash
 # Initialize a project with clean architecture rules
-dotnet run --project src/ArchGov.Host.Cli -- init --template clean-architecture
+dotnet run --project src/Ariadne.NET.Cli -- init --template clean-architecture
 
 # Compose multiple patterns
-dotnet run --project src/ArchGov.Host.Cli -- init --template clean-architecture+cqrs
+dotnet run --project src/Ariadne.NET.Cli -- init --template clean-architecture+cqrs
 
 # List available component roles
-dotnet run --project src/ArchGov.Host.Cli -- roles
+dotnet run --project src/Ariadne.NET.Cli -- roles
 
 # Show resolved architecture rules (layers + dependencies)
-dotnet run --project src/ArchGov.Host.Cli -- rules
+dotnet run --project src/Ariadne.NET.Cli -- rules
 
 # Generate a component
-dotnet run --project src/ArchGov.Host.Cli -- generate \
+dotnet run --project src/Ariadne.NET.Cli -- generate \
   --role Entity --name Order --solution MyApp --feature Orders
 ```
 
@@ -39,9 +39,9 @@ The engine runs as an MCP server for AI agent integration (Claude Code, Cursor, 
 ```json
 {
   "mcpServers": {
-    "archgov": {
+    "ariadne": {
       "command": "dotnet",
-      "args": ["run", "--project", "path/to/src/ArchGov.Host.Mcp"]
+      "args": ["run", "--project", "path/to/src/Ariadne.NET.Mcp"]
     }
   }
 }
@@ -50,7 +50,7 @@ The engine runs as an MCP server for AI agent integration (Claude Code, Cursor, 
 **HTTP (remote/team)** — start the API server, MCP endpoint at `/mcp`:
 
 ```bash
-dotnet run --project src/ArchGov.Host.Api
+dotnet run --project src/Ariadne.NET.Mcp.Http
 ```
 
 **MCP Tools:**
@@ -70,7 +70,7 @@ dotnet run --project src/ArchGov.Host.Api
 
 | Resource | Description |
 |----------|-------------|
-| `archgov://packs/{name}` | Full YAML content of a built-in rule pack |
+| `ariadne://packs/{name}` | Full YAML content of a built-in rule pack |
 
 All tools auto-detect `.architecture/rules.yaml` in the working directory. Pass an explicit `template` parameter to override; composite templates such as `clean-architecture+cqrs` work here as well.
 
@@ -155,13 +155,13 @@ imports:
 
 ```bash
 # Fetch rule packs from git repos
-dotnet run --project src/ArchGov.Host.Cli -- sync
+dotnet run --project src/Ariadne.NET.Cli -- sync
 
 # Force fresh sync (ignore cache)
-dotnet run --project src/ArchGov.Host.Cli -- sync --no-cache
+dotnet run --project src/Ariadne.NET.Cli -- sync --no-cache
 
 # Sync a single import
-dotnet run --project src/ArchGov.Host.Cli -- sync --name company-standards
+dotnet run --project src/Ariadne.NET.Cli -- sync --name company-standards
 ```
 
 Then reference synced packs in your rules:
@@ -227,7 +227,7 @@ The engine validates existing source code against architecture rules using Rosly
 
 ```bash
 # CLI
-dotnet run --project src/ArchGov.Host.Cli -- validate ./src
+dotnet run --project src/Ariadne.NET.Cli -- validate ./src
 ```
 
 Over MCP, use the `validate_source` tool.
@@ -242,7 +242,7 @@ A lighter check that detects namespace-vs-directory layer mismatches:
 
 ```bash
 # CLI
-dotnet run --project src/ArchGov.Host.Cli -- lint ./src
+dotnet run --project src/Ariadne.NET.Cli -- lint ./src
 ```
 
 Over MCP, use the `lint_source` tool.
@@ -251,7 +251,7 @@ Over MCP, use the `lint_source` tool.
 
 ```
 src/
-  ArchGov.Core/              # Rule engine library (zero host dependencies)
+  Ariadne.NET/                # Rule engine library (zero host dependencies)
     RuleSchema/               # Models: RulePack, LayerDefinition, ComponentRoleDefinition
     RuleLoader/               # YAML parsing, built-in pack registry, resolver
     RuleEngine/               # Merger, dependency validator, layer inference
@@ -261,13 +261,14 @@ src/
     Sync/                     # Git-based sync: imports, semver, caching
     BuiltinPacks/             # Embedded YAML templates
 
-  ArchGov.Host.Api/           # MCP HTTP transport (reuses the ArchGov.Host.Mcp tools)
-  ArchGov.Host.Cli/           # CLI tool (System.CommandLine)
-  ArchGov.Host.Mcp/           # MCP stdio server for AI agents
+  Ariadne.NET.Cli/            # CLI tool (System.CommandLine)
+  Ariadne.NET.Mcp/            # MCP stdio server for AI agents
+  Ariadne.NET.Mcp.Http/       # MCP HTTP transport (reuses the Ariadne.NET.Mcp tools)
 
 tests/
-  ArchGov.Core.Tests/         # Unit + integration tests
-  ArchGov.Host.Mcp.Tests/     # MCP tool + resource tests
+  Ariadne.NET.Tests/          # Unit + integration tests
+  Ariadne.NET.Cli.Tests/      # CLI exit-code tests
+  Ariadne.NET.Mcp.Tests/      # MCP tool + resource tests
 ```
 
 ### Core Pipeline
@@ -286,7 +287,7 @@ User Request
 All core services are registered with a single call:
 
 ```csharp
-services.AddArchGovCoreServices();
+services.AddAriadneNETServices();
 ```
 
 The method is generated at compile time by ZInject from the `[Singleton]` attribute on each service class.
@@ -313,21 +314,21 @@ This registers:
 
 | Command | Description |
 |---------|-------------|
-| `arch init --template <name>` | Initialize `.architecture/rules.yaml` |
-| `arch rules` | Print resolved layer rules |
-| `arch roles` | Print component roles table |
-| `arch generate --role <role> --name <name> --solution <sol> --feature <feat>` | Generate a component |
-| `arch validate <path>` | Validate source files against architecture rules |
-| `arch lint <path>` | Lint source files for namespace-layer mismatches |
-| `arch sync` | Sync rule packs from git repositories defined in imports.yaml |
+| `ariadne init --template <name>` | Initialize `.architecture/rules.yaml` |
+| `ariadne rules` | Print resolved layer rules |
+| `ariadne roles` | Print component roles table |
+| `ariadne generate --role <role> --name <name> --solution <sol> --feature <feat>` | Generate a component |
+| `ariadne validate <path>` | Validate source files against architecture rules |
+| `ariadne lint <path>` | Lint source files for namespace-layer mismatches |
+| `ariadne sync` | Sync rule packs from git repositories defined in imports.yaml |
 
 Exit codes: `0` success, `1` violations or lint issues found, `2` error (missing files or directories, failed generation or sync). CI pipelines can fail on any non-zero code, or treat `1` and `2` differently.
 
 ## Building
 
 ```bash
-dotnet build src/ArchGov.slnx
-dotnet test src/ArchGov.slnx
+dotnet build src/Ariadne.NET.slnx
+dotnet test src/Ariadne.NET.slnx
 ```
 
 ## Tech Stack

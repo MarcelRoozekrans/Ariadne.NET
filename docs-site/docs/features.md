@@ -121,7 +121,7 @@ Detected violations:
 
 ```bash
 # CLI
-arch validate ./src
+ariadne validate ./src
 ```
 
 ## Linting
@@ -132,7 +132,7 @@ Flags files where the namespace implies one layer but the directory structure im
 
 ```bash
 # CLI
-arch lint ./src
+ariadne lint ./src
 ```
 
 ## Workspace Scaffolding
@@ -180,9 +180,9 @@ Versions are resolved against git tags using semver ranges:
 Packs are cached locally in `.architecture/.cache/git/` so validation works offline. Use `--no-cache` to force a fresh sync.
 
 ```bash
-arch sync                              # Sync all imports
-arch sync --name company-standards     # Sync a single import
-arch sync --no-cache                   # Force fresh fetch
+ariadne sync                              # Sync all imports
+ariadne sync --name company-standards     # Sync a single import
+ariadne sync --no-cache                   # Force fresh fetch
 ```
 
 ### Consuming synced packs
@@ -217,7 +217,7 @@ The engine exposes its full capability set as MCP tools and resources for AI age
 
 | URI | Description |
 |-----|-------------|
-| `archgov://packs/{name}` | Raw YAML content of a built-in rule pack |
+| `ariadne://packs/{name}` | Raw YAML content of a built-in rule pack |
 
 ### Transports
 
@@ -230,11 +230,11 @@ All tools auto-detect `.architecture/rules.yaml` in the working directory. Pass 
 
 | Host | Use Case | Protocol |
 |------|----------|----------|
-| **CLI** (`ArchGov.Host.Cli`) | Developer workflow, CI/CD pipelines | Terminal |
-| **MCP stdio** (`ArchGov.Host.Mcp`) | Local AI agent integration (Claude Code, Cursor) | MCP stdio |
-| **MCP HTTP** (`ArchGov.Host.Api`) | Remote/team AI agent access | MCP over HTTP |
+| **CLI** (`Ariadne.NET.Cli`) | Developer workflow, CI/CD pipelines | Terminal |
+| **MCP stdio** (`Ariadne.NET.Mcp`) | Local AI agent integration (Claude Code, Cursor) | MCP stdio |
+| **MCP HTTP** (`Ariadne.NET.Mcp.Http`) | Remote/team AI agent access | MCP over HTTP |
 
-All three hosts share the same core engine via `services.AddArchGovCoreServices()`, generated at compile time by ZInject. The two MCP hosts expose identical tools and resources — stdio for local use, HTTP for remote.
+All three hosts share the same core engine via `services.AddAriadneNETServices()`, generated at compile time by ZInject. The two MCP hosts expose identical tools and resources — stdio for local use, HTTP for remote.
 
 ## Extensibility
 

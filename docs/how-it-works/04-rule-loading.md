@@ -42,10 +42,10 @@ IBuiltinPackRegistry
 
 **Discovery algorithm (constructor):**
 
-1. Scans all manifest resource names in the `ArchGov.Core` assembly
+1. Scans all manifest resource names in the `Ariadne.NET` assembly
 2. Filters for names containing `"BuiltinPacks"` and ending with `".yaml"`
 3. Extracts pack names from resource paths:
-   - `ArchGov.Core.BuiltinPacks.clean-architecture.yaml` → `clean-architecture`
+   - `Ariadne.NET.BuiltinPacks.clean-architecture.yaml` → `clean-architecture`
    - Algorithm: strip `.yaml`, take the segment after the last `.` before the extension
 4. Builds a `Dictionary<string, string>` mapping pack names to resource names
 
