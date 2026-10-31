@@ -53,7 +53,13 @@ internal static class SyncCommand
         var loader = provider.GetRequiredService<IImportsLoader>();
         var orchestrator = provider.GetRequiredService<ISyncOrchestrator>();
 
-        var manifest = loader.LoadFromFile(importsPath);
+        var loaded = loader.LoadFromFile(importsPath);
+        if (loaded.IsFailure)
+        {
+            return ErrorOutput.Report(loaded.Error);
+        }
+
+        var manifest = loaded.Value;
 
         if (manifest.Imports.Count == 0)
         {

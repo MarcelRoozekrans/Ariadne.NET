@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Ariadne.NET.Abstractions;
 using Ariadne.NET.Sync;
 
 namespace Ariadne.NET.Tests.Sync;
@@ -40,7 +41,7 @@ public class SemVerRangeTests
     [InlineData("1.0.0", "2.0.0", false)]
     public void ExactMatch_ShouldMatchExactly(string range, string candidate, bool expected)
     {
-        var semVerRange = SemVerRange.Parse(range);
+        var semVerRange = SemVerRange.Parse(range).Value;
         SemVer.TryParse(candidate, out var version);
 
         semVerRange.IsSatisfiedBy(version!).Should().Be(expected);
@@ -58,7 +59,7 @@ public class SemVerRangeTests
     [InlineData("^0.1.0", "0.2.0", false)]
     public void CaretRange_ShouldAllowMinorAndPatchBumps(string range, string candidate, bool expected)
     {
-        var semVerRange = SemVerRange.Parse(range);
+        var semVerRange = SemVerRange.Parse(range).Value;
         SemVer.TryParse(candidate, out var version);
 
         semVerRange.IsSatisfiedBy(version!).Should().Be(expected);
@@ -71,7 +72,7 @@ public class SemVerRangeTests
     [InlineData("~1.2.0", "1.1.0", false)]
     public void TildeRange_ShouldAllowPatchBumpsOnly(string range, string candidate, bool expected)
     {
-        var semVerRange = SemVerRange.Parse(range);
+        var semVerRange = SemVerRange.Parse(range).Value;
         SemVer.TryParse(candidate, out var version);
 
         semVerRange.IsSatisfiedBy(version!).Should().Be(expected);
@@ -84,7 +85,7 @@ public class SemVerRangeTests
     public void FindBestMatch_ShouldReturnHighestSatisfying(
         string range, string t1, string t2, string t3, string t4, string expectedTag)
     {
-        var semVerRange = SemVerRange.Parse(range);
+        var semVerRange = SemVerRange.Parse(range).Value;
         var tags = new[] { t1, t2, t3, t4 };
 
         var best = semVerRange.FindBestMatch(tags);
@@ -95,7 +96,7 @@ public class SemVerRangeTests
     [Fact]
     public void FindBestMatch_NoMatch_ShouldReturnNull()
     {
-        var semVerRange = SemVerRange.Parse("^1.0");
+        var semVerRange = SemVerRange.Parse("^1.0").Value;
         var tags = new[] { "v3.0.0", "v4.0.0" };
 
         var best = semVerRange.FindBestMatch(tags);
@@ -107,21 +108,23 @@ public class SemVerRangeTests
     [InlineData("^2.0")]
     [InlineData("~1.3")]
     [InlineData("1.0.0")]
-    public void Parse_ValidRanges_ShouldNotThrow(string range)
+    public void Parse_ValidRanges_ReturnsSuccess(string range)
     {
-        var act = () => SemVerRange.Parse(range);
-
-        act.Should().NotThrow();
+        SemVerRange.Parse(range).IsSuccess.Should().BeTrue();
     }
 
     [Theory]
     [InlineData("")]
     [InlineData("not-valid")]
-    public void Parse_InvalidRanges_ShouldThrow(string range)
+    [InlineData("^nope")]
+    [InlineData("~nope")]
+    public void Parse_InvalidRanges_ReturnsInvalid(string range)
     {
-        var act = () => SemVerRange.Parse(range);
+        var result = SemVerRange.Parse(range);
 
-        act.Should().Throw<FormatException>();
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().Be($"Invalid semver range: '{range}'");
     }
 
     [Theory]
@@ -138,7 +141,7 @@ public class SemVerRangeTests
     public void FindBestMatch_ShouldIgnorePreReleaseTags()
     {
         var tags = new[] { "v1.0.0-beta", "v1.0.0", "v1.1.0-rc.1", "v1.1.0" };
-        var range = SemVerRange.Parse("^1.0");
+        var range = SemVerRange.Parse("^1.0").Value;
 
         var best = range.FindBestMatch(tags);
 
@@ -149,7 +152,7 @@ public class SemVerRangeTests
     public void FindBestMatch_OnlyPreReleaseTags_ShouldReturnNull()
     {
         var tags = new[] { "v1.0.0-beta", "v1.1.0-rc.1", "v2.0.0-alpha" };
-        var range = SemVerRange.Parse("^1.0");
+        var range = SemVerRange.Parse("^1.0").Value;
 
         range.FindBestMatch(tags).Should().BeNull();
     }

@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Ariadne.NET.Abstractions;
 using Ariadne.NET.Sync;
 
 namespace Ariadne.NET.Tests.Sync;
@@ -38,7 +39,7 @@ public class ImportsYamlLoaderTests : IDisposable
                 version: "2.0.0"
             """;
 
-        var manifest = _loader.LoadFromString(yaml);
+        var manifest = _loader.LoadFromString(yaml).Value;
 
         manifest.Imports.Should().HaveCount(2);
 
@@ -62,7 +63,7 @@ public class ImportsYamlLoaderTests : IDisposable
             imports: []
             """;
 
-        var manifest = _loader.LoadFromString(yaml);
+        var manifest = _loader.LoadFromString(yaml).Value;
 
         manifest.Imports.Should().BeEmpty();
     }
@@ -80,34 +81,98 @@ public class ImportsYamlLoaderTests : IDisposable
         var filePath = Path.Combine(_tempDir, "imports.yaml");
         File.WriteAllText(filePath, yaml);
 
-        var manifest = _loader.LoadFromFile(filePath);
+        var manifest = _loader.LoadFromFile(filePath).Value;
 
         manifest.Imports.Should().HaveCount(1);
         manifest.Imports[0].Name.Should().Be("shared-rules");
     }
 
     [Fact]
-    public void LoadFromFile_FileNotFound_ShouldThrow()
+    public void LoadFromFile_FileNotFound_ReturnsNotFound()
     {
         var missingPath = Path.Combine(_tempDir, "nonexistent.yaml");
 
-        var act = () => _loader.LoadFromFile(missingPath);
+        var result = _loader.LoadFromFile(missingPath);
 
-        act.Should().Throw<FileNotFoundException>();
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.NotFound);
+        result.Error.Message.Should().Be($"Imports file '{missingPath}' not found.");
+        result.Error.Detail.Should().Be(missingPath);
     }
 
     [Fact]
-    public void LoadFromString_MalformedYaml_ShouldThrow()
+    public void LoadFromFile_PathIsDirectory_ReturnsUnavailable()
+    {
+        var result = _loader.LoadFromFile(_tempDir);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.Unavailable);
+        result.Error.Message.Should().Be($"Imports file '{_tempDir}' could not be read.");
+        result.Error.Detail.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public void LoadFromString_MalformedYaml_ReturnsInvalidWithLine()
     {
         var yaml = """
             imports:
               - name: broken
-                type: [this is not valid
+                type: "unterminated
             """;
 
-        var act = () => _loader.LoadFromString(yaml);
+        var result = _loader.LoadFromString(yaml);
 
-        act.Should().Throw<Exception>();
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().StartWith("Imports YAML could not be parsed: ");
+        result.Error.Detail.Should().StartWith("line ");
+    }
+
+    [Fact]
+    public void LoadFromFile_MalformedYaml_NamesTheFile()
+    {
+        var filePath = Path.Combine(_tempDir, "imports.yaml");
+        File.WriteAllText(filePath, "imports:\n  - name: \"broken\n");
+
+        var result = _loader.LoadFromFile(filePath);
+
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().StartWith($"Imports file '{filePath}' could not be parsed: ");
+    }
+
+    [Fact]
+    public void LoadFromString_WrongShape_ReturnsSchemaMismatchWithoutClrTypes()
+    {
+        var result = _loader.LoadFromString("imports: not-a-list");
+
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().Be("Imports YAML does not match the imports schema.");
+        result.Error.Detail.Should().StartWith("line ");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   \n  ")]
+    [InlineData("~")]
+    public void LoadFromString_Empty_ReturnsInvalid(string yaml)
+    {
+        var result = _loader.LoadFromString(yaml);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().Be("Imports YAML is empty.");
+    }
+
+    [Theory]
+    [InlineData("imports: ~")]
+    [InlineData("imports:\n  - ~")]
+    public void LoadFromString_NullEntries_ReturnsInvalidWithoutThrowing(string yaml)
+    {
+        var result = _loader.LoadFromString(yaml);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().StartWith("Imports YAML has an empty entry under 'imports'");
     }
 
     [Fact]
@@ -122,7 +187,7 @@ public class ImportsYamlLoaderTests : IDisposable
                 unknownField: should-be-ignored
             """;
 
-        var manifest = _loader.LoadFromString(yaml);
+        var manifest = _loader.LoadFromString(yaml).Value;
 
         manifest.Imports.Should().ContainSingle();
         manifest.Imports[0].Name.Should().Be("test-pack");

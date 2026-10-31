@@ -180,6 +180,30 @@ public sealed class ExitCodeTests : IDisposable
     }
 
     [Fact]
+    public void Sync_MalformedImportsFile_ReturnsErrorAndWritesStderr()
+    {
+        var importsPath = Path.Combine(_tempDir, ".architecture", "imports.yaml");
+        File.WriteAllText(importsPath, "imports:\n  - name: \"broken\n");
+        var originalError = Console.Error;
+        using var error = new StringWriter();
+        Console.SetError(error);
+
+        try
+        {
+            Run("sync").Should().Be(ExitCodes.Error);
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
+
+        var lines = error.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        lines.Should().HaveCount(2, "an expected failure prints the message and the location, not a stack trace");
+        lines[0].Should().StartWith($"Error: Imports file '{importsPath}' could not be parsed: ");
+        lines[1].Should().StartWith("line ");
+    }
+
+    [Fact]
     public void Validate_RulesExtendUnknownBuiltin_ShouldReturnErrorAndWriteStderr()
     {
         WriteRules("""

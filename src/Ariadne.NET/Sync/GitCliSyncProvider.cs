@@ -16,7 +16,18 @@ public sealed class GitCliSyncProvider : IGitSyncProvider
         CancellationToken ct = default)
     {
         var importCacheDir = Path.Combine(cacheDir, import.Name);
-        var versionRange = SemVerRange.Parse(import.Version);
+        var parsedRange = SemVerRange.Parse(import.Version);
+        if (parsedRange.IsFailure)
+        {
+            return new SyncResult
+            {
+                ImportName = import.Name,
+                Success = false,
+                Error = parsedRange.Error.Message,
+            };
+        }
+
+        var versionRange = parsedRange.Value;
 
         if (!noCache && IsCacheValid(importCacheDir, import.Url, versionRange))
         {

@@ -1,7 +1,10 @@
+using Ariadne.NET.Abstractions;
+using ZeroAlloc.Results;
+
 namespace Ariadne.NET.Sync;
 
 public interface IImportsLoader
 {
-    ImportsManifest LoadFromString(string yaml);
-    ImportsManifest LoadFromFile(string filePath);
+    Result<ImportsManifest, AriadneError> LoadFromString(string yaml);
+    Result<ImportsManifest, AriadneError> LoadFromFile(string filePath);
 }

@@ -1,3 +1,6 @@
+using Ariadne.NET.Abstractions;
+using ZeroAlloc.Results;
+
 namespace Ariadne.NET.Sync;
 
 public sealed class SemVerRange
@@ -33,11 +36,11 @@ public sealed class SemVerRange
         return bestTag;
     }
 
-    public static SemVerRange Parse(string range)
+    public static Result<SemVerRange, AriadneError> Parse(string range)
     {
         if (string.IsNullOrEmpty(range))
         {
-            throw new FormatException($"Invalid semver range: '{range}'");
+            return Invalid(range);
         }
 
         if (range.StartsWith('^'))
@@ -45,10 +48,10 @@ public sealed class SemVerRange
             var versionPart = range[1..];
             if (!SemVer.TryParse(versionPart, out var baseVersion))
             {
-                throw new FormatException($"Invalid semver range: '{range}'");
+                return Invalid(range);
             }
 
-            return new SemVerRange(v =>
+            return Result<SemVerRange, AriadneError>.Success(new SemVerRange(v =>
             {
                 if (baseVersion!.Major == 0)
                 {
@@ -61,7 +64,7 @@ public sealed class SemVerRange
                 // For ^X.Y.Z where X>0, allow minor+patch bumps within same major
                 return v.Major == baseVersion.Major
                     && v.CompareTo(baseVersion) >= 0;
-            });
+            }));
         }
 
         if (range.StartsWith('~'))
@@ -69,21 +72,26 @@ public sealed class SemVerRange
             var versionPart = range[1..];
             if (!SemVer.TryParse(versionPart, out var baseVersion))
             {
-                throw new FormatException($"Invalid semver range: '{range}'");
+                return Invalid(range);
             }
 
-            return new SemVerRange(v =>
+            return Result<SemVerRange, AriadneError>.Success(new SemVerRange(v =>
                 v.Major == baseVersion!.Major
                 && v.Minor == baseVersion.Minor
-                && v.Patch >= baseVersion.Patch);
+                && v.Patch >= baseVersion.Patch));
         }
 
         // Exact match
         if (!SemVer.TryParse(range, out var exactVersion))
         {
-            throw new FormatException($"Invalid semver range: '{range}'");
+            return Invalid(range);
         }
 
-        return new SemVerRange(v => v.CompareTo(exactVersion!) == 0);
+        return Result<SemVerRange, AriadneError>.Success(new SemVerRange(v => v.CompareTo(exactVersion!) == 0));
     }
+
+    private static Result<SemVerRange, AriadneError> Invalid(string range) =>
+        Result<SemVerRange, AriadneError>.Failure(new AriadneError(
+            AriadneErrorCode.Invalid,
+            $"Invalid semver range: '{range}'"));
 }

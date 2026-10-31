@@ -73,16 +73,9 @@ public sealed class YamlRulePackLoader : IRulePackLoader
         {
             pack = _deserializer.Deserialize<RulePack?>(yaml);
         }
-        catch (YamlException ex) when (ex is SyntaxErrorException or SemanticErrorException)
-        {
-            // The parser rejected the text itself; its message is a readable reason with no CLR type names.
-            return Invalid($"{subject} could not be parsed: {ex.Message}", ex);
-        }
         catch (YamlException ex)
         {
-            // YamlDotNet wraps exceptions raised while converting nodes to the schema types, so YAML of the wrong
-            // shape arrives here too. Their text names CLR types, so the message is fixed and only the location shows.
-            return Invalid($"{subject} does not match the rule pack schema.", ex);
+            return Result<RulePack, AriadneError>.Failure(YamlFailure.ToError(ex, subject, "rule pack"));
         }
 
         return pack is null ? Empty(subject) : CheckMembers(pack, subject);
@@ -109,12 +102,6 @@ public sealed class YamlRulePackLoader : IRulePackLoader
 
         return Result<RulePack, AriadneError>.Failure(RulePackReferenceCheck.Invalid(pack.Name, lines, subject));
     }
-
-    private static Result<RulePack, AriadneError> Invalid(string message, YamlException ex) =>
-        Result<RulePack, AriadneError>.Failure(new AriadneError(
-            AriadneErrorCode.Invalid,
-            message,
-            $"line {ex.Start.Line}, column {ex.Start.Column}"));
 
     private static Result<RulePack, AriadneError> Empty(string subject) =>
         Result<RulePack, AriadneError>.Failure(new AriadneError(AriadneErrorCode.Invalid, $"{subject} is empty."));

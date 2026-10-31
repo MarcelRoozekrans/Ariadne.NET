@@ -43,7 +43,7 @@ public sealed class GitSyncIntegrationTests : IDisposable
 
         // 2. Load with ImportsYamlLoader and verify 1 import
         var loader = new ImportsYamlLoader();
-        var manifest = loader.LoadFromFile(Path.Combine(archDir, "imports.yaml"));
+        var manifest = loader.LoadFromFile(Path.Combine(archDir, "imports.yaml")).Value;
         manifest.Imports.Should().HaveCount(1);
         manifest.Imports[0].Name.Should().Be("shared-rules");
 
@@ -172,15 +172,15 @@ public sealed class GitSyncIntegrationTests : IDisposable
         const string url = "https://github.com/test.git";
 
         // 2. ^1.0 should match v1.2.0 (same major, >= 1.0.0)
-        GitCliSyncProvider.IsCacheValid(cacheDir, url, SemVerRange.Parse("^1.0")).Should().BeTrue();
+        GitCliSyncProvider.IsCacheValid(cacheDir, url, SemVerRange.Parse("^1.0").Value).Should().BeTrue();
 
         // 3. ^2.0 should NOT match v1.2.0 (different major)
-        GitCliSyncProvider.IsCacheValid(cacheDir, url, SemVerRange.Parse("^2.0")).Should().BeFalse();
+        GitCliSyncProvider.IsCacheValid(cacheDir, url, SemVerRange.Parse("^2.0").Value).Should().BeFalse();
 
         // 4. ~1.2 should match v1.2.0 (same major.minor, patch >= 0)
-        GitCliSyncProvider.IsCacheValid(cacheDir, url, SemVerRange.Parse("~1.2")).Should().BeTrue();
+        GitCliSyncProvider.IsCacheValid(cacheDir, url, SemVerRange.Parse("~1.2").Value).Should().BeTrue();
 
         // 5. ~1.3 should NOT match v1.2.0 (different minor)
-        GitCliSyncProvider.IsCacheValid(cacheDir, url, SemVerRange.Parse("~1.3")).Should().BeFalse();
+        GitCliSyncProvider.IsCacheValid(cacheDir, url, SemVerRange.Parse("~1.3").Value).Should().BeFalse();
     }
 }

@@ -66,7 +66,7 @@ public class GitCliSyncProviderTests
         var result = GitCliSyncProvider.IsCacheValid(
             Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()),
             "https://example.com/repo.git",
-            SemVerRange.Parse("^1.0"));
+            SemVerRange.Parse("^1.0").Value);
 
         result.Should().BeFalse();
     }
@@ -92,7 +92,7 @@ public class GitCliSyncProviderTests
             var result = GitCliSyncProvider.IsCacheValid(
                 tempDir,
                 "https://example.com/repo.git",
-                SemVerRange.Parse("^1.0"));
+                SemVerRange.Parse("^1.0").Value);
 
             result.Should().BeTrue();
         }
@@ -126,7 +126,7 @@ public class GitCliSyncProviderTests
             var result = GitCliSyncProvider.IsCacheValid(
                 tempDir,
                 "https://example.com/repo.git",
-                SemVerRange.Parse("^1.0"));
+                SemVerRange.Parse("^1.0").Value);
 
             result.Should().BeFalse();
         }
@@ -169,7 +169,7 @@ public class GitCliSyncProviderTests
             var result = GitCliSyncProvider.IsCacheValid(
                 tempDir,
                 "https://example.com/repo.git",
-                SemVerRange.Parse("^1.0"));
+                SemVerRange.Parse("^1.0").Value);
 
             result.Should().BeFalse();
         }
@@ -203,7 +203,7 @@ public class GitCliSyncProviderTests
             var result = GitCliSyncProvider.IsCacheValid(
                 tempDir,
                 "https://example.com/repo.git",
-                SemVerRange.Parse("^2.0"));
+                SemVerRange.Parse("^2.0").Value);
 
             result.Should().BeFalse();
         }
@@ -214,5 +214,23 @@ public class GitCliSyncProviderTests
                 Directory.Delete(tempDir, recursive: true);
             }
         }
+    }
+
+    [Fact]
+    public async Task SyncAsync_InvalidVersionRange_ReturnsFailedResultWithMessage()
+    {
+        var import = new ImportDefinition
+        {
+            Name = "bad-range",
+            Type = "git",
+            Url = "https://example.com/rules.git",
+            Version = "not-valid",
+        };
+
+        var result = await new GitCliSyncProvider().SyncAsync(import, Path.GetTempPath(), noCache: true);
+
+        result.Success.Should().BeFalse();
+        result.ImportName.Should().Be("bad-range");
+        result.Error.Should().Be("Invalid semver range: 'not-valid'");
     }
 }
