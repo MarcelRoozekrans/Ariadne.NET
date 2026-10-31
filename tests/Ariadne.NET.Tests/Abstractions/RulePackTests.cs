@@ -1,7 +1,7 @@
 using FluentAssertions;
-using Ariadne.NET.RuleSchema;
+using Ariadne.NET.Abstractions;
 
-namespace Ariadne.NET.Tests.RuleSchema;
+namespace Ariadne.NET.Tests.Abstractions;
 
 public class RulePackTests
 {

@@ -1,5 +1,5 @@
 using System.Reflection;
-using Ariadne.NET.RuleSchema;
+using Ariadne.NET.Abstractions;
 
 using ZInject;
 

@@ -1,4 +1,4 @@
-using Ariadne.NET.RuleSchema;
+using Ariadne.NET.Abstractions;
 using Ariadne.NET.Validation;
 using FluentAssertions;
 

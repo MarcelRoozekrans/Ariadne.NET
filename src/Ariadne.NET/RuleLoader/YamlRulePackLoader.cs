@@ -1,4 +1,4 @@
-using Ariadne.NET.RuleSchema;
+using Ariadne.NET.Abstractions;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 

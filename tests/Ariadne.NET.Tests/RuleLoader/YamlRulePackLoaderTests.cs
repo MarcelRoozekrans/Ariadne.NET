@@ -1,6 +1,6 @@
 using FluentAssertions;
+using Ariadne.NET.Abstractions;
 using Ariadne.NET.RuleLoader;
-using Ariadne.NET.RuleSchema;
 
 namespace Ariadne.NET.Tests.RuleLoader;
 

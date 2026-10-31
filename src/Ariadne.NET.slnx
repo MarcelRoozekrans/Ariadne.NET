@@ -2,6 +2,7 @@
   <Project Path="../tests/Ariadne.NET.Tests/Ariadne.NET.Tests.csproj" />
   <Project Path="../tests/Ariadne.NET.Cli.Tests/Ariadne.NET.Cli.Tests.csproj" />
   <Project Path="../tests/Ariadne.NET.Mcp.Tests/Ariadne.NET.Mcp.Tests.csproj" />
+  <Project Path="Ariadne.NET.Abstractions/Ariadne.NET.Abstractions.csproj" />
   <Project Path="Ariadne.NET/Ariadne.NET.csproj" />
   <Project Path="Ariadne.NET.Mcp.Http/Ariadne.NET.Mcp.Http.csproj" />
   <Project Path="Ariadne.NET.Cli/Ariadne.NET.Cli.csproj" />

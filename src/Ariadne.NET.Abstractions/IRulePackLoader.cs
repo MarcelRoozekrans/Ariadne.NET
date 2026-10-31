@@ -1,6 +1,4 @@
-using Ariadne.NET.RuleSchema;
-
-namespace Ariadne.NET.RuleLoader;
+namespace Ariadne.NET.Abstractions;
 
 public interface IRulePackLoader
 {

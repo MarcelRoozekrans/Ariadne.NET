@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using Ariadne.NET.Abstractions;
 using Ariadne.NET.RuleLoader;
 using ModelContextProtocol.Server;
 

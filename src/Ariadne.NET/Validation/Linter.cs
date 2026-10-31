@@ -1,4 +1,4 @@
-using Ariadne.NET.RuleSchema;
+using Ariadne.NET.Abstractions;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 

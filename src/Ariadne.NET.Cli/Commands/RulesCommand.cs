@@ -1,6 +1,5 @@
 using System.CommandLine;
-using Ariadne.NET.RuleLoader;
-using Ariadne.NET.RuleSchema;
+using Ariadne.NET.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Ariadne.NET.Cli.Commands;

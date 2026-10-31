@@ -1,5 +1,5 @@
 using System.ComponentModel;
-using Ariadne.NET.RuleSchema;
+using Ariadne.NET.Abstractions;
 using ModelContextProtocol.Server;
 
 namespace Ariadne.NET.Mcp.Tools;

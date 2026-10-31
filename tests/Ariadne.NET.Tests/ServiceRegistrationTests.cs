@@ -1,7 +1,7 @@
+using Ariadne.NET.Abstractions;
 using Ariadne.NET.CodeGeneration;
 using Ariadne.NET.Orchestration;
 using Ariadne.NET.RuleEngine;
-using Ariadne.NET.RuleLoader;
 using Ariadne.NET.Validation;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;

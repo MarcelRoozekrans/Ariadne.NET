@@ -1,5 +1,5 @@
+using Ariadne.NET.Abstractions;
 using Ariadne.NET.CodeGeneration;
-using Ariadne.NET.RuleSchema;
 using FluentAssertions;
 
 namespace Ariadne.NET.Tests.CodeGeneration;

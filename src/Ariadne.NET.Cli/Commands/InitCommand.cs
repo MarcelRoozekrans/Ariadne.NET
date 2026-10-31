@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Ariadne.NET.Abstractions;
 using Ariadne.NET.RuleLoader;
 using Microsoft.Extensions.DependencyInjection;
 using YamlDotNet.Serialization;

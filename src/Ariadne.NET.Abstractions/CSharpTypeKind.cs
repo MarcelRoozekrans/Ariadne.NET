@@ -1,4 +1,4 @@
-namespace Ariadne.NET.RuleSchema;
+namespace Ariadne.NET.Abstractions;
 
 public enum CSharpTypeKind
 {

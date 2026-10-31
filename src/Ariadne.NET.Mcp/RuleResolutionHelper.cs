@@ -1,5 +1,5 @@
+using Ariadne.NET.Abstractions;
 using Ariadne.NET.RuleLoader;
-using Ariadne.NET.RuleSchema;
 
 using ZInject;
 

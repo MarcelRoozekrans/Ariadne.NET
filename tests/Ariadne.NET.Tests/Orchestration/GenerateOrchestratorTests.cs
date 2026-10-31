@@ -1,8 +1,8 @@
 using FluentAssertions;
+using Ariadne.NET.Abstractions;
 using Ariadne.NET.CodeGeneration;
 using Ariadne.NET.Orchestration;
 using Ariadne.NET.RuleEngine;
-using Ariadne.NET.RuleSchema;
 
 namespace Ariadne.NET.Tests.Orchestration;
 
