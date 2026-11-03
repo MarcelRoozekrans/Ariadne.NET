@@ -6,9 +6,6 @@
     <Nullable>enable</Nullable>
     <PackageId>Ariadne.NET</PackageId>
     <Description>Pluggable, pattern-agnostic architecture governance engine. Enforces structural rules for AI code generation via declarative YAML rule packs.</Description>
-    <Authors>Marcel Roozekrans</Authors>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <RepositoryUrl>https://github.com/MarcelRoozekrans/architecture-governance-engine</RepositoryUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <!-- The generated registration is internal; the public AddAriadneNETServices wraps it and adds the git client proxy. -->
     <ZeroAllocGeneratedAccessibility>Internal</ZeroAllocGeneratedAccessibility>
