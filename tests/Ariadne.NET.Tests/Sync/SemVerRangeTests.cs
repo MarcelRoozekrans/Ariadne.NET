@@ -42,7 +42,7 @@ public class SemVerRangeTests
     public void ExactMatch_ShouldMatchExactly(string range, string candidate, bool expected)
     {
         var semVerRange = SemVerRange.Parse(range).Value;
-        SemVer.TryParse(candidate, out var version);
+        SemVer.TryParse(candidate, out var version).Should().BeTrue();
 
         semVerRange.IsSatisfiedBy(version!).Should().Be(expected);
     }
@@ -60,7 +60,7 @@ public class SemVerRangeTests
     public void CaretRange_ShouldAllowMinorAndPatchBumps(string range, string candidate, bool expected)
     {
         var semVerRange = SemVerRange.Parse(range).Value;
-        SemVer.TryParse(candidate, out var version);
+        SemVer.TryParse(candidate, out var version).Should().BeTrue();
 
         semVerRange.IsSatisfiedBy(version!).Should().Be(expected);
     }
@@ -73,7 +73,7 @@ public class SemVerRangeTests
     public void TildeRange_ShouldAllowPatchBumpsOnly(string range, string candidate, bool expected)
     {
         var semVerRange = SemVerRange.Parse(range).Value;
-        SemVer.TryParse(candidate, out var version);
+        SemVer.TryParse(candidate, out var version).Should().BeTrue();
 
         semVerRange.IsSatisfiedBy(version!).Should().Be(expected);
     }

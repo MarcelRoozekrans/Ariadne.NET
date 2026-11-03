@@ -17,7 +17,7 @@ Phase 1.3 outcome:
 
 ## Open Decisions
 
-- ZeroAlloc.Analyzers goes to 1.12.0 in 1.4, decided 2026-10-31; it arrives with the merge of `main` in plan task 1.
+- ZeroAlloc.Analyzers: settled at 1.12.0 (arrived with the merge of `main` in plan task 1, build at 0 warnings).
 - The 1.4 plan runs subagent-driven, chosen by the owner on 2026-11-03.
 - An own YAML library: a separate, unscheduled project outside Ariadne (agreed 2026-10-31).
 - From the roadmap design, none blocking: whether M3 ships a Roslyn analyzer; code generation's role after M4; Mnemosyne.NET integration.
