@@ -26,7 +26,7 @@ Phase 1.3 outcome:
 
 - **Upstream issue not filed.** ZeroAlloc.Resilience 3.4.0 reports the total timeout as `ResilienceError` with PolicyType "Retry", and a timeout during the backoff delay carries the previous attempt's error. Filing on `ZeroAlloc-Net/ZeroAlloc.Resilience` was blocked by the session's permission policy; the user files it or allows it. Ariadne maps it correctly via `InnerException is OperationCanceledException` in `Sync/SyncOperations.cs`.
 - **GitHub Actions are disabled on the repo** on purpose. Phase 1.4 re-enables them and makes the repo public; confirm with the user first.
-- The main worktree at `the main worktree` has `fix/mcp-composite-template` checked out at an older commit. Work from a worktree, and push with `git push -u origin HEAD:fix/mcp-composite-template`.
+- The main worktree has `fix/mcp-composite-template` checked out at an older commit. Work from a worktree, and push with `git push -u origin HEAD:fix/mcp-composite-template`.
 
 ## Added 2026-11-03
 
