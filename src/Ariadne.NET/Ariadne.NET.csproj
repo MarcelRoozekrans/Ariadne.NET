@@ -1,0 +1,46 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>Ariadne.NET</PackageId>
+    <Description>Pluggable, pattern-agnostic architecture governance engine. Enforces structural rules for AI code generation via declarative YAML rule packs.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- The generated registration is internal; the public AddAriadneNETServices wraps it and adds the git client proxy. -->
+    <ZeroAllocGeneratedAccessibility>Internal</ZeroAllocGeneratedAccessibility>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ariadne.NET.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ariadne.NET.Abstractions\Ariadne.NET.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.9.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.14" />
+    <PackageReference Include="YamlDotNet" Version="16.3.0" />
+    <PackageReference Include="ZeroAlloc.Inject" Version="1.11.6" />
+    <PackageReference Include="ZeroAlloc.Inject.Generator" Version="1.11.6" PrivateAssets="all" />
+    <PackageReference Include="ZeroAlloc.Resilience" Version="3.4.0" />
+    <!--
+      The [Instrument] attributes are needed at run time, so the library flows to consumers. The bundled proxy generator
+      runs for this library only: PrivateAssets keeps its analyzer and build assets out of consumers' builds, as Minos.NET
+      does. NuGet may still flow the analyzer, NuGet/Home#6720, where it stays inert without [Instrument].
+    -->
+    <PackageReference Include="ZeroAlloc.Telemetry" Version="1.12.7" PrivateAssets="analyzers;build;buildtransitive" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="BuiltinPacks\*.yaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

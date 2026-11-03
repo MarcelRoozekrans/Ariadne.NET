@@ -1,60 +1,95 @@
-# Architecture Governance Engine
+# Ariadne.NET
 
-A pluggable, pattern-agnostic architecture governance engine that enforces structural rules for AI code generation via declarative YAML rule packs.
+[![CI](https://github.com/MarcelRoozekrans/Ariadne.NET/actions/workflows/ci.yml/badge.svg)](https://github.com/MarcelRoozekrans/Ariadne.NET/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/MarcelRoozekrans/Ariadne.NET/graph/badge.svg)](https://codecov.io/gh/MarcelRoozekrans/Ariadne.NET)
+[![Ariadne.NET](https://img.shields.io/nuget/v/Ariadne.NET?label=Ariadne.NET)](https://www.nuget.org/packages/Ariadne.NET)
+[![Ariadne.NET.Abstractions](https://img.shields.io/nuget/v/Ariadne.NET.Abstractions?label=Ariadne.NET.Abstractions)](https://www.nuget.org/packages/Ariadne.NET.Abstractions)
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://marcelroozekrans.github.io/Ariadne.NET/)
 
-> **Core Principle:** AI generates behavior. The engine governs structure.
+A .NET library that enforces structural rules on AI-generated code. You describe an architecture in a declarative YAML rule pack: layers, allowed dependencies, component roles and naming. Ariadne.NET resolves the pack, generates correctly placed C# components, and checks existing source against it.
 
-## Why
+AI coding agents write behavior well but invent folder structures, improvise namespaces and break dependency rules without saying so. Here the AI declares intent and the library decides the structure.
 
-AI coding agents generate behavior effectively but are unreliable at structural decisions — they invent folder structures, improvise namespaces, and silently violate dependency rules. This engine separates structural governance from AI code generation: the AI declares intent, the engine enforces structure.
+## Install
 
-## Quick Start
+```bash
+dotnet add package Ariadne.NET
+```
+
+`Ariadne.NET.Abstractions` holds the rule-pack schema and contracts. Reference it alone when your tool only needs to describe rule packs.
+
+Load a built-in rule pack and check a directory against it in a console app. This needs `dotnet add package Microsoft.Extensions.DependencyInjection` as well, because Ariadne.NET references only the dependency injection abstractions.
+
+```csharp
+using Ariadne.NET.Abstractions;
+using Ariadne.NET.Validation;
+using Microsoft.Extensions.DependencyInjection;
+
+using var services = new ServiceCollection().AddAriadneNETServices().BuildServiceProvider();
+var loader = services.GetRequiredService<IRulePackLoader>();
+var resolver = services.GetRequiredService<IRulePackResolver>();
+var validator = services.GetRequiredService<ISourceValidator>();
+
+// A rule pack that builds on the built-in clean-architecture pack.
+var pack = loader.LoadFromString("""
+    name: my-service
+    extends:
+      - builtin://clean-architecture
+    """);
+if (pack.IsFailure)
+{
+    Console.Error.WriteLine(pack.Error.Message);
+    return 1;
+}
+
+var resolved = resolver.Resolve(pack.Value);
+if (resolved.IsFailure)
+{
+    Console.Error.WriteLine(resolved.Error.Message);
+    return 1;
+}
+
+Console.WriteLine($"{resolved.Value.Name}: {resolved.Value.Layers.Count} layers, {resolved.Value.ComponentRoles.Count} component roles");
+foreach (var layer in resolved.Value.Layers)
+{
+    Console.WriteLine($"  {layer.Name} -> [{string.Join(", ", layer.AllowedDependencies)}]");
+}
+
+// Check the C# files under a directory against the pack: the first argument, else the current directory.
+var result = validator.Validate(resolved.Value, args.Length > 0 ? args[0] : Directory.GetCurrentDirectory());
+Console.WriteLine($"Checked {result.FilesScanned} files: {result.Violations.Count} violations");
+foreach (var violation in result.Violations)
+{
+    Console.WriteLine($"  {violation.ViolationType} in {violation.FilePath}: {violation.Message}");
+}
+
+return result.IsValid ? 0 : 1;
+```
+
+`dotnet run` prints the resolved pack name, its layer and component role counts, and each layer with the layers it may depend on. It then checks the C# files under the directory you pass as the first argument, or the current directory, and prints each violation with its file and message. The exit code is 1 when there are violations. The [documentation site](https://marcelroozekrans.github.io/Ariadne.NET/) has the full guide.
+
+## CLI and MCP server
+
+The CLI and the MCP server are not packaged yet. Run them from a clone of this repository.
 
 ### CLI
 
 ```bash
 # Initialize a project with clean architecture rules
-dotnet run --project src/ArchGov.Host.Cli -- init --template clean-architecture
+dotnet run --project src/Ariadne.NET.Cli -- init --template clean-architecture
 
 # Compose multiple patterns
-dotnet run --project src/ArchGov.Host.Cli -- init --template clean-architecture+cqrs
+dotnet run --project src/Ariadne.NET.Cli -- init --template clean-architecture+cqrs
 
 # List available component roles
-dotnet run --project src/ArchGov.Host.Cli -- roles
+dotnet run --project src/Ariadne.NET.Cli -- roles
 
 # Show resolved architecture rules (layers + dependencies)
-dotnet run --project src/ArchGov.Host.Cli -- rules
+dotnet run --project src/Ariadne.NET.Cli -- rules
 
 # Generate a component
-dotnet run --project src/ArchGov.Host.Cli -- generate \
+dotnet run --project src/Ariadne.NET.Cli -- generate \
   --role Entity --name Order --solution MyApp --feature Orders
-```
-
-### API
-
-```bash
-# Start the API server
-dotnet run --project src/ArchGov.Host.Api
-
-# List available templates
-curl http://localhost:5000/v1.0/architecture/templates
-
-# Get layer definitions
-curl http://localhost:5000/v1.0/architecture/layers
-
-# Get component roles
-curl http://localhost:5000/v1.0/architecture/component-roles
-
-# Generate components
-curl -X POST http://localhost:5000/v1.0/architecture/generate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "solutionName": "MyApp",
-    "components": [
-      { "componentRole": "Entity", "name": "Order" },
-      { "componentRole": "Repository", "name": "OrderRepository" }
-    ]
-  }'
 ```
 
 ### MCP Server
@@ -66,9 +101,9 @@ The engine runs as an MCP server for AI agent integration (Claude Code, Cursor, 
 ```json
 {
   "mcpServers": {
-    "archgov": {
+    "ariadne": {
       "command": "dotnet",
-      "args": ["run", "--project", "path/to/src/ArchGov.Host.Mcp"]
+      "args": ["run", "--project", "path/to/src/Ariadne.NET.Mcp"]
     }
   }
 }
@@ -77,7 +112,7 @@ The engine runs as an MCP server for AI agent integration (Claude Code, Cursor, 
 **HTTP (remote/team)** — start the API server, MCP endpoint at `/mcp`:
 
 ```bash
-dotnet run --project src/ArchGov.Host.Api
+dotnet run --project src/Ariadne.NET.Mcp.Http
 ```
 
 **MCP Tools:**
@@ -89,6 +124,7 @@ dotnet run --project src/ArchGov.Host.Api
 | `get_component_roles` | Get available component roles |
 | `get_rules` | Get code feature rules |
 | `generate_component` | Generate a C# component |
+| `generate_workspace` | Scaffold the project structure for a solution |
 | `validate_source` | Validate source files against rules |
 | `lint_source` | Lint for namespace-layer mismatches |
 
@@ -96,9 +132,9 @@ dotnet run --project src/ArchGov.Host.Api
 
 | Resource | Description |
 |----------|-------------|
-| `archgov://packs/{name}` | Full YAML content of a built-in rule pack |
+| `ariadne://packs/{name}` | Full YAML content of a built-in rule pack |
 
-All tools auto-detect `.architecture/rules.yaml` in the working directory. Pass an explicit `template` parameter to override.
+All tools auto-detect `.architecture/rules.yaml` in the working directory. Pass an explicit `template` parameter to override; composite templates such as `clean-architecture+cqrs` work here as well.
 
 ## How It Works
 
@@ -143,7 +179,7 @@ namingConventions:
 
 ### 2. Built-in Templates
 
-Ten templates ship with the engine:
+Ten templates ship with the library:
 
 | Template | Layers | Roles | Description |
 |----------|--------|-------|-------------|
@@ -181,13 +217,13 @@ imports:
 
 ```bash
 # Fetch rule packs from git repos
-dotnet run --project src/ArchGov.Host.Cli -- sync
+dotnet run --project src/Ariadne.NET.Cli -- sync
 
 # Force fresh sync (ignore cache)
-dotnet run --project src/ArchGov.Host.Cli -- sync --no-cache
+dotnet run --project src/Ariadne.NET.Cli -- sync --no-cache
 
 # Sync a single import
-dotnet run --project src/ArchGov.Host.Cli -- sync --name company-standards
+dotnet run --project src/Ariadne.NET.Cli -- sync --name company-standards
 ```
 
 Then reference synced packs in your rules:
@@ -201,7 +237,7 @@ extends:
 
 Private repos work out of the box — the engine uses your existing git credentials (SSH keys, credential managers). Versions are resolved against git tags using semver ranges (`^2.0`, `~1.3`, or exact `1.0.0`). Packs are cached locally in `.architecture/.cache/` so validation works offline.
 
-### 5. Composability & Merge Semantics
+### 4. Composability & Merge Semantics
 
 Multiple rule packs can be composed together:
 
@@ -226,7 +262,7 @@ Merge rules:
 
 Use `MergeWithDiagnostics` to get warnings when locked rules are skipped during merging.
 
-### 6. Code Generation
+### 5. Code Generation
 
 The engine uses Roslyn to generate correctly structured C# code based on rule pack definitions:
 
@@ -247,45 +283,39 @@ The generated code respects:
 - **Interface inheritance** when `requiresInterface` is set
 - **Namespace** and **file path** from naming conventions
 
-### 7. Source Validation
+### 6. Source Validation
 
 The engine validates existing source code against architecture rules using Roslyn parsing:
 
 ```bash
 # CLI
-dotnet run --project src/ArchGov.Host.Cli -- validate ./src
-
-# API
-curl -X POST http://localhost:5000/v1.0/architecture/validate \
-  -H "Content-Type: application/json" \
-  -d '{"sourceDirectory": "./src", "template": "clean-architecture"}'
+dotnet run --project src/Ariadne.NET.Cli -- validate ./src
 ```
+
+Over MCP, use the `validate_source` tool.
 
 Checks performed:
 - **Dependency validation**: verifies `using` directives comply with layer dependency rules (e.g. Domain cannot reference Infrastructure)
 - **Lint**: checks namespace segments match directory-based layer structure
 
-### 8. Lint
+### 7. Lint
 
 A lighter check that detects namespace-vs-directory layer mismatches:
 
 ```bash
 # CLI
-dotnet run --project src/ArchGov.Host.Cli -- lint ./src
-
-# API
-curl -X POST http://localhost:5000/v1.0/architecture/lint \
-  -H "Content-Type: application/json" \
-  -d '{"sourceDirectory": "./src", "template": "clean-architecture"}'
+dotnet run --project src/Ariadne.NET.Cli -- lint ./src
 ```
+
+Over MCP, use the `lint_source` tool.
 
 ## Architecture
 
 ```
 src/
-  ArchGov.Core/              # Rule engine library (zero host dependencies)
-    RuleSchema/               # Models: RulePack, LayerDefinition, ComponentRoleDefinition
-    RuleLoader/               # YAML parsing, built-in pack registry, resolver
+  Ariadne.NET.Abstractions/   # Rule-pack schema and contracts (ZeroAlloc.Results and ZeroAlloc.Validation only, AOT)
+  Ariadne.NET/                # Rule engine library (zero host dependencies)
+    RuleLoader/               # YAML loading, built-in pack registry, extends resolution
     RuleEngine/               # Merger, dependency validator, layer inference
     CodeGeneration/           # Roslyn-based code generator
     Orchestration/            # Wires inference + validation + generation + workspace
@@ -293,14 +323,15 @@ src/
     Sync/                     # Git-based sync: imports, semver, caching
     BuiltinPacks/             # Embedded YAML templates
 
-  ArchGov.Host.Api/           # ASP.NET REST API + MCP HTTP transport
-  ArchGov.Host.Cli/           # CLI tool (System.CommandLine)
-  ArchGov.Host.Mcp/           # MCP stdio server for AI agents
+  Ariadne.NET.Cli/            # CLI tool (System.CommandLine)
+  Ariadne.NET.Mcp/            # MCP stdio server for AI agents
+  Ariadne.NET.Mcp.Http/       # MCP HTTP transport (reuses the Ariadne.NET.Mcp tools)
 
 tests/
-  ArchGov.Core.Tests/         # 218 unit + integration tests
-  ArchGov.Host.Mcp.Tests/     # 22 MCP tool + resource tests
-  ArchGov.Host.Api.Tests/     # 12 integration tests
+  Ariadne.NET.Tests/          # Unit + integration tests
+  Ariadne.NET.Cli.Tests/      # CLI exit-code tests
+  Ariadne.NET.Mcp.Tests/      # MCP tool + resource tests
+  Ariadne.NET.AotSmoke/       # Native AOT publish check for Abstractions
 ```
 
 ### Core Pipeline
@@ -319,8 +350,10 @@ User Request
 All core services are registered with a single call:
 
 ```csharp
-services.AddArchGovCore();
+services.AddAriadneNETServices();
 ```
+
+The method is composed from the registrations that ZeroAlloc.Inject generates at compile time from the `[Singleton]` attribute on each service class, plus the ZeroAlloc.Resilience-wrapped git client.
 
 This registers:
 | Interface | Implementation | Lifetime |
@@ -340,46 +373,48 @@ This registers:
 | `IGitSyncProvider` | `GitCliSyncProvider` | Singleton |
 | `ISyncOrchestrator` | `SyncOrchestrator` | Singleton |
 
-## API Reference
-
-### REST Endpoints
-
-| Route | Method | Description |
-|-------|--------|-------------|
-| `/v1.0/architecture/templates` | GET | List available built-in templates |
-| `/v1.0/architecture/layers` | GET | Get layer definitions (query: `?template=`) |
-| `/v1.0/architecture/component-roles` | GET | Get component roles (query: `?template=`) |
-| `/v1.0/architecture/rules` | GET | Get code feature rules (query: `?template=`) |
-| `/v1.0/architecture/generate` | POST | Generate component code |
-| `/v1.0/architecture/generate-workspace` | POST | Scaffold solution project structure |
-| `/v1.0/architecture/validate` | POST | Validate source files against rules |
-| `/v1.0/architecture/lint` | POST | Lint source files for layer mismatches |
-
-### CLI Commands
+## CLI Reference
 
 | Command | Description |
 |---------|-------------|
-| `arch init --template <name>` | Initialize `.architecture/rules.yaml` |
-| `arch rules` | Print resolved layer rules |
-| `arch roles` | Print component roles table |
-| `arch generate --role <role> --name <name> --solution <sol> --feature <feat>` | Generate a component |
-| `arch validate <path>` | Validate source files against architecture rules |
-| `arch lint <path>` | Lint source files for namespace-layer mismatches |
-| `arch sync` | Sync rule packs from git repositories defined in imports.yaml |
+| `ariadne init --template <name>` | Initialize `.architecture/rules.yaml` |
+| `ariadne rules` | Print resolved layer rules |
+| `ariadne roles` | Print component roles table |
+| `ariadne generate --role <role> --name <name> --solution <sol> --feature <feat>` | Generate a component |
+| `ariadne validate <path>` | Validate source files against architecture rules |
+| `ariadne lint <path>` | Lint source files for namespace-layer mismatches |
+| `ariadne sync` | Sync rule packs from git repositories defined in imports.yaml |
+
+Exit codes: `0` success, `1` violations or lint issues found, `2` error (missing files or directories, failed generation or sync). CI pipelines can fail on any non-zero code, or treat `1` and `2` differently.
 
 ## Building
 
 ```bash
-dotnet build src/ArchGov.slnx
-dotnet test src/ArchGov.slnx
+dotnet build src/Ariadne.NET.slnx
+dotnet test src/Ariadne.NET.slnx
 ```
 
-## Tech Stack
+## Family
 
-- **.NET 10**
-- **YamlDotNet** — YAML parsing
-- **Microsoft.CodeAnalysis.CSharp** (Roslyn) — Code generation
-- **System.CommandLine** — CLI framework
-- **ASP.NET Core** — API host with API versioning + Swagger
-- **ModelContextProtocol** — MCP server SDK (stdio + HTTP)
-- **xUnit + FluentAssertions** — Testing
+Ariadne.NET is part of a small family of .NET projects for AI work:
+
+- [Minos.NET](https://marcelroozekrans.github.io/Minos.NET/): A client for decision models that returns calibrated, typed answers to typed questions.
+- [Rag.NET](https://marcelroozekrans.github.io/Rag.NET/): A modular retrieval-augmented generation pipeline on Microsoft.Extensions.AI.
+- [Mnemosyne.NET](https://marcelroozekrans.github.io/Mnemosyne.NET/): Procedural memory for .NET agents: store, find and reuse the procedures that worked.
+- [Thalos.NET](https://github.com/MarcelRoozekrans/Thalos.NET): A ZeroAlloc-native agent framework for .NET on Microsoft Agent Framework.
+- [Daedalus.NET](https://github.com/MarcelRoozekrans/Daedalus.NET): A .NET 10 runtime where AI executes tasks planned on a task board.
+
+## Built on ZeroAlloc
+
+Ariadne.NET uses these [ZeroAlloc](https://zeroalloc.net) libraries, which are source generators and analyzers with no reflection at runtime:
+
+- [ZeroAlloc.Analyzers](https://analyzers.zeroalloc.net)
+- [ZeroAlloc.Inject](https://inject.zeroalloc.net)
+- [ZeroAlloc.Resilience](https://resilience.zeroalloc.net)
+- [ZeroAlloc.Results](https://results.zeroalloc.net)
+- [ZeroAlloc.Telemetry](https://telemetry.zeroalloc.net)
+- [ZeroAlloc.Validation](https://validation.zeroalloc.net)
+
+## License
+
+[MIT](https://github.com/MarcelRoozekrans/Ariadne.NET/blob/main/LICENSE)

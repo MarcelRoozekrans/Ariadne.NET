@@ -1,0 +1,78 @@
+using Ariadne.NET.Abstractions;
+
+using ZeroAlloc.Results;
+
+namespace Ariadne.NET.RuleLoader;
+
+/// <summary>
+/// Cross-reference rules for a complete, merged rule pack. A lone user pack may rely on <c>extends</c> for the layers
+/// its roles name, so these rules cannot run at load time; the resolver runs them on the result of every resolve.
+/// Names compare case-insensitively, as <c>DependencyValidator</c>, <c>LayerInferenceEngine</c> and
+/// <c>CodeGeneratorService</c> match them.
+/// </summary>
+internal static class RulePackReferenceCheck
+{
+    public static Result<RulePack, AriadneError> Check(RulePack mergedPack)
+    {
+        ArgumentNullException.ThrowIfNull(mergedPack);
+
+        var failures = new List<string>();
+
+        var layerNames = CollectNames(mergedPack.Layers.Select(static l => l.Name), "Layers", "layer", failures);
+        var roleNames = CollectNames(mergedPack.ComponentRoles.Select(static r => r.Name), "ComponentRoles", "role", failures);
+
+        for (var i = 0; i < mergedPack.Layers.Count; i++)
+        {
+            var dependencies = mergedPack.Layers[i].AllowedDependencies;
+            for (var d = 0; d < dependencies.Count; d++)
+            {
+                if (!Contains(layerNames, dependencies[d]))
+                {
+                    failures.Add($"Layers[{i}].AllowedDependencies[{d}]: refers to unknown layer '{dependencies[d]}'.");
+                }
+            }
+        }
+
+        for (var i = 0; i < mergedPack.ComponentRoles.Count; i++)
+        {
+            var role = mergedPack.ComponentRoles[i];
+
+            // Role-only built-in packs such as cqrs and ddd-tactical declare no layers and work on their own, because code
+            // generation only reads the role's Layer text. With no layer model there is nothing to refer to.
+            if (layerNames.Count > 0 && !Contains(layerNames, role.Layer))
+            {
+                failures.Add($"ComponentRoles[{i}].Layer: refers to unknown layer '{role.Layer}'.");
+            }
+
+            // The engine reads InterfaceRole only when it is non-empty, so an empty value means "none".
+            if (!string.IsNullOrEmpty(role.InterfaceRole) && !Contains(roleNames, role.InterfaceRole))
+            {
+                failures.Add($"ComponentRoles[{i}].InterfaceRole: refers to unknown role '{role.InterfaceRole}'.");
+            }
+        }
+
+        return failures.Count == 0
+            ? Result<RulePack, AriadneError>.Success(mergedPack)
+            : Result<RulePack, AriadneError>.Failure(RulePackError.Invalid(mergedPack.Name, failures));
+    }
+
+    private static HashSet<string> CollectNames(IEnumerable<string> names, string path, string kind, List<string> failures)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var index = 0;
+        foreach (var name in names)
+        {
+            // A missing name is a member-rule failure at load; skip it here rather than report it twice.
+            if (!string.IsNullOrEmpty(name) && !seen.Add(name))
+            {
+                failures.Add($"{path}[{index}].Name: duplicate {kind} name '{name}'.");
+            }
+
+            index++;
+        }
+
+        return seen;
+    }
+
+    private static bool Contains(HashSet<string> names, string? name) => !string.IsNullOrEmpty(name) && names.Contains(name);
+}

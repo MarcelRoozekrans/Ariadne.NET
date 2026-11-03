@@ -2,13 +2,45 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
-    branches: [main]
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      publish_to_nuget:
+        description: Push the release packages to nuget.org. Only takes effect on a v* tag; see RELEASING.md
+        type: boolean
+        default: false
+      resume:
+        description: Finish a publish that died partway, skipping the packages already on nuget.org; see RELEASING.md
+        type: boolean
+        default: false
+
+# A newer push to the same branch or pull request makes the running workflow irrelevant, so it is cancelled. A dispatch
+# never cancels a running one, and a publish dispatch runs on its tag ref, which no push or pull request run shares, so
+# nothing cancels a publish halfway: that would leave some packages on nuget.org and others not, and nuget.org cannot
+# take them back.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
+permissions:
+  contents: read
 
 jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
+  # Builds and tests on Linux and Windows. fail-fast is off so both legs always finish: the two platforms fail for
+  # different reasons, and cancelling the Windows leg the moment Linux goes red hides the failure only Windows shows.
+  # Coverage is measured on the Linux leg only, because ci-baseline's coverage gate runs on Linux runners only.
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+    permissions:
+      contents: read
+      id-token: write   # Codecov upload via OIDC, no token secret
+
     steps:
       - uses: actions/checkout@v7
         with:
@@ -17,22 +49,282 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: '10.0.x'
+          cache: true
+          cache-dependency-path: '**/*.csproj'
 
       - name: Restore
-        run: dotnet restore src/ArchGov.slnx
+        run: dotnet restore src/Ariadne.NET.slnx
 
       - name: Build
-        run: dotnet build src/ArchGov.slnx --configuration Release --no-restore
+        run: dotnet build src/Ariadne.NET.slnx --no-restore -c Release
 
       - name: Test
-        run: dotnet test src/ArchGov.slnx --configuration Release --no-build --verbosity normal
+        run: dotnet test src/Ariadne.NET.slnx --no-build -c Release --collect:"XPlat Code Coverage" --results-directory ./test-results
 
-      - name: Pack (verify)
-        run: dotnet pack src/ArchGov.slnx --configuration Release --no-build --output ./artifacts
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v7
+      # Merges the Cobertura reports and fails below 80 percent line coverage, or when codecov.yml would let a drop in
+      # coverage pass quietly.
+      - name: Coverage gate
+        if: runner.os == 'Linux'
+        uses: MarcelRoozekrans/ci-baseline/actions/coverage-gate@v1
         with:
-          name: packages
-          path: ./artifacts/*.nupkg
+          reports: test-results/**/coverage.cobertura.xml
+
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        uses: codecov/codecov-action@v7
+        with:
+          use_oidc: true
+          files: test-results/**/coverage.cobertura.xml
+          disable_search: true   # only the files above, not every *.xml the search finds
+          fail_ci_if_error: false
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: test-results-${{ matrix.os }}
+          path: ./test-results
+
+  aot-smoke:
+    runs-on: ubuntu-latest
+    # Publishes tests/Ariadne.NET.AotSmoke with PublishAot=true and runs it: Ariadne.NET.Abstractions, its rule-pack
+    # schema and the validators ZeroAlloc.Validation generates for it must survive ILC with every warning treated as an
+    # error, including the full IL2xxx/IL3xxx trim/AOT surface.
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install AOT native toolchain
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+
+      - name: Publish AOT
+        run: dotnet publish tests/Ariadne.NET.AotSmoke -c Release -r linux-x64 -p:PublishAot=true -warnaserror -o ./aot-out
+
+      - name: Run AOT binary
+        run: |
+          status=0
+          ./aot-out/Ariadne.NET.AotSmoke || status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "::error::The AOT binary failed with exit code $status"
+            exit "$status"
+          fi
+
+  # Packs the two release packages exactly as publish-nuget does, inspects them, and rehearses the push against a local
+  # folder feed, on every push and pull request, so the release path is exercised long before release day. A folder
+  # feed silently drops .snupkg files, so symbol packages are checked by the inspection, not by the push.
+  pack-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Read the release version
+        shell: bash
+        run: |
+          version=$(jq -r '."." // empty' .release-please-manifest.json)
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::.release-please-manifest.json gives '$version', not a version."
+            exit 1
+          fi
+          echo "PACKAGE_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Pack the release build
+        run: dotnet pack src/Ariadne.NET.slnx -c Release -p:AriadneRelease=true -o artifacts/packages
+
+      - name: Test the inspection script
+        run: python3 -m unittest discover -s tools/release -p "test_inspect_packages.py"
+
+      - name: Inspect the packages
+        run: python3 tools/release/inspect_packages.py artifacts/packages "$PACKAGE_VERSION"
+
+      - name: Rehearse the push against a local feed
+        shell: bash
+        run: |
+          feed="$RUNNER_TEMP/local-feed"
+          mkdir -p "$feed"
+          dotnet nuget push "artifacts/packages/*.nupkg" --source "$feed" --skip-duplicate
+          for package in artifacts/packages/*.nupkg; do
+            if [ ! -f "$feed/$(basename "$package")" ]; then
+              echo "::error::$(basename "$package") was pushed and did not arrive in the local feed."
+              exit 1
+            fi
+          done
+          before=$(find "$feed" -type f | wc -l)
+          dotnet nuget push "artifacts/packages/*.nupkg" --source "$feed" --skip-duplicate
+          after=$(find "$feed" -type f | wc -l)
+          if [ "$before" -ne "$after" ]; then
+            echo "::error::A second push changed the feed from $before to $after files; a re-run must change nothing."
+            exit 1
+          fi
+
+      # Builds and runs the getting-started sample, tools/release/consumer/Program.cs, against the packages in the local
+      # feed. nuget.config maps Ariadne.NET* to the local feed only, so the restore cannot fall back to a published
+      # package. Ariadne.NET.Abstractions arrives as Ariadne.NET's dependency, which proves the dependency resolves.
+      # Microsoft.Extensions.DependencyInjection comes from nuget.org: Ariadne.NET depends only on the DI abstractions,
+      # and the sample needs a container to resolve the services from. The sample also checks a directory against the
+      # pack, and the step runs it twice. First against the consumer's own project, whose only source is a Program.cs
+      # without a namespace: no violations, so it must exit 0. Then against a fixture written under RUNNER_TEMP, a Domain
+      # file that uses a WebApi namespace, which the clean-architecture pack forbids: it must exit exactly 1, so a crash
+      # fails too. The second run proves the packed library reports a violation, not only that it stays quiet on
+      # clean code.
+      - name: Restore, build and run a consumer from the local feed
+        shell: bash
+        run: |
+          app="$RUNNER_TEMP/consumer"
+          dotnet new console -o "$app" --framework net10.0
+          cp tools/release/consumer/Program.cs "$app/Program.cs"
+          dotnet add "$app" package Ariadne.NET --version "$PACKAGE_VERSION" --no-restore
+          dotnet add "$app" package Microsoft.Extensions.DependencyInjection --version 10.0.14 --no-restore
+          cat > "$app/nuget.config" <<EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="local" value="$RUNNER_TEMP/local-feed" />
+              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+            </packageSources>
+            <packageSourceMapping>
+              <packageSource key="local"><package pattern="Ariadne.NET*" /></packageSource>
+              <packageSource key="nuget.org"><package pattern="*" /></packageSource>
+            </packageSourceMapping>
+          </configuration>
+          EOF
+          dotnet build "$app" -c Release
+          dotnet run --project "$app" --no-build -c Release -- "$app"
+          fixture="$RUNNER_TEMP/violation-fixture"
+          mkdir -p "$fixture/Domain"
+          printf 'using Shop.WebApi;\nnamespace Shop.Domain;\npublic class Order {}\n' > "$fixture/Domain/Order.cs"
+          set +e
+          dotnet run --project "$app" --no-build -c Release -- "$fixture"
+          code=$?
+          set -e
+          if [ "$code" -ne 1 ]; then
+            echo "::error::Expected exit 1 for one violation, got $code. 0 means the packed validator reported none; anything else is a crash."
+            exit 1
+          fi
+
+  # Lints the commit messages a pull request adds against .commitlintrc.yml. release-please builds the changelog and the
+  # next version from these messages, and silently drops a commit it cannot parse, so a bad message is caught here,
+  # before the merge. Pull-request events only: a push to main is a merge of commits this job already linted.
+  commitlint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The full history, so the PR's base and head commits are both present to lint between.
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+
+      # The same pins as Rag.NET; the two packages version independently, which is why the pins differ.
+      - name: Lint the commits this pull request adds
+        run: >
+          npx --yes --package @commitlint/cli@21.2.1 --package @commitlint/config-conventional@21.2.0
+          commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
+
+  # Publishes a release to nuget.org. release-please.yml dispatches this workflow on the release tag with
+  # publish_to_nuget=true when it creates a release; a maintainer can dispatch it the same way with resume=true to
+  # finish a push that died partway. It runs after build, aot-smoke and pack-validate on that exact commit, and it
+  # refuses a prerelease and a tag that is not the manifest's version. The key comes from nuget.org's Trusted
+  # Publishing; no key is stored. A .snupkg beside its .nupkg is delivered with the same push. The pack must pass
+  # -p:AriadneRelease=true: without it Directory.Build.props versions every build X.Y.Z-local, and the version is
+  # compiled into the DLLs, so a pack after a build without the switch would ship release-numbered packages whose DLLs
+  # still say -local. RELEASING.md has the procedure.
+  publish-nuget:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_to_nuget && startsWith(github.ref, 'refs/tags/v')
+    needs: [ build, aot-smoke, pack-validate ]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Refuse anything but a stable release from its own tag
+        shell: bash
+        run: |
+          version=$(jq -r '."." // empty' .release-please-manifest.json)
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Refusing to publish '$version': it is not a stable version."
+            exit 1
+          fi
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::Refusing to publish: the tag is $GITHUB_REF_NAME but the manifest says $version."
+            exit 1
+          fi
+          echo "PACKAGE_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Pack the release build
+        run: dotnet pack src/Ariadne.NET.slnx -c Release -p:AriadneRelease=true -o artifacts/packages
+
+      - name: Inspect the packages
+        run: python3 tools/release/inspect_packages.py artifacts/packages "$PACKAGE_VERSION"
+
+      - name: Mint a short-lived nuget.org key
+        uses: NuGet/login@v1
+        id: nuget-login
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      # A release run pushes without --skip-duplicate, so a version that is already on nuget.org fails the run instead of
+      # being skipped while the job goes green. Only a dispatch with resume=true, which finishes a push that died partway,
+      # skips the packages that already arrived.
+      - name: Push to nuget.org
+        shell: bash
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+          RESUME: ${{ inputs.resume }}
+        run: |
+          if [ -z "$NUGET_API_KEY" ]; then
+            echo "::error::NuGet/login minted no key. Check the NUGET_USER repository variable and the Trusted Publishing policy on nuget.org; see RELEASING.md."
+            exit 1
+          fi
+          skip_duplicate=""
+          if [ "$RESUME" = "true" ]; then
+            skip_duplicate="--skip-duplicate"
+          fi
+          if ! dotnet nuget push "artifacts/packages/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" $skip_duplicate; then
+            echo "::error::nuget.org refused the push; its reason is on the error line above. A 409 can mean the version already exists or that the package ID is reserved by another owner; see RELEASING.md before re-running."
+            exit 1
+          fi
+
+      - name: Attach the packages to the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" artifacts/packages/*.nupkg artifacts/packages/*.snupkg --clobber
+
+      # A CycloneDX SBOM of the solution, attached to the same release. The release exists by now: release-please
+      # created it before dispatching this workflow.
+      - name: Attach the SBOM to the GitHub release
+        uses: MarcelRoozekrans/ci-baseline/actions/sbom@v1
+        with:
+          solution: src/Ariadne.NET.slnx
+          tag: ${{ github.ref_name }}

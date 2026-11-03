@@ -4,9 +4,9 @@ sidebar_position: 10
 
 # Host Applications
 
-The engine ships with three host applications, each targeting a different use case. All share the same core engine via `services.AddArchGovCore()`.
+The engine ships with three host applications, each targeting a different use case. All share the same core engine via `services.AddAriadneNETServices()`.
 
-## CLI (ArchGov.Host.Cli)
+## CLI (Ariadne.NET.Cli)
 
 Built with **System.CommandLine 3.0** (uses `Command`, `RootCommand`, `Option<T>` — no `Cli` prefix).
 
@@ -14,9 +14,11 @@ Built with **System.CommandLine 3.0** (uses `Command`, `RootCommand`, `Option<T>
 
 ### `init` — Initialize architecture rules
 
+> Until the `ariadne` dotnet tool ships, run these commands as `dotnet run --project src/Ariadne.NET.Cli -- <command>`.
+
 ```bash
-arch init --template clean-architecture
-arch init --template clean-architecture+cqrs+ddd-tactical
+ariadne init --template clean-architecture
+ariadne init --template clean-architecture+cqrs+ddd-tactical
 ```
 
 - Splits template string by `+`
@@ -26,7 +28,7 @@ arch init --template clean-architecture+cqrs+ddd-tactical
 ### `rules` — Print resolved layer rules
 
 ```bash
-arch rules
+ariadne rules
 ```
 
 - Loads `.architecture/rules.yaml` from current directory
@@ -36,7 +38,7 @@ arch rules
 ### `roles` — Print component roles table
 
 ```bash
-arch roles
+ariadne roles
 ```
 
 - Resolves rules, then prints a formatted table:
@@ -45,7 +47,7 @@ arch roles
 ### `generate` — Generate a component
 
 ```bash
-arch generate --role Entity --name Order --solution MyApp --feature Orders
+ariadne generate --role Entity --name Order --solution MyApp --feature Orders
 ```
 
 | Option | Short | Type | Description |
@@ -60,8 +62,8 @@ Prints the generated file path, namespace, type name, and full source code.
 ### `validate` — Validate source code
 
 ```bash
-arch validate ./src
-arch validate /path/to/source
+ariadne validate ./src
+ariadne validate /path/to/source
 ```
 
 - Argument: `path` (default: `"./src"`)
@@ -72,7 +74,7 @@ arch validate /path/to/source
 ### `lint` — Lint source code
 
 ```bash
-arch lint ./src
+ariadne lint ./src
 ```
 
 - Argument: `path` (default: `"./src"`)
@@ -82,9 +84,9 @@ arch lint ./src
 ### `sync` — Sync rule packs from git
 
 ```bash
-arch sync                              # sync all imports
-arch sync --name company-standards     # sync one import
-arch sync --no-cache                   # force fresh fetch
+ariadne sync                              # sync all imports
+ariadne sync --name company-standards     # sync one import
+ariadne sync --no-cache                   # force fresh fetch
 ```
 
 | Option | Short | Type | Description |
@@ -106,13 +108,13 @@ All commands that need rules use `RulesCommand.ResolveRulesFromFile()`:
 4. Resolve with `IRulePackResolver`
 5. Return resolved `RulePack`
 
-## MCP HTTP Host (ArchGov.Host.Api)
+## MCP HTTP Host (Ariadne.NET.Mcp.Http)
 
 A thin ASP.NET Core host that exposes the MCP server over HTTP for remote/team access. No REST controllers — all capabilities are served via the MCP protocol at `/mcp`.
 
 ```csharp
-builder.Services.AddArchGovCore();
-builder.Services.AddSingleton<RuleResolutionHelper>();
+builder.Services.AddAriadneNETServices();
+builder.Services.AddAriadneNETMcpServices();   // registers RuleResolutionHelper
 builder.Services.AddMcpServer()
     .WithHttpTransport()
     .WithToolsFromAssembly(typeof(TemplateTools).Assembly)
@@ -123,7 +125,7 @@ app.MapMcp();
 
 The same MCP tools and resources available via stdio are available over HTTP — zero duplication between hosts.
 
-## MCP Server (ArchGov.Host.Mcp)
+## MCP Server (Ariadne.NET.Mcp)
 
 Built with the **ModelContextProtocol SDK** for AI agent integration.
 
@@ -136,7 +138,7 @@ Built with the **ModelContextProtocol SDK** for AI agent integration.
 ```mermaid
 flowchart TD
     A["Resolve(template?)"] --> B{"template<br/>provided?"}
-    B -->|Yes| C["Create pack extending<br/>builtin://template<br/>→ Resolve"]
+    B -->|Yes| C["Split template on '+'<br/>extend builtin:// per name<br/>→ Resolve"]
     B -->|No| D{".architecture/rules.yaml<br/>exists?"}
     D -->|Yes| E["Load and resolve<br/>rules.yaml"]
     D -->|No| F["Default to<br/>builtin://clean-architecture"]
@@ -159,7 +161,7 @@ flowchart TD
 
 | URI Template | Returns | Description |
 |-------------|---------|-------------|
-| `archgov://packs/{name}` | Raw YAML string | Full content of a built-in pack |
+| `ariadne://packs/{name}` | Raw YAML string | Full content of a built-in pack |
 
 All tools auto-detect `.architecture/rules.yaml` in the working directory. The `template` parameter overrides auto-detection.
 

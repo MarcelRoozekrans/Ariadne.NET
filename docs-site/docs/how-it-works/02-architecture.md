@@ -9,9 +9,9 @@ sidebar_position: 2
 ```mermaid
 graph TD
     subgraph src
-        subgraph ArchGov.Core["ArchGov.Core (Rule engine library)"]
-            RuleSchema["RuleSchema<br/><i>Domain models</i>"]
-            RuleLoader["RuleLoader<br/><i>YAML parsing, registry, resolver</i>"]
+        Abstractions["Ariadne.NET.Abstractions<br/><i>Rule-pack schema + contracts<br/>ZeroAlloc.Results + Validation only, Native AOT</i>"]
+        subgraph Ariadne.NET["Ariadne.NET (Rule engine library)"]
+            RuleLoader["RuleLoader<br/><i>YAML loading, registry, extends resolution</i>"]
             RuleEngine["RuleEngine<br/><i>Merger, validator, inference</i>"]
             CodeGeneration["CodeGeneration<br/><i>Roslyn C# generator</i>"]
             Orchestration["Orchestration<br/><i>Generate + workspace</i>"]
@@ -19,15 +19,16 @@ graph TD
             Sync["Sync<br/><i>Git sync, semver, caching</i>"]
             BuiltinPacks["BuiltinPacks<br/><i>10 embedded YAML templates</i>"]
         end
-        HostApi["ArchGov.Host.Api<br/><i>REST API + MCP HTTP</i>"]
-        HostCli["ArchGov.Host.Cli<br/><i>CLI (System.CommandLine 3.0)</i>"]
-        HostMcp["ArchGov.Host.Mcp<br/><i>MCP stdio server</i>"]
+        HostApi["Ariadne.NET.Mcp.Http<br/><i>MCP over HTTP</i>"]
+        HostCli["Ariadne.NET.Cli<br/><i>CLI (System.CommandLine 3.0)</i>"]
+        HostMcp["Ariadne.NET.Mcp<br/><i>MCP stdio server</i>"]
     end
 
     subgraph tests
-        CoreTests["ArchGov.Core.Tests<br/><i>Unit + integration tests</i>"]
-        ApiTests["ArchGov.Host.Api.Tests<br/><i>API integration tests</i>"]
-        McpTests["ArchGov.Host.Mcp.Tests<br/><i>MCP tool + resource tests</i>"]
+        CoreTests["Ariadne.NET.Tests<br/><i>Unit + integration tests</i>"]
+        CliTests["Ariadne.NET.Cli.Tests<br/><i>CLI exit-code tests</i>"]
+        McpTests["Ariadne.NET.Mcp.Tests<br/><i>MCP tool + resource tests</i>"]
+        AotSmoke["Ariadne.NET.AotSmoke<br/><i>Native AOT publish check</i>"]
     end
 ```
 
@@ -39,7 +40,7 @@ The engine processes a user request through a series of stages:
 flowchart TD
     A["User Request<br/><i>role, name, solution, feature</i>"] --> B
 
-    subgraph Core["ArchGov.Core Pipeline"]
+    subgraph Core["Ariadne.NET Pipeline"]
         B["1. RulePackResolver<br/><i>Parse extends references<br/>(builtin://, import://)<br/>Load referenced packs</i>"]
         B --> C["2. RulePackMerger<br/><i>Combine layers (union deps)<br/>Roles (last wins)<br/>Rules (locked protection)</i>"]
         C --> D["3. LayerInferenceEngine<br/><i>Map role name → layer<br/>Primary + alternative names<br/>Ambiguity detection</i>"]
@@ -52,16 +53,18 @@ flowchart TD
 
 ## Dependency Flow
 
-All three host applications depend only on `ArchGov.Core`. They never depend on each other.
+All three host applications depend on `Ariadne.NET`, which depends on `Ariadne.NET.Abstractions`. Abstractions holds the rule-pack schema and the loader, resolver and registry contracts, and depends on nothing, so other tools can reference it without pulling in Roslyn or YamlDotNet. The only host-to-host dependency is `Ariadne.NET.Mcp.Http` → `Ariadne.NET.Mcp`, so the HTTP transport serves the same MCP tools and resources as stdio.
 
 ```mermaid
 graph LR
-    Api["ArchGov.Host.Api"] --> Core["ArchGov.Core"]
-    Cli["ArchGov.Host.Cli"] --> Core
-    Mcp["ArchGov.Host.Mcp"] --> Core
+    Api["Ariadne.NET.Mcp.Http"] --> Core["Ariadne.NET"]
+    Api --> Mcp
+    Cli["Ariadne.NET.Cli"] --> Core
+    Mcp["Ariadne.NET.Mcp"] --> Core
+    Core --> Abs["Ariadne.NET.Abstractions"]
 ```
 
-Within `ArchGov.Core`, dependencies flow strictly top-down:
+Within `Ariadne.NET`, dependencies flow strictly top-down:
 
 ```mermaid
 graph TD
@@ -71,7 +74,7 @@ graph TD
     CodeGeneration --> RuleEngine
     Validation --> RuleEngine
     RuleEngine --> RuleLoader
-    RuleLoader --> RuleSchema["RuleSchema<br/><i>(leaf — no dependencies)</i>"]
+    RuleLoader --> Abstractions["Ariadne.NET.Abstractions<br/><i>(separate package — ZeroAlloc.Results + Validation only)</i>"]
     Sync["Sync<br/><i>(independent module)</i>"]
 ```
 

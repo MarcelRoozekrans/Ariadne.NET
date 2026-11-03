@@ -1,10 +1,10 @@
 ---
-sidebar_position: 2
+sidebar_position: 3
 ---
 
 # Features
 
-Complete feature reference for the Architecture Governance Engine.
+Complete feature reference for Ariadne.NET.
 
 ## Declarative Rule Packs
 
@@ -56,7 +56,7 @@ Ten templates ship out of the box, covering the most common architectural patter
 | `cqrs` | _(composable)_ | 7 | Add-on |
 | `ddd-tactical` | _(composable)_ | 9 | Add-on |
 
-**Standalone** templates define their own layers and can be used independently. **Add-on** templates define only component roles and are designed to be composed with a standalone template.
+**Standalone** templates define their own layers and can be used independently. **Add-on** templates define only component roles and are designed to be composed with a standalone template: a role-only pack resolves on its own, but combining it with a base pack that declares the layers its roles name (for example Application and Domain) is recommended. When the merged pack declares at least one layer, a role naming an undeclared layer is an Invalid error.
 
 ## Composability & Merge Semantics
 
@@ -77,6 +77,8 @@ Merge rules applied in order (first pack is the base, subsequent packs overlay):
 | Component Roles | Merged by name. Later pack overrides earlier. |
 | Code Feature Rules | Merged by ID. **Locked rules cannot be overridden** — attempts produce a warning. |
 | Naming Conventions | Last pack wins. |
+
+Validation rejects an empty `Namespace` or `FilePath` in the naming conventions.
 
 Use `MergeWithDiagnostics` programmatically to inspect merge warnings (e.g., locked rule override attempts).
 
@@ -119,9 +121,11 @@ Detected violations:
 - **AccessibilityMismatch** — a type's accessibility modifier doesn't match the role definition
 - **MissingInterface** — a role requires an interface but none was found
 
+> Until the `ariadne` dotnet tool ships, run these commands as `dotnet run --project src/Ariadne.NET.Cli -- <command>`.
+
 ```bash
 # CLI
-arch validate ./src
+ariadne validate ./src
 ```
 
 ## Linting
@@ -132,7 +136,7 @@ Flags files where the namespace implies one layer but the directory structure im
 
 ```bash
 # CLI
-arch lint ./src
+ariadne lint ./src
 ```
 
 ## Workspace Scaffolding
@@ -180,9 +184,9 @@ Versions are resolved against git tags using semver ranges:
 Packs are cached locally in `.architecture/.cache/git/` so validation works offline. Use `--no-cache` to force a fresh sync.
 
 ```bash
-arch sync                              # Sync all imports
-arch sync --name company-standards     # Sync a single import
-arch sync --no-cache                   # Force fresh fetch
+ariadne sync                              # Sync all imports
+ariadne sync --name company-standards     # Sync a single import
+ariadne sync --no-cache                   # Force fresh fetch
 ```
 
 ### Consuming synced packs
@@ -217,7 +221,7 @@ The engine exposes its full capability set as MCP tools and resources for AI age
 
 | URI | Description |
 |-----|-------------|
-| `archgov://packs/{name}` | Raw YAML content of a built-in rule pack |
+| `ariadne://packs/{name}` | Raw YAML content of a built-in rule pack |
 
 ### Transports
 
@@ -230,11 +234,11 @@ All tools auto-detect `.architecture/rules.yaml` in the working directory. Pass 
 
 | Host | Use Case | Protocol |
 |------|----------|----------|
-| **CLI** (`ArchGov.Host.Cli`) | Developer workflow, CI/CD pipelines | Terminal |
-| **MCP stdio** (`ArchGov.Host.Mcp`) | Local AI agent integration (Claude Code, Cursor) | MCP stdio |
-| **MCP HTTP** (`ArchGov.Host.Api`) | Remote/team AI agent access | MCP over HTTP |
+| **CLI** (`Ariadne.NET.Cli`) | Developer workflow, CI/CD pipelines | Terminal |
+| **MCP stdio** (`Ariadne.NET.Mcp`) | Local AI agent integration (Claude Code, Cursor) | MCP stdio |
+| **MCP HTTP** (`Ariadne.NET.Mcp.Http`) | Remote/team AI agent access | MCP over HTTP |
 
-All three hosts share the same core engine via `services.AddArchGovCore()`. The two MCP hosts expose identical tools and resources — stdio for local use, HTTP for remote.
+All three hosts share the same core engine via `services.AddAriadneNETServices()`, composed from registrations that ZeroAlloc.Inject generates at compile time. The two MCP hosts expose identical tools and resources — stdio for local use, HTTP for remote.
 
 ## Extensibility
 
