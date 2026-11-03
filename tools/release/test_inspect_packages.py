@@ -98,6 +98,40 @@ class InspectPackagesTests(unittest.TestCase):
         errors = inspect_packages.problems(self.directory, VERSION)
         self.assertTrue(any(ARIADNE in error and "AriadneRelease" in error for error in errors), errors)
 
+    def test_names_the_version_a_local_dll_says(self) -> None:
+        self.write_all(**{ARIADNE: {"dll_version": "0.1.0-local+abc"}})
+        errors = inspect_packages.problems(self.directory, VERSION)
+        self.assertTrue(any("says 0.1.0-local+abc, expected 0.1.0" in error and "AriadneRelease" in error
+                            for error in errors), errors)
+
+    def test_names_the_version_when_the_length_byte_is_a_digit(self) -> None:
+        # 52 characters, so the length byte is the digit 4, as with a real commit hash.
+        local = "0.1.0-local+" + "a" * 40
+        self.write_all(**{ARIADNE: {"dll_version": local}})
+        errors = inspect_packages.problems(self.directory, VERSION)
+        self.assertTrue(any(f"says {local}, expected 0.1.0" in error for error in errors), errors)
+
+    def test_accepts_a_bare_version_without_a_suffix(self) -> None:
+        self.write_all(**{ARIADNE: {"dll_version": "0.1.0"}})
+        self.assertEqual([], inspect_packages.problems(self.directory, VERSION))
+
+    def test_rejects_a_version_that_extends_the_last_number(self) -> None:
+        self.write_all(**{ARIADNE: {"dll_version": "0.1.01"}})
+        errors = inspect_packages.problems(self.directory, VERSION)
+        self.assertTrue(any(ARIADNE in error and "says 0.1.01, expected 0.1.0" in error for error in errors), errors)
+
+    def test_rejects_a_local_prerelease_without_a_commit_suffix(self) -> None:
+        self.write_all(**{ARIADNE: {"dll_version": "0.1.0-local"}})
+        errors = inspect_packages.problems(self.directory, VERSION)
+        self.assertTrue(any(ARIADNE in error and "says 0.1.0-local, expected 0.1.0" in error for error in errors), errors)
+
+    def test_rejects_a_symbol_package_without_a_nupkg(self) -> None:
+        self.write_all()
+        write_package(self.directory, "Other", VERSION)
+        (self.directory / f"Other.{VERSION}.nupkg").unlink()
+        errors = inspect_packages.problems(self.directory, VERSION)
+        self.assertTrue(any("Other.0.1.0.snupkg" in error and "no matching" in error for error in errors), errors)
+
     def test_a_longer_version_ending_in_the_release_does_not_count(self) -> None:
         self.write_all(**{ARIADNE: {"dll_version": "10.1.0"}})
         self.assertNotEqual([], inspect_packages.problems(self.directory, VERSION))

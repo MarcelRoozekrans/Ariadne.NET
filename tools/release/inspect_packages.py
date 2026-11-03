@@ -38,6 +38,18 @@ def _informational_version_found(dll: bytes, version: str) -> bool:
     )
 
 
+def _informational_versions_seen(dll: bytes) -> list[str]:
+    # Version-like length-prefixed strings that end a custom attribute blob, for the error message. The four-part
+    # FileVersion is skipped: it is never the informational version.
+    # A lookahead finds overlapping candidates: the length byte can itself be a digit, as '4' is for 52 characters.
+    seen: list[str] = []
+    for match in re.finditer(rb"(?=([0-9]+\.[0-9]+\.[0-9]+[0-9A-Za-z.+-]*)\x00\x00)", dll):
+        text = match.group(1).decode("ascii")
+        if match.start() > 0 and dll[match.start() - 1] == len(text) and not re.fullmatch(r"[0-9]+(\.[0-9]+){3}", text):
+            seen.append(text)
+    return seen
+
+
 def _symbol_problems(directory: pathlib.Path, package: str, version: str) -> list[str]:
     path = directory / f"{package}.{version}.snupkg"
     if not path.is_file():
@@ -87,7 +99,9 @@ def _package_problems(directory: pathlib.Path, package: str, version: str) -> li
         errors.append(f"{package}: {path.name} has no DLL under lib/")
     for name, content in sorted(dlls.items()):
         if not _informational_version_found(content, version):
-            errors.append(f"{package}: {name} has no informational version {version}; was it built with -p:AriadneRelease=true?")
+            seen = _informational_versions_seen(content)
+            says = f"says {', '.join(seen)}, expected {version}" if seen else f"has no informational version {version}"
+            errors.append(f"{package}: {name} {says}; was it built with -p:AriadneRelease=true?")
 
     errors.extend(_symbol_problems(directory, package, version))
 
@@ -121,6 +135,10 @@ def problems(directory: pathlib.Path, version: str) -> list[str]:
         return [f"expected exactly the two release packages in {directory}; missing {missing}, unexpected {extra}"]
 
     errors: list[str] = []
+    expected_symbols = {f"{package}.{version}.snupkg" for package in PACKAGES}
+    for name in sorted(path.name for path in directory.glob("*.snupkg")):
+        if name not in expected_symbols:
+            errors.append(f"{name} has no matching release package")
     for package in PACKAGES:
         errors.extend(_package_problems(directory, package, version))
     return errors
