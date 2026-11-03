@@ -407,4 +407,4 @@ Ariadne.NET uses these [ZeroAlloc](https://zeroalloc.net) libraries, which are s
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/MarcelRoozekrans/Ariadne.NET/blob/main/LICENSE)
