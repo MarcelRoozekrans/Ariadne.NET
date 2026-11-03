@@ -329,7 +329,7 @@ public sealed class ExitCodeTests : IDisposable
         exitCode.Should().Be(ExitCodes.Error);
         var lines = stderr.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
         lines.Should().HaveCount(2, "an expected failure prints the message and the OS reason, not a stack trace");
-        lines[0].Should().Be($"Error: Import cache directory '{Path.Combine(_tempDir, ".architecture/.cache/git")}' could not be created.");
+        lines[0].Should().Be($"Error: Import cache directory '{Path.Combine(_tempDir, ".architecture", ".cache", "git")}' could not be created.");
     }
 
     [Fact]
