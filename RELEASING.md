@@ -23,7 +23,7 @@ Every push and pull request also runs `pack-validate`. It packs the same way, in
 - **Codecov:** add the repository on codecov, so the coverage upload from `build` is accepted.
 - **CodeQL:** keep the default setup off. CodeQL runs in `baseline-checks.yml` through the ci-baseline v1 reusable workflow, and with default setup on, GitHub refuses that workflow's SARIF upload.
 
-Without the App installed and its client id and private key, `release-please.yml` cannot mint a token, so no release PR is opened and no tag dispatch happens. Without `NUGET_USER`, the login in `publish-nuget` fails. Without the Trusted Publishing policy and the id prefix, the push fails and nothing reaches nuget.org.
+Without the App installed and its client id and private key, `release-please.yml` cannot mint a token, so no release PR is opened and no tag dispatch happens. Without `NUGET_USER`, the login in `publish-nuget` fails. Without the Trusted Publishing policy, the login or push fails and nothing reaches nuget.org. Without the reservation, anyone can claim the ids first.
 
 ## Re-running a publish
 
