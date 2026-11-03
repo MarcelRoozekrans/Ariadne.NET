@@ -6,7 +6,7 @@
 ## Current Position
 
 - **Milestone:** 1 — Ariadne.NET identity and family shape [active]
-- **Phase:** 1.4 — Publish [pending, unblocked 2026-11-03; design spec `docs/superpowers/specs/2026-10-31-phase-1.4-publish-design.md`, no plan yet]
+- **Phase:** 1.4 — Publish [planned 2026-11-03; spec `docs/superpowers/specs/2026-10-31-phase-1.4-publish-design.md`, plan `docs/superpowers/plans/2026-11-03-phase-1.4-publish.md`, 13 tasks, none started]
 - **Last completed:** Phase 1.3 — Family conventions, completed 2026-10-31. All 11 plan tasks executed subagent-driven, each with task review and fix loop, then a whole-branch final review, one fix wave and a clean scoped re-review.
 
 Phase 1.3 outcome:
@@ -17,7 +17,8 @@ Phase 1.3 outcome:
 
 ## Open Decisions
 
-- ZeroAlloc.Analyzers 1.12.0 exists; the 1.3 spec pinned 1.11.x, so it stayed at 1.11.3. Ask the user whether to bump in 1.4.
+- ZeroAlloc.Analyzers goes to 1.12.0 in 1.4, decided 2026-10-31; it arrives with the merge of `main` in plan task 1.
+- The execution method for the 1.4 plan has not been chosen yet: subagent-driven or native.
 - An own YAML library: a separate, unscheduled project outside Ariadne (agreed 2026-10-31).
 - From the roadmap design, none blocking: whether M3 ships a Roslyn analyzer; code generation's role after M4; Mnemosyne.NET integration.
 
@@ -40,8 +41,12 @@ Phase 1.3 outcome:
 - What it provides: the reusable workflows `baseline.yml`, with the required checks `baseline / gitleaks`, `baseline / codeql (csharp)` and `baseline / nuget-audit`, and `history-scan.yml`, plus the actions `actions/coverage-gate`, an 80% line floor, and `actions/sbom`, a CycloneDX SBOM on the release. Its README is the adoption guide: caller jobs, the `codecov.yml` block, the `Directory.Build.props` audit properties and the ruleset's required check names.
 - Consequence for the 1.4 design: the spec lists a shared reusable workflow as a non-goal, in Non-goals and option C, and plans its own per-repo baseline. That workflow now exists. Before writing the 1.4 plan, update the spec so 1.4 adopts `ci-baseline@v1` instead of duplicating it; confirm with the user.
 
+## Decided 2026-11-03: ci-baseline adoption
+
+The spec now adopts `ci-baseline@v1`. The owner chose: the `baseline` caller in its own `baseline-checks.yml`; the pre-public history scan run locally with gitleaks 8.30.1, so Actions stay off until it passes; the `main` ruleset added after the Milestone 1 merge, once `main` has a codecov upload. Merged line coverage measured with the gate's exclusions: 89.4 percent, so no floor override. `main` now has 33 Renovate commits the branch lacks; plan task 1 merges them.
+
 ## Recommended Next Step
 
-Update the Phase 1.4 design spec to adopt `ci-baseline@v1` for the security and quality baseline, then write the 1.4 plan with `superpowers:writing-plans`. Inputs: CI with build, tests, the AotSmoke publish (`dotnet publish tests/Ariadne.NET.AotSmoke -c Release -r linux-x64 -p:PublishAot=true -warnaserror`) and codecov; release-please first release; docs site; Family README section; making the repo public and re-enabling Actions (confirm with the user).
+The owner reviews the 1.4 plan and picks the execution method, then execution starts at task 1: delete `publish.yml`, merge `origin/main` and re-apply the Renovate bumps to the renamed projects. Tasks 10 to 13 each stop for the owner: history findings, going public, merging, releasing.
 
 Commit rules: conventional commits; no `Co-Authored-By` trailer or session link (owner's global CLAUDE.md); no nested parentheses in commit bodies (release-please).
