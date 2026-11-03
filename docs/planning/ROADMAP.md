@@ -10,6 +10,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 - [ ] `Ariadne.NET.Abstractions` and `Ariadne.NET` build as separate packages
 - [ ] Public engine APIs return ZeroAlloc Results instead of throwing for expected failures
 - [ ] GitHub repo exists with CI, codecov and docs site, and a first version is released by release-please
+- [ ] CI runs the security baseline: gitleaks, NuGetAudit on transitive packages, CodeQL, a CycloneDX SBOM per release, and a codecov coverage floor
 
 ### Phase 1.1: Rename to Ariadne.NET [status: complete]
 **Goal:** Rename solution, namespaces, packages, CLI and docs from ArchGov to Ariadne.NET.
@@ -36,7 +37,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Completed:** 2026-10-31
 
 ### Phase 1.4: Publish [status: pending]
-**Goal:** Create the GitHub repo, CI with codecov, the first release-please release, the docs site and the Family README section.
+**Goal:** Create the GitHub repo, CI with codecov and a coverage floor, the security baseline (gitleaks on every pull request after the one-time history scan, `NuGetAuditMode=all`, CodeQL, a CycloneDX SBOM attached to each release), the first release-please release, the docs site and the Family README section. Trivy waits until a container image ships.
 **Surface:** Infra
 **HelpWanted:** no
 **Plan:** _to be written_
@@ -47,6 +48,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 - [ ] Every rule type in the design's Daedalus appendix is expressible in YAML and enforced
 - [ ] Dependency checks use the semantic type graph
 - [ ] A rule that matches no types fails
+- [ ] Packs can forbid APIs and namespaces per layer for security reasons, such as SQL, crypto or HTTP access outside Infrastructure
 - [ ] Built-in packs are migrated to schema v2 and a JSON Schema is published
 
 ### Phase 2.1: Semantic dependency analysis [status: pending]
@@ -70,8 +72,8 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **HelpWanted:** no
 **Plan:** _to be written_
 
-### Phase 2.4: Banned packages and name collisions [status: pending]
-**Goal:** Add rule types for banned packages and cross-layer name collisions.
+### Phase 2.4: Banned packages, forbidden APIs and name collisions [status: pending]
+**Goal:** Add rule types for banned packages, APIs and namespaces forbidden per layer (structural security rules such as "only Infrastructure touches SQL, crypto or HTTP", each with its `because`), and cross-layer name collisions.
 **Surface:** Backend
 **HelpWanted:** no
 **Plan:** _to be written_
@@ -195,6 +197,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 - [ ] roslyn-codelens evaluates Ariadne packs
 - [ ] Packs can be shared through NuGet as well as git
 - [ ] The docs site has family cross-links and a pack catalogue
+- [ ] A built-in pack maps its rules to ISO/IEC 25010 maintainability qualities
 
 ### Phase 6.1: roslyn-codelens reads Ariadne packs [status: pending]
 **Goal:** `check_architecture` evaluates Ariadne packs, with Ariadne supplying the Abstractions package.
@@ -212,5 +215,11 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 ### Phase 6.3: Docs site complete [status: pending]
 **Goal:** Family cross-links and a pack catalogue.
 **Surface:** Docs
+**HelpWanted:** no
+**Plan:** _to be written_
+
+### Phase 6.4: ISO/IEC 25010 maintainability pack [status: pending]
+**Goal:** A built-in pack whose rules for modularity, coupling, cycles and layering each name the ISO/IEC 25010 maintainability sub-characteristic they protect, so a report reads against the standard. Structure only: complexity metrics stay with roslyn-codelens.
+**Surface:** Mixed
 **HelpWanted:** no
 **Plan:** _to be written_

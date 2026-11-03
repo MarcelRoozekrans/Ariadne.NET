@@ -27,6 +27,12 @@ Phase 1.3 outcome:
 - **GitHub Actions are disabled on the repo** on purpose. Phase 1.4 re-enables them and makes the repo public; confirm with the user first.
 - The main worktree at `the main worktree` has `fix/mcp-composite-template` checked out at an older commit. Work from a worktree, and push with `git push -u origin HEAD:fix/mcp-composite-template`.
 
+## Added 2026-11-03
+
+- The owner added a CI security and quality baseline to Phase 1.4 (gitleaks per PR, NuGetAudit on transitive packages, CodeQL, CycloneDX SBOM, codecov coverage floor). It is in the roadmap and in the Goals of the 1.4 design spec; the plan must cover it.
+- Phase 2.4 now also covers structural security rules (APIs and namespaces forbidden per layer), and a new Phase 6.4 adds an ISO/IEC 25010 maintainability pack.
+- The owner wants the same baseline in all their repos, personal and org. That is the family reusable workflow the 1.4 design lists as a non-goal: its own project, outside this repo.
+
 ## Recommended Next Step
 
 Run `start-next-phase`: Phase 1.4 (Publish, Surface Infra) has no design spec, so it routes to `superpowers:brainstorming` at phase scope. Inputs: CI with build, tests, the AotSmoke publish (`dotnet publish tests/Ariadne.NET.AotSmoke -c Release -r linux-x64 -p:PublishAot=true -warnaserror`) and codecov; release-please first release; docs site; Family README section; making the repo public and re-enabling Actions (confirm with the user).
