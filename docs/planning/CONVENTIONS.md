@@ -33,6 +33,6 @@
 
 ## Deployment
 
-**Deploy target:** NuGet.org and GitHub Packages for ArchGov.Core, GitHub Pages for docs
+**Deploy target:** nuget.org for Ariadne.NET and Ariadne.NET.Abstractions, GitHub Pages for docs
 **Environments:** github-pages
 **Deployed by:** GitHub Actions

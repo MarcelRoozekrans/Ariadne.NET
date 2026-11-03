@@ -1,6 +1,6 @@
 # Features
 
-Complete feature reference for the Architecture Governance Engine.
+Complete feature reference for Ariadne.NET.
 
 ## Declarative Rule Packs
 

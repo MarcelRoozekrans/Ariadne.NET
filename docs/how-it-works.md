@@ -1,6 +1,6 @@
 # How It Works
 
-Extensive technical documentation for the Architecture Governance Engine — a pluggable, pattern-agnostic governance system that enforces structural rules for AI code generation via declarative YAML rule packs.
+Extensive technical documentation for Ariadne.NET — a pluggable, pattern-agnostic governance system that enforces structural rules for AI code generation via declarative YAML rule packs.
 
 > **Core Principle:** AI generates behavior. The engine governs structure.
 

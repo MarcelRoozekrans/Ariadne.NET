@@ -1,6 +1,6 @@
 # Ariadne.NET.Abstractions
 
-The rule-pack schema and contracts for [Ariadne.NET](https://github.com/MarcelRoozekrans/architecture-governance-engine), an architecture governance engine driven by declarative YAML rule packs.
+The rule-pack schema and contracts for [Ariadne.NET](https://github.com/MarcelRoozekrans/Ariadne.NET), an architecture governance engine driven by declarative YAML rule packs.
 
 Reference this package when your tool needs to talk about rule packs without pulling in the engine. Its only package dependencies are `ZeroAlloc.Results` and `ZeroAlloc.Validation` (which bundles its generator), and it is Native AOT compatible.
 

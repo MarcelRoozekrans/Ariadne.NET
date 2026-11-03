@@ -1,14 +1,66 @@
 # Ariadne.NET
 
-A pluggable, pattern-agnostic architecture governance engine that enforces structural rules for AI code generation via declarative YAML rule packs.
+[![CI](https://github.com/MarcelRoozekrans/Ariadne.NET/actions/workflows/ci.yml/badge.svg)](https://github.com/MarcelRoozekrans/Ariadne.NET/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/MarcelRoozekrans/Ariadne.NET/graph/badge.svg)](https://codecov.io/gh/MarcelRoozekrans/Ariadne.NET)
+[![Ariadne.NET](https://img.shields.io/nuget/v/Ariadne.NET?label=Ariadne.NET)](https://www.nuget.org/packages/Ariadne.NET)
+[![Ariadne.NET.Abstractions](https://img.shields.io/nuget/v/Ariadne.NET.Abstractions?label=Ariadne.NET.Abstractions)](https://www.nuget.org/packages/Ariadne.NET.Abstractions)
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://marcelroozekrans.github.io/Ariadne.NET/)
 
-> **Core Principle:** AI generates behavior. The engine governs structure.
+A .NET library that enforces structural rules on AI-generated code. You describe an architecture in a declarative YAML rule pack: layers, allowed dependencies, component roles and naming. Ariadne.NET resolves the pack, generates correctly placed C# components, and checks existing source against it.
 
-## Why
+AI coding agents write behavior well but invent folder structures, improvise namespaces and break dependency rules without saying so. Here the AI declares intent and the library decides the structure.
 
-AI coding agents generate behavior effectively but are unreliable at structural decisions — they invent folder structures, improvise namespaces, and silently violate dependency rules. This engine separates structural governance from AI code generation: the AI declares intent, the engine enforces structure.
+## Install
 
-## Quick Start
+```bash
+dotnet add package Ariadne.NET
+```
+
+`Ariadne.NET.Abstractions` holds the rule-pack schema and contracts. Reference it alone when your tool only needs to describe rule packs.
+
+Load a rule pack and resolve it in a console app. This needs `dotnet add package Microsoft.Extensions.DependencyInjection` as well, because Ariadne.NET references only the dependency injection abstractions.
+
+```csharp
+using Ariadne.NET.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
+
+using var services = new ServiceCollection().AddAriadneNETServices().BuildServiceProvider();
+var loader = services.GetRequiredService<IRulePackLoader>();
+var resolver = services.GetRequiredService<IRulePackResolver>();
+
+// A rule pack that builds on the built-in clean-architecture pack.
+var pack = loader.LoadFromString("""
+    name: my-service
+    extends:
+      - builtin://clean-architecture
+    """);
+if (pack.IsFailure)
+{
+    Console.Error.WriteLine(pack.Error.Message);
+    return 1;
+}
+
+var resolved = resolver.Resolve(pack.Value);
+if (resolved.IsFailure)
+{
+    Console.Error.WriteLine(resolved.Error.Message);
+    return 1;
+}
+
+Console.WriteLine($"{resolved.Value.Name}: {resolved.Value.Layers.Count} layers, {resolved.Value.ComponentRoles.Count} component roles");
+foreach (var layer in resolved.Value.Layers)
+{
+    Console.WriteLine($"  {layer.Name} -> [{string.Join(", ", layer.AllowedDependencies)}]");
+}
+
+return 0;
+```
+
+`dotnet run` prints the resolved pack name, its layer and component role counts, and each layer with the layers it may depend on. The [documentation site](https://marcelroozekrans.github.io/Ariadne.NET/) has the full guide.
+
+## CLI and MCP server
+
+The CLI and the MCP server are not packaged yet. Run them from a clone of this repository.
 
 ### CLI
 
@@ -117,7 +169,7 @@ namingConventions:
 
 ### 2. Built-in Templates
 
-Ten templates ship with the engine:
+Ten templates ship with the library:
 
 | Template | Layers | Roles | Description |
 |----------|--------|-------|-------------|
@@ -332,14 +384,27 @@ dotnet build src/Ariadne.NET.slnx
 dotnet test src/Ariadne.NET.slnx
 ```
 
-## Tech Stack
+## Family
 
-- **.NET 10**
-- **YamlDotNet** — YAML parsing
-- **Microsoft.CodeAnalysis.CSharp** (Roslyn) — Code generation
-- **System.CommandLine** — CLI framework
-- **ASP.NET Core** — HTTP host for the MCP server
-- **ZeroAlloc.Inject** — compile-time DI registration
-- **ZeroAlloc.Results / Validation / Resilience / Telemetry** — error values, schema validation, git retry and timeout, and tracing
-- **ModelContextProtocol** — MCP server SDK (stdio + HTTP)
-- **xUnit + FluentAssertions** — Testing
+Ariadne.NET is part of a small family of .NET projects for AI work:
+
+- [Minos.NET](https://marcelroozekrans.github.io/Minos.NET/): A client for decision models that returns calibrated, typed answers to typed questions.
+- [Rag.NET](https://marcelroozekrans.github.io/Rag.NET/): A modular retrieval-augmented generation pipeline on Microsoft.Extensions.AI.
+- [Mnemosyne.NET](https://marcelroozekrans.github.io/Mnemosyne.NET/): Procedural memory for .NET agents: store, find and reuse the procedures that worked.
+- [Thalos.NET](https://github.com/MarcelRoozekrans/Thalos.NET): A ZeroAlloc-native agent framework for .NET on Microsoft Agent Framework.
+- [Daedalus.NET](https://github.com/MarcelRoozekrans/Daedalus.NET): A .NET 10 runtime where AI executes tasks planned on a task board.
+
+## Built on ZeroAlloc
+
+Ariadne.NET uses these [ZeroAlloc](https://zeroalloc.net) libraries, which are source generators and analyzers with no reflection at runtime:
+
+- [ZeroAlloc.Analyzers](https://analyzers.zeroalloc.net)
+- [ZeroAlloc.Inject](https://inject.zeroalloc.net)
+- [ZeroAlloc.Resilience](https://resilience.zeroalloc.net)
+- [ZeroAlloc.Results](https://results.zeroalloc.net)
+- [ZeroAlloc.Telemetry](https://telemetry.zeroalloc.net)
+- [ZeroAlloc.Validation](https://validation.zeroalloc.net)
+
+## License
+
+[MIT](LICENSE)

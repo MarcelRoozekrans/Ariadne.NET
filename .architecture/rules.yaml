@@ -1,4 +1,4 @@
-name: architecture-governance-engine
+name: ariadne
 version: "1.0.0"
 author: ariadne
 extends:

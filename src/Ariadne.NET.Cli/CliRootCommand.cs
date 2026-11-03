@@ -8,7 +8,7 @@ public static class CliRootCommand
 {
     public static RootCommand Create(IServiceProvider provider)
     {
-        var rootCommand = new RootCommand("Architecture Governance Engine CLI");
+        var rootCommand = new RootCommand("Ariadne.NET CLI");
 
         rootCommand.Subcommands.Add(InitCommand.Create(provider));
         rootCommand.Subcommands.Add(RulesCommand.Create(provider));
