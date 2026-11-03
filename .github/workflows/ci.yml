@@ -178,8 +178,9 @@ jobs:
       # and the sample needs a container to resolve the services from. The sample also checks a directory against the
       # pack, and the step runs it twice. First against the consumer's own project, whose only source is a Program.cs
       # without a namespace: no violations, so it must exit 0. Then against a fixture written under RUNNER_TEMP, a Domain
-      # file that uses a WebApi namespace, which the clean-architecture pack forbids: it must exit 1. The second run
-      # proves the packed library reports a violation, not only that it stays quiet on clean code.
+      # file that uses a WebApi namespace, which the clean-architecture pack forbids: it must exit exactly 1, so a crash
+      # fails too. The second run proves the packed library reports a violation, not only that it stays quiet on
+      # clean code.
       - name: Restore, build and run a consumer from the local feed
         shell: bash
         run: |
@@ -207,8 +208,12 @@ jobs:
           fixture="$RUNNER_TEMP/violation-fixture"
           mkdir -p "$fixture/Domain"
           printf 'using Shop.WebApi;\nnamespace Shop.Domain;\npublic class Order {}\n' > "$fixture/Domain/Order.cs"
-          if dotnet run --project "$app" --no-build -c Release -- "$fixture"; then
-            echo "::error::The sample exited 0 on a Domain file that uses a WebApi namespace; the packed validator reported no violation."
+          set +e
+          dotnet run --project "$app" --no-build -c Release -- "$fixture"
+          code=$?
+          set -e
+          if [ "$code" -ne 1 ]; then
+            echo "::error::Expected exit 1 for one violation, got $code. 0 means the packed validator reported none; anything else is a crash."
             exit 1
           fi
 
