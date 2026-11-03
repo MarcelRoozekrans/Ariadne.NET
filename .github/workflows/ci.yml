@@ -16,8 +16,10 @@ on:
         type: boolean
         default: false
 
-# A newer push to the same ref makes the running workflow irrelevant, so it is cancelled. A dispatch is never cancelled:
-# a publish cancelled halfway leaves some packages on nuget.org and others not, and nuget.org cannot take them back.
+# A newer push to the same branch or pull request makes the running workflow irrelevant, so it is cancelled. A dispatch
+# never cancels a running one, and a publish dispatch runs on its tag ref, which no push or pull request run shares, so
+# nothing cancels a publish halfway: that would leave some packages on nuget.org and others not, and nuget.org cannot
+# take them back.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
@@ -69,7 +71,7 @@ jobs:
           reports: test-results/**/coverage.cobertura.xml
 
       - name: Upload coverage to Codecov
-        if: runner.os == 'Linux'
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
         uses: codecov/codecov-action@v7
         with:
           use_oidc: true
@@ -225,12 +227,12 @@ jobs:
 
   # Publishes a release to nuget.org. release-please.yml dispatches this workflow on the release tag with
   # publish_to_nuget=true when it creates a release; a maintainer can dispatch it the same way with resume=true to
-  # finish a push that died partway. It runs after every other job on that exact commit, and it refuses a prerelease and
-  # a tag that is not the manifest's version. The key comes from nuget.org's Trusted Publishing; no key is stored. A
-  # .snupkg beside its .nupkg is delivered with the same push. The pack must pass -p:AriadneRelease=true: without it
-  # Directory.Build.props versions every build X.Y.Z-local, and the version is compiled into the DLLs, so a pack after a
-  # build without the switch would ship release-numbered packages whose DLLs still say -local. RELEASING.md has the
-  # procedure.
+  # finish a push that died partway. It runs after build, aot-smoke and pack-validate on that exact commit, and it
+  # refuses a prerelease and a tag that is not the manifest's version. The key comes from nuget.org's Trusted
+  # Publishing; no key is stored. A .snupkg beside its .nupkg is delivered with the same push. The pack must pass
+  # -p:AriadneRelease=true: without it Directory.Build.props versions every build X.Y.Z-local, and the version is
+  # compiled into the DLLs, so a pack after a build without the switch would ship release-numbered packages whose DLLs
+  # still say -local. RELEASING.md has the procedure.
   publish-nuget:
     if: github.event_name == 'workflow_dispatch' && inputs.publish_to_nuget && startsWith(github.ref, 'refs/tags/v')
     needs: [ build, aot-smoke, pack-validate ]
