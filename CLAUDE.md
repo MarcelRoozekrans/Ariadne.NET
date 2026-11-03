@@ -82,4 +82,4 @@ Expected failures are values, not exceptions. The loader, resolver, registry, `T
 
 ## Releases
 
-Conventional commits on `main` drive release-please (`release-type: simple`); `publish.yml` versions with GitVersion (Mainline mode) and pushes `Ariadne.NET` to NuGet and GitHub Packages on every push to `main`.
+Conventional commits on `main` drive release-please, which opens a release PR using the release bot App token. Merging it tags `vX.Y.Z` and dispatches `ci.yml`, whose `publish-nuget` job pushes `Ariadne.NET` and `Ariadne.NET.Abstractions` to nuget.org. The version comes from `.release-please-manifest.json`; see `RELEASING.md`.
