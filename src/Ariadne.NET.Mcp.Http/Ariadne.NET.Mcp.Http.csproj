@@ -14,6 +14,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
+    <!--
+      The MCP HTTP host is deliberately not a package until Phase 5.1. The Web SDK warns when a non-packable web project is
+      packed; the release pack still packs the whole solution, so the inspection catches a project turning packable by accident.
+    -->
+    <WarnOnPackingNonPackableProject>false</WarnOnPackingNonPackableProject>
   </PropertyGroup>
 
 </Project>

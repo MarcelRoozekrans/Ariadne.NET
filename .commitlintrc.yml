@@ -30,3 +30,9 @@ rules:
     - 2
     - always
     - 100
+
+  # Off: a wrapped commit body is style, nothing downstream parses its line length, and the history already exceeds 100.
+  body-max-line-length:
+    - 0
+    - always
+    - 100
