@@ -176,9 +176,10 @@ jobs:
       # package. Ariadne.NET.Abstractions arrives as Ariadne.NET's dependency, which proves the dependency resolves.
       # Microsoft.Extensions.DependencyInjection comes from nuget.org: Ariadne.NET depends only on the DI abstractions,
       # and the sample needs a container to resolve the services from. The sample also checks a directory against the
-      # pack, here the consumer's own project, whose only source is a Program.cs without a namespace. That gives no
-      # violations, so the run exits 0; a package that breaks the check, or one that reports violations in clean code,
-      # fails the step.
+      # pack, and the step runs it twice. First against the consumer's own project, whose only source is a Program.cs
+      # without a namespace: no violations, so it must exit 0. Then against a fixture written under RUNNER_TEMP, a Domain
+      # file that uses a WebApi namespace, which the clean-architecture pack forbids: it must exit 1. The second run
+      # proves the packed library reports a violation, not only that it stays quiet on clean code.
       - name: Restore, build and run a consumer from the local feed
         shell: bash
         run: |
@@ -203,6 +204,13 @@ jobs:
           EOF
           dotnet build "$app" -c Release
           dotnet run --project "$app" --no-build -c Release -- "$app"
+          fixture="$RUNNER_TEMP/violation-fixture"
+          mkdir -p "$fixture/Domain"
+          printf 'using Shop.WebApi;\nnamespace Shop.Domain;\npublic class Order {}\n' > "$fixture/Domain/Order.cs"
+          if dotnet run --project "$app" --no-build -c Release -- "$fixture"; then
+            echo "::error::The sample exited 0 on a Domain file that uses a WebApi namespace; the packed validator reported no violation."
+            exit 1
+          fi
 
   # Lints the commit messages a pull request adds against .commitlintrc.yml. release-please builds the changelog and the
   # next version from these messages, and silently drops a commit it cannot parse, so a bad message is caught here,
