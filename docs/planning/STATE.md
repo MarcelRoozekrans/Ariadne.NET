@@ -18,7 +18,7 @@ Phase 1.3 outcome:
 ## Open Decisions
 
 - ZeroAlloc.Analyzers goes to 1.12.0 in 1.4, decided 2026-10-31; it arrives with the merge of `main` in plan task 1.
-- The execution method for the 1.4 plan has not been chosen yet: subagent-driven or native.
+- The 1.4 plan runs subagent-driven, chosen by the owner on 2026-11-03.
 - An own YAML library: a separate, unscheduled project outside Ariadne (agreed 2026-10-31).
 - From the roadmap design, none blocking: whether M3 ships a Roslyn analyzer; code generation's role after M4; Mnemosyne.NET integration.
 
@@ -47,6 +47,6 @@ The spec now adopts `ci-baseline@v1`. The owner chose: the `baseline` caller in 
 
 ## Recommended Next Step
 
-The owner reviews the 1.4 plan and picks the execution method, then execution starts at task 1: delete `publish.yml`, merge `origin/main` and re-apply the Renovate bumps to the renamed projects. Tasks 10 to 13 each stop for the owner: history findings, going public, merging, releasing.
+Execute the 1.4 plan with `superpowers:subagent-driven-development`, starting at task 1: delete `publish.yml`, merge `origin/main` and re-apply the Renovate bumps to the renamed projects. Tasks 10 to 13 each stop for the owner: history findings, going public, merging, releasing.
 
 Commit rules: conventional commits; no `Co-Authored-By` trailer or session link (owner's global CLAUDE.md); no nested parentheses in commit bodies (release-please).
