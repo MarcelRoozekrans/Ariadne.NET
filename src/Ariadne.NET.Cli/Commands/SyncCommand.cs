@@ -7,8 +7,9 @@ namespace Ariadne.NET.Cli.Commands;
 
 internal static class SyncCommand
 {
-    private const string DefaultImportsPath = ".architecture/imports.yaml";
-    private const string DefaultCacheDir = ".architecture/.cache/git";
+    private const string ArchitectureDir = ".architecture";
+    private const string ImportsFileName = "imports.yaml";
+    private const string CacheDirName = ".cache";
 
     public static Command Create(IServiceProvider provider)
     {
@@ -42,7 +43,7 @@ internal static class SyncCommand
         IServiceProvider provider, string? name, bool noCache, CancellationToken ct)
     {
         var workingDir = Directory.GetCurrentDirectory();
-        var importsPath = Path.Combine(workingDir, DefaultImportsPath);
+        var importsPath = Path.Combine(workingDir, ArchitectureDir, ImportsFileName);
 
         var loader = provider.GetRequiredService<IImportsLoader>();
         var orchestrator = provider.GetRequiredService<ISyncOrchestrator>();
@@ -62,7 +63,7 @@ internal static class SyncCommand
             return ExitCodes.Success;
         }
 
-        var cacheDir = Path.Combine(workingDir, DefaultCacheDir);
+        var cacheDir = Path.Combine(workingDir, ArchitectureDir, CacheDirName, "git");
         try
         {
             Directory.CreateDirectory(cacheDir);
