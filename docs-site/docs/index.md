@@ -16,6 +16,8 @@ AI coding agents generate behavior effectively but are unreliable at structural 
 
 ## Quick Start
 
+To use the library from your own project, see [Getting started](getting-started.md).
+
 ### CLI
 
 > Until the `ariadne` dotnet tool ships, run these commands as `dotnet run --project src/Ariadne.NET.Cli -- <command>`.
