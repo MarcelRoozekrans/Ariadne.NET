@@ -5,7 +5,7 @@ title: Getting started
 
 # Getting started
 
-Load a rule pack and resolve it in a .NET console app.
+Load a built-in rule pack and check a directory against it in a .NET console app.
 
 ```bash
 dotnet new console -o MyApp --framework net10.0
@@ -20,11 +20,13 @@ Replace `Program.cs` with:
 
 ```csharp
 using Ariadne.NET.Abstractions;
+using Ariadne.NET.Validation;
 using Microsoft.Extensions.DependencyInjection;
 
 using var services = new ServiceCollection().AddAriadneNETServices().BuildServiceProvider();
 var loader = services.GetRequiredService<IRulePackLoader>();
 var resolver = services.GetRequiredService<IRulePackResolver>();
+var validator = services.GetRequiredService<ISourceValidator>();
 
 // A rule pack that builds on the built-in clean-architecture pack.
 var pack = loader.LoadFromString("""
@@ -51,7 +53,15 @@ foreach (var layer in resolved.Value.Layers)
     Console.WriteLine($"  {layer.Name} -> [{string.Join(", ", layer.AllowedDependencies)}]");
 }
 
-return 0;
+// Check the C# files under a directory against the pack: the first argument, else the current directory.
+var result = validator.Validate(resolved.Value, args.Length > 0 ? args[0] : Directory.GetCurrentDirectory());
+Console.WriteLine($"Checked {result.FilesScanned} files: {result.Violations.Count} violations");
+foreach (var violation in result.Violations)
+{
+    Console.WriteLine($"  {violation.ViolationType} in {violation.FilePath}: {violation.Message}");
+}
+
+return result.IsValid ? 0 : 1;
 ```
 
-`dotnet run` prints the resolved pack name, its layer and component role counts, and each layer with the layers it may depend on.
+`dotnet run` prints the resolved pack name, its layer and component role counts, and each layer with the layers it may depend on. It then checks the C# files under the directory you pass as the first argument, or the current directory, and prints each violation with its file and message. The exit code is 1 when there are violations.

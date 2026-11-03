@@ -175,7 +175,10 @@ jobs:
       # feed. nuget.config maps Ariadne.NET* to the local feed only, so the restore cannot fall back to a published
       # package. Ariadne.NET.Abstractions arrives as Ariadne.NET's dependency, which proves the dependency resolves.
       # Microsoft.Extensions.DependencyInjection comes from nuget.org: Ariadne.NET depends only on the DI abstractions,
-      # and the sample needs a container to resolve the services from.
+      # and the sample needs a container to resolve the services from. The sample also checks a directory against the
+      # pack, here the consumer's own project, whose only source is a Program.cs without a namespace. That gives no
+      # violations, so the run exits 0; a package that breaks the check, or one that reports violations in clean code,
+      # fails the step.
       - name: Restore, build and run a consumer from the local feed
         shell: bash
         run: |
@@ -199,7 +202,7 @@ jobs:
           </configuration>
           EOF
           dotnet build "$app" -c Release
-          dotnet run --project "$app" --no-build -c Release
+          dotnet run --project "$app" --no-build -c Release -- "$app"
 
   # Lints the commit messages a pull request adds against .commitlintrc.yml. release-please builds the changelog and the
   # next version from these messages, and silently drops a commit it cannot parse, so a bad message is caught here,
