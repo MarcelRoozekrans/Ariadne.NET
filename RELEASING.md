@@ -21,9 +21,9 @@ Every push and pull request also runs `pack-validate`. It packs the same way, in
 - **Trusted Publishing:** on nuget.org, a Trusted Publishing policy exists for the repository `MarcelRoozekrans/Ariadne.NET` and the workflow file `ci.yml` (done 2026-10-31). It must be allowed to push new packages as well as new versions, since both ids are new on nuget.org.
 - **Reserve the id prefix:** reserve the `Ariadne.NET` id prefix on nuget.org. Anyone can take an id until it is published.
 - **Codecov:** add the repository on codecov, so the coverage upload from `build` is accepted.
-- **CodeQL:** keep the default setup off. The repository's own CodeQL workflow does the scanning, and both together report twice.
+- **CodeQL:** keep the default setup off. CodeQL runs in `baseline-checks.yml` through the ci-baseline v1 reusable workflow, and with default setup on, GitHub refuses that workflow's SARIF upload.
 
-Without the first three, no release PR gets CI or no publish starts. Without the policy and the prefix, `publish-nuget` fails at its login or push step and nothing reaches nuget.org.
+Without the App installed and its client id and private key, `release-please.yml` cannot mint a token, so no release PR is opened and no tag dispatch happens. Without `NUGET_USER`, the login in `publish-nuget` fails. Without the Trusted Publishing policy and the id prefix, the push fails and nothing reaches nuget.org.
 
 ## Re-running a publish
 
@@ -35,8 +35,7 @@ With `resume=true` the push uses `--skip-duplicate`, so it skips the packages th
 
 A release run, without `resume`, does not skip anything: if a package is already on nuget.org at the release version, the run fails and names it. That version was then published by something other than this pipeline. Check what is on nuget.org before resuming; a published version can be unlisted but never replaced, so a wrong package means releasing the next patch version.
 
-A re-run skips a package that already arrived, and may not re-send its symbol package. If a symbol package is missing on nuget.org
-after a publish, it is attached to the GitHub release and can be uploaded on nuget.org's web upload page.
+A re-run skips a package that already arrived, and may not re-send its symbol package. If a symbol package is missing on nuget.org after a publish, it is attached to the GitHub release and can be uploaded on nuget.org's web upload page.
 
 ## When nuget.org refuses a push
 
