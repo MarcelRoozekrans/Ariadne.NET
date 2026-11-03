@@ -31,7 +31,7 @@ dotnet publish tests/Ariadne.NET.AotSmoke -c Release -r linux-x64 -p:PublishAot=
 cd docs-site && npm ci && npm run start
 ```
 
-CI (`.github/workflows/ci.yml`) runs restore → build → test → pack in Release. There is no separate lint step: analyzers (Meziantou, Roslynator, ErrorProne.NET, NetFabric.Hyperlinq, ZeroAlloc) run during build via `Directory.Build.props`. `TreatWarningsAsErrors` is on in `Directory.Build.props`, so the build must stay at zero warnings. ZeroAlloc.Analyzers is pinned to 1.11.x; do not bump it to 1.12 without a decision.
+CI (`.github/workflows/ci.yml`) builds and tests on ubuntu and windows, with a coverage gate and a codecov upload on ubuntu. It also runs `aot-smoke` and `pack-validate`, `commitlint` on pull requests, and `publish-nuget` on a tag dispatch. `.github/workflows/baseline-checks.yml` runs the ci-baseline v1 checks: gitleaks, CodeQL and NuGetAudit. There is no separate lint step: analyzers (Meziantou, Roslynator, ErrorProne.NET, NetFabric.Hyperlinq, ZeroAlloc) run during build via `Directory.Build.props`. `TreatWarningsAsErrors` is on in `Directory.Build.props`, so the build must stay at zero warnings. ZeroAlloc.Analyzers is at 1.12.0.
 
 ## Architecture
 
