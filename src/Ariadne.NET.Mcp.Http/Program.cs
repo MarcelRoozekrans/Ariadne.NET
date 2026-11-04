@@ -3,6 +3,7 @@ using ModelContextProtocol.Server;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddAriadneNETServices();
+builder.Services.AddAriadneNETWorkspaces();
 builder.Services.AddAriadneNETMcpServices();
 builder.Services
     .AddMcpServer()

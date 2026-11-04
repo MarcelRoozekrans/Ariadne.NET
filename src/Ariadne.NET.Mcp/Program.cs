@@ -10,6 +10,7 @@ builder.Logging.AddConsole(options =>
 });
 
 builder.Services.AddAriadneNETServices();
+builder.Services.AddAriadneNETWorkspaces();
 builder.Services.AddAriadneNETMcpServices();
 builder.Services
     .AddMcpServer()

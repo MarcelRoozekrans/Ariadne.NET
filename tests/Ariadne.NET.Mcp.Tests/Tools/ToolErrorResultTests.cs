@@ -73,6 +73,8 @@ public sealed class ToolErrorResultTests : IAsyncLifetime
                 arguments["features"] = "Orders";
                 break;
             case "validate_source":
+                arguments["path"] = Path.GetTempPath();
+                break;
             case "lint_source":
                 arguments["sourceDirectory"] = Path.GetTempPath();
                 break;

@@ -1,5 +1,7 @@
 using System.ComponentModel;
+using Ariadne.NET.Analysis;
 using Ariadne.NET.Validation;
+using Ariadne.NET.Workspaces;
 using ModelContextProtocol.Server;
 
 namespace Ariadne.NET.Mcp.Tools;
@@ -8,17 +10,19 @@ namespace Ariadne.NET.Mcp.Tools;
 public static class ValidationTools
 {
     [McpServerTool(Name = "validate_source")]
-    [Description("Validate existing source files against architecture dependency rules. Checks that using directives comply with layer dependency constraints (e.g. Domain cannot reference Infrastructure).")]
-    public static SourceValidationResult ValidateSource(
+    [Description("Validate a solution or project against the architecture rules, using the semantic type graph of its compilations. Reports each layer dependency that is not allowed and each component role mismatch.")]
+    public static async Task<ArchitectureReport> ValidateSource(
         IRuleResolutionHelper helper,
-        ISourceValidator validator,
-        [Description("Absolute or relative path to the source directory to validate.")]
-        string sourceDirectory,
+        ISolutionValidator validator,
+        [Description("Path to a .sln, .slnx, .slnf or .csproj, or a directory holding exactly one.")]
+        string path,
         [Description("Template name. Optional - auto-detects from .architecture/rules.yaml.")]
-        string? template = null)
+        string? template = null,
+        CancellationToken cancellationToken = default)
     {
         var resolved = ToolError.ValueOrToolError(helper.Resolve(template));
-        return validator.Validate(resolved, sourceDirectory);
+        var result = await validator.ValidateAsync(resolved, path, cancellationToken).ConfigureAwait(false);
+        return ToolError.ValueOrToolError(result);
     }
 
     [McpServerTool(Name = "lint_source")]
