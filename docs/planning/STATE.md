@@ -7,7 +7,7 @@
 
 - **Milestone:** 1 — Ariadne.NET identity and family shape [complete 2026-11-04]; audit PASS in `docs/superpowers/reviews/2026-11-04-milestone-1-audit.md`
 - **Phase:** 1.4 — Publish [complete 2026-11-04]
-- **Next milestone:** 2 — Rule engine v2 [pending], not started
+- **Active milestone:** 2 — Rule engine v2 [active since 2026-11-04]; design `docs/superpowers/specs/2026-11-04-milestone-2-design.md`, `MILESTONE.md` written. All six phases pending.
 
 Release 0.1.0, 2026-11-04:
 - The owner added the release bot App, `RELEASE_BOT_CLIENT_ID`, `RELEASE_BOT_PRIVATE_KEY`, `NUGET_USER`, the Trusted Publishing policy for new ids and the `Ariadne.NET` prefix reservation.
@@ -32,6 +32,8 @@ Release 0.1.0, 2026-11-04:
 
 ## Recommended Next Step
 
-Start Milestone 2, Rule engine v2, with project-orchestration `new-milestone`: a milestone-scope brainstorm using `docs/superpowers/specs/2026-10-30-roadmap-design.md` as input, then `MILESTONE.md` for Milestone 2. Branch from `ariadne/main`.
+Once the Milestone 2 design PR is merged, run project-orchestration `start-next-phase`: it routes Phase 2.1, Semantic dependency analysis, to a phase-scope brainstorm, then writing-plans. Branch from `ariadne/main`.
+
+User decisions of 2026-11-04 for Milestone 2: namespace and assembly glob selectors; solutions load through MSBuildWorkspace; the syntax-only `SourceValidator` is replaced, not kept. Claude's calls are listed in the design spec for review.
 
 Commit rules: conventional commits; no `Co-Authored-By` trailer or session link; no nested parentheses in commit bodies.

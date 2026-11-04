@@ -45,50 +45,55 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Plan:** `docs/superpowers/plans/2026-11-03-phase-1.4-publish.md`
 **Completed:** 2026-11-04
 
-## Milestone 2: Rule engine v2 [status: pending]
+## Milestone 2: Rule engine v2 [status: active]
 **Goal:** Packs can express and enforce everything the Daedalus rules need, checked against the real type graph.
+**Started:** 2026-11-04
+**Design:** `docs/superpowers/specs/2026-11-04-milestone-2-design.md`
 **Definition of Done:**
-- [ ] Every rule type in the design's Daedalus appendix is expressible in YAML and enforced
-- [ ] Dependency checks use the semantic type graph
-- [ ] A rule that matches no types fails
-- [ ] Packs can forbid APIs and namespaces per layer for security reasons, such as SQL, crypto or HTTP access outside Infrastructure
-- [ ] Built-in packs are migrated to schema v2 and a JSON Schema is published
+- [ ] Every rule type in the design's Daedalus appendix is expressible in a v2 pack and enforced, shown by a fixture solution with a clean and a broken variant per rule type
+- [ ] Dependency checks use the semantic type graph; `SourceValidator` is deleted and CLI `validate` and MCP `validate_source` use the new engine
+- [ ] `Ariadne.NET.Workspaces` loads solutions through MSBuildWorkspace and is published beside the other two packages
+- [ ] A rule or layer selector that matches no type fails, unless the rule sets `allowEmpty: true`
+- [ ] Packs can forbid namespaces, types and members per layer for security reasons, such as SQL, crypto or HTTP access outside Infrastructure
+- [ ] The v2 loader rejects unknown keys and rules without a `because`
+- [ ] Built-in packs and `.architecture/rules.yaml` are migrated to schema v2 and a JSON Schema is published
+- [ ] The milestone's changes ship to nuget.org in a release-please release
 
 ### Phase 2.1: Semantic dependency analysis [status: pending]
 **Note:** Consider ZeroAlloc.TestHelpers allocation budgets for the type-graph hot path; consolidate the two UnixNonRootFactAttribute copies (and UnixFact) into TestHelpers.
-**Goal:** Analyse a Roslyn compilation instead of scanning `using` directives.
+**Goal:** Build a type dependency graph from a Roslyn `Compilation`, add `Ariadne.NET.Workspaces` to load solutions through MSBuildWorkspace, and replace `SourceValidator` behind CLI `validate` and MCP `validate_source` on the v1 layer rules; closes #1.
 **Surface:** Backend
 **HelpWanted:** no
 **Plan:** _to be written_
 
 ### Phase 2.2: Rule schema v2 [status: pending]
 **Note:** Consider ZeroAlloc.Specification for rule matching; extend the ZeroAlloc.Validation rules from 1.3.
-**Goal:** A versioned schema with `forbid` and `allowOnly` at layer, namespace and type level, exception lists, and a `because` reason on every rule.
+**Goal:** A versioned, strict schema with namespace and assembly selectors, `forbid` and `allowOnly` at layer, namespace and type level, per-rule exceptions and a required `because`, with the built-in packs, this repo's pack and every engine part that reads a pack migrated to it.
 **Surface:** Backend
 **HelpWanted:** no
 **Plan:** _to be written_
 
 ### Phase 2.3: Enforce placement and code-feature rules [status: pending]
 **Note:** Consider ZeroAlloc.Specification for placement and code-feature matching.
-**Goal:** Make YAML-defined placement and code-feature rules actually run.
+**Goal:** Placement-by-role rules and typed code-feature rules run on the type graph, and `CODE-001` and `CODE-002` are enforced from the pack instead of hard-coded checks.
 **Surface:** Backend
 **HelpWanted:** no
 **Plan:** _to be written_
 
 ### Phase 2.4: Banned packages, forbidden APIs and name collisions [status: pending]
-**Goal:** Add rule types for banned packages, APIs and namespaces forbidden per layer (structural security rules such as "only Infrastructure touches SQL, crypto or HTTP", each with its `because`), and cross-layer name collisions.
+**Goal:** Rule types for banned packages over the resolved package graph, member-level forbidden APIs per layer with the security worked example, and the same type name kept in two layers.
 **Surface:** Backend
 **HelpWanted:** no
 **Plan:** _to be written_
 
 ### Phase 2.5: Vacuity detection [status: pending]
-**Goal:** A rule that matches no types fails instead of passing silently.
+**Goal:** A rule or layer selector that matches no type fails with its own violation kind, unless the rule opts out with `allowEmpty: true`.
 **Surface:** Backend
 **HelpWanted:** no
 **Plan:** _to be written_
 
 ### Phase 2.6: Pack reference and JSON Schema [status: pending]
-**Goal:** Document every rule type and publish a JSON Schema for editor validation.
+**Goal:** Document every v2 rule type on the docs site, publish a JSON Schema for editor validation, and delete the drifted `docs/how-it-works/` copy.
 **Surface:** Docs
 **HelpWanted:** no
 **Plan:** _to be written_
