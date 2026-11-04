@@ -10,4 +10,5 @@
   <Project Path="Ariadne.NET.Mcp.Http/Ariadne.NET.Mcp.Http.csproj" />
   <Project Path="Ariadne.NET.Cli/Ariadne.NET.Cli.csproj" />
   <Project Path="Ariadne.NET.Mcp/Ariadne.NET.Mcp.csproj" />
+  <Project Path="../tools/perf/Ariadne.NET.Perf/Ariadne.NET.Perf.csproj" />
 </Solution>
