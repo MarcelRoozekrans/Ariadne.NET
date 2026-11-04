@@ -227,11 +227,16 @@ jobs:
           printf 'namespace Shop.WebApi;\npublic class Controller { }\n' > "$fixture/WebApi/Controller.cs"
           dotnet restore "$fixture"
           set +e
-          dotnet run --project "$app" --no-build -c Release -- "$fixture"
+          output=$(dotnet run --project "$app" --no-build -c Release -- "$fixture")
           code=$?
           set -e
+          echo "$output"
           if [ "$code" -ne 1 ]; then
             echo "::error::Expected exit 1 for one violation, got $code. 0 means the packed validator reported none; anything else is a crash."
+            exit 1
+          fi
+          if ! grep -q "DependencyNotAllowed" <<< "$output"; then
+            echo "::error::Exit 1 without a DependencyNotAllowed violation in the output; the run failed for another reason."
             exit 1
           fi
 

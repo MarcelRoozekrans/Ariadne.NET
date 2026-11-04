@@ -81,6 +81,19 @@ class InspectPackagesTests(unittest.TestCase):
         errors = inspect_packages.problems(self.directory, VERSION)
         self.assertTrue(any(f"{WORKSPACES}.0.1.0.nupkg" in error and "missing" in error for error in errors), errors)
 
+    def test_rejects_the_engine_depending_on_msbuild_packages(self) -> None:
+        for msbuild in ("Microsoft.Build.Locator", "Microsoft.Build.Framework", "Microsoft.CodeAnalysis.Workspaces.MSBuild"):
+            with self.subTest(msbuild):
+                self.write_all(**{ARIADNE: {"dependencies": (ABSTRACTIONS, msbuild)}})
+                errors = inspect_packages.problems(self.directory, VERSION)
+                self.assertTrue(any(f"{ARIADNE} depends on {msbuild}" in error and "MSBuild" in error
+                                    for error in errors), errors)
+
+    def test_accepts_workspaces_depending_on_msbuild_packages(self) -> None:
+        self.write_all(**{WORKSPACES: {"dependencies": (ARIADNE, "Microsoft.Build.Locator",
+                                                         "Microsoft.CodeAnalysis.Workspaces.MSBuild")}})
+        self.assertEqual([], inspect_packages.problems(self.directory, VERSION))
+
     def test_rejects_workspaces_depending_on_another_engine_version(self) -> None:
         self.write_all(**{WORKSPACES: {"ariadne_version": "0.0.9"}})
         errors = inspect_packages.problems(self.directory, VERSION)

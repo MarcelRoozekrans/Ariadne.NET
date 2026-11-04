@@ -16,14 +16,14 @@ var pack = loader.LoadFromString("""
 if (pack.IsFailure)
 {
     Console.Error.WriteLine(pack.Error.Message);
-    return 1;
+    return 2;
 }
 
 var resolved = resolver.Resolve(pack.Value);
 if (resolved.IsFailure)
 {
     Console.Error.WriteLine(resolved.Error.Message);
-    return 1;
+    return 2;
 }
 
 Console.WriteLine($"{resolved.Value.Name}: {resolved.Value.Layers.Count} layers, {resolved.Value.ComponentRoles.Count} component roles");
