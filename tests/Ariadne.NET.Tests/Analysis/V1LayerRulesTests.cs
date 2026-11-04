@@ -155,13 +155,20 @@ public class V1LayerRulesTests
         (GC.GetAllocatedBytesForCurrentThread() - before).Should().Be(0);
     }
 
+    // Interim: see the note on LayerOf_CachedSymbol_AllocatesNothing, ZeroAlloc-Net/ZeroAlloc.TestHelpers#106.
     [Fact]
     public void LayerOf_TypeWithoutLayer_IsNullAndCached()
     {
         var compilation = TestCompilation.Create("namespace Shop.Misc { public class Thing { } }");
         var type = compilation.GetTypeByMetadataName("Shop.Misc.Thing")!;
         var map = new V1LayerMap(Pack);
-        map.LayerOf(type).Should().BeNull();
+
+        var beforeMiss = GC.GetAllocatedBytesForCurrentThread();
+        var first = map.LayerOf(type);
+        var missBytes = GC.GetAllocatedBytesForCurrentThread() - beforeMiss;
+
+        first.Should().BeNull();
+        missBytes.Should().BeGreaterThan(0, "the null result is inserted into the cache");
 
         var before = GC.GetAllocatedBytesForCurrentThread();
         for (var i = 0; i < 1_000; i++)
