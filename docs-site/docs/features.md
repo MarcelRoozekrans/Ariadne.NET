@@ -118,7 +118,7 @@ Checks a solution or project against the architecture rules with the compiler's 
 Detected violations:
 - **DependencyNotAllowed** — a type references a type in a layer that is not in its layer's `allowedDependencies`. One violation per source type and target type, located at the first reference, with a reference count.
 - **TypeKindMismatch** — a type doesn't match the role's expected type kind
-- **AccessibilityMismatch** — a type's accessibility doesn't match the role definition; a type with no access modifier counts as internal
+- **AccessibilityMismatch** — a type's accessibility doesn't match the role definition; a top-level type with no access modifier counts as internal (a nested one is private)
 - **MissingInterface** — a role requires an interface but none was found
 
 Each violation has a rule id, `layer/<Layer>` or `role/<Role>`. A project that targets several frameworks is checked once per framework, and a violation found in only some of them lists them. See [Validation and Linting](how-it-works/08-validation.md) for the details.

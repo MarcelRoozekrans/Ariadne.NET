@@ -347,9 +347,9 @@ src/
   Ariadne.NET.Abstractions/   # Rule-pack schema and contracts (ZeroAlloc.Results and ZeroAlloc.Validation only, AOT)
   Ariadne.NET/                # Rule engine library (zero host dependencies)
     RuleLoader/               # YAML loading, built-in pack registry, extends resolution
-    RuleEngine/               # Merger, dependency validator, layer inference
+    RuleEngine/               # Merger, layer inference
     CodeGeneration/           # Roslyn-based code generator
-    Orchestration/            # Wires inference + validation + generation + workspace
+    Orchestration/            # Wires inference + generation + workspace
     Analysis/                 # Type graph and architecture validator on Roslyn compilations
     Validation/               # Linter (namespace vs directory)
     Sync/                     # Git-based sync: imports, semver, caching

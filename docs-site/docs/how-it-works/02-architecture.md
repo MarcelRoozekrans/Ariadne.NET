@@ -70,19 +70,21 @@ graph LR
     Core --> Abs["Ariadne.NET.Abstractions"]
 ```
 
-Within `Ariadne.NET`, dependencies flow strictly top-down:
+Within `Ariadne.NET`, the namespaces depend on each other as follows. `Analysis` and `Validation` depend only on Abstractions, and `Telemetry` holds the instrumented pack and sync interfaces, so the pack and sync code and `Telemetry` reference each other.
 
 ```mermaid
 graph TD
     Orchestration --> CodeGeneration
-    Orchestration --> Validation
-    Analysis --> Abstractions
     Orchestration --> RuleEngine
-    CodeGeneration --> RuleEngine
-    Validation --> RuleEngine
-    RuleEngine --> RuleLoader
+    RuleLoader --> RuleEngine
+    RuleLoader --> Telemetry
+    Sync --> Telemetry
+    Telemetry --> RuleLoader
+    Telemetry --> Sync
+    Telemetry --> RuleEngine
     RuleLoader --> Abstractions["Ariadne.NET.Abstractions<br/><i>(separate package — ZeroAlloc.Results + Validation only)</i>"]
-    Sync["Sync<br/><i>(independent module)</i>"]
+    Analysis --> Abstractions
+    Validation --> Abstractions
 ```
 
 ---
