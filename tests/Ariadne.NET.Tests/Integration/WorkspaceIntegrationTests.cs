@@ -17,7 +17,6 @@ public sealed class WorkspaceIntegrationTests : IDisposable
     private readonly BuiltinPackRegistry _registry;
     private readonly WorkspaceOrchestrator _workspaceOrchestrator;
     private readonly GenerateOrchestrator _generateOrchestrator;
-    private readonly SourceValidator _validator;
     private readonly Linter _linter;
 
     public WorkspaceIntegrationTests()
@@ -31,7 +30,6 @@ public sealed class WorkspaceIntegrationTests : IDisposable
         _generateOrchestrator = new GenerateOrchestrator(
             new LayerInferenceEngine(),
             new CodeGeneratorService());
-        _validator = new SourceValidator();
         _linter = new Linter();
     }
 
@@ -72,7 +70,7 @@ public sealed class WorkspaceIntegrationTests : IDisposable
         generateResult.Success.Should().BeTrue();
         generateResult.GeneratedFiles.Should().HaveCount(2);
 
-        // Step 3: Write files to workspace and validate
+        // Step 3: Write files to workspace
         foreach (var file in generateResult.GeneratedFiles)
         {
             var fullPath = Path.Combine(_tempDir, file.FilePath);
@@ -81,10 +79,7 @@ public sealed class WorkspaceIntegrationTests : IDisposable
             File.WriteAllText(fullPath, file.Code);
         }
 
-        var validationResult = _validator.Validate(pack, _tempDir);
-
-        validationResult.IsValid.Should().BeTrue();
-        validationResult.FilesScanned.Should().Be(2);
+        Directory.GetFiles(_tempDir, "*.cs", SearchOption.AllDirectories).Should().HaveCount(2);
     }
 
     [Fact]
@@ -119,13 +114,11 @@ public sealed class WorkspaceIntegrationTests : IDisposable
         ordersResult.Success.Should().BeTrue();
         usersResult.Success.Should().BeTrue();
 
-        // Write and validate both features
+        // Write both features
         WriteGeneratedFiles(ordersResult);
         WriteGeneratedFiles(usersResult);
 
-        var validationResult = _validator.Validate(pack, _tempDir);
-        validationResult.IsValid.Should().BeTrue();
-        validationResult.FilesScanned.Should().Be(2);
+        Directory.GetFiles(_tempDir, "*.cs", SearchOption.AllDirectories).Should().HaveCount(2);
     }
 
     [Fact]

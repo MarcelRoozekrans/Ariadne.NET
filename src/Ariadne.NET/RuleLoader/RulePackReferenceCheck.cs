@@ -7,8 +7,8 @@ namespace Ariadne.NET.RuleLoader;
 /// <summary>
 /// Cross-reference rules for a complete, merged rule pack. A lone user pack may rely on <c>extends</c> for the layers
 /// its roles name, so these rules cannot run at load time; the resolver runs them on the result of every resolve.
-/// Names compare case-insensitively, as <c>DependencyValidator</c>, <c>LayerInferenceEngine</c> and
-/// <c>CodeGeneratorService</c> match them.
+/// Names compare case-insensitively, as <c>LayerInferenceEngine</c> and <c>CodeGeneratorService</c>
+/// match them.
 /// </summary>
 internal static class RulePackReferenceCheck
 {

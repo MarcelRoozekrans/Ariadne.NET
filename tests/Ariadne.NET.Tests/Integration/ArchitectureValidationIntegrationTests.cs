@@ -71,7 +71,7 @@ public sealed class ArchitectureValidationIntegrationTests
     }
 
     [Fact]
-    public void CleanArchProject_DomainDependsOnInfrastructure_ShouldReportDependencyViolation()
+    public void CleanArchProject_DomainDependsOnInfrastructure_ShouldReportLayerViolation()
     {
         var report = Validate(
             ("Order.cs", """

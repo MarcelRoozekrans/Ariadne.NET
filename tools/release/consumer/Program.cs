@@ -1,11 +1,11 @@
 using Ariadne.NET.Abstractions;
-using Ariadne.NET.Validation;
+using Ariadne.NET.Workspaces;
 using Microsoft.Extensions.DependencyInjection;
 
-using var services = new ServiceCollection().AddAriadneNETServices().BuildServiceProvider();
+using var services = new ServiceCollection().AddAriadneNETServices().AddAriadneNETWorkspaces().BuildServiceProvider();
 var loader = services.GetRequiredService<IRulePackLoader>();
 var resolver = services.GetRequiredService<IRulePackResolver>();
-var validator = services.GetRequiredService<ISourceValidator>();
+var validator = services.GetRequiredService<ISolutionValidator>();
 
 // A rule pack that builds on the built-in clean-architecture pack.
 var pack = loader.LoadFromString("""
@@ -32,12 +32,14 @@ foreach (var layer in resolved.Value.Layers)
     Console.WriteLine($"  {layer.Name} -> [{string.Join(", ", layer.AllowedDependencies)}]");
 }
 
-// Check the C# files under a directory against the pack: the first argument, else the current directory.
-var result = validator.Validate(resolved.Value, args.Length > 0 ? args[0] : Directory.GetCurrentDirectory());
-Console.WriteLine($"Checked {result.FilesScanned} files: {result.Violations.Count} violations");
-foreach (var violation in result.Violations)
+// Check a solution or project against the pack: the first argument, else the current directory.
+var result = await validator.ValidateAsync(resolved.Value, args.Length > 0 ? args[0] : Directory.GetCurrentDirectory());
+if (result.IsFailure)
 {
-    Console.WriteLine($"  {violation.ViolationType} in {violation.FilePath}: {violation.Message}");
+    Console.Error.WriteLine(result.Error.Message);
+    return 2;
 }
 
-return result.IsValid ? 0 : 1;
+var report = result.Value;
+Console.WriteLine($"Checked {report.TypesChecked} types: {report.Violations.Count} violations");
+return report.Violations.Count == 0 ? 0 : 1;
