@@ -8,7 +8,7 @@
 - **Milestone:** 1 — Ariadne.NET identity and family shape [complete 2026-11-04]; audit PASS in `docs/superpowers/reviews/2026-11-04-milestone-1-audit.md`
 - **Phase:** 1.4 — Publish [complete 2026-11-04]
 - **Active milestone:** 2 — Rule engine v2 [active since 2026-11-04]; design `docs/superpowers/specs/2026-11-04-milestone-2-design.md`, `MILESTONE.md` written. All six phases pending.
-- **Phase 2.1 — Semantic dependency analysis:** design and plan done, in PR #23 on branch `docs/phase-2.1-design`, marked ready for the owner to merge. Design `docs/superpowers/specs/2026-11-04-phase-2.1-semantic-dependency-analysis-design.md`; plan `docs/superpowers/plans/2026-11-04-phase-2.1-semantic-dependency-analysis.md`, 17 tasks, none started. Phase status in ROADMAP.md is still `pending`.
+- **Phase 2.1 — Semantic dependency analysis:** active since 2026-11-04. Design and plan merged in PR #23. Execution runs subagent-driven on branch `feat/phase-2.1-semantic-analysis`, pushed with `git push ariadne HEAD:feat/phase-2.1-semantic-analysis`. Design `docs/superpowers/specs/2026-11-04-phase-2.1-semantic-dependency-analysis-design.md`; plan `docs/superpowers/plans/2026-11-04-phase-2.1-semantic-dependency-analysis.md`, 17 tasks.
 
 Phase 2.1 decisions by the owner, 2026-11-04: bound syntax walk for the graph; MCP loads the workspace on every call; one violation per source type and target type with a reference count; every C# project the given path names is checked, with `.slnf` for selection; the Unix test attributes go to `tests/Shared/`, not ZeroAlloc.TestHelpers; execution is subagent-driven. Issue #1 was reopened after PR #22 auto-closed it; the implementation PR closes it.
 

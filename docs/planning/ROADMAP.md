@@ -59,7 +59,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 - [ ] Built-in packs and `.architecture/rules.yaml` are migrated to schema v2 and a JSON Schema is published
 - [ ] The milestone's changes ship to nuget.org in a release-please release
 
-### Phase 2.1: Semantic dependency analysis [status: pending]
+### Phase 2.1: Semantic dependency analysis [status: active]
 **Note:** Consider ZeroAlloc.TestHelpers allocation budgets for the type-graph hot path; consolidate the two UnixNonRootFactAttribute copies (and UnixFact) into TestHelpers.
 **Goal:** Build a type dependency graph from a Roslyn `Compilation`, add `Ariadne.NET.Workspaces` to load solutions through MSBuildWorkspace, and replace `SourceValidator` behind CLI `validate` and MCP `validate_source` on the v1 layer rules; closes #1.
 **Surface:** Backend
