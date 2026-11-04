@@ -41,7 +41,7 @@ internal static class TypeGraphBuilder
             sourceTypes.Add(declaration.Type);
         }
 
-        return new TypeGraph(edges, sourceTypes);
+        return new TypeGraph(edges, sourceTypes, walker.SourceTypes);
     }
 
     /// <summary>Orders locations by file path, line and column.</summary>
