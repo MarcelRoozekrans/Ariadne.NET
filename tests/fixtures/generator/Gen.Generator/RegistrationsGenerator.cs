@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 
@@ -10,5 +11,7 @@ public sealed class RegistrationsGenerator : IIncrementalGenerator
         context.RegisterPostInitializationOutput(static output =>
             output.AddSource(
                 "Registrations.cs",
-                SourceText.From("namespace Gen.App.Domain; class Registrations { Gen.App.Infrastructure.Store? S; }")));
+                SourceText.From(
+                    "namespace Gen.App.Domain; class Registrations { Gen.App.Infrastructure.Store? S; }",
+                    Encoding.UTF8)));
 }
