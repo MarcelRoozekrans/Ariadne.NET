@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Numerics;
 using Ariadne.NET.Abstractions;
 using Ariadne.NET.Analysis;
 using Ariadne.NET.Workspaces;
@@ -62,7 +63,8 @@ var projects = 0;
 var types = 0;
 var violations = 0;
 
-for (var run = 0; run < runs; run++)
+// Run -1 is a warm-up: it pays for JIT and cold caches, and is neither stored nor printed.
+for (var run = -1; run < runs; run++)
 {
     var loadWatch = Stopwatch.StartNew();
     var loaded = await loader.LoadAsync(path).ConfigureAwait(false);
@@ -75,11 +77,19 @@ for (var run = 0; run < runs; run++)
 
     using (loaded.Value)
     {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
         var before = GC.GetTotalAllocatedBytes(true);
         var checkWatch = Stopwatch.StartNew();
         var report = validator.Validate(resolved.Value, loaded.Value.Projects);
         checkWatch.Stop();
         var after = GC.GetTotalAllocatedBytes(true);
+
+        if (run < 0)
+        {
+            continue;
+        }
 
         loadMs[run] = loadWatch.Elapsed.TotalMilliseconds;
         checkMs[run] = checkWatch.Elapsed.TotalMilliseconds;
@@ -97,21 +107,14 @@ for (var run = 0; run < runs; run++)
 Console.WriteLine(string.Create(CultureInfo.InvariantCulture, $"projects {projects}, types {types}, violations {violations}"));
 Console.WriteLine(string.Create(
     CultureInfo.InvariantCulture,
-    $"median ({runs} runs): load {Median(loadMs):F0} ms, check {Median(checkMs):F1} ms, check allocated {MedianLong(allocated):N0} bytes"));
+    $"median ({runs} runs): load {Median(loadMs):F0} ms, check {Median(checkMs):F1} ms, check allocated {Median(allocated):N0} bytes"));
 return 0;
 
-static double Median(double[] values)
+static T Median<T>(T[] values)
+    where T : INumber<T>
 {
-    var sorted = (double[])values.Clone();
+    var sorted = (T[])values.Clone();
     Array.Sort(sorted);
     var mid = sorted.Length / 2;
-    return sorted.Length % 2 == 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-}
-
-static long MedianLong(long[] values)
-{
-    var sorted = (long[])values.Clone();
-    Array.Sort(sorted);
-    var mid = sorted.Length / 2;
-    return sorted.Length % 2 == 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+    return sorted.Length % 2 == 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / T.CreateChecked(2);
 }
