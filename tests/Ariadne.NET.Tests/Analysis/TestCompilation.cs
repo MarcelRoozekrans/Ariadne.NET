@@ -11,8 +11,12 @@ internal static class TestCompilation
 
     public static CSharpCompilation Create(string source) => Create(("Test.cs", source));
 
-    public static CSharpCompilation Create(params (string Path, string Source)[] files)
+    public static CSharpCompilation Create(params (string Path, string Source)[] files) =>
+        Create(extraReferences: [], files);
+
+    public static CSharpCompilation Create(IReadOnlyList<MetadataReference> extraReferences, params (string Path, string Source)[] files)
     {
+        ArgumentNullException.ThrowIfNull(extraReferences);
         ArgumentNullException.ThrowIfNull(files);
 
         var trees = files
@@ -22,7 +26,7 @@ internal static class TestCompilation
         var compilation = CSharpCompilation.Create(
             "TestAssembly",
             trees,
-            PlatformReferences.Value,
+            [.. PlatformReferences.Value, .. extraReferences],
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
 
         var errors = new List<string>();
