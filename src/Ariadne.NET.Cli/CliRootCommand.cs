@@ -30,6 +30,11 @@ public static class CliRootCommand
             var parseResult = CommandLineParser.Parse(Create(provider), args, new ParserConfiguration());
             return await parseResult.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }, cancellationToken).ConfigureAwait(false);
         }
+        catch (OperationCanceledException ex) when (ex.CancellationToken.IsCancellationRequested || cancellationToken.IsCancellationRequested)
+        {
+            Console.Error.WriteLine("Cancelled.");
+            return ExitCodes.Error;
+        }
         catch (Exception ex)
         {
             ReportUnexpected(ex);

@@ -6,11 +6,5 @@ services.AddAriadneNETServices();
 services.AddAriadneNETWorkspaces();
 using var provider = services.BuildServiceProvider();
 
-using var cancellation = new CancellationTokenSource();
-Console.CancelKeyPress += (_, e) =>
-{
-    e.Cancel = true;
-    cancellation.Cancel();
-};
-
-return await CliRootCommand.InvokeAsync(provider, args, cancellation.Token).ConfigureAwait(false);
+// System.CommandLine cancels the action's token on Ctrl+C and SIGTERM by itself, so no handler is hooked here.
+return await CliRootCommand.InvokeAsync(provider, args).ConfigureAwait(false);

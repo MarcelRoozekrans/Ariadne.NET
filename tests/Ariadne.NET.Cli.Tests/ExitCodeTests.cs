@@ -1,7 +1,7 @@
 using System.Runtime.Versioning;
+using Ariadne.NET.Analysis;
 using Ariadne.NET.Cli;
 using Ariadne.NET.Cli.Commands;
-using Ariadne.NET.Analysis;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -461,6 +461,34 @@ public sealed class ExitCodeTests : IDisposable
         var lines = error.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
         lines[0].Should().Be("Error: boom");
         error.ToString().Should().Contain("System.InvalidOperationException: boom").And.Contain(" at ");
+    }
+
+    [Fact]
+    public async Task CancelledCommand_ReportsOneLineAndReturnsError()
+    {
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+        var originalError = Console.Error;
+        using var error = new StringWriter();
+        Console.SetError(error);
+
+        int exitCode;
+        try
+        {
+            exitCode = await CliRootCommand.InvokeAsync(new CancellingServiceProvider(cancelled.Token), ["rules"]);
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
+
+        exitCode.Should().Be(ExitCodes.Error);
+        error.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries).Should().Equal("Cancelled.");
+    }
+
+    private sealed class CancellingServiceProvider(CancellationToken token) : IServiceProvider
+    {
+        public object? GetService(Type serviceType) => throw new OperationCanceledException(token);
     }
 
     private sealed class ThrowingServiceProvider : IServiceProvider
