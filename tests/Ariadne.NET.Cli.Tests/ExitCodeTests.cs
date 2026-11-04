@@ -1,6 +1,7 @@
 using System.Runtime.Versioning;
 using Ariadne.NET.Cli;
 using Ariadne.NET.Cli.Commands;
+using Ariadne.NET.Analysis;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -42,7 +43,7 @@ public sealed class ExitCodeTests : IDisposable
         }
     }
 
-    private int Run(params string[] args) => CliRootCommand.Invoke(_provider, args);
+    private int Run(params string[] args) => CliRootCommand.InvokeAsync(_provider, args).GetAwaiter().GetResult();
 
     private void WriteRules(string content) =>
         File.WriteAllText(Path.Combine(_tempDir, ".architecture", "rules.yaml"), content);
@@ -80,7 +81,49 @@ public sealed class ExitCodeTests : IDisposable
         var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("broken", "Shop.slnx"));
 
         exitCode.Should().Be(ExitCodes.Violations);
-        stdout.Should().Contain("Shop.Domain/Order.cs:").And.NotContain(FixtureProjects.Root);
+        stdout.Should().Contain("  [DependencyNotAllowed] Shop.Domain/Order.cs:").And.NotContain(FixtureProjects.Root);
+    }
+
+    [Fact]
+    public void Validate_ProjectFolder_ShowsViolationFilesRelativeToTheFolder()
+    {
+        var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("multitarget"));
+
+        exitCode.Should().Be(ExitCodes.Violations);
+        stdout.Should().Contain("  [DependencyNotAllowed] Domain/Order.cs:").And.NotContain(FixtureProjects.Root);
+    }
+
+    [Fact]
+    public void Print_SkippedProjectAndViolationWithoutLocation_WritesBothLines()
+    {
+        var report = new ArchitectureReport
+        {
+            Violations =
+            [
+                new ArchitectureViolation
+                {
+                    RuleId = "r",
+                    Kind = ViolationKind.TypeKindMismatch,
+                    SourceType = "Shop.Domain.Order",
+                    Message = "Order must be a record",
+                },
+            ],
+            Projects = [new CheckedProject("Shop.Domain", ["net10.0"])],
+            SkippedProjects = [new SkippedProject("Shop.Docs", "no compilation")],
+            TypesChecked = 4,
+        };
+        using var writer = new StringWriter();
+
+        var exitCode = ValidateCommand.Print(writer, report, _tempDir);
+
+        exitCode.Should().Be(ExitCodes.Violations);
+        var lines = writer.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        lines.Should().Equal(
+            "Checked 4 types in 1 projects",
+            "Skipped Shop.Docs: no compilation",
+            "Result: FAIL - 1 violation(s) found.",
+            "  [TypeKindMismatch] Shop.Domain.Order",
+            "    Order must be a record");
     }
 
     [Fact]
@@ -398,7 +441,7 @@ public sealed class ExitCodeTests : IDisposable
     }
 
     [Fact]
-    public void UnexpectedException_ReportsMessageThenStackTraceAndReturnsError()
+    public async Task UnexpectedException_ReportsMessageThenStackTraceAndReturnsError()
     {
         var originalError = Console.Error;
         using var error = new StringWriter();
@@ -407,7 +450,7 @@ public sealed class ExitCodeTests : IDisposable
         int exitCode;
         try
         {
-            exitCode = CliRootCommand.Invoke(new ThrowingServiceProvider(), ["rules"]);
+            exitCode = await CliRootCommand.InvokeAsync(new ThrowingServiceProvider(), ["rules"]);
         }
         finally
         {

@@ -36,7 +36,7 @@ public static class ValidateCommand
                 return ErrorOutput.Report(result.Error);
             }
 
-            return Print(result.Value, RootOf(path));
+            return Print(Console.Out, result.Value, RootOf(path));
         });
 
         return command;
@@ -48,29 +48,29 @@ public static class ValidateCommand
         return Directory.Exists(full) ? full : Path.GetDirectoryName(full)!;
     }
 
-    private static int Print(ArchitectureReport report, string root)
+    internal static int Print(TextWriter output, ArchitectureReport report, string root)
     {
-        Console.WriteLine($"Checked {report.TypesChecked} types in {report.Projects.Count} projects");
+        output.WriteLine($"Checked {report.TypesChecked} types in {report.Projects.Count} projects");
         foreach (var skipped in report.SkippedProjects)
         {
-            Console.WriteLine($"Skipped {skipped.Name}: {skipped.Reason}");
+            output.WriteLine($"Skipped {skipped.Name}: {skipped.Reason}");
         }
 
         if (report.IsValid)
         {
-            Console.WriteLine("Result: PASS - No violations found.");
+            output.WriteLine("Result: PASS - No violations found.");
             return ExitCodes.Success;
         }
 
-        Console.WriteLine($"Result: FAIL - {report.Violations.Count} violation(s) found.");
-        Console.WriteLine();
+        output.WriteLine($"Result: FAIL - {report.Violations.Count} violation(s) found.");
+        output.WriteLine();
         foreach (var violation in report.Violations)
         {
             var where = violation.Location is { } location
                 ? $"{Path.GetRelativePath(root, location.FilePath).Replace('\\', '/')}:{location.Line}"
                 : violation.SourceType;
-            Console.WriteLine($"  [{violation.Kind}] {where}");
-            Console.WriteLine($"    {violation.Message}");
+            output.WriteLine($"  [{violation.Kind}] {where}");
+            output.WriteLine($"    {violation.Message}");
         }
 
         return ExitCodes.Violations;

@@ -6,4 +6,11 @@ services.AddAriadneNETServices();
 services.AddAriadneNETWorkspaces();
 using var provider = services.BuildServiceProvider();
 
-return CliRootCommand.Invoke(provider, args);
+using var cancellation = new CancellationTokenSource();
+Console.CancelKeyPress += (_, e) =>
+{
+    e.Cancel = true;
+    cancellation.Cancel();
+};
+
+return await CliRootCommand.InvokeAsync(provider, args, cancellation.Token).ConfigureAwait(false);
