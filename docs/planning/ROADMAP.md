@@ -2,15 +2,16 @@
 
 Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 
-## Milestone 1: Ariadne.NET identity and family shape [status: active]
+## Milestone 1: Ariadne.NET identity and family shape [status: complete]
 **Goal:** The engine is renamed to Ariadne.NET, restructured into the family's package shape and published for the first time.
 **Started:** 2026-10-30
+**Completed:** 2026-11-04
 **Definition of Done:**
-- [ ] No `ArchGov` names remain in code, packages, CLI or docs, apart from historical plan documents
-- [ ] `Ariadne.NET.Abstractions` and `Ariadne.NET` build as separate packages
-- [ ] Public engine APIs return ZeroAlloc Results instead of throwing for expected failures
-- [ ] GitHub repo exists with CI, codecov and docs site, and a first version is released by release-please
-- [ ] CI runs the security baseline: gitleaks, NuGetAudit on transitive packages, CodeQL, a CycloneDX SBOM per release, and a codecov coverage floor
+- [x] No `ArchGov` names remain in code, packages, CLI or docs, apart from historical plan documents
+- [x] `Ariadne.NET.Abstractions` and `Ariadne.NET` build as separate packages
+- [x] Public engine APIs return ZeroAlloc Results instead of throwing for expected failures
+- [x] GitHub repo exists with CI, codecov and docs site, and a first version is released by release-please
+- [x] CI runs the security baseline: gitleaks, NuGetAudit on transitive packages, CodeQL, a CycloneDX SBOM per release, and a codecov coverage floor
 
 ### Phase 1.1: Rename to Ariadne.NET [status: complete]
 **Goal:** Rename solution, namespaces, packages, CLI and docs from ArchGov to Ariadne.NET.
@@ -36,11 +37,13 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Plan:** `docs/superpowers/plans/2026-10-31-phase-1.3-family-conventions.md`
 **Completed:** 2026-10-31
 
-### Phase 1.4: Publish [status: pending]
+### Phase 1.4: Publish [status: complete]
 **Goal:** Create the GitHub repo, CI with codecov and a coverage floor, the security baseline (gitleaks on every pull request after the one-time history scan, `NuGetAuditMode=all`, CodeQL, a CycloneDX SBOM attached to each release), the first release-please release, the docs site and the Family README section. Trivy waits until a container image ships.
 **Surface:** Infra
 **HelpWanted:** no
-**Plan:** _to be written_
+**Design:** `docs/superpowers/specs/2026-10-31-phase-1.4-publish-design.md`
+**Plan:** `docs/superpowers/plans/2026-11-03-phase-1.4-publish.md`
+**Completed:** 2026-11-04
 
 ## Milestone 2: Rule engine v2 [status: pending]
 **Goal:** Packs can express and enforce everything the Daedalus rules need, checked against the real type graph.
