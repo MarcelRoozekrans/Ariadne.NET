@@ -100,33 +100,41 @@ public sealed class ArchitectureValidator : IArchitectureValidator
     }
 
     // A role that requires an interface role is satisfied by a matching type in any project of the same target framework.
+    // A project with a null target framework is single-target, so it is present in every framework's scope, and its own
+    // scope holds the matches of every project, because the checks are open-world. Two different named frameworks never
+    // satisfy each other.
     private static void AddMissingInterfaceViolations(List<Entry> entries, RulePack pack)
     {
-        var byFramework = new Dictionary<ValueTuple<string?>, List<Entry>>();
+        var unnamed = new List<RoleMatches>();
+        var all = new List<RoleMatches>(entries.Count);
+        var byFramework = new Dictionary<string, List<RoleMatches>>(StringComparer.Ordinal);
         foreach (ref readonly var entry in CollectionsMarshal.AsSpan(entries))
         {
-            var key = new ValueTuple<string?>(entry.Project.TargetFramework);
-            if (!byFramework.TryGetValue(key, out var list))
+            all.Add(entry.Matches);
+            if (entry.Project.TargetFramework is not { } framework)
             {
-                list = [];
-                byFramework.Add(key, list);
+                unnamed.Add(entry.Matches);
+                continue;
             }
 
-            list.Add(entry);
+            if (!byFramework.TryGetValue(framework, out var list))
+            {
+                list = [];
+                byFramework.Add(framework, list);
+            }
+
+            list.Add(entry.Matches);
         }
 
         foreach (var list in byFramework.Values)
         {
-            var scope = new List<RoleMatches>(list.Count);
-            foreach (ref readonly var entry in CollectionsMarshal.AsSpan(list))
-            {
-                scope.Add(entry.Matches);
-            }
+            list.AddRange(unnamed);
+        }
 
-            foreach (ref readonly var entry in CollectionsMarshal.AsSpan(list))
-            {
-                entry.Violations.AddRange(V1RoleRules.CheckMissingInterface(entry.Matches, scope, pack));
-            }
+        foreach (ref readonly var entry in CollectionsMarshal.AsSpan(entries))
+        {
+            var scope = entry.Project.TargetFramework is { } framework ? byFramework[framework] : all;
+            entry.Violations.AddRange(V1RoleRules.CheckMissingInterface(entry.Matches, scope, pack));
         }
     }
 

@@ -216,6 +216,35 @@ public class ArchitectureValidatorTests
     }
 
     [Fact]
+    public void MissingInterface_SingleTargetInterfaceSatisfiesMultiTargetImplementation()
+    {
+        var repository = ("Repo.cs", "namespace MyApp.Orders.Infrastructure; internal class OrderRepository { }");
+        var contract = ("Contract.cs", "namespace MyApp.Orders.Domain; public interface IOrderRepository { }");
+
+        // Workspaces gives a single-target project a null framework and each framework of a multi-target project its name.
+        _validator.Validate(Pack,
+        [
+            new AnalyzedProject("Domain", null, TestCompilation.Create(contract)),
+            new AnalyzedProject("Infra", "netstandard2.0", TestCompilation.Create(repository)),
+            new AnalyzedProject("Infra", "net8.0", TestCompilation.Create(repository)),
+        ]).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void MissingInterface_MultiTargetInterfaceSatisfiesSingleTargetImplementation()
+    {
+        var repository = ("Repo.cs", "namespace MyApp.Orders.Infrastructure; internal class OrderRepository { }");
+        var contract = ("Contract.cs", "namespace MyApp.Orders.Domain; public interface IOrderRepository { }");
+
+        _validator.Validate(Pack,
+        [
+            new AnalyzedProject("Domain", "netstandard2.0", TestCompilation.Create(contract)),
+            new AnalyzedProject("Domain", "net8.0", TestCompilation.Create(contract)),
+            new AnalyzedProject("Infra", null, TestCompilation.Create(repository)),
+        ]).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
     public void NoProjects_IsValidAndEmpty()
     {
         var report = _validator.Validate(Pack, []);
