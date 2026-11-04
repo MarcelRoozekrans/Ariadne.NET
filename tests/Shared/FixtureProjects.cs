@@ -8,7 +8,7 @@ namespace Ariadne.NET.Tests.Shared;
 /// </summary>
 internal static class FixtureProjects
 {
-    private const string LockFileName = ".restore.lock";
+    internal const string LockFileName = ".restore.lock";
     private const string MarkerFileName = ".restore-marker";
 
     private static readonly string[] RestoreTargets =
@@ -46,38 +46,41 @@ internal static class FixtureProjects
                 return;
             }
 
-            RestoreUnderLock();
+            RestoreUnderLock(Root);
             _restored = true;
         }
     }
 
-    /// <summary>Takes the lock, then restores unless the marker says the fixtures are already restored. Bypasses the once-per-process guard.</summary>
-    internal static void RestoreUnderLock()
+    /// <summary>
+    /// Takes the lock, then restores unless the marker says the fixtures are already restored. Bypasses the once-per-process
+    /// guard. <paramref name="root"/> is a fixtures folder: the real one, or a copy that a test can damage.
+    /// </summary>
+    internal static void RestoreUnderLock(string root)
     {
-        using var fileLock = TakeLock(Path(LockFileName));
+        using var fileLock = TakeLock(System.IO.Path.Combine(root, LockFileName));
 
-        var stamp = LatestSourceWrite().ToString(CultureInfo.InvariantCulture);
-        var markerPath = Path(MarkerFileName);
+        var stamp = LatestSourceWrite(root).ToString(CultureInfo.InvariantCulture);
+        var markerPath = System.IO.Path.Combine(root, MarkerFileName);
         if (File.Exists(markerPath)
             && string.Equals(File.ReadAllText(markerPath), stamp, StringComparison.Ordinal)
-            && OutputsExist())
+            && OutputsExist(root))
         {
             return;
         }
 
         foreach (var target in RestoreTargets)
         {
-            Dotnet("restore", Path(target.Split('/')));
+            Dotnet("restore", System.IO.Path.Combine([root, .. target.Split('/')]));
         }
 
-        Dotnet("build", Path("generator", "Gen.Generator", "Gen.Generator.csproj"), "--no-restore");
+        Dotnet("build", System.IO.Path.Combine(root, "generator", "Gen.Generator", "Gen.Generator.csproj"), "--no-restore");
         File.WriteAllText(markerPath, stamp);
     }
 
     /// <summary>True when every restore target has its assets file and the generator has been built.</summary>
-    internal static bool OutputsExist()
+    internal static bool OutputsExist(string root)
     {
-        foreach (var assets in AssetsFiles())
+        foreach (var assets in AssetsFiles(root))
         {
             if (!File.Exists(assets))
             {
@@ -85,15 +88,15 @@ internal static class FixtureProjects
             }
         }
 
-        return File.Exists(GeneratorDll());
+        return File.Exists(GeneratorDll(root));
     }
 
     /// <summary>The <c>obj/project.assets.json</c> of each restore target, one per project folder of a solution.</summary>
-    internal static IEnumerable<string> AssetsFiles()
+    internal static IEnumerable<string> AssetsFiles(string root)
     {
         foreach (var target in RestoreTargets)
         {
-            var targetPath = Path(target.Split('/'));
+            var targetPath = System.IO.Path.Combine([root, .. target.Split('/')]);
             var folder = System.IO.Path.GetDirectoryName(targetPath)!;
             if (targetPath.EndsWith(".slnx", StringComparison.Ordinal))
             {
@@ -109,8 +112,8 @@ internal static class FixtureProjects
         }
     }
 
-    internal static string GeneratorDll() =>
-        Path("generator", "Gen.Generator", "bin", "Debug", "netstandard2.0", "Gen.Generator.dll");
+    internal static string GeneratorDll(string root) =>
+        System.IO.Path.Combine(root, "generator", "Gen.Generator", "bin", "Debug", "netstandard2.0", "Gen.Generator.dll");
 
     /// <summary>Takes an exclusive lock on <paramref name="lockPath"/>, retrying while another holder has it, for at most five minutes.</summary>
     internal static FileStream TakeLock(string lockPath)
@@ -134,17 +137,22 @@ internal static class FixtureProjects
         }
     }
 
-    // A held lock surfaces as a plain IOException on every platform. Missing folders, bad paths and missing drives are
-    // IOException subclasses that waiting cannot fix, so they are rethrown.
-    private static bool IsSharingViolation(IOException ex) =>
-        ex is not (DirectoryNotFoundException or FileNotFoundException or PathTooLongException or DriveNotFoundException);
+    /// <summary>
+    /// True when <paramref name="ex"/> says another holder has the file: ERROR_SHARING_VIOLATION on Windows, and on Unix the
+    /// errno that .NET passes through as the HResult of a failed advisory lock, EAGAIN, which is 11 on Linux and 35 on macOS.
+    /// Anything else, such as a missing folder or a full disk, is a real error and not a reason to wait.
+    /// </summary>
+    internal static bool IsSharingViolation(IOException ex) =>
+        OperatingSystem.IsWindows()
+            ? ex.HResult == unchecked((int)0x80070020)
+            : ex.HResult is 11 or 35;
 
-    private static long LatestSourceWrite()
+    private static long LatestSourceWrite(string root)
     {
         var latest = 0L;
-        foreach (var file in Directory.EnumerateFiles(Root, "*", SearchOption.AllDirectories))
+        foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
         {
-            var relative = System.IO.Path.GetRelativePath(Root, file);
+            var relative = System.IO.Path.GetRelativePath(root, file);
             var segments = relative.Split(System.IO.Path.DirectorySeparatorChar);
             if (Array.Exists(segments, IsBuildOutput) || segments[0].StartsWith(".restore", StringComparison.Ordinal))
             {

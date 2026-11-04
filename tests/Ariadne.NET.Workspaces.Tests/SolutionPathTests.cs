@@ -136,12 +136,11 @@ public sealed class SolutionPathTests : IDisposable
     public async Task RestoreUnderLock_WaitsWhileAnotherHolderHasTheLock()
     {
         FixtureProjects.EnsureRestored();
-        var lockPath = FixtureProjects.Path(".restore.lock");
-        var held = FixtureProjects.TakeLock(lockPath);
+        var held = FixtureProjects.TakeLock(FixtureProjects.Path(FixtureProjects.LockFileName));
         Task restore;
         try
         {
-            restore = Task.Run(FixtureProjects.RestoreUnderLock);
+            restore = Task.Run(() => FixtureProjects.RestoreUnderLock(FixtureProjects.Root));
 
             await Task.Delay(300);
             restore.IsCompleted.Should().BeFalse("the lock is held by someone else");
@@ -152,21 +151,66 @@ public sealed class SolutionPathTests : IDisposable
         }
 
         await restore.WaitAsync(TimeSpan.FromMinutes(2));
-        File.Exists(FixtureProjects.Path("clean", "Shop.Domain", "obj", "project.assets.json")).Should().BeTrue();
     }
 
     [Fact]
     public void RestoreUnderLock_MissingAssetsFile_RestoresAgain()
     {
         FixtureProjects.EnsureRestored();
-        var assets = FixtureProjects.Path("multitarget", "obj", "project.assets.json");
-        File.Delete(assets);
-        FixtureProjects.OutputsExist().Should().BeFalse();
+        var copy = Directory.CreateDirectory(Path.Combine(_dir, "fixtures")).FullName;
+        CopySources(FixtureProjects.Root, copy);
+        var assets = Path.Combine(copy, "multitarget", "obj", "project.assets.json");
 
-        FixtureProjects.RestoreUnderLock();
+        FixtureProjects.RestoreUnderLock(copy);
+        File.Exists(assets).Should().BeTrue();
+        FixtureProjects.OutputsExist(copy).Should().BeTrue();
+
+        File.Delete(assets);
+        FixtureProjects.OutputsExist(copy).Should().BeFalse();
+
+        FixtureProjects.RestoreUnderLock(copy);
 
         File.Exists(assets).Should().BeTrue();
-        FixtureProjects.OutputsExist().Should().BeTrue();
+        FixtureProjects.OutputsExist(copy).Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsSharingViolation_TrueForAHeldLock()
+    {
+        var lockPath = Path.Combine(_dir, "held.lock");
+        using var held = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+
+        var act = () => new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+
+        var thrown = act.Should().Throw<IOException>().Which;
+        FixtureProjects.IsSharingViolation(thrown).Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsSharingViolation_FalseForOtherIOExceptions()
+    {
+        FixtureProjects.IsSharingViolation(new IOException("wrapped", new FileNotFoundException("gone"))).Should().BeFalse();
+        FixtureProjects.IsSharingViolation(new DirectoryNotFoundException("gone")).Should().BeFalse();
+        FixtureProjects.IsSharingViolation(new IOException("There is not enough space on the disk.", unchecked((int)0x80070070))).Should().BeFalse();
+    }
+
+    // Copies the fixture sources, keeping the fixture-local Directory.Build files so the import chain still stops there.
+    private static void CopySources(string from, string to)
+    {
+        foreach (var file in Directory.EnumerateFiles(from, "*", SearchOption.AllDirectories))
+        {
+            var relative = Path.GetRelativePath(from, file);
+            var segments = relative.Split(Path.DirectorySeparatorChar);
+            if (Array.Exists(segments, s => string.Equals(s, "bin", StringComparison.Ordinal) || string.Equals(s, "obj", StringComparison.Ordinal))
+                || segments[0].StartsWith(".restore", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var target = Path.Combine(to, relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(file, target);
+        }
     }
 
     private string Touch(string name)
