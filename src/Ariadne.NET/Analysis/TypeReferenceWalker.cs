@@ -112,6 +112,13 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
         }
 
         var symbol = Resolve(Model.GetSymbolInfo(node, _cancellationToken));
+
+        // 'nint' and 'nuint' are keywords that parse as identifiers; like 'var' and like 'int', they give no edge.
+        if (symbol is INamedTypeSymbol { IsNativeIntegerType: true } && node.Identifier.ValueText is "nint" or "nuint")
+        {
+            return;
+        }
+
         var target = NormalizeSymbol(symbol);
         if (target is null || IsMemberOfWrittenType(node, symbol!, target))
         {
@@ -170,7 +177,10 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
             : null;
     }
 
-    /// <summary>True for a type C# writes as a keyword, such as <c>int</c> or <c>string</c>; a written keyword is not a name and gives no edge.</summary>
+    /// <summary>
+    /// True for a type C# writes as a keyword, such as <c>int</c>, <c>string</c> or <c>nint</c>. A written keyword gives no edge:
+    /// most are predefined-type syntax, and a written <c>nint</c> or <c>nuint</c> is skipped in <see cref="VisitIdentifierName"/>.
+    /// </summary>
     private static bool IsKeywordType(INamedTypeSymbol type) => type.SpecialType switch
     {
         SpecialType.System_Object or SpecialType.System_Void or SpecialType.System_Boolean or SpecialType.System_Char
@@ -196,7 +206,6 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
         var left = node.Parent switch
         {
             MemberAccessExpressionSyntax memberAccess when memberAccess.Name == node => memberAccess.Expression,
-            QualifiedNameSyntax qualified when qualified.Right == node => qualified.Left,
             _ => null,
         };
 
@@ -206,8 +215,9 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     }
 
     /// <summary>
-    /// For a bare name that binds to a static member or nested type, returns the <c>using static</c> type that imports it:
-    /// the member's containing type, or a type that inherits the member from it. Null for any other name.
+    /// For a bare name that binds to a static member or nested type, returns the <c>using static</c> type that imports it.
+    /// That is the member's containing type itself: <c>using static</c> imports only members declared directly in the named type,
+    /// never inherited ones. Null for any other name.
     /// </summary>
     private INamedTypeSymbol? FindStaticImport(IdentifierNameSyntax node, ISymbol symbol)
     {
@@ -223,12 +233,9 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
 
         foreach (ref readonly var imported in CollectionsMarshal.AsSpan(GetStaticImports(node)))
         {
-            for (var type = imported; type is not null; type = type.BaseType)
+            if (SymbolEqualityComparer.Default.Equals(imported, containingType))
             {
-                if (SymbolEqualityComparer.Default.Equals(type, containingType))
-                {
-                    return imported;
-                }
+                return imported;
             }
         }
 

@@ -15,6 +15,7 @@ public class TypeGraphBuilderTests
         {
             public class Store { }
             public class Base<T> { public static void Foo() { } public class Nested { } }
+            public class Derived : Base<Store> { }
             public class Repo<T> { public string? Name { get; set; } public void Save(T? entity) { } }
             public sealed record Box<T>(T? Value);
             public class Holder { public Repo<Store>? Repo { get; set; } }
@@ -459,6 +460,9 @@ public class TypeGraphBuilderTests
     [InlineData("Shop.Infra.Outer.Inner")]
     [InlineData("Shop.Infra.Outer.Inner[]")]
     [InlineData("System.Collections.Generic.Dictionary<Shop.Infra.Store, (Shop.Infra.Outer, object)>")]
+    [InlineData("System.Collections.Generic.Dictionary<Shop.Infra.Store, Shop.Infra.Store>")]
+    [InlineData("System.Collections.Generic.List<nint>")]
+    [InlineData("System.Collections.Generic.List<nuint>")]
     public void AliasUse_GivesTheSameEdgesAsTheWrittenTarget(string target)
     {
         const string Types = "namespace Shop.Infra { public class Store { } public class Outer { public class Inner { } } }";
@@ -469,8 +473,9 @@ public class TypeGraphBuilderTests
             ("Store.cs", Types),
             ("Order.cs", "namespace Shop.Domain { public class Order { private " + target + " _value = default!; } }"));
 
+        // Distinct pairs: an alias use is one location, the written target may name a type twice.
         aliased.Should().NotBeEmpty();
-        aliased.Should().BeEquivalentTo(written);
+        aliased.Distinct().Should().BeEquivalentTo(written.Distinct());
     }
 
     [Fact]
@@ -487,6 +492,83 @@ public class TypeGraphBuilderTests
             """);
 
         AssertOrderEdges(graph, (Store, 5, 46), (Store, 5, 70));
+    }
+
+    [Fact]
+    public void UsingStaticOfDerivedType_InheritedMemberCalledFromOwnBase_NoEdgeToImportedType()
+    {
+        var graph = Build(
+            ("Store.cs", ExpansionTypes),
+            ("Order.cs", """
+                using static Shop.Infra.Derived;
+
+                namespace Shop.Domain
+                {
+                    public class Order : Shop.Infra.Base<Shop.Infra.Store>
+                    {
+                        public void Place() => Foo();
+                    }
+                }
+                """));
+
+        AssertOrderEdges(graph, ("Shop.Infra.Base<T>", 5, 37), (Store, 5, 53), ("Shop.Infra.Base<T>", 7, 32));
+    }
+
+    [Fact]
+    public void UsingStaticOfNonGenericType_OneEdgePerUse()
+    {
+        var graph = Build(
+            ("Store.cs", StoreClass),
+            ("Order.cs", """
+                using static Shop.Infra.Store;
+
+                namespace Shop.Domain
+                {
+                    public class Order
+                    {
+                        public void Place() { Make(); _ = Count; }
+                    }
+                }
+                """));
+
+        AssertOrderEdges(graph, (Store, 7, 31), (Store, 7, 43));
+    }
+
+    [Fact]
+    public void StaticMemberOfNestedType_EdgesToOuterAndInnerOnly()
+    {
+        var graph = Build(
+            ("Store.cs", "namespace Shop.Infra { public class Outer { public class Inner { public static void M() { } } } }"),
+            ("Order.cs", """
+                namespace Shop.Domain
+                {
+                    public class Order
+                    {
+                        public void Place() => Shop.Infra.Outer.Inner.M();
+                    }
+                }
+                """));
+
+        AssertOrderEdges(graph, ("Shop.Infra.Outer", 5, 43), ("Shop.Infra.Outer.Inner", 5, 49));
+    }
+
+    [Fact]
+    public void AliasOnLeftOfStaticMemberAccess_EdgesAtTheAliasOnly()
+    {
+        var graph = Build(
+            ("Store.cs", StoreClass + "\nnamespace Shop.Util { public static class Helper<T> { public static void Foo() { } } }"),
+            ("Order.cs", """
+                namespace Shop.Domain
+                {
+                    using H = Shop.Util.Helper<Shop.Infra.Store>;
+                    public class Order
+                    {
+                        public void Place() => H.Foo();
+                    }
+                }
+                """));
+
+        AssertOrderEdges(graph, (Store, 6, 32), ("Shop.Util.Helper<T>", 6, 32));
     }
 
     [Fact]
