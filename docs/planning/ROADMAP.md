@@ -64,7 +64,8 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Goal:** Build a type dependency graph from a Roslyn `Compilation`, add `Ariadne.NET.Workspaces` to load solutions through MSBuildWorkspace, and replace `SourceValidator` behind CLI `validate` and MCP `validate_source` on the v1 layer rules; closes #1.
 **Surface:** Backend
 **HelpWanted:** no
-**Plan:** _to be written_
+**Design:** `docs/superpowers/specs/2026-11-04-phase-2.1-semantic-dependency-analysis-design.md`
+**Plan:** `docs/superpowers/plans/2026-11-04-phase-2.1-semantic-dependency-analysis.md`
 
 ### Phase 2.2: Rule schema v2 [status: pending]
 **Note:** Consider ZeroAlloc.Specification for rule matching; extend the ZeroAlloc.Validation rules from 1.3.
