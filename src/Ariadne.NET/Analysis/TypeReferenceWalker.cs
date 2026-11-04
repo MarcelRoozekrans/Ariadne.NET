@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -12,6 +13,10 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     private readonly Dictionary<INamedTypeSymbol, bool> _checkedTypes = new(SymbolEqualityComparer.Default);
     private SemanticModel? _model;
     private INamedTypeSymbol? _programType;
+
+    /// <summary>The <c>using static</c> types in scope at <see cref="_importScopeOwner"/>, computed on first need.</summary>
+    private List<INamedTypeSymbol>? _staticImports;
+    private SyntaxNode? _importScopeOwner;
 
     /// <summary>The current edge source, or null outside a type or inside a type that is not checked.</summary>
     private INamedTypeSymbol? _source;
@@ -32,6 +37,8 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
         _model = model;
         _programType = null;
         _source = null;
+        _staticImports = null;
+        _importScopeOwner = null;
         Visit(model.SyntaxTree.GetRoot(_cancellationToken));
         _model = null;
     }
@@ -97,21 +104,26 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
         }
 
         // An alias target is written in the using directive, outside any type, so the use site
-        // is the only place that can record the types inside it.
+        // records the edges that writing the target in its place would give.
         if (Model.GetAliasInfo(node, _cancellationToken) is { } alias)
         {
-            AddEdgesForType(alias.Target as ITypeSymbol, node.Span);
+            AddEdgesForWrittenType(alias.Target as ITypeSymbol, node.Span);
             return;
         }
 
         var symbol = Resolve(Model.GetSymbolInfo(node, _cancellationToken));
-        AddEdge(NormalizeSymbol(symbol), node.Span);
-
-        // A bare name that binds into a constructed type, as through 'using static Helper<Store>;',
-        // has its type arguments written in the directive, not here.
-        if (IsBareName(node) && symbol?.ContainingType is { } containingType && IsConstructed(containingType))
+        var target = NormalizeSymbol(symbol);
+        if (target is null || IsMemberOfWrittenType(node, symbol!, target))
         {
-            AddEdgesForType(containingType, node.Span);
+            return;
+        }
+
+        AddEdge(target, node.Span);
+
+        // A bare name imported through 'using static Helper<Store>;' has its type written in the directive.
+        if (FindStaticImport(node, symbol!) is { } imported)
+        {
+            AddEdgesForWrittenType(imported, node.Span);
         }
     }
 
@@ -139,7 +151,6 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
 
     private static INamedTypeSymbol? NormalizeSymbol(ISymbol? symbol) => symbol switch
     {
-        IAliasSymbol alias => NormalizeSymbol(alias.Target),
         IMethodSymbol method => NormalizeType((method.ReducedFrom ?? method).ContainingType),
         IPropertySymbol or IFieldSymbol or IEventSymbol => NormalizeType(symbol.ContainingType),
         ITypeSymbol type => NormalizeType(type),
@@ -148,25 +159,106 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
 
     private static INamedTypeSymbol? NormalizeType(ITypeSymbol? type)
     {
-        while (true)
+        // A member of a C# 14 extension block belongs to the static class around the block.
+        if (type is INamedTypeSymbol { IsExtension: true } extension)
         {
-            switch (type)
+            type = extension.ContainingType;
+        }
+
+        return type is INamedTypeSymbol named && named.TypeKind != TypeKind.Error && !named.IsAnonymousType
+            ? named.OriginalDefinition
+            : null;
+    }
+
+    /// <summary>True for a type C# writes as a keyword, such as <c>int</c> or <c>string</c>; a written keyword is not a name and gives no edge.</summary>
+    private static bool IsKeywordType(INamedTypeSymbol type) => type.SpecialType switch
+    {
+        SpecialType.System_Object or SpecialType.System_Void or SpecialType.System_Boolean or SpecialType.System_Char
+            or SpecialType.System_SByte or SpecialType.System_Byte or SpecialType.System_Int16 or SpecialType.System_UInt16
+            or SpecialType.System_Int32 or SpecialType.System_UInt32 or SpecialType.System_Int64 or SpecialType.System_UInt64
+            or SpecialType.System_Decimal or SpecialType.System_Single or SpecialType.System_Double
+            or SpecialType.System_String => true,
+        SpecialType.System_IntPtr or SpecialType.System_UIntPtr => type.IsNativeIntegerType,
+        _ => false,
+    };
+
+    /// <summary>
+    /// True when the name is a member accessed through a type name that already gave the edge, as <c>Count</c> in <c>Store.Count</c>,
+    /// so one written reference counts once.
+    /// </summary>
+    private bool IsMemberOfWrittenType(IdentifierNameSyntax node, ISymbol symbol, INamedTypeSymbol target)
+    {
+        if (symbol is ITypeSymbol)
+        {
+            return false;
+        }
+
+        var left = node.Parent switch
+        {
+            MemberAccessExpressionSyntax memberAccess when memberAccess.Name == node => memberAccess.Expression,
+            QualifiedNameSyntax qualified when qualified.Right == node => qualified.Left,
+            _ => null,
+        };
+
+        return left is not null
+            && Resolve(Model.GetSymbolInfo(left, _cancellationToken)) is ITypeSymbol leftType
+            && SymbolEqualityComparer.Default.Equals(NormalizeType(leftType), target);
+    }
+
+    /// <summary>
+    /// For a bare name that binds to a static member or nested type, returns the <c>using static</c> type that imports it:
+    /// the member's containing type, or a type that inherits the member from it. Null for any other name.
+    /// </summary>
+    private INamedTypeSymbol? FindStaticImport(IdentifierNameSyntax node, ISymbol symbol)
+    {
+        if (symbol.ContainingType is not { } containingType
+            || (symbol is not INamedTypeSymbol && !symbol.IsStatic)
+            || SymbolEqualityComparer.Default.Equals(containingType.OriginalDefinition, _source)
+            || node.Parent is MemberAccessExpressionSyntax { Name: var name } && name == node
+            || node.Parent is QualifiedNameSyntax { Right: var right } && right == node
+            || node.Parent is AliasQualifiedNameSyntax or MemberBindingExpressionSyntax)
+        {
+            return null;
+        }
+
+        foreach (ref readonly var imported in CollectionsMarshal.AsSpan(GetStaticImports(node)))
+        {
+            for (var type = imported; type is not null; type = type.BaseType)
             {
-                case IArrayTypeSymbol array:
-                    type = array.ElementType;
-                    break;
-                case IPointerTypeSymbol pointer:
-                    type = pointer.PointedAtType;
-                    break;
-                case INamedTypeSymbol { IsExtension: true } extension:
-                    type = extension.ContainingType;
-                    break;
-                case INamedTypeSymbol named when named.TypeKind != TypeKind.Error && !named.IsAnonymousType:
-                    return named.OriginalDefinition;
-                default:
-                    return null;
+                if (SymbolEqualityComparer.Default.Equals(type, containingType))
+                {
+                    return imported;
+                }
             }
         }
+
+        return null;
+    }
+
+    private List<INamedTypeSymbol> GetStaticImports(SyntaxNode node)
+    {
+        // Import scopes change only at namespace declarations, so the list is cached per declaration.
+        var owner = (SyntaxNode?)node.FirstAncestorOrSelf<BaseNamespaceDeclarationSyntax>() ?? node.SyntaxTree.GetRoot(_cancellationToken);
+        if (_staticImports is not null && owner == _importScopeOwner)
+        {
+            return _staticImports;
+        }
+
+        var imports = new List<INamedTypeSymbol>();
+        foreach (var scope in Model.GetImportScopes(node.SpanStart, _cancellationToken))
+        {
+            foreach (var import in scope.Imports)
+            {
+                if (import.NamespaceOrType is INamedTypeSymbol type)
+                {
+                    imports.Add(type);
+                }
+            }
+        }
+
+        _importScopeOwner = owner;
+        _staticImports = imports;
+        return imports;
     }
 
     private INamedTypeSymbol? EnterType(SyntaxNode declaration, SyntaxToken identifier)
@@ -216,19 +308,6 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     private static ISymbol? Resolve(SymbolInfo info) =>
         info.Symbol ?? (info.CandidateSymbols.Length > 0 ? info.CandidateSymbols[0] : null);
 
-    /// <summary>True when the name has no qualifier or receiver, so nothing at the use site writes its containing type.</summary>
-    private static bool IsBareName(IdentifierNameSyntax node) => node.Parent switch
-    {
-        MemberAccessExpressionSyntax memberAccess => memberAccess.Name != node,
-        QualifiedNameSyntax qualified => qualified.Right != node,
-        AliasQualifiedNameSyntax aliasQualified => aliasQualified.Name != node,
-        MemberBindingExpressionSyntax => false,
-        _ => true,
-    };
-
-    private static bool IsConstructed(INamedTypeSymbol type) =>
-        !SymbolEqualityComparer.Default.Equals(type, type.OriginalDefinition);
-
     private void AddEdge(SymbolInfo info, TextSpan span) => AddEdge(NormalizeSymbol(Resolve(info)), span);
 
     private void AddEdge(INamedTypeSymbol? target, TextSpan span)
@@ -241,23 +320,45 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
         Edges.Add(new TypeEdge(_source, target, ToLocation(span)));
     }
 
-    /// <summary>Adds an edge to the type and to every named type inside it: element types, containing types and type arguments, recursively.</summary>
-    private void AddEdgesForType(ITypeSymbol? type, TextSpan span)
+    /// <summary>
+    /// Adds the edges that writing the type at the span would give: the type and its containing types, the type arguments,
+    /// tuple element, array and pointer element types, and function pointer signatures, recursively.
+    /// A tuple or <c>T?</c> gives only its parts, and a keyword type gives nothing, as their written forms do.
+    /// </summary>
+    private void AddEdgesForWrittenType(ITypeSymbol? type, TextSpan span)
     {
         switch (type)
         {
             case IArrayTypeSymbol array:
-                AddEdgesForType(array.ElementType, span);
+                AddEdgesForWrittenType(array.ElementType, span);
                 break;
             case IPointerTypeSymbol pointer:
-                AddEdgesForType(pointer.PointedAtType, span);
+                AddEdgesForWrittenType(pointer.PointedAtType, span);
                 break;
-            case INamedTypeSymbol named:
+            case IFunctionPointerTypeSymbol functionPointer:
+                AddEdgesForWrittenType(functionPointer.Signature.ReturnType, span);
+                foreach (var parameter in functionPointer.Signature.Parameters)
+                {
+                    AddEdgesForWrittenType(parameter.Type, span);
+                }
+
+                break;
+            case INamedTypeSymbol { IsTupleType: true } tuple:
+                foreach (var element in tuple.TupleElements)
+                {
+                    AddEdgesForWrittenType(element.Type, span);
+                }
+
+                break;
+            case INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable:
+                AddEdgesForWrittenType(nullable.TypeArguments[0], span);
+                break;
+            case INamedTypeSymbol named when !IsKeywordType(named):
                 AddEdge(NormalizeType(named), span);
-                AddEdgesForType(named.ContainingType, span);
+                AddEdgesForWrittenType(named.ContainingType, span);
                 foreach (var typeArgument in named.TypeArguments)
                 {
-                    AddEdgesForType(typeArgument, span);
+                    AddEdgesForWrittenType(typeArgument, span);
                 }
 
                 break;

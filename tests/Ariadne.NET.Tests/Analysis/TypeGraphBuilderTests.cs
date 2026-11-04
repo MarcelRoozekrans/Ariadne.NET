@@ -10,6 +10,18 @@ public class TypeGraphBuilderTests
     private const string Order = "Shop.Domain.Order";
     private const string Store = "Shop.Infra.Store";
 
+    private const string ExpansionTypes = """
+        namespace Shop.Infra
+        {
+            public class Store { }
+            public class Base<T> { public static void Foo() { } public class Nested { } }
+            public class Repo<T> { public string? Name { get; set; } public void Save(T? entity) { } }
+            public sealed record Box<T>(T? Value);
+            public class Holder { public Repo<Store>? Repo { get; set; } }
+            public class Factory { public Repo<Store> Make() => new(); public Box<Store> MakeBox() => new(null); }
+        }
+        """;
+
     private const string StoreClass = """
         namespace Shop.Infra
         {
@@ -255,8 +267,8 @@ public class TypeGraphBuilderTests
     }
 
     [Fact]
-    public void AliasToConstructedGeneric_GivesEdgeToTypeArgument() => AssertSingleOrderToStoreAt(
-        """
+    public void AliasToConstructedGeneric_GivesEdgeToTypeArgument() => AssertOrderEdges(
+        BuildOrder("""
         namespace Shop.Domain
         {
             using Stores = System.Collections.Generic.List<Shop.Infra.Store>;
@@ -265,13 +277,13 @@ public class TypeGraphBuilderTests
                 private Stores? _stores;
             }
         }
-        """,
-        line: 6,
-        column: 17);
+        """),
+        (Store, 6, 17),
+        ("System.Collections.Generic.List<T>", 6, 17));
 
     [Fact]
-    public void TupleAlias_GivesEdgeToElementType() => AssertSingleOrderToStoreAt(
-        """
+    public void TupleAlias_GivesEdgeToElementType() => AssertOrderEdges(
+        BuildOrder("""
         namespace Shop.Domain
         {
             using Pair = (Shop.Infra.Store Store, int Count);
@@ -280,13 +292,12 @@ public class TypeGraphBuilderTests
                 private Pair _pair;
             }
         }
-        """,
-        line: 6,
-        column: 17);
+        """),
+        (Store, 6, 17));
 
     [Fact]
-    public void DelegateAlias_GivesEdgeToTypeArgument() => AssertSingleOrderToStoreAt(
-        """
+    public void DelegateAlias_GivesEdgeToTypeArgument() => AssertOrderEdges(
+        BuildOrder("""
         namespace Shop.Domain
         {
             using Find = System.Func<Shop.Infra.Store>;
@@ -295,9 +306,9 @@ public class TypeGraphBuilderTests
                 private Find? _find;
             }
         }
-        """,
-        line: 6,
-        column: 17);
+        """),
+        (Store, 6, 17),
+        ("System.Func<TResult>", 6, 17));
 
     [Fact]
     public void UsingStaticOfConstructedGeneric_GivesEdgeToTypeArgument()
@@ -316,8 +327,7 @@ public class TypeGraphBuilderTests
                 }
                 """));
 
-        AssertSingleOrderToStoreAt(graph, "Order.cs", line: 7, column: 32);
-        graph.Edges.Select(Pair).Should().Contain((Order, "Shop.Util.Helper<T>"));
+        AssertOrderEdges(graph, (Store, 7, 32), ("Shop.Util.Helper<T>", 7, 32));
     }
 
     [Fact]
@@ -388,7 +398,207 @@ public class TypeGraphBuilderTests
             }
             """);
 
-        AssertSingleOrderToStoreAt(graph, "Order.cs", line: 6, column: 17);
+        AssertOrderEdges(graph, (Store, 6, 17));
+    }
+
+    [Fact]
+    public void NullableAlias_GivesEdgeToUnderlyingTypeOnly()
+    {
+        var graph = BuildUnsafe("""
+            namespace Shop.Domain
+            {
+                using MaybeStore = Shop.Infra.Store?;
+                public class Order
+                {
+                    private MaybeStore _store;
+                }
+            }
+            """);
+
+        AssertOrderEdges(graph, (Store, 6, 17));
+    }
+
+    [Fact]
+    public void KeywordTypeInAlias_NoEdge()
+    {
+        var graph = BuildOrder("""
+            namespace Shop.Domain
+            {
+                using Lookup = System.Collections.Generic.Dictionary<string, int>;
+                public class Order
+                {
+                    private Lookup? _lookup;
+                }
+            }
+            """);
+
+        AssertOrderEdges(graph, ("System.Collections.Generic.Dictionary<TKey, TValue>", 6, 17));
+    }
+
+    [Fact]
+    public void FunctionPointerAlias_GivesEdgesToSignatureTypes()
+    {
+        var graph = BuildUnsafe("""
+            namespace Shop.Domain
+            {
+                using unsafe Persist = delegate*<Shop.Infra.Store, void>;
+                public unsafe class Order
+                {
+                    private Persist _persist;
+                }
+            }
+            """);
+
+        AssertOrderEdges(graph, (Store, 6, 17));
+    }
+
+    [Theory]
+    [InlineData("(Shop.Infra.Store, int)")]
+    [InlineData("System.Collections.Generic.List<Shop.Infra.Store>")]
+    [InlineData("System.Func<Shop.Infra.Store, string>")]
+    [InlineData("Shop.Infra.Outer.Inner")]
+    [InlineData("Shop.Infra.Outer.Inner[]")]
+    [InlineData("System.Collections.Generic.Dictionary<Shop.Infra.Store, (Shop.Infra.Outer, object)>")]
+    public void AliasUse_GivesTheSameEdgesAsTheWrittenTarget(string target)
+    {
+        const string Types = "namespace Shop.Infra { public class Store { } public class Outer { public class Inner { } } }";
+        var aliased = Edges(
+            ("Store.cs", Types),
+            ("Order.cs", "namespace Shop.Domain { using A = " + target + "; public class Order { private A _value = default!; } }"));
+        var written = Edges(
+            ("Store.cs", Types),
+            ("Order.cs", "namespace Shop.Domain { public class Order { private " + target + " _value = default!; } }"));
+
+        aliased.Should().NotBeEmpty();
+        aliased.Should().BeEquivalentTo(written);
+    }
+
+    [Fact]
+    public void StaticMemberAccessOnTypeName_OneEdge()
+    {
+        var graph = BuildOrder("""
+            namespace Shop.Domain
+            {
+                public class Order
+                {
+                    public void Place() { _ = Shop.Infra.Store.Count; Shop.Infra.Store.Make(); }
+                }
+            }
+            """);
+
+        AssertOrderEdges(graph, (Store, 5, 46), (Store, 5, 70));
+    }
+
+    [Fact]
+    public void InheritedStaticMemberOfConstructedBase_NoExpansion()
+    {
+        var graph = Build(
+            ("Store.cs", ExpansionTypes),
+            ("Order.cs", """
+                namespace Shop.Domain
+                {
+                    public class Order : Shop.Infra.Base<Shop.Infra.Store>
+                    {
+                        public void Place() => Foo();
+                    }
+                }
+                """));
+
+        AssertOrderEdges(graph, ("Shop.Infra.Base<T>", 3, 37), (Store, 3, 53), ("Shop.Infra.Base<T>", 5, 32));
+    }
+
+    [Fact]
+    public void NestedTypeOfConstructedBase_NoExpansion()
+    {
+        var graph = Build(
+            ("Store.cs", ExpansionTypes),
+            ("Order.cs", """
+                namespace Shop.Domain
+                {
+                    public class Order : Shop.Infra.Base<Shop.Infra.Store>
+                    {
+                        private Nested? _nested;
+                    }
+                }
+                """));
+
+        AssertOrderEdges(graph, ("Shop.Infra.Base<T>", 3, 37), (Store, 3, 53), ("Shop.Infra.Base<T>.Nested", 5, 17));
+    }
+
+    [Fact]
+    public void ObjectInitializerMember_NoExpansion()
+    {
+        var graph = Build(
+            ("Store.cs", ExpansionTypes),
+            ("Order.cs", """
+                namespace Shop.Domain
+                {
+                    public class Order
+                    {
+                        public object Place() => new Shop.Infra.Repo<Shop.Infra.Store> { Name = "" };
+                    }
+                }
+                """));
+
+        AssertOrderEdges(
+            graph,
+            ("Shop.Infra.Repo<T>", 5, 49),
+            (Store, 5, 65),
+            ("Shop.Infra.Repo<T>", 5, 74));
+    }
+
+    [Fact]
+    public void NamedArgumentOnVarTypedValue_NoExpansion()
+    {
+        var graph = Build(
+            ("Store.cs", ExpansionTypes),
+            ("Order.cs", """
+                namespace Shop.Domain
+                {
+                    public class Order
+                    {
+                        public void Place(Shop.Infra.Factory factory)
+                        {
+                            var repo = factory.Make();
+                            repo.Save(entity: null!);
+                        }
+                    }
+                }
+                """));
+
+        AssertOrderEdges(
+            graph,
+            ("Shop.Infra.Factory", 5, 38),
+            ("Shop.Infra.Factory", 7, 32),
+            ("Shop.Infra.Repo<T>", 8, 18));
+    }
+
+    [Fact]
+    public void PropertySubpatternAndWithOnVarTypedValue_NoExpansion()
+    {
+        var graph = Build(
+            ("Store.cs", ExpansionTypes),
+            ("Order.cs", """
+                namespace Shop.Domain
+                {
+                    public class Order
+                    {
+                        public bool Place(Shop.Infra.Factory factory)
+                        {
+                            var box = factory.MakeBox();
+                            var copy = box with { Value = null };
+                            return copy is { Value: null };
+                        }
+                    }
+                }
+                """));
+
+        AssertOrderEdges(
+            graph,
+            ("Shop.Infra.Factory", 5, 38),
+            ("Shop.Infra.Factory", 7, 31),
+            ("Shop.Infra.Box<T>", 8, 35),
+            ("Shop.Infra.Box<T>", 9, 30));
     }
 
     // No edge
@@ -613,7 +823,7 @@ public class TypeGraphBuilderTests
                 """));
 
         graph.Edges.Select(e => (e.Location.Line, e.Location.Column)).Should().Equal(
-            (6, 17), (7, 17), (8, 31), (8, 37), (8, 44));
+            (6, 17), (7, 17), (8, 31), (8, 44));
         graph.Edges.Select(Pair).Should().AllBeEquivalentTo((Order, Store));
     }
 
@@ -658,12 +868,9 @@ public class TypeGraphBuilderTests
 
         var graph = TypeGraphBuilder.Build(compilation, NoGeneratedTrees, CancellationToken.None);
 
-        graph.Edges.Select(Pair).Should().Equal(("Program", Store), ("Program", Store));
+        graph.Edges.Select(Pair).Should().Equal(("Program", Store));
         graph.SourceTypes.Select(t => t.ToDisplayString()).Should().Contain("Program");
     }
-
-    private static void AssertSingleOrderToStoreAt(string orderSource, int line, int column) =>
-        AssertSingleOrderToStoreAt(Build(("Store.cs", StoreClass), ("Order.cs", orderSource)), "Order.cs", line, column);
 
     private static void AssertSingleOrderToStoreAt(TypeGraph graph, string path, int line, int column)
     {
@@ -671,6 +878,14 @@ public class TypeGraphBuilderTests
         toStore.Should().ContainSingle();
         toStore[0].Location.Should().Be(new SourceLocation(path, line, column));
     }
+
+    private static TypeGraph BuildOrder(string orderSource) => Build(("Store.cs", StoreClass), ("Order.cs", orderSource));
+
+    private static void AssertOrderEdges(TypeGraph graph, params (string Target, int Line, int Column)[] expected) =>
+        graph.Edges
+            .Select(e => (e.Source.ToDisplayString(), e.Target.ToDisplayString(), e.Location))
+            .Where(e => string.Equals(e.Item1, Order, StringComparison.Ordinal))
+            .Should().Equal(expected.Select(x => (Order, x.Target, new SourceLocation("Order.cs", x.Line, x.Column))));
 
     private static TypeGraph BuildUnsafe(string orderSource)
     {
