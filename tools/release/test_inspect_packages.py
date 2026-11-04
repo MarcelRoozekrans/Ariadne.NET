@@ -12,6 +12,7 @@ import inspect_packages
 VERSION = "0.1.0"
 ARIADNE = "Ariadne.NET"
 ABSTRACTIONS = "Ariadne.NET.Abstractions"
+WORKSPACES = "Ariadne.NET.Workspaces"
 ABSTRACTIONS_DEPENDENCIES = ("ZeroAlloc.Results", "ZeroAlloc.Validation")
 
 
@@ -24,13 +25,18 @@ def informational(version: str) -> bytes:
 def write_package(directory: pathlib.Path, package_id: str, version: str, *,
                   dll_version: str | None = None, nuspec_version: str | None = None,
                   dependencies: tuple[str, ...] | None = None,
-                  abstractions_version: str | None = None, with_symbols: bool = True) -> None:
-    # The SDK writes a project reference as a plain version, so that is what the fake Ariadne.NET nuspec carries.
+                  abstractions_version: str | None = None, ariadne_version: str | None = None,
+                  with_symbols: bool = True) -> None:
+    # The SDK writes a project reference as a plain version, so that is what the fake nuspecs carry. Each package lists
+    # its direct dependencies only: Workspaces reaches Abstractions through Ariadne.NET, not directly.
     if dependencies is None:
-        dependencies = ABSTRACTIONS_DEPENDENCIES if package_id == ABSTRACTIONS else (ABSTRACTIONS, "YamlDotNet")
+        dependencies = {
+            ABSTRACTIONS: ABSTRACTIONS_DEPENDENCIES,
+            WORKSPACES: (ARIADNE, "Microsoft.CodeAnalysis.CSharp.Workspaces"),
+        }.get(package_id, (ABSTRACTIONS, "YamlDotNet"))
+    versions = {ABSTRACTIONS: abstractions_version or version, ARIADNE: ariadne_version or version}
     elements = "".join(
-        f'<dependency id="{dependency}" version="'
-        f'{(abstractions_version or version) if dependency == ABSTRACTIONS else "1.0.0"}" exclude="Build,Analyzers" />'
+        f'<dependency id="{dependency}" version="{versions.get(dependency, "1.0.0")}" exclude="Build,Analyzers" />'
         for dependency in dependencies)
     nuspec = (f'<?xml version="1.0" encoding="utf-8"?><package><metadata><id>{package_id}</id>'
               f'<version>{nuspec_version or version}</version>'
@@ -58,15 +64,51 @@ class InspectPackagesTests(unittest.TestCase):
         for package_id in inspect_packages.PACKAGES:
             write_package(self.directory, package_id, version, **overrides.get(package_id, {}))
 
-    def test_accepts_the_two_release_packages(self) -> None:
+    def test_accepts_the_three_release_packages(self) -> None:
         self.write_all()
         self.assertEqual([], inspect_packages.problems(self.directory, VERSION))
 
-    def test_rejects_a_third_package(self) -> None:
+    def test_rejects_a_fourth_package(self) -> None:
         self.write_all()
         write_package(self.directory, "Ariadne.NET.Other", VERSION)
         errors = inspect_packages.problems(self.directory, VERSION)
-        self.assertTrue(any("unexpected" in error and "Ariadne.NET.Other.0.1.0.nupkg" in error for error in errors), errors)
+        self.assertTrue(any("exactly the three release packages" in error and "Ariadne.NET.Other.0.1.0.nupkg" in error
+                            for error in errors), errors)
+
+    def test_rejects_a_missing_workspaces_package(self) -> None:
+        self.write_all()
+        (self.directory / f"{WORKSPACES}.{VERSION}.nupkg").unlink()
+        errors = inspect_packages.problems(self.directory, VERSION)
+        self.assertTrue(any(f"{WORKSPACES}.0.1.0.nupkg" in error and "missing" in error for error in errors), errors)
+
+    def test_rejects_the_engine_depending_on_msbuild_packages(self) -> None:
+        for msbuild in ("Microsoft.Build.Locator", "Microsoft.Build.Framework", "Microsoft.CodeAnalysis.Workspaces.MSBuild"):
+            with self.subTest(msbuild):
+                self.write_all(**{ARIADNE: {"dependencies": (ABSTRACTIONS, msbuild)}})
+                errors = inspect_packages.problems(self.directory, VERSION)
+                self.assertTrue(any(f"{ARIADNE} depends on {msbuild}" in error and "MSBuild" in error
+                                    for error in errors), errors)
+
+    def test_accepts_workspaces_depending_on_msbuild_packages(self) -> None:
+        self.write_all(**{WORKSPACES: {"dependencies": (ARIADNE, "Microsoft.Build.Locator",
+                                                         "Microsoft.CodeAnalysis.Workspaces.MSBuild")}})
+        self.assertEqual([], inspect_packages.problems(self.directory, VERSION))
+
+    def test_rejects_workspaces_depending_on_another_engine_version(self) -> None:
+        self.write_all(**{WORKSPACES: {"ariadne_version": "0.0.9"}})
+        errors = inspect_packages.problems(self.directory, VERSION)
+        self.assertTrue(any(WORKSPACES in error and f"depends on {ARIADNE} 0.0.9, expected {VERSION}" in error
+                            for error in errors), errors)
+
+    def test_rejects_workspaces_without_the_engine_dependency(self) -> None:
+        self.write_all(**{WORKSPACES: {"dependencies": ("Microsoft.CodeAnalysis.CSharp.Workspaces",)}})
+        errors = inspect_packages.problems(self.directory, VERSION)
+        self.assertTrue(any(f"{WORKSPACES} does not depend on {ARIADNE}" in error for error in errors), errors)
+
+    def test_rejects_workspaces_depending_on_abstractions_directly(self) -> None:
+        self.write_all(**{WORKSPACES: {"dependencies": (ARIADNE, ABSTRACTIONS)}})
+        errors = inspect_packages.problems(self.directory, VERSION)
+        self.assertTrue(any(f"{WORKSPACES} depends on {ABSTRACTIONS}" in error for error in errors), errors)
 
     def test_rejects_a_missing_snupkg(self) -> None:
         self.write_all(**{ABSTRACTIONS: {"with_symbols": False}})

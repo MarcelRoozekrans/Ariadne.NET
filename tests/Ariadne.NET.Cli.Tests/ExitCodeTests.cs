@@ -1,4 +1,5 @@
 using System.Runtime.Versioning;
+using Ariadne.NET.Analysis;
 using Ariadne.NET.Cli;
 using Ariadne.NET.Cli.Commands;
 using FluentAssertions;
@@ -14,6 +15,7 @@ public sealed class ExitCodeTests : IDisposable
 
     public ExitCodeTests()
     {
+        FixtureProjects.EnsureRestored();
         _originalDirectory = Directory.GetCurrentDirectory();
         _tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-cli-{Guid.NewGuid():N}");
         Directory.CreateDirectory(Path.Combine(_tempDir, ".architecture"));
@@ -27,6 +29,7 @@ public sealed class ExitCodeTests : IDisposable
 
         var services = new ServiceCollection();
         services.AddAriadneNETServices();
+        services.AddAriadneNETWorkspaces();
         _provider = services.BuildServiceProvider();
     }
 
@@ -40,7 +43,7 @@ public sealed class ExitCodeTests : IDisposable
         }
     }
 
-    private int Run(params string[] args) => CliRootCommand.Invoke(_provider, args);
+    private int Run(params string[] args) => CliRootCommand.InvokeAsync(_provider, args).GetAwaiter().GetResult();
 
     private void WriteRules(string content) =>
         File.WriteAllText(Path.Combine(_tempDir, ".architecture", "rules.yaml"), content);
@@ -53,32 +56,130 @@ public sealed class ExitCodeTests : IDisposable
     }
 
     [Fact]
-    public void Validate_CleanSource_ShouldReturnSuccess()
+    public void Validate_CleanFixture_ShouldReturnSuccess()
     {
-        WriteSource("MyApp.Orders.Domain", "Order.cs", """
-            namespace MyApp.Orders.Domain;
-            public class Order { }
-            """);
+        var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("clean", "Shop.slnx"));
 
-        Run("validate", "src").Should().Be(ExitCodes.Success);
+        exitCode.Should().Be(ExitCodes.Success);
+        stdout.Should().Contain("Result: PASS - No violations found.");
     }
 
     [Fact]
-    public void Validate_DependencyViolation_ShouldReturnViolations()
+    public void Validate_BrokenFixture_ShouldReturnViolations()
     {
-        WriteSource("MyApp.Orders.Domain", "Order.cs", """
-            using MyApp.Orders.Infrastructure;
-            namespace MyApp.Orders.Domain;
-            public class Order { }
-            """);
+        var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("broken", "Shop.slnx"));
 
-        Run("validate", "src").Should().Be(ExitCodes.Violations);
+        exitCode.Should().Be(ExitCodes.Violations);
+        stdout.Should().Contain("Result: FAIL - 1 violation(s) found.")
+            .And.Contain("[DependencyNotAllowed] Shop.Domain")
+            .And.Contain("Order.cs:");
     }
 
     [Fact]
-    public void Validate_MissingDirectory_ShouldReturnError()
+    public void Validate_BrokenFixture_ShowsViolationFileRelativeToTheSolutionDirectory()
+    {
+        var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("broken", "Shop.slnx"));
+
+        exitCode.Should().Be(ExitCodes.Violations);
+        stdout.Should().Contain("  [DependencyNotAllowed] Shop.Domain/Order.cs:").And.NotContain(FixtureProjects.Root);
+    }
+
+    [Fact]
+    public void Validate_ProjectFolder_ShowsViolationFilesRelativeToTheFolder()
+    {
+        var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("multitarget"));
+
+        exitCode.Should().Be(ExitCodes.Violations);
+        stdout.Should().Contain("  [DependencyNotAllowed] Domain/Order.cs:").And.NotContain(FixtureProjects.Root);
+    }
+
+    [Fact]
+    public void Validate_ViolationInSomeTargetFrameworks_ListsThemAfterTheLocation()
+    {
+        var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("multitarget", "Multi.csproj"));
+
+        exitCode.Should().Be(ExitCodes.Violations);
+        stdout.Should().MatchRegex(@"(?m)^  \[DependencyNotAllowed\] Domain/Order\.cs:\d+ \(net10\.0\)\r?$");
+    }
+
+    [Fact]
+    public void Print_SkippedProjectAndViolationWithoutLocation_WritesBothLines()
+    {
+        var report = new ArchitectureReport
+        {
+            Violations =
+            [
+                new ArchitectureViolation
+                {
+                    RuleId = "r",
+                    Kind = ViolationKind.TypeKindMismatch,
+                    SourceType = "Shop.Domain.Order",
+                    Message = "Order must be a record",
+                },
+            ],
+            Projects = [new CheckedProject("Shop.Domain", ["net10.0"])],
+            SkippedProjects = [new SkippedProject("Shop.Docs", "no compilation")],
+            TypesChecked = 4,
+        };
+        using var writer = new StringWriter();
+
+        var exitCode = ValidateCommand.Print(writer, report, _tempDir);
+
+        exitCode.Should().Be(ExitCodes.Violations);
+        var lines = writer.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        lines.Should().Equal(
+            "Checked 4 types in 1 projects",
+            "Skipped Shop.Docs: no compilation",
+            "Result: FAIL - 1 violation(s) found.",
+            "  [TypeKindMismatch] Shop.Domain.Order",
+            "    Order must be a record");
+    }
+
+    [Fact]
+    public void Print_ViolationInSeveralTargetFrameworks_ListsThemCommaSeparated()
+    {
+        var report = new ArchitectureReport
+        {
+            Violations =
+            [
+                new ArchitectureViolation
+                {
+                    RuleId = "r",
+                    Kind = ViolationKind.TypeKindMismatch,
+                    SourceType = "Shop.Domain.Order",
+                    Message = "Order must be a record",
+                    TargetFrameworks = ["net8.0", "net9.0"],
+                },
+            ],
+            Projects = [new CheckedProject("Shop.Domain", ["net10.0", "net8.0", "net9.0"])],
+            TypesChecked = 1,
+        };
+        using var writer = new StringWriter();
+
+        ValidateCommand.Print(writer, report, _tempDir);
+
+        writer.ToString().Split(Environment.NewLine).Should().Contain("  [TypeKindMismatch] Shop.Domain.Order (net8.0, net9.0)");
+    }
+
+    [Fact]
+    public void Validate_MissingPath_ShouldReturnError()
     {
         Run("validate", "does-not-exist").Should().Be(ExitCodes.Error);
+    }
+
+    [Fact]
+    public void Validate_DirectoryWithTwoSolutions_ShouldReturnError()
+    {
+        var (exitCode, stderr) = RunCapturingStderr("validate", FixtureProjects.Path("clean"));
+
+        exitCode.Should().Be(ExitCodes.Error);
+        stderr.Should().StartWith("Error: ");
+    }
+
+    [Fact]
+    public void Validate_CompileErrorFixture_ShouldReturnError()
+    {
+        Run("validate", FixtureProjects.Path("compile-error", "Broken.csproj")).Should().Be(ExitCodes.Error);
     }
 
     [Fact]
@@ -217,7 +318,7 @@ public sealed class ExitCodeTests : IDisposable
 
         try
         {
-            Run("validate", "src").Should().Be(ExitCodes.Error);
+            Run("validate", FixtureProjects.Path("clean", "Shop.slnx")).Should().Be(ExitCodes.Error);
         }
         finally
         {
@@ -239,7 +340,7 @@ public sealed class ExitCodeTests : IDisposable
 
         try
         {
-            Run("validate", "src").Should().Be(ExitCodes.Error);
+            Run("validate", FixtureProjects.Path("clean", "Shop.slnx")).Should().Be(ExitCodes.Error);
         }
         finally
         {
@@ -263,7 +364,7 @@ public sealed class ExitCodeTests : IDisposable
 
         try
         {
-            Run("validate", "src").Should().Be(ExitCodes.Error);
+            Run("validate", FixtureProjects.Path("clean", "Shop.slnx")).Should().Be(ExitCodes.Error);
         }
         finally
         {
@@ -344,6 +445,21 @@ public sealed class ExitCodeTests : IDisposable
             $"    fatal: not a repository{nl}    fatal: Could not read{nl}{nl}    Please check{nl}");
     }
 
+    private (int ExitCode, string Stdout) RunCapturingStdout(params string[] args)
+    {
+        var originalOut = Console.Out;
+        using var output = new StringWriter();
+        Console.SetOut(output);
+        try
+        {
+            return (Run(args), output.ToString());
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+    }
+
     private (int ExitCode, string Stderr) RunCapturingStderr(params string[] args)
     {
         var originalError = Console.Error;
@@ -360,7 +476,7 @@ public sealed class ExitCodeTests : IDisposable
     }
 
     [Fact]
-    public void UnexpectedException_ReportsMessageThenStackTraceAndReturnsError()
+    public async Task UnexpectedException_ReportsMessageThenStackTraceAndReturnsError()
     {
         var originalError = Console.Error;
         using var error = new StringWriter();
@@ -369,7 +485,7 @@ public sealed class ExitCodeTests : IDisposable
         int exitCode;
         try
         {
-            exitCode = CliRootCommand.Invoke(new ThrowingServiceProvider(), ["rules"]);
+            exitCode = await CliRootCommand.InvokeAsync(new ThrowingServiceProvider(), ["rules"]);
         }
         finally
         {
@@ -380,6 +496,34 @@ public sealed class ExitCodeTests : IDisposable
         var lines = error.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
         lines[0].Should().Be("Error: boom");
         error.ToString().Should().Contain("System.InvalidOperationException: boom").And.Contain(" at ");
+    }
+
+    [Fact]
+    public async Task CancelledCommand_ReportsOneLineAndReturnsError()
+    {
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+        var originalError = Console.Error;
+        using var error = new StringWriter();
+        Console.SetError(error);
+
+        int exitCode;
+        try
+        {
+            exitCode = await CliRootCommand.InvokeAsync(new CancellingServiceProvider(cancelled.Token), ["rules"]);
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
+
+        exitCode.Should().Be(ExitCodes.Error);
+        error.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries).Should().Equal("Cancelled.");
+    }
+
+    private sealed class CancellingServiceProvider(CancellationToken token) : IServiceProvider
+    {
+        public object? GetService(Type serviceType) => throw new OperationCanceledException(token);
     }
 
     private sealed class ThrowingServiceProvider : IServiceProvider

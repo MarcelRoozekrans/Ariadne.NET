@@ -1,4 +1,5 @@
 using Ariadne.NET.Abstractions;
+using Ariadne.NET.Analysis;
 using Ariadne.NET.CodeGeneration;
 using Ariadne.NET.Orchestration;
 using Ariadne.NET.RuleEngine;
@@ -21,12 +22,20 @@ public class ServiceRegistrationTests
         provider.GetService<IBuiltinPackRegistry>().Should().NotBeNull();
         provider.GetService<IRulePackMerger>().Should().NotBeNull();
         provider.GetService<IRulePackResolver>().Should().NotBeNull();
-        provider.GetService<IDependencyValidator>().Should().NotBeNull();
         provider.GetService<ILayerInferenceEngine>().Should().NotBeNull();
         provider.GetService<ICodeGeneratorService>().Should().NotBeNull();
         provider.GetService<IGenerateOrchestrator>().Should().NotBeNull();
-        provider.GetService<ISourceValidator>().Should().NotBeNull();
         provider.GetService<ILinter>().Should().NotBeNull();
         provider.GetService<IWorkspaceOrchestrator>().Should().NotBeNull();
+    }
+
+    [Fact]
+    public void ServiceRegistration_ResolvesIArchitectureValidator()
+    {
+        var services = new ServiceCollection();
+        services.AddAriadneNETServices();
+        using var provider = services.BuildServiceProvider();
+
+        provider.GetService<IArchitectureValidator>().Should().BeOfType<ArchitectureValidator>();
     }
 }

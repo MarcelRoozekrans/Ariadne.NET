@@ -1,15 +1,19 @@
-using FluentAssertions;
+using Ariadne.NET.Analysis;
+using Ariadne.NET.Mcp.Tools;
 using Ariadne.NET.RuleEngine;
 using Ariadne.NET.RuleLoader;
+using Ariadne.NET.Tests.Shared;
 using Ariadne.NET.Validation;
-using Ariadne.NET.Mcp.Tools;
+using Ariadne.NET.Workspaces;
+using FluentAssertions;
+using ModelContextProtocol;
 
 namespace Ariadne.NET.Mcp.Tests.Tools;
 
 public class ValidationToolsTests
 {
     private readonly RuleResolutionHelper _helper;
-    private readonly SourceValidator _validator;
+    private readonly SolutionValidator _validator;
     private readonly Linter _linter;
 
     public ValidationToolsTests()
@@ -20,30 +24,49 @@ public class ValidationToolsTests
             registry,
             new RulePackResolver(registry, loader, new RulePackMerger()),
             loader);
-        _validator = new SourceValidator();
+        _validator = new SolutionValidator(new SolutionLoader(), new ArchitectureValidator());
         _linter = new Linter();
     }
 
     [Fact]
-    public void ValidateSource_EmptyDir_ShouldReturnValid()
+    public async Task ValidateSource_CleanFixture_IsValid()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        Directory.CreateDirectory(tempDir);
+        FixtureProjects.EnsureRestored();
 
-        try
-        {
-            var result = ValidationTools.ValidateSource(
-                _helper, _validator,
-                sourceDirectory: tempDir,
-                template: "clean-architecture");
+        var report = await ValidationTools.ValidateSource(
+            _helper, _validator,
+            path: FixtureProjects.Path("clean", "Shop.slnx"),
+            template: "clean-architecture");
 
-            result.IsValid.Should().BeTrue();
-            result.FilesScanned.Should().Be(0);
-        }
-        finally
-        {
-            Directory.Delete(tempDir, true);
-        }
+        report.IsValid.Should().BeTrue();
+        report.TypesChecked.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task ValidateSource_BrokenFixture_HasOneViolation()
+    {
+        FixtureProjects.EnsureRestored();
+
+        var report = await ValidationTools.ValidateSource(
+            _helper, _validator,
+            path: FixtureProjects.Path("broken", "Shop.slnx"),
+            template: "clean-architecture");
+
+        report.IsValid.Should().BeFalse();
+        report.Violations.Should().ContainSingle(v => v.Kind == ViolationKind.DependencyNotAllowed);
+    }
+
+    [Fact]
+    public async Task ValidateSource_MissingPath_IsToolError()
+    {
+        var missing = Path.Combine(Path.GetTempPath(), $"ariadne-missing-{Guid.NewGuid():N}", "Nope.slnx");
+
+        var act = () => ValidationTools.ValidateSource(
+            _helper, _validator,
+            path: missing,
+            template: "clean-architecture");
+
+        await act.Should().ThrowAsync<McpException>().WithMessage("Path '*' does not exist.*");
     }
 
     [Fact]
@@ -60,93 +83,6 @@ public class ValidationToolsTests
                 template: "clean-architecture");
 
             result.IsClean.Should().BeTrue();
-        }
-        finally
-        {
-            Directory.Delete(tempDir, true);
-        }
-    }
-
-    [Fact]
-    public void ValidateSource_DependencyViolation_ShouldReturnInvalid()
-    {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-mcp-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(tempDir);
-
-        try
-        {
-            var domainDir = Path.Combine(tempDir, "MyApp.Orders.Domain");
-            Directory.CreateDirectory(domainDir);
-            File.WriteAllText(Path.Combine(domainDir, "Order.cs"), """
-                using MyApp.Orders.Infrastructure;
-
-                namespace MyApp.Orders.Domain;
-
-                public class Order { }
-                """);
-
-            var infraDir = Path.Combine(tempDir, "MyApp.Orders.Infrastructure");
-            Directory.CreateDirectory(infraDir);
-            File.WriteAllText(Path.Combine(infraDir, "Db.cs"), """
-                namespace MyApp.Orders.Infrastructure;
-
-                public class Db { }
-                """);
-
-            var result = ValidationTools.ValidateSource(
-                _helper, _validator,
-                sourceDirectory: tempDir,
-                template: "clean-architecture");
-
-            result.IsValid.Should().BeFalse();
-            result.Violations.Should().ContainSingle(v =>
-                v.ViolationType == "DependencyViolation"
-                && v.Message.Contains("Domain")
-                && v.Message.Contains("Infrastructure"));
-            result.FilesScanned.Should().Be(2);
-        }
-        finally
-        {
-            Directory.Delete(tempDir, true);
-        }
-    }
-
-    [Fact]
-    public void ValidateSource_CorrectStructure_ShouldReturnValid()
-    {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-mcp-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(tempDir);
-
-        try
-        {
-            var domainDir = Path.Combine(tempDir, "MyApp.Orders.Domain");
-            Directory.CreateDirectory(domainDir);
-            File.WriteAllText(Path.Combine(domainDir, "Order.cs"), """
-                namespace MyApp.Orders.Domain;
-
-                public class Order
-                {
-                    public Guid Id { get; init; }
-                }
-                """);
-
-            var appDir = Path.Combine(tempDir, "MyApp.Orders.Application");
-            Directory.CreateDirectory(appDir);
-            File.WriteAllText(Path.Combine(appDir, "OrderService.cs"), """
-                using MyApp.Orders.Domain;
-
-                namespace MyApp.Orders.Application;
-
-                public class OrderService { }
-                """);
-
-            var result = ValidationTools.ValidateSource(
-                _helper, _validator,
-                sourceDirectory: tempDir,
-                template: "clean-architecture");
-
-            result.IsValid.Should().BeTrue();
-            result.FilesScanned.Should().Be(2);
         }
         finally
         {
@@ -186,33 +122,4 @@ public class ValidationToolsTests
         }
     }
 
-    [Fact]
-    public void ValidateSource_WithHexagonalTemplate_ShouldUseCorrectRules()
-    {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-mcp-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(tempDir);
-
-        try
-        {
-            var coreDir = Path.Combine(tempDir, "MyApp.Orders.Core");
-            Directory.CreateDirectory(coreDir);
-            File.WriteAllText(Path.Combine(coreDir, "Order.cs"), """
-                namespace MyApp.Orders.Core;
-
-                public class Order { }
-                """);
-
-            var result = ValidationTools.ValidateSource(
-                _helper, _validator,
-                sourceDirectory: tempDir,
-                template: "hexagonal-architecture");
-
-            result.IsValid.Should().BeTrue();
-            result.FilesScanned.Should().Be(1);
-        }
-        finally
-        {
-            Directory.Delete(tempDir, true);
-        }
-    }
 }

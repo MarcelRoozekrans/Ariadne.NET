@@ -13,7 +13,7 @@ AI coding agents generate behavior effectively but are unreliable at structural 
 1. **Defines architecture** as declarative YAML rule packs (layers, component roles, naming conventions, code feature rules)
 2. **Loads and composes** multiple rule packs with deterministic merge semantics
 3. **Generates code** using Roslyn that conforms to the resolved rules
-4. **Validates existing code** against architecture rules (dependency analysis, type checking, interface requirements)
+4. **Validates existing solutions** against architecture rules with the compiler's semantic model (dependency analysis, type checking, interface requirements)
 5. **Lints** for namespace-vs-directory mismatches
 6. **Syncs rule packs** from git repositories with semver-aware version resolution
 7. **Exposes all capabilities** via CLI and an MCP server (stdio and HTTP) for AI agent integration

@@ -111,22 +111,28 @@ The engine automatically resolves which layer a component belongs to based on it
 - **Alternative names**: roles can declare `alternativeNames` for flexible matching
 - **Ambiguity detection**: if a role name matches multiple definitions, the engine returns an `Ambiguous` status with all matching options
 
-## Dependency Validation
+## Semantic Validation
 
-Validates that layer dependencies in source code comply with architecture rules by analyzing Roslyn-parsed `using` directives.
+Checks a solution or project against the architecture rules with the compiler's semantic model. `Ariadne.NET.Workspaces` loads the projects with MSBuild, and the engine builds a type graph from each compilation. A dependency is a type reference somebody wrote: base types, interfaces, attributes, member signatures, generic arguments and types used in bodies. An unused `using` and `var` give nothing, and generated code is never a source.
 
 Detected violations:
-- **DependencyViolation** — a `using` directive references a layer not in `allowedDependencies`
-- **TypeKindMismatch** — a type declaration doesn't match the role's expected type kind
-- **AccessibilityMismatch** — a type's accessibility modifier doesn't match the role definition
+- **DependencyNotAllowed** — a type references a type in a layer that is not in its layer's `allowedDependencies`. One violation per source type and target type, located at the first reference, with a reference count.
+- **TypeKindMismatch** — a type doesn't match the role's expected type kind
+- **AccessibilityMismatch** — a type's accessibility doesn't match the role definition; a top-level type with no access modifier counts as internal (a nested one is private)
 - **MissingInterface** — a role requires an interface but none was found
+
+Each violation has a rule id, `layer/<Layer>` or `role/<Role>`. A project that targets several frameworks is checked once per framework, and a violation found in only some of them lists them. See [Validation and Linting](how-it-works/08-validation.md) for the details.
+
+Ariadne never restores, so run `dotnet restore` before you validate. The CLI exits 0 when clean, 1 on violations and 2 on an error.
 
 > Until the `ariadne` dotnet tool ships, run these commands as `dotnet run --project src/Ariadne.NET.Cli -- <command>`.
 
 ```bash
 # CLI
-ariadne validate ./src
+ariadne validate MyApp.slnx
 ```
+
+The path is a `.sln`, `.slnx`, `.slnf` or `.csproj` file, or a directory that holds exactly one; it defaults to `.`. The package that does the loading, `Ariadne.NET.Workspaces`, needs a .NET SDK on the machine.
 
 ## Linting
 
@@ -214,7 +220,7 @@ The engine exposes its full capability set as MCP tools and resources for AI age
 | `get_rules` | `template?` | Get code feature rules |
 | `generate_component` | `role`, `name`, `solution`, `feature`, `template?` | Generate a C# component file |
 | `generate_workspace` | `solution`, `features`, `template?` | Scaffold project structure |
-| `validate_source` | `sourceDirectory`, `template?` | Validate source against architecture rules |
+| `validate_source` | `path`, `template?` | Validate a solution or project against architecture rules; returns the report |
 | `lint_source` | `sourceDirectory`, `template?` | Lint for namespace-layer mismatches |
 
 ### Resources

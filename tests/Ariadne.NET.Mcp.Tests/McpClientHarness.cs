@@ -30,6 +30,7 @@ internal sealed class McpClientHarness : IAsyncDisposable
 
         var builder = Host.CreateEmptyApplicationBuilder(settings: null);
         builder.Services.AddAriadneNETServices();
+        builder.Services.AddAriadneNETWorkspaces();
         builder.Services.AddAriadneNETMcpServices();
         builder.Services
             .AddMcpServer()

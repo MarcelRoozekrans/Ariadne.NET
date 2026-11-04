@@ -21,14 +21,19 @@ public static class CliRootCommand
         return rootCommand;
     }
 
-    public static int Invoke(IServiceProvider provider, string[] args)
+    public static async Task<int> InvokeAsync(IServiceProvider provider, string[] args, CancellationToken cancellationToken = default)
     {
         // Expected failures come back as results with their own exit code. This handler is for unexpected
         // exceptions only, and the default handler would exit with 1, which reads as "violations found".
         try
         {
             var parseResult = CommandLineParser.Parse(Create(provider), args, new ParserConfiguration());
-            return parseResult.Invoke(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+            return await parseResult.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException ex) when (ex.CancellationToken.IsCancellationRequested || cancellationToken.IsCancellationRequested)
+        {
+            Console.Error.WriteLine("Cancelled.");
+            return ExitCodes.Error;
         }
         catch (Exception ex)
         {

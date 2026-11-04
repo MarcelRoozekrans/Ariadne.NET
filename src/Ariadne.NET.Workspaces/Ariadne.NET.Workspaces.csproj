@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>Ariadne.NET.Workspaces</PackageId>
+    <Description>Loads .NET solutions and projects with MSBuildWorkspace so Ariadne.NET can check architecture rules against the compiler's semantic model.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ariadne.NET.Workspaces.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ariadne.NET\Ariadne.NET.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.9.0" />
+    <!--
+      The out-of-process build host, the BuildHost-netcore and BuildHost-net472 folders, ships as contentFiles of this
+      package. PrivateAssets="none" lists the dependency in the nuspec with include="All", so a package consumer gets
+      the folders in its output. The default would be a private reference whose contentFiles stop here.
+    -->
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.9.0" PrivateAssets="none" />
+    <PackageReference Include="Microsoft.Build.Locator" Version="1.11.2" />
+    <!-- The solution parser MSBuildWorkspace uses; read directly to know which projects a .sln or .slnx lists. -->
+    <PackageReference Include="Microsoft.VisualStudio.SolutionPersistence" Version="1.0.52" />
+    <!--
+      MSBuildLocator loads Microsoft.Build.Framework from the .NET SDK, so the copy must stay out of the output. The
+      exclusion does not flow to consumers: each project that references this one carries its own reference too.
+    -->
+    <PackageReference Include="Microsoft.Build.Framework" Version="17.11.48" ExcludeAssets="runtime" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>
