@@ -13,6 +13,8 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <!-- Required by every project that references Ariadne.NET.Workspaces; see its README. -->
+    <PackageReference Include="Microsoft.Build.Framework" Version="17.11.48" ExcludeAssets="runtime" />
   </ItemGroup>
 
   <ItemGroup>
@@ -23,6 +25,7 @@
   <ItemGroup>
     <Compile Include="..\Shared\UnixFactAttribute.cs" Link="Shared\UnixFactAttribute.cs" />
     <Compile Include="..\Shared\UnixNonRootFactAttribute.cs" Link="Shared\UnixNonRootFactAttribute.cs" />
+    <Compile Include="..\Shared\FixtureProjects.cs" Link="Shared\FixtureProjects.cs" />
   </ItemGroup>
 
   <ItemGroup>
