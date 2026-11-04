@@ -149,6 +149,44 @@ public class V1RoleRulesTests
             (ViolationKind.MissingInterface, null, "MyApp.Orders.Infrastructure.BRepository"));
     }
 
+    [Fact]
+    public void EnumAndDelegateNamedLikeRoles_AreNotMatched() =>
+        Check("""
+            namespace MyApp.Orders.Infrastructure
+            {
+                public enum OrderRepository { A }
+                public delegate void SaveRepository();
+            }
+            """).Should().BeEmpty();
+
+    [Fact]
+    public void EnumNamedLikeInterfaceRole_DoesNotSatisfyMissingInterface() =>
+        Check(
+            ("A.cs", "namespace MyApp.Orders.Infrastructure { internal class OrderRepository { } }"),
+            ("B.cs", "namespace MyApp.Orders.Domain { public enum StateRepository { A } public delegate void RunRepository(); }"))
+            .Should().ContainSingle().Which.Kind.Should().Be(ViolationKind.MissingInterface);
+
+    [Fact]
+    public void NestedTypeWithoutModifier_IsPrivate() =>
+        Check(
+            "namespace MyApp.Orders.Infrastructure { public class Outer { class OrderRepository { } } }",
+            InterfaceFile)
+            .Should().ContainSingle().Which.Message.Should().EndWith("but is declared 'private'");
+
+    [Fact]
+    public void PartialTypeWithGeneratedFirstDeclaration_IsLocatedAtHandWrittenOne()
+    {
+        var violations = Check(
+            ("A.g.cs", "namespace MyApp.Orders.Application { public partial class SaveCommand { } }"),
+            ("B.cs", "namespace MyApp.Orders.Application { public partial class SaveCommand { } }"));
+
+        violations.Should().ContainSingle().Which.Location.Should().Be(new SourceLocation("B.cs", 1, 59));
+    }
+
+    [Fact]
+    public void TypeInNamespaceWithoutLayer_IsNotChecked() =>
+        Check("namespace MyApp.Orders.Misc; public class SaveCommand { }").Should().BeEmpty();
+
     private static IReadOnlyList<ArchitectureViolation> Check(string source, params (string Path, string Source)[] more) =>
         Check([("Test.cs", source), .. more]);
 

@@ -19,7 +19,7 @@ internal static class V1RoleRules
         var matchedRoleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var type in graph.SourceTypes)
         {
-            // Enums and delegates have no type declaration syntax of the kind v1 roles apply to.
+            // v1 roles apply to class, struct, interface and record declarations. Enums and delegates were never matched.
             if (type.TypeKind is not (TypeKind.Class or TypeKind.Struct or TypeKind.Interface))
             {
                 continue;
@@ -163,35 +163,39 @@ internal static class V1RoleRules
         _ => "private",
     };
 
-    private static int CompareViolations(ArchitectureViolation x, ArchitectureViolation y)
+    // Located violations come first, ordered by location, rule id, source type and kind.
+    // Unlocated ones, the missing-interface violations, come last, ordered by source type, rule id and kind.
+    private static int CompareViolations(ArchitectureViolation x, ArchitectureViolation y) =>
+        (x.Location, y.Location) switch
+        {
+            ({ } a, { } b) => CompareLocated(x, a, y, b),
+            ({ }, null) => -1,
+            (null, { }) => 1,
+            _ => CompareUnlocated(x, y),
+        };
+
+    private static int CompareLocated(ArchitectureViolation x, in SourceLocation a, ArchitectureViolation y, in SourceLocation b)
     {
-        // Violations with a location come first.
-        if (x.Location is { } a)
-        {
-            if (y.Location is not { } b)
-            {
-                return -1;
-            }
-
-            var byLocation = TypeGraphBuilder.Compare(a, b);
-            if (byLocation != 0)
-            {
-                return byLocation;
-            }
-        }
-        else if (y.Location is not null)
-        {
-            return 1;
-        }
-
-        var result = x.Location is null
-            ? string.CompareOrdinal(x.SourceType, y.SourceType)
-            : string.CompareOrdinal(x.RuleId, y.RuleId);
+        var result = TypeGraphBuilder.Compare(a, b);
         if (result == 0)
         {
-            result = x.Location is null
-                ? string.CompareOrdinal(x.RuleId, y.RuleId)
-                : string.CompareOrdinal(x.SourceType, y.SourceType);
+            result = string.CompareOrdinal(x.RuleId, y.RuleId);
+        }
+
+        if (result == 0)
+        {
+            result = string.CompareOrdinal(x.SourceType, y.SourceType);
+        }
+
+        return result == 0 ? x.Kind.CompareTo(y.Kind) : result;
+    }
+
+    private static int CompareUnlocated(ArchitectureViolation x, ArchitectureViolation y)
+    {
+        var result = string.CompareOrdinal(x.SourceType, y.SourceType);
+        if (result == 0)
+        {
+            result = string.CompareOrdinal(x.RuleId, y.RuleId);
         }
 
         return result == 0 ? x.Kind.CompareTo(y.Kind) : result;

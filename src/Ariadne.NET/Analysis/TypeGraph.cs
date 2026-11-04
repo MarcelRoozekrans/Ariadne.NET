@@ -10,10 +10,9 @@ internal sealed class TypeGraph
     {
         ArgumentNullException.ThrowIfNull(edges);
         ArgumentNullException.ThrowIfNull(sourceTypes);
-
-        Edges = edges;
         ArgumentNullException.ThrowIfNull(sourceTypeLocations);
 
+        Edges = edges;
         SourceTypes = sourceTypes;
         SourceTypeLocations = sourceTypeLocations;
     }
