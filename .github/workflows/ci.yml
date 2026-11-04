@@ -116,7 +116,7 @@ jobs:
             exit "$status"
           fi
 
-  # Packs the two release packages exactly as publish-nuget does, inspects them, and rehearses the push against a local
+  # Packs the three release packages exactly as publish-nuget does, inspects them, and rehearses the push against a local
   # folder feed, on every push and pull request, so the release path is exercised long before release day. A folder
   # feed silently drops .snupkg files, so symbol packages are checked by the inspection, not by the push.
   pack-validate:
@@ -173,22 +173,36 @@ jobs:
 
       # Builds and runs the getting-started sample, tools/release/consumer/Program.cs, against the packages in the local
       # feed. nuget.config maps Ariadne.NET* to the local feed only, so the restore cannot fall back to a published
-      # package. Ariadne.NET.Abstractions arrives as Ariadne.NET's dependency, which proves the dependency resolves.
+      # package. The sample references Ariadne.NET.Workspaces, which brings Ariadne.NET and then
+      # Ariadne.NET.Abstractions in as dependencies: this proves all three packages restore from the feed.
       # Microsoft.Extensions.DependencyInjection comes from nuget.org: Ariadne.NET depends only on the DI abstractions,
-      # and the sample needs a container to resolve the services from. The sample also checks a directory against the
-      # pack, and the step runs it twice. First against the consumer's own project, whose only source is a Program.cs
-      # without a namespace: no violations, so it must exit 0. Then against a fixture written under RUNNER_TEMP, a Domain
-      # file that uses a WebApi namespace, which the clean-architecture pack forbids: it must exit exactly 1, so a crash
-      # fails too. The second run proves the packed library reports a violation, not only that it stays quiet on
-      # clean code.
+      # and the sample needs a container to resolve the services from. Microsoft.Build.Framework comes from nuget.org
+      # too: Workspaces keeps its own copy out of the output because MSBuildLocator loads the SDK's, and that exclusion
+      # does not flow to consumers, so the consumer carries its own reference with the runtime assets excluded or the
+      # build fails with MSBL001. Microsoft.CodeAnalysis.Workspaces.MSBuild is referenced directly as well, for its BuildHost
+      # folders. The sample also checks a directory against the pack, and the step runs it twice. First
+      # against the consumer's own project, whose only source is a Program.cs without a namespace: no violations, so it
+      # must exit 0. Then against a fixture class library written under RUNNER_TEMP, a Domain type that references a
+      # WebApi type, which the clean-architecture pack forbids: it must exit exactly 1, so a crash fails too. The second
+      # run proves the packed library reports a violation, not only that it stays quiet on clean code.
       - name: Restore, build and run a consumer from the local feed
         shell: bash
         run: |
           app="$RUNNER_TEMP/consumer"
           dotnet new console -o "$app" --framework net10.0
           cp tools/release/consumer/Program.cs "$app/Program.cs"
-          dotnet add "$app" package Ariadne.NET --version "$PACKAGE_VERSION" --no-restore
+          dotnet add "$app" package Ariadne.NET.Workspaces --version "$PACKAGE_VERSION" --no-restore
           dotnet add "$app" package Microsoft.Extensions.DependencyInjection --version 10.0.14 --no-restore
+          # Workspaces.MSBuild must also be a direct reference: its BuildHost-netcore and BuildHost-net472 folders arrive as
+          # NuGet contentFiles, which do not flow from a transitive dependency, so without it the load fails at run time
+          # with "The build host could not be found". This stands in for a fix in the Ariadne.NET.Workspaces package
+          # itself; see the Task 14 report.
+          dotnet add "$app" package Microsoft.CodeAnalysis.Workspaces.MSBuild --version 5.9.0 --no-restore
+          # dotnet add package cannot set ExcludeAssets, so add the reference and then rewrite it in place. The grep
+          # fails the step if the rewrite did not match, rather than letting the build fail later with MSBL001.
+          dotnet add "$app" package Microsoft.Build.Framework --version 17.11.48 --no-restore
+          sed -i 's|<PackageReference Include="Microsoft.Build.Framework" Version="17.11.48" />|<PackageReference Include="Microsoft.Build.Framework" Version="17.11.48" ExcludeAssets="runtime" />|' "$app/consumer.csproj"
+          grep -q 'Include="Microsoft.Build.Framework".*ExcludeAssets="runtime"' "$app/consumer.csproj"
           cat > "$app/nuget.config" <<EOF
           <?xml version="1.0" encoding="utf-8"?>
           <configuration>
@@ -206,8 +220,18 @@ jobs:
           dotnet build "$app" -c Release
           dotnet run --project "$app" --no-build -c Release -- "$app"
           fixture="$RUNNER_TEMP/violation-fixture"
-          mkdir -p "$fixture/Domain"
-          printf 'using Shop.WebApi;\nnamespace Shop.Domain;\npublic class Order {}\n' > "$fixture/Domain/Order.cs"
+          mkdir -p "$fixture/Domain" "$fixture/WebApi"
+          cat > "$fixture/Fixture.csproj" <<EOF
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net10.0</TargetFramework>
+              <Nullable>enable</Nullable>
+            </PropertyGroup>
+          </Project>
+          EOF
+          printf 'namespace Shop.Domain;\npublic class Order { public Shop.WebApi.Controller? Controller { get; init; } }\n' > "$fixture/Domain/Order.cs"
+          printf 'namespace Shop.WebApi;\npublic class Controller { }\n' > "$fixture/WebApi/Controller.cs"
+          dotnet restore "$fixture"
           set +e
           dotnet run --project "$app" --no-build -c Release -- "$fixture"
           code=$?

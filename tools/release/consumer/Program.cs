@@ -42,4 +42,10 @@ if (result.IsFailure)
 
 var report = result.Value;
 Console.WriteLine($"Checked {report.TypesChecked} types: {report.Violations.Count} violations");
+foreach (var violation in report.Violations)
+{
+    var where = violation.Location is { } location ? $"{location.FilePath}:{location.Line}" : violation.SourceType;
+    Console.WriteLine($"  [{violation.Kind}] {where}: {violation.Message}");
+}
+
 return report.IsValid ? 0 : 1;

@@ -8,17 +8,17 @@ Releases are cut by release-please and published to nuget.org by `ci.yml`. Nothi
 2. Merging that PR tags `vX.Y.Z` and creates the GitHub release.
 3. `release-please.yml` then dispatches `ci.yml` on the tag with `publish_to_nuget=true`.
 4. On that run, the jobs `publish-nuget` needs, `build`, `aot-smoke` and `pack-validate`, run on the tagged commit. `publish-nuget` starts only after they pass.
-5. `publish-nuget` refuses a prerelease, or a tag that is not the manifest's version. It then packs with `-p:AriadneRelease=true`, inspects the packages, pushes the two `.nupkg` files, `Ariadne.NET` and `Ariadne.NET.Abstractions`, to nuget.org, and attaches them and their `.snupkg` files to the GitHub release. nuget.org takes each `.snupkg` with the same push as its `.nupkg`.
+5. `publish-nuget` refuses a prerelease, or a tag that is not the manifest's version. It then packs with `-p:AriadneRelease=true`, inspects the packages, pushes the three `.nupkg` files, `Ariadne.NET`, `Ariadne.NET.Abstractions` and `Ariadne.NET.Workspaces`, to nuget.org, and attaches them and their `.snupkg` files to the GitHub release. nuget.org takes each `.snupkg` with the same push as its `.nupkg`.
 6. The same job then attaches a CycloneDX SBOM, a `.cdx.json` file, to the GitHub release.
 
-Every push and pull request also runs `pack-validate`. It packs the same way, inspects the packages, and rehearses the push against a local feed.
+Every push and pull request also runs `pack-validate`. It packs the same way, inspects the packages, and rehearses the push against a local feed. It then restores a consumer that references `Ariadne.NET.Workspaces` from that feed and runs it twice: a clean project must exit 0, and a fixture with a forbidden dependency must exit 1.
 
 ## Before the first release: settings on nuget.org and GitHub
 
 - **Release bot App:** the release bot GitHub App is installed on `MarcelRoozekrans/Ariadne.NET`.
 - **`RELEASE_BOT_CLIENT_ID` and `RELEASE_BOT_PRIVATE_KEY`:** in the GitHub repository, add the variable `RELEASE_BOT_CLIENT_ID` and the secret `RELEASE_BOT_PRIVATE_KEY` from the App. `release-please.yml` mints its token from them.
 - **`NUGET_USER`:** add a variable named `NUGET_USER` holding the nuget.org user name that owns the policy.
-- **Trusted Publishing:** on nuget.org, a Trusted Publishing policy exists for the repository `MarcelRoozekrans/Ariadne.NET` and the workflow file `ci.yml` (done 2026-10-31). It must be allowed to push new packages as well as new versions, since both ids are new on nuget.org.
+- **Trusted Publishing:** on nuget.org, a Trusted Publishing policy exists for the repository `MarcelRoozekrans/Ariadne.NET` and the workflow file `ci.yml` (done 2026-10-31). It must be allowed to push new packages as well as new versions, since all three ids are new on nuget.org.
 - **Reserve the id prefix:** reserve the `Ariadne.NET` id prefix on nuget.org. Anyone can take an id until it is published.
 - **Codecov:** add the repository on codecov, so the coverage upload from `build` is accepted.
 - **CodeQL:** keep the default setup off. CodeQL runs in `baseline-checks.yml` through the ci-baseline v1 reusable workflow, and with default setup on, GitHub refuses that workflow's SARIF upload.
