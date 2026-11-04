@@ -1,4 +1,4 @@
-namespace Ariadne.NET.Tests;
+namespace Ariadne.NET.Tests.Shared;
 
 /// <summary>
 /// A fact that creates symbolic links: skipped on Windows, where that needs a privilege or developer mode the test run may lack.

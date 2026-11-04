@@ -1,4 +1,4 @@
-namespace Ariadne.NET.Tests;
+namespace Ariadne.NET.Tests.Shared;
 
 /// <summary>
 /// A fact that needs Unix file modes to take effect: skipped on Windows, and as root, which ignores file permissions.
