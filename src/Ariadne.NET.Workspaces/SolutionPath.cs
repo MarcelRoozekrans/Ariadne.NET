@@ -14,7 +14,20 @@ internal static class SolutionPath
     {
         ArgumentNullException.ThrowIfNull(path);
 
-        var full = Path.GetFullPath(path);
+        if (string.IsNullOrWhiteSpace(path) || path.Contains('\0', StringComparison.Ordinal))
+        {
+            return Failure(AriadneErrorCode.Invalid, "The path is empty or contains an invalid character.");
+        }
+
+        string full;
+        try
+        {
+            full = Path.GetFullPath(path);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return Failure(AriadneErrorCode.Invalid, $"'{path}' is not a valid path.", ex.Message);
+        }
 
         if (File.Exists(full))
         {
@@ -28,10 +41,18 @@ internal static class SolutionPath
             return Failure(AriadneErrorCode.NotFound, $"Path '{full}' does not exist.");
         }
 
-        var candidates = Directory.EnumerateFiles(full)
-            .Where(IsSupported)
-            .Order(StringComparer.Ordinal)
-            .ToList();
+        List<string> candidates;
+        try
+        {
+            candidates = Directory.EnumerateFiles(full)
+                .Where(IsSupported)
+                .Order(StringComparer.Ordinal)
+                .ToList();
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            return Failure(AriadneErrorCode.Invalid, $"Directory '{full}' cannot be read.", ex.Message);
+        }
 
         return candidates.Count switch
         {

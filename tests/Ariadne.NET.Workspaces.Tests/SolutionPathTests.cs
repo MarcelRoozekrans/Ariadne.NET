@@ -107,14 +107,66 @@ public sealed class SolutionPathTests : IDisposable
     }
 
     [Fact]
-    public async Task EnsureRestored_TwoProcessesAtOnce_BothSucceed()
+    public void SlnAndSlnxTogether_IsInvalidAndListsBoth()
     {
-        var first = Task.Run(FixtureProjects.RestoreUnderLock);
-        var second = Task.Run(FixtureProjects.RestoreUnderLock);
+        Touch("Shop.sln");
+        Touch("Shop.slnx");
 
-        await Task.WhenAll(first, second);
+        var result = SolutionPath.Resolve(_dir);
 
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Detail.Should().Contain("Shop.sln,").And.Contain("Shop.slnx");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("a\0b.sln")]
+    public void EmptyOrMalformedPath_IsInvalid(string path)
+    {
+        var result = SolutionPath.Resolve(path);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().EndWith(".");
+    }
+
+    [Fact]
+    public async Task RestoreUnderLock_WaitsWhileAnotherHolderHasTheLock()
+    {
+        FixtureProjects.EnsureRestored();
+        var lockPath = FixtureProjects.Path(".restore.lock");
+        var held = FixtureProjects.TakeLock(lockPath);
+        Task restore;
+        try
+        {
+            restore = Task.Run(FixtureProjects.RestoreUnderLock);
+
+            await Task.Delay(300);
+            restore.IsCompleted.Should().BeFalse("the lock is held by someone else");
+        }
+        finally
+        {
+            await held.DisposeAsync();
+        }
+
+        await restore.WaitAsync(TimeSpan.FromMinutes(2));
         File.Exists(FixtureProjects.Path("clean", "Shop.Domain", "obj", "project.assets.json")).Should().BeTrue();
+    }
+
+    [Fact]
+    public void RestoreUnderLock_MissingAssetsFile_RestoresAgain()
+    {
+        FixtureProjects.EnsureRestored();
+        var assets = FixtureProjects.Path("multitarget", "obj", "project.assets.json");
+        File.Delete(assets);
+        FixtureProjects.OutputsExist().Should().BeFalse();
+
+        FixtureProjects.RestoreUnderLock();
+
+        File.Exists(assets).Should().BeTrue();
+        FixtureProjects.OutputsExist().Should().BeTrue();
     }
 
     private string Touch(string name)

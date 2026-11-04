@@ -20,12 +20,11 @@ internal static class FixtureProjects
         "generator/Gen.App/Gen.App.csproj",
     ];
 
+    private static readonly TimeSpan LockTimeout = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan ProcessTimeout = TimeSpan.FromMinutes(5);
     private static readonly Lazy<string> RootFolder = new(FindRoot);
-    private static readonly Lazy<bool> Restored = new(() =>
-    {
-        RestoreUnderLock();
-        return true;
-    });
+    private static readonly Lock RestoreGuard = new();
+    private static bool _restored;
 
     /// <summary>The <c>tests/fixtures</c> folder.</summary>
     public static string Root => RootFolder.Value;
@@ -38,7 +37,19 @@ internal static class FixtureProjects
     /// Restores every fixture except <c>unrestored/</c> and builds the generator fixture. Runs once per process, and under an
     /// exclusive file lock, so test assemblies that run in parallel take turns.
     /// </summary>
-    public static void EnsureRestored() => _ = Restored.Value;
+    public static void EnsureRestored()
+    {
+        lock (RestoreGuard)
+        {
+            if (_restored)
+            {
+                return;
+            }
+
+            RestoreUnderLock();
+            _restored = true;
+        }
+    }
 
     /// <summary>Takes the lock, then restores unless the marker says the fixtures are already restored. Bypasses the once-per-process guard.</summary>
     internal static void RestoreUnderLock()
@@ -49,7 +60,7 @@ internal static class FixtureProjects
         var markerPath = Path(MarkerFileName);
         if (File.Exists(markerPath)
             && string.Equals(File.ReadAllText(markerPath), stamp, StringComparison.Ordinal)
-            && File.Exists(Path("clean", "Shop.Domain", "obj", "project.assets.json")))
+            && OutputsExist())
         {
             return;
         }
@@ -63,20 +74,70 @@ internal static class FixtureProjects
         File.WriteAllText(markerPath, stamp);
     }
 
-    private static FileStream TakeLock(string lockPath)
+    /// <summary>True when every restore target has its assets file and the generator has been built.</summary>
+    internal static bool OutputsExist()
     {
+        foreach (var assets in AssetsFiles())
+        {
+            if (!File.Exists(assets))
+            {
+                return false;
+            }
+        }
+
+        return File.Exists(GeneratorDll());
+    }
+
+    /// <summary>The <c>obj/project.assets.json</c> of each restore target, one per project folder of a solution.</summary>
+    internal static IEnumerable<string> AssetsFiles()
+    {
+        foreach (var target in RestoreTargets)
+        {
+            var targetPath = Path(target.Split('/'));
+            var folder = System.IO.Path.GetDirectoryName(targetPath)!;
+            if (targetPath.EndsWith(".slnx", StringComparison.Ordinal))
+            {
+                foreach (var project in Directory.EnumerateDirectories(folder))
+                {
+                    yield return System.IO.Path.Combine(project, "obj", "project.assets.json");
+                }
+            }
+            else
+            {
+                yield return System.IO.Path.Combine(folder, "obj", "project.assets.json");
+            }
+        }
+    }
+
+    internal static string GeneratorDll() =>
+        Path("generator", "Gen.Generator", "bin", "Debug", "netstandard2.0", "Gen.Generator.dll");
+
+    /// <summary>Takes an exclusive lock on <paramref name="lockPath"/>, retrying while another holder has it, for at most five minutes.</summary>
+    internal static FileStream TakeLock(string lockPath)
+    {
+        var deadline = DateTime.UtcNow + LockTimeout;
         while (true)
         {
             try
             {
                 return new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
             }
-            catch (IOException)
+            catch (IOException ex) when (IsSharingViolation(ex))
             {
+                if (DateTime.UtcNow >= deadline)
+                {
+                    throw new TimeoutException($"Could not take the lock file '{lockPath}' within {LockTimeout.TotalMinutes} minutes.", ex);
+                }
+
                 Thread.Sleep(50);
             }
         }
     }
+
+    // A held lock surfaces as a plain IOException on every platform. Missing folders, bad paths and missing drives are
+    // IOException subclasses that waiting cannot fix, so they are rethrown.
+    private static bool IsSharingViolation(IOException ex) =>
+        ex is not (DirectoryNotFoundException or FileNotFoundException or PathTooLongException or DriveNotFoundException);
 
     private static long LatestSourceWrite()
     {
@@ -117,7 +178,13 @@ internal static class FixtureProjects
         using var process = Process.Start(info) ?? throw new InvalidOperationException("Could not start dotnet.");
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
-        process.WaitForExit();
+        if (!process.WaitForExit(ProcessTimeout))
+        {
+            process.Kill(entireProcessTree: true);
+            process.WaitForExit();
+            throw new TimeoutException(
+                $"dotnet {verb} {target} did not finish within {ProcessTimeout.TotalMinutes} minutes.{Environment.NewLine}{stdout.GetAwaiter().GetResult()}{stderr.GetAwaiter().GetResult()}");
+        }
 
         if (process.ExitCode != 0)
         {
@@ -130,12 +197,13 @@ internal static class FixtureProjects
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
         {
-            if (File.Exists(System.IO.Path.Combine(dir.FullName, "src", "Ariadne.NET.slnx")))
+            var fixtures = System.IO.Path.Combine(dir.FullName, "tests", "fixtures");
+            if (File.Exists(System.IO.Path.Combine(dir.FullName, "src", "Ariadne.NET.slnx")) && Directory.Exists(fixtures))
             {
-                return System.IO.Path.Combine(dir.FullName, "tests", "fixtures");
+                return fixtures;
             }
         }
 
-        throw new DirectoryNotFoundException($"No folder with src/Ariadne.NET.slnx above '{AppContext.BaseDirectory}'.");
+        throw new DirectoryNotFoundException($"No folder with src/Ariadne.NET.slnx and tests/fixtures above '{AppContext.BaseDirectory}'.");
     }
 }
