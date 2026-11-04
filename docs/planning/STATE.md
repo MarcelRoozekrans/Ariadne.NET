@@ -1,52 +1,46 @@
 # Session State
 
 **Last session:** 2026-11-03
-**Branch:** `fix/mcp-composite-template`, pushed to the private repo `MarcelRoozekrans/architecture-governance-engine` (`main` still holds the pre-2026-10-30 state). No PR opened yet; the branch collects Milestone 1 work.
+**Repository:** `MarcelRoozekrans/Ariadne.NET`, public since 2026-11-03. Milestone 1 merged to `main` through PR #5 as merge commit `ef725d0`. The old private repository `MarcelRoozekrans/architecture-governance-engine` is frozen and stays private.
 
 ## Current Position
 
 - **Milestone:** 1 — Ariadne.NET identity and family shape [active]
-- **Phase:** 1.4 — Publish [planned 2026-11-03; spec `docs/superpowers/specs/2026-10-31-phase-1.4-publish-design.md`, plan `docs/superpowers/plans/2026-11-03-phase-1.4-publish.md`, 13 tasks, none started]
-- **Last completed:** Phase 1.3 — Family conventions, completed 2026-10-31. All 11 plan tasks executed subagent-driven, each with task review and fix loop, then a whole-branch final review, one fix wave and a clean scoped re-review.
+- **Phase:** 1.4 — Publish [tasks 1–12 done; task 13, the 0.1.0 release, waits on the owner's settings checklist]
+- **Plan:** `docs/superpowers/plans/2026-11-03-phase-1.4-publish.md`; spec `docs/superpowers/specs/2026-10-31-phase-1.4-publish-design.md`
 
-Phase 1.3 outcome:
-- Pack pipeline and sync return `Result<T, AriadneError>`; CLI maps errors to exit 2 via `ErrorOutput`, MCP via `ToolError`/`ErrorText`.
-- ZeroAlloc.Inject 1.11.6, Analyzers 1.11.3 with `TreatWarningsAsErrors`, Validation 2.5.0 on the Abstractions schema types, Telemetry 1.12.7 (source `Ariadne.NET`), Resilience 3.4.0 on an internal `IGitClient`.
-- Sync hardened: git argv list with `--`, contained import names and paths, symlink and `.git` refusal, staged cache swap, url credential redaction.
-- Verified at head: `dotnet build --no-incremental` 0 warnings; `dotnet test` 474 passing (413 + 41 Mcp + 20 Cli); AotSmoke publish clean; `dotnet pack` gives exactly `Ariadne.NET` and `Ariadne.NET.Abstractions`, the Abstractions nuspec lists only ZeroAlloc.Results and ZeroAlloc.Validation.
+Phase 1.4 so far:
+- Tasks 1–9 ran subagent-driven with a task review each, then a whole-branch review, one fix wave and a clean re-review.
+- The `Getting started` sample loads the built-in clean-architecture pack and checks a directory with `ISourceValidator`. `pack-validate` runs it against the packed packages twice: clean code must exit 0, a Domain file using a WebApi namespace must exit 1.
+- The first PR run failed only on Windows: `SyncCommand` joined `.architecture/imports.yaml` with `Path.Combine`, giving mixed separators. Fixed in the CLI, plus one test that expected the mixed path.
+- On `main` after the merge: CI, baseline-checks and Deploy Docs green; the docs site answers at https://marcelroozekrans.github.io/Ariadne.NET/. Release Please fails at the token step until the release bot App settings exist.
+- `Main` ruleset active, requiring `build (ubuntu-latest)`, `build (windows-latest)`, `aot-smoke`, `pack-validate`, `baseline / gitleaks`, `baseline / codeql (csharp)`, `baseline / nuget-audit` and `codecov/project`.
+
+## Decided 2026-11-03: a fresh repository instead of a rename
+
+The local history scan, gitleaks 8.30.1 with default rules plus private-detail rules, found no secrets, but the owner's home-domain email on 318 author and committer entries and a home-directory path in three old commits of this file. In-place rewriting could not remove them: GitHub keeps `refs/pull/*` for the old repository's 50 bot PRs, and only GitHub Support can delete those. The owner chose a fresh repository:
+- History of `main` and `fix/mcp-composite-template` rewritten with git-filter-repo 2.47.0: a mailmap maps the home email to the GitHub noreply address, and the home paths are replaced. Trees are unchanged. gitleaks on the rewrite: no leaks.
+- `MarcelRoozekrans/Ariadne.NET` created private with Actions off, the two branches pushed, then made public with CodeQL default setup off, Pages from Actions and Actions on.
+- Local clones: the remote `ariadne` points at the new repository; `origin` still points at the old one, so branches with old history cannot be pushed into the new repository by accident. Push with `git push ariadne HEAD:<branch>`. The repository's git `user.email` is the GitHub noreply address.
 
 ## Open Decisions
 
-- ZeroAlloc.Analyzers: settled at 1.12.0 (arrived with the merge of `main` in plan task 1, build at 0 warnings).
-- The 1.4 plan runs subagent-driven, chosen by the owner on 2026-11-03.
+- ZeroAlloc.Analyzers: settled at 1.12.0.
 - An own YAML library: a separate, unscheduled project outside Ariadne (agreed 2026-10-31).
 - From the roadmap design, none blocking: whether M3 ships a Roslyn analyzer; code generation's role after M4; Mnemosyne.NET integration.
 
 ## Blockers
 
-- **Upstream issue not filed.** ZeroAlloc.Resilience 3.4.0 reports the total timeout as `ResilienceError` with PolicyType "Retry", and a timeout during the backoff delay carries the previous attempt's error. Filing on `ZeroAlloc-Net/ZeroAlloc.Resilience` was blocked by the session's permission policy; the user files it or allows it. Ariadne maps it correctly via `InnerException is OperationCanceledException` in `Sync/SyncOperations.cs`.
-- **GitHub Actions are disabled on the repo** on purpose. Phase 1.4 re-enables them and makes the repo public; confirm with the user first.
-- The main worktree has `fix/mcp-composite-template` checked out at an older commit. Work from a worktree, and push with `git push -u origin HEAD:fix/mcp-composite-template`.
+- **Owner settings for the release**, from `RELEASING.md`: release bot App installed on `MarcelRoozekrans/Ariadne.NET`; variable `RELEASE_BOT_CLIENT_ID` and secret `RELEASE_BOT_PRIVATE_KEY`; variable `NUGET_USER`; Trusted Publishing policy allows new package ids; `Ariadne.NET` id prefix reserved; codecov already reports on the new repository.
+- **actionlint false positives:** actionlint 1.7.12 reports two errors on `actions/create-github-app-token@v3` `client-id`, an actionlint metadata bug tracked as rhysd/actionlint#648 and #669. Expect exactly these two until it ships a fix.
 
-## Added 2026-11-03
+## Follow-ups
 
-- The owner added a CI security and quality baseline to Phase 1.4 (gitleaks per PR, NuGetAudit on transitive packages, CodeQL, CycloneDX SBOM, codecov coverage floor). It is in the roadmap and in the Goals of the 1.4 design spec; the plan must cover it.
-- Phase 2.4 now also covers structural security rules (APIs and namespaces forbidden per layer), and a new Phase 6.4 adds an ISO/IEC 25010 maintainability pack.
-- The owner wants the same baseline in all their repos, personal and org. That is the family reusable workflow the 1.4 design lists as a non-goal: its own project, outside this repo.
-
-## Unblocked 2026-11-03: ci-baseline v1
-
-`MarcelRoozekrans/ci-baseline` v1.0.0 is released, and the major tag `v1` points at the same commit, `6faa4c5`. Phase 1.4 is unblocked.
-
-- What it provides: the reusable workflows `baseline.yml`, with the required checks `baseline / gitleaks`, `baseline / codeql (csharp)` and `baseline / nuget-audit`, and `history-scan.yml`, plus the actions `actions/coverage-gate`, an 80% line floor, and `actions/sbom`, a CycloneDX SBOM on the release. Its README is the adoption guide: caller jobs, the `codecov.yml` block, the `Directory.Build.props` audit properties and the ruleset's required check names.
-- Consequence for the 1.4 design: the spec lists a shared reusable workflow as a non-goal, in Non-goals and option C, and plans its own per-repo baseline. That workflow now exists. Before writing the 1.4 plan, update the spec so 1.4 adopts `ci-baseline@v1` instead of duplicating it; confirm with the user.
-
-## Decided 2026-11-03: ci-baseline adoption
-
-The spec now adopts `ci-baseline@v1`. The owner chose: the `baseline` caller in its own `baseline-checks.yml`; the pre-public history scan run locally with gitleaks 8.30.1, so Actions stay off until it passes; the `main` ruleset added after the Milestone 1 merge, once `main` has a codecov upload. Merged line coverage measured with the gate's exclusions: 89.4 percent, so no floor override. `main` now has 33 Renovate commits the branch lacks; plan task 1 merges them.
+- `MarcelRoozekrans/Ariadne.NET#1`: `SourceValidator` misses usings inside a file-scoped namespace and scans `bin/` and `obj/`.
+- Open Renovate and Dependabot PRs on the new repository, from before the merge: review after the release.
 
 ## Recommended Next Step
 
-Execute the 1.4 plan with `superpowers:subagent-driven-development`, starting at task 1: delete `publish.yml`, merge `origin/main` and re-apply the Renovate bumps to the renamed projects. Tasks 10 to 13 each stop for the owner: history findings, going public, merging, releasing.
+Plan task 13. Confirm with the owner that the settings above are done, then re-run the failed Release Please run on `main` (`gh run rerun 41719092172 -R MarcelRoozekrans/Ariadne.NET`; the workflow has no dispatch trigger), or let the next push to `main` start it. Check that the release PR proposes 0.1.0 and that its changelog holds every Milestone 1 `feat:` and `fix:`; merge it with the owner's consent; watch the dispatched `ci.yml` publish on `v0.1.0`; verify both packages resolve on nuget.org and the release carries both `.nupkg`, both `.snupkg` and the `.cdx.json` SBOM. Then mark Phase 1.4 and Milestone 1 complete in `ROADMAP.md` and here.
 
-Commit rules: conventional commits; no `Co-Authored-By` trailer or session link (owner's global CLAUDE.md); no nested parentheses in commit bodies (release-please).
+Commit rules: conventional commits; no `Co-Authored-By` trailer or session link; no nested parentheses in commit bodies.
