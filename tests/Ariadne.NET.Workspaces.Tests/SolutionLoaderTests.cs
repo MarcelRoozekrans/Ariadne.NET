@@ -137,7 +137,9 @@ public sealed class SolutionLoaderTests : IDisposable
 
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
-        result.Error.Message.Should().Contain("'Unrestored'").And.Contain(RestoreHint).And.EndWith(".");
+        result.Error.Message.Should().Contain("'Unrestored'").And.EndWith("; it may not be restored: run 'dotnet restore' first.");
+        result.Error.Detail.Should().Contain("CS0246");
+        result.Error.Detail!.Split('\n').Should().Contain(RestoreHint);
         File.Exists(FixtureProjects.Path("unrestored", "obj", "project.assets.json")).Should().BeFalse("the loader never restores");
     }
 
@@ -212,6 +214,7 @@ public sealed class SolutionLoaderTests : IDisposable
 
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().Be("The solution holds no C# project to check.");
     }
 
     [Fact]
@@ -260,20 +263,168 @@ public sealed class SolutionLoaderTests : IDisposable
     public async Task DuplicateProjectName_IsInvalid()
     {
         using var workspace = new AdhocWorkspace();
-        AddProject(workspace, "Lib", LanguageNames.CSharp, "namespace One; public class A { }");
-        AddProject(workspace, "Lib", LanguageNames.CSharp, "namespace Two; public class B { }");
+        AddProject(workspace, "Lib", LanguageNames.CSharp, "namespace One; public class A { }", Path.Combine(_dir, "One", "Lib.csproj"));
+        AddProject(workspace, "Lib", LanguageNames.CSharp, "namespace Two; public class B { }", Path.Combine(_dir, "Two", "Lib.csproj"));
 
         var result = await SolutionLoader.FromSolutionAsync(workspace.CurrentSolution, _dir, CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
-        result.Error.Message.Should().Contain("'Lib'").And.EndWith(".");
+        result.Error.Message.Should().Be("More than one project is named 'Lib'.");
+        result.Error.Detail.Should().Contain(Path.Combine("One", "Lib.csproj")).And.Contain(Path.Combine("Two", "Lib.csproj"));
+    }
+
+    [Theory]
+    [InlineData("docker-compose.dcproj")]
+    [InlineData("Shared.shproj")]
+    public async Task LanguagelessProjectFile_IsSkipped(string projectFile)
+    {
+        await File.WriteAllTextAsync(Path.Combine(_dir, projectFile), "<Project />");
+        var solution = Path.Combine(_dir, "Mixed.slnx");
+        await File.WriteAllTextAsync(
+            solution,
+            $"""<Solution><Project Path="{FixtureProjects.Path("clean", "Shop.Domain", "Shop.Domain.csproj")}" /><Project Path="{projectFile}" /></Solution>""");
+
+        var result = await _loader.LoadAsync(solution);
+
+        result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.ToString() : null);
+        using var loaded = result.Value;
+        loaded.Projects.Select(p => p.Name).Should().Equal("Shop.Domain");
+        loaded.SkippedProjects.Should().Equal(new SkippedProject(Path.GetFileNameWithoutExtension(projectFile), "not a C# project"));
+    }
+
+    [Fact]
+    public async Task ArtifactsOutputLayout_LoadsWhenRestored()
+    {
+        // With UseArtifactsOutput the assets file sits in artifacts/obj/<project>/, not in obj/ beside the project file.
+        var project = Path.Combine(_dir, "Art", "Art.csproj");
+        Directory.CreateDirectory(Path.GetDirectoryName(project)!);
+        await File.WriteAllTextAsync(
+            Path.Combine(_dir, "Directory.Build.props"),
+            "<Project><PropertyGroup><UseArtifactsOutput>true</UseArtifactsOutput></PropertyGroup></Project>");
+        await File.WriteAllTextAsync(
+            project,
+            """<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>""");
+        await File.WriteAllTextAsync(Path.Combine(_dir, "Art", "Order.cs"), "namespace Art; public class Order { }");
+        Restore(project);
+        File.Exists(Path.Combine(_dir, "Art", "obj", "project.assets.json")).Should().BeFalse("the artifacts layout moves obj/");
+
+        var result = await _loader.LoadAsync(project);
+
+        result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.ToString() : null);
+        using var loaded = result.Value;
+        loaded.Projects.Select(p => p.Name).Should().Equal("Art");
+    }
+
+    [Fact]
+    public async Task UnrestoredProjectThatCompiles_Loads()
+    {
+        // A project with no packages that targets the SDK's own framework compiles completely without a restore.
+        var project = Path.Combine(_dir, "Plain", "Plain.csproj");
+        Directory.CreateDirectory(Path.GetDirectoryName(project)!);
+        await File.WriteAllTextAsync(
+            project,
+            """<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>""");
+        await File.WriteAllTextAsync(Path.Combine(_dir, "Plain", "Order.cs"), "namespace Plain; public class Order { }");
+
+        var result = await _loader.LoadAsync(project);
+
+        result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.ToString() : null);
+        using var loaded = result.Value;
+        loaded.Projects.Select(p => p.Name).Should().Equal("Plain");
+        File.Exists(Path.Combine(_dir, "Plain", "obj", "project.assets.json")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ProjectWithoutCoreLibrary_IsInvalid()
+    {
+        using var workspace = new AdhocWorkspace();
+        var info = ProjectInfo.Create(
+            ProjectId.CreateNewId(),
+            VersionStamp.Default,
+            "Bare",
+            "Bare",
+            LanguageNames.CSharp,
+            compilationOptions: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var project = workspace.AddProject(info);
+        workspace.AddDocument(project.Id, "A.cs", SourceText.From("namespace Bare; public class A { }"));
+
+        var result = await SolutionLoader.FromSolutionAsync(workspace.CurrentSolution, _dir, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().Be("Project 'Bare' cannot resolve System.Object.");
+    }
+
+    [Fact]
+    public async Task ManyCompileErrors_ListsTheFirstFive()
+    {
+        using var workspace = new AdhocWorkspace();
+        var fields = string.Concat(Enumerable.Range(1, 7).Select(i => $"int F{i} = \"x\";\n"));
+        AddProject(workspace, "Errors", LanguageNames.CSharp, $"namespace Errors;\npublic class A\n{{\n{fields}}}\n");
+
+        var result = await SolutionLoader.FromSolutionAsync(workspace.CurrentSolution, _dir, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Be("Project 'Errors' has 7 compile errors.");
+        result.Error.Detail!.Split('\n').Should().HaveCount(5).And.OnlyContain(l => l.Contains("CS0029", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task MissingSourceFile_IsInvalidAndNamesIt()
+    {
+        using var workspace = new AdhocWorkspace();
+        var project = AddProject(workspace, "Lib", LanguageNames.CSharp, "namespace Lib; public class A { }");
+        workspace.AddDocument(DocumentInfo.Create(
+            DocumentId.CreateNewId(project.Id),
+            "Gone.cs",
+            loader: TextLoader.From(TextAndVersion.Create(SourceText.From(""), VersionStamp.Default)),
+            filePath: Path.Combine(_dir, "Gone.cs")));
+
+        var result = await SolutionLoader.FromSolutionAsync(workspace.CurrentSolution, _dir, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().Be("Project 'Lib' lists a source file that does not exist.");
+        result.Error.Detail.Should().Be("Gone.cs: file not found");
+    }
+
+    [Fact]
+    public async Task ParenthesisedProjectFileName_IsNotATargetFramework()
+    {
+        using var workspace = new AdhocWorkspace();
+        AddProject(workspace, "Lib (Legacy)", LanguageNames.CSharp, "namespace Legacy; public class A { }", Path.Combine(_dir, "Lib (Legacy).csproj"));
+        AddProject(workspace, "Multi(net9.0)", LanguageNames.CSharp, "namespace Multi; public class B { }", Path.Combine(_dir, "Multi.csproj"));
+
+        var result = await SolutionLoader.FromSolutionAsync(workspace.CurrentSolution, _dir, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.ToString() : null);
+        using var loaded = result.Value;
+        loaded.Projects.Select(p => (p.Name, p.TargetFramework)).Should().BeEquivalentTo(
+            [("Lib (Legacy)", (string?)null), ("Multi", "net9.0")]);
     }
 
     private static bool IsUnderObj(string path) =>
         path.Contains("/obj/", StringComparison.Ordinal) || path.Contains("\\obj\\", StringComparison.Ordinal);
 
-    private static void AddProject(AdhocWorkspace workspace, string name, string language, string? source = null)
+    private static void Restore(string project)
+    {
+        var info = new System.Diagnostics.ProcessStartInfo("dotnet")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        info.ArgumentList.Add("restore");
+        info.ArgumentList.Add(project);
+        using var process = System.Diagnostics.Process.Start(info)!;
+        var output = process.StandardOutput.ReadToEndAsync();
+        var error = process.StandardError.ReadToEndAsync();
+        process.WaitForExit(TimeSpan.FromMinutes(5)).Should().BeTrue("dotnet restore should finish");
+        process.ExitCode.Should().Be(0, output.GetAwaiter().GetResult() + error.GetAwaiter().GetResult());
+    }
+
+    private static Project AddProject(AdhocWorkspace workspace, string name, string language, string? source = null, string? filePath = null)
     {
         var info = ProjectInfo.Create(
             ProjectId.CreateNewId(),
@@ -281,6 +432,7 @@ public sealed class SolutionLoaderTests : IDisposable
             name,
             name,
             language,
+            filePath: filePath,
             compilationOptions: string.Equals(language, LanguageNames.CSharp, StringComparison.Ordinal)
                 ? new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
                 : null,
@@ -288,8 +440,10 @@ public sealed class SolutionLoaderTests : IDisposable
         var project = workspace.AddProject(info);
         if (source is not null)
         {
-            workspace.AddDocument(project.Id, "A.cs", SourceText.From(source));
+            project = workspace.AddDocument(project.Id, "A.cs", SourceText.From(source)).Project;
         }
+
+        return project;
     }
 
     private async Task<LoadedSolution> LoadAsync(params string[] parts)

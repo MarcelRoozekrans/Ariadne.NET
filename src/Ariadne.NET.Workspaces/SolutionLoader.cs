@@ -1,5 +1,3 @@
-using System.Collections.Frozen;
-using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
@@ -15,10 +13,7 @@ namespace Ariadne.NET.Workspaces;
 /// <summary>Loads solutions and projects with MSBuildWorkspace and fails on any load that is not complete.</summary>
 public sealed partial class SolutionLoader : ISolutionLoader
 {
-    private const string RestoreHint = "run 'dotnet restore' first";
-    private const string AssetsFileName = "project.assets.json";
     private const string NotCSharp = "not a C# project";
-    private const int MaxListedDiagnostics = 5;
 
     /// <inheritdoc />
     public async Task<Result<LoadedSolution, AriadneError>> LoadAsync(string path, CancellationToken cancellationToken = default)
@@ -56,7 +51,7 @@ public sealed partial class SolutionLoader : ISolutionLoader
         ArgumentNullException.ThrowIfNull(solution);
         ArgumentNullException.ThrowIfNull(rootDirectory);
 
-        return BuildAsync(solution, rootDirectory, named: null, owner: null, cancellationToken);
+        return BuildAsync(solution, rootDirectory, named: null, failures: [], owner: null, cancellationToken);
     }
 
     // The first method that touches MSBuildWorkspace; kept out of line so the JIT loads no MSBuild type before the locator registers.
@@ -92,12 +87,7 @@ public sealed partial class SolutionLoader : ISolutionLoader
                 snapshot = [.. failures];
             }
 
-            if (snapshot.Length > 0)
-            {
-                return Failure(LoadFailure(snapshot));
-            }
-
-            var result = await BuildAsync(solution, Path.GetDirectoryName(file)!, named, workspace, cancellationToken)
+            var result = await BuildAsync(solution, Path.GetDirectoryName(file)!, named, snapshot, workspace, cancellationToken)
                 .ConfigureAwait(false);
             if (result.IsSuccess)
             {
@@ -125,28 +115,39 @@ public sealed partial class SolutionLoader : ISolutionLoader
         }
     }
 
-    // The steps shared by a real load and the AdhocWorkspace seam, after any workspace failure has ended a real load: pick the named
-    // projects, check they are restored and loaded, skip non-C# projects, then compile each C# project and fail on any compile error.
+    // The steps shared by a real load and the AdhocWorkspace seam:
+    // 1. pick the named projects the workspace loaded;
+    // 2. skip named project files it did not load because they are not C#, such as .dcproj or .shproj, with their failures;
+    // 3. fail on any other workspace failure, then on a named .csproj that did not load;
+    // 4. skip the loaded non-C# projects, then compile each C# project and fail on what makes it uncheckable.
+    // Restore is detected from each compilation, after the failures, so a malformed project file is not reported as unrestored.
     private static async Task<Result<LoadedSolution, AriadneError>> BuildAsync(
         Solution solution,
         string rootDirectory,
         IReadOnlySet<string>? named,
+        IReadOnlyList<string> failures,
         IDisposable? owner,
         CancellationToken cancellationToken)
     {
         var selected = SelectNamed(solution, named);
+        var (unloadedCSharp, unloadedOther) = Unloaded(selected, named);
 
-        if (CheckRestored(selected, rootDirectory) is { } notRestored)
+        var remaining = WithoutFailuresOf(failures, unloadedOther);
+        if (remaining.Count > 0)
         {
-            return Failure(notRestored);
+            return Failure(LoadFailure(remaining));
         }
 
-        if (MissingNamed(selected, named, rootDirectory) is { } missing)
+        if (unloadedCSharp.Count > 0)
         {
-            return Failure(missing);
+            var path = unloadedCSharp[0];
+            return Failure(
+                AriadneErrorCode.Invalid,
+                $"Project '{Path.GetFileNameWithoutExtension(path)}' did not load.",
+                $"{ProjectCompiler.Relative(rootDirectory, path)}: the workspace has no project for this file");
         }
 
-        var (csharp, skipped) = Partition(selected);
+        var (csharp, skipped) = Partition(selected, unloadedOther);
         if (csharp.Count == 0)
         {
             return Failure(
@@ -155,7 +156,7 @@ public sealed partial class SolutionLoader : ISolutionLoader
                 skipped.Count == 0 ? null : string.Join('\n', skipped.Select(s => $"{s.Name}: {s.Reason}")));
         }
 
-        if (DuplicateName(csharp) is { } duplicate)
+        if (DuplicateName(csharp, rootDirectory) is { } duplicate)
         {
             return Failure(duplicate);
         }
@@ -163,7 +164,7 @@ public sealed partial class SolutionLoader : ISolutionLoader
         var analyzed = new List<AnalyzedProject>(csharp.Count);
         for (var i = 0; i < csharp.Count; i++)
         {
-            var compiled = await CompileAsync(csharp[i], rootDirectory, cancellationToken).ConfigureAwait(false);
+            var compiled = await ProjectCompiler.CompileAsync(csharp[i], rootDirectory, cancellationToken).ConfigureAwait(false);
             if (compiled.IsFailure)
             {
                 return Failure(compiled.Error);
@@ -191,76 +192,14 @@ public sealed partial class SolutionLoader : ISolutionLoader
         return selected;
     }
 
-    // Non-C# projects are skipped, once per project even when it has several target frameworks.
-    private static (List<Project> CSharp, List<SkippedProject> Skipped) Partition(List<Project> projects)
+    // The named project files with no loaded project: .csproj files, which must load, and the rest, which are not C# and are skipped.
+    private static (List<string> CSharp, List<string> Other) Unloaded(List<Project> selected, IReadOnlySet<string>? named)
     {
-        var csharp = new List<Project>(projects.Count);
-        var skipped = new List<SkippedProject>();
-        foreach (ref readonly var project in CollectionsMarshal.AsSpan(projects))
-        {
-            if (string.Equals(project.Language, LanguageNames.CSharp, StringComparison.Ordinal))
-            {
-                csharp.Add(project);
-                continue;
-            }
-
-            var name = SplitName(project.Name).Name;
-            if (!skipped.Exists(s => string.Equals(s.Name, name, StringComparison.Ordinal)))
-            {
-                skipped.Add(new SkippedProject(name, NotCSharp));
-            }
-        }
-
-        return (csharp, skipped);
-    }
-
-    // Ariadne never restores. An unrestored project loads without a workspace failure and only shows compile errors, so this runs first.
-    private static AriadneError? CheckRestored(List<Project> projects, string rootDirectory)
-    {
-        var names = new List<string>();
-        var lines = new List<string>();
-        var seen = new HashSet<string>(NamedProjects.PathComparer);
-        foreach (ref readonly var project in CollectionsMarshal.AsSpan(projects))
-        {
-            if (project.FilePath is not { Length: > 0 } filePath || !seen.Add(filePath))
-            {
-                continue;
-            }
-
-            var assets = Path.Combine(Path.GetDirectoryName(filePath)!, "obj", AssetsFileName);
-            if (!File.Exists(assets))
-            {
-                names.Add($"'{SplitName(project.Name).Name}'");
-                lines.Add($"{Relative(rootDirectory, filePath)}: obj/{AssetsFileName} is missing");
-            }
-        }
-
-        if (names.Count == 0)
-        {
-            return null;
-        }
-
-        var subject = names.Count == 1 ? $"Project {names[0]} is" : $"Projects {string.Join(", ", names)} are";
-        return new AriadneError(AriadneErrorCode.Invalid, $"{subject} not restored; {RestoreHint}.", string.Join('\n', lines));
-    }
-
-    // A workspace diagnostic carries only a message; MSBuildWorkspace puts the project file's path in it.
-    private static AriadneError LoadFailure(IReadOnlyList<string> failures)
-    {
-        var match = ProjectFilePattern().Match(failures[0]);
-        var subject = match.Success
-            ? $"Project '{Path.GetFileNameWithoutExtension(match.Value)}' did not load"
-            : "The solution did not load completely";
-        var hint = Mentions(failures, AssetsFileName) ? $"; {RestoreHint}" : "";
-        return new AriadneError(AriadneErrorCode.Invalid, $"{subject}{hint}.", string.Join('\n', failures));
-    }
-
-    // A project the solution, solution filter or project file names but the workspace did not load.
-    private static AriadneError? MissingNamed(List<Project> selected, IReadOnlySet<string>? named, string rootDirectory)
-    {
+        var csharp = new List<string>();
+        var other = new List<string>();
         if (named is null)
         {
-            return null;
+            return (csharp, other);
         }
 
         var loaded = new HashSet<string>(NamedProjects.PathComparer);
@@ -271,32 +210,106 @@ public sealed partial class SolutionLoader : ISolutionLoader
 
         foreach (var path in named.Order(NamedProjects.PathComparer))
         {
-            if (!loaded.Contains(path))
+            if (loaded.Contains(path))
             {
-                return new AriadneError(
-                    AriadneErrorCode.Invalid,
-                    $"Project '{Path.GetFileNameWithoutExtension(path)}' did not load.",
-                    $"{Relative(rootDirectory, path)}: the workspace has no project for this file");
+                continue;
+            }
+
+            (string.Equals(Path.GetExtension(path), ".csproj", StringComparison.OrdinalIgnoreCase) ? csharp : other).Add(path);
+        }
+
+        return (csharp, other);
+    }
+
+    // Drops the failures that name a skipped project file, matched by the project path the message carries.
+    private static List<string> WithoutFailuresOf(IReadOnlyList<string> failures, List<string> skippedPaths)
+    {
+        var skipped = new HashSet<string>(skippedPaths, NamedProjects.PathComparer);
+        var remaining = new List<string>(failures.Count);
+        foreach (var failure in failures)
+        {
+            var aboutSkipped = false;
+            foreach (Match match in ProjectFilePattern().Matches(failure))
+            {
+                if (skipped.Contains(NamedProjects.Normalize(match.Value)))
+                {
+                    aboutSkipped = true;
+                    break;
+                }
+            }
+
+            if (!aboutSkipped)
+            {
+                remaining.Add(failure);
             }
         }
 
-        return null;
+        return remaining;
+    }
+
+    // Non-C# projects are skipped, once per project even when it has several target frameworks, with the named files that did not load.
+    private static (List<Project> CSharp, List<SkippedProject> Skipped) Partition(List<Project> projects, List<string> unloadedOther)
+    {
+        var csharp = new List<Project>(projects.Count);
+        var skipped = new List<SkippedProject>();
+        foreach (ref readonly var project in CollectionsMarshal.AsSpan(projects))
+        {
+            if (string.Equals(project.Language, LanguageNames.CSharp, StringComparison.Ordinal))
+            {
+                csharp.Add(project);
+            }
+            else
+            {
+                AddSkipped(skipped, ProjectName.Split(project).Name);
+            }
+        }
+
+        foreach (ref readonly var path in CollectionsMarshal.AsSpan(unloadedOther))
+        {
+            AddSkipped(skipped, Path.GetFileNameWithoutExtension(path));
+        }
+
+        return (csharp, skipped);
+    }
+
+    private static void AddSkipped(List<SkippedProject> skipped, string name)
+    {
+        if (!skipped.Exists(s => string.Equals(s.Name, name, StringComparison.Ordinal)))
+        {
+            skipped.Add(new SkippedProject(name, NotCSharp));
+        }
+    }
+
+    // A workspace diagnostic carries only a message; MSBuildWorkspace puts the project file's path in it.
+    private static AriadneError LoadFailure(List<string> failures)
+    {
+        var match = ProjectFilePattern().Match(failures[0]);
+        var subject = match.Success
+            ? $"Project '{Path.GetFileNameWithoutExtension(match.Value)}' did not load"
+            : "The solution did not load completely";
+        var hint = failures.Exists(f => f.Contains(ProjectCompiler.AssetsFileName, StringComparison.OrdinalIgnoreCase))
+            ? ProjectCompiler.RestoreSuffix
+            : "";
+        return new AriadneError(AriadneErrorCode.Invalid, $"{subject}{hint}.", string.Join('\n', failures));
     }
 
     // The engine merges entries by project name, so two projects of one name would be checked as one.
-    private static AriadneError? DuplicateName(List<Project> projects)
+    private static AriadneError? DuplicateName(List<Project> projects, string rootDirectory)
     {
         var frameworks = new Dictionary<string, HashSet<string?>>(StringComparer.Ordinal);
         foreach (ref readonly var project in CollectionsMarshal.AsSpan(projects))
         {
-            var (name, targetFramework) = SplitName(project.Name);
+            var (name, targetFramework) = ProjectName.Split(project);
             if (!frameworks.TryGetValue(name, out var seen))
             {
                 frameworks.Add(name, seen = []);
             }
             else if (seen.Contains(targetFramework) || (targetFramework is null) != seen.Contains(null))
             {
-                return new AriadneError(AriadneErrorCode.Invalid, $"More than one project is named '{name}'.");
+                return new AriadneError(
+                    AriadneErrorCode.Invalid,
+                    $"More than one project is named '{name}'.",
+                    string.Join('\n', ProjectFilesNamed(projects, name, rootDirectory)));
             }
 
             seen.Add(targetFramework);
@@ -305,105 +318,27 @@ public sealed partial class SolutionLoader : ISolutionLoader
         return null;
     }
 
-    private static async Task<Result<AnalyzedProject, AriadneError>> CompileAsync(
-        Project project,
-        string rootDirectory,
-        CancellationToken cancellationToken)
+    private static List<string> ProjectFilesNamed(List<Project> projects, string name, string rootDirectory)
     {
-        var compilation = await project.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
-        if (compilation is null)
+        var files = new List<string>();
+        foreach (ref readonly var project in CollectionsMarshal.AsSpan(projects))
         {
-            return Result<AnalyzedProject, AriadneError>.Failure(
-                new AriadneError(AriadneErrorCode.Invalid, $"Project '{project.Name}' has no compilation."));
-        }
-
-        var errorCount = 0;
-        var lines = new List<string>(MaxListedDiagnostics);
-        var mentionsAssets = false;
-        foreach (var diagnostic in compilation.GetDiagnostics(cancellationToken))
-        {
-            if (diagnostic.Severity != DiagnosticSeverity.Error)
+            if (!string.Equals(ProjectName.Split(project).Name, name, StringComparison.Ordinal))
             {
                 continue;
             }
 
-            errorCount++;
-            var message = diagnostic.GetMessage(CultureInfo.InvariantCulture);
-            mentionsAssets |= message.Contains(AssetsFileName, StringComparison.OrdinalIgnoreCase);
-            if (lines.Count < MaxListedDiagnostics)
+            var file = project.FilePath is { Length: > 0 } filePath
+                ? $"{ProjectCompiler.Relative(rootDirectory, filePath)}: project '{project.Name}'"
+                : $"{project.Name}: project without a file";
+            if (!files.Contains(file, StringComparer.Ordinal))
             {
-                lines.Add(Describe(diagnostic, message, project.Name, rootDirectory));
+                files.Add(file);
             }
         }
 
-        if (errorCount > 0)
-        {
-            var errors = errorCount == 1 ? "1 compile error" : string.Create(CultureInfo.InvariantCulture, $"{errorCount} compile errors");
-            var hint = mentionsAssets ? $"; {RestoreHint}" : "";
-            return Result<AnalyzedProject, AriadneError>.Failure(
-                new AriadneError(AriadneErrorCode.Invalid, $"Project '{project.Name}' has {errors}{hint}.", string.Join('\n', lines)));
-        }
-
-        var generatedPaths = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var document in await project.GetSourceGeneratedDocumentsAsync(cancellationToken).ConfigureAwait(false))
-        {
-            if (document.FilePath is { Length: > 0 } filePath)
-            {
-                generatedPaths.Add(filePath);
-            }
-        }
-
-        var generatedTrees = compilation.SyntaxTrees.Where(t => generatedPaths.Contains(t.FilePath)).ToFrozenSet();
-        var (name, targetFramework) = SplitName(project.Name);
-        return Result<AnalyzedProject, AriadneError>.Success(
-            new AnalyzedProject(name, targetFramework, compilation) { GeneratedTrees = generatedTrees });
+        return files;
     }
-
-    // path:line:column: id message, with the path relative to the root; a diagnostic without a source location uses the project name.
-    private static string Describe(Diagnostic diagnostic, string message, string projectName, string rootDirectory)
-    {
-        var span = diagnostic.Location.GetLineSpan();
-        if (!diagnostic.Location.IsInSource || string.IsNullOrEmpty(span.Path))
-        {
-            return $"{projectName}: {diagnostic.Id} {message}";
-        }
-
-        var start = span.StartLinePosition;
-        return string.Create(
-            CultureInfo.InvariantCulture,
-            $"{Relative(rootDirectory, span.Path)}:{start.Line + 1}:{start.Character + 1}: {diagnostic.Id} {message}");
-    }
-
-    // MSBuildWorkspace names each target framework of a multi-targeting project "Name(tfm)".
-    private static (string Name, string? TargetFramework) SplitName(string projectName)
-    {
-        if (projectName.EndsWith(')'))
-        {
-            var open = projectName.LastIndexOf('(');
-            if (open > 0 && open < projectName.Length - 2)
-            {
-                return (projectName[..open], projectName[(open + 1)..^1]);
-            }
-        }
-
-        return (projectName, null);
-    }
-
-    private static bool Mentions(IReadOnlyList<string> messages, string text)
-    {
-        foreach (var message in messages)
-        {
-            if (message.Contains(text, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static string Relative(string rootDirectory, string path) =>
-        Path.IsPathRooted(path) ? Path.GetRelativePath(rootDirectory, path) : path;
 
     [GeneratedRegex(@"[^\s'""]+\.[A-Za-z]+proj\b", RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 1000)]
     private static partial Regex ProjectFilePattern();

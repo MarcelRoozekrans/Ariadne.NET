@@ -11,7 +11,10 @@ internal static class MSBuildLocatorRegistration
 {
     private static readonly Lock Gate = new();
 
-    /// <summary>Registers the default .NET SDK unless one is registered; returns the error when no SDK is found.</summary>
+    /// <summary>
+    /// Registers the default .NET SDK unless one is registered. Returns the error when no SDK is found, or when MSBuild assemblies
+    /// are already loaded in this process, which makes registration impossible.
+    /// </summary>
     public static AriadneError? EnsureRegistered()
     {
         lock (Gate)
@@ -21,18 +24,21 @@ internal static class MSBuildLocatorRegistration
                 return null;
             }
 
-            try
+            if (!MSBuildLocator.QueryVisualStudioInstances().Any())
             {
-                MSBuildLocator.RegisterDefaults();
-                return null;
+                return new AriadneError(AriadneErrorCode.Unavailable, "No .NET SDK was found to load the solution with.");
             }
-            catch (InvalidOperationException ex)
+
+            if (!MSBuildLocator.CanRegister)
             {
                 return new AriadneError(
                     AriadneErrorCode.Unavailable,
-                    "No .NET SDK was found to load the solution with.",
-                    ex.Message);
+                    "MSBuild assemblies were loaded before the .NET SDK could be registered.",
+                    "MSBuildLocator must register before any Microsoft.Build assembly is loaded; this is a fault in the host process.");
             }
+
+            MSBuildLocator.RegisterDefaults();
+            return null;
         }
     }
 }
