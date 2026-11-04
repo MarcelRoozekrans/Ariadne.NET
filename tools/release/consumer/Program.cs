@@ -42,4 +42,4 @@ if (result.IsFailure)
 
 var report = result.Value;
 Console.WriteLine($"Checked {report.TypesChecked} types: {report.Violations.Count} violations");
-return report.Violations.Count == 0 ? 0 : 1;
+return report.IsValid ? 0 : 1;

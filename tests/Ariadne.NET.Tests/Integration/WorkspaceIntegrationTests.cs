@@ -1,4 +1,8 @@
+using Ariadne.NET.Abstractions;
+using Ariadne.NET.Analysis;
 using FluentAssertions;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Ariadne.NET.CodeGeneration;
 using Ariadne.NET.Orchestration;
 using Ariadne.NET.RuleEngine;
@@ -9,7 +13,7 @@ namespace Ariadne.NET.Tests.Integration;
 
 /// <summary>
 /// Integration tests that exercise the full workspace pipeline:
-/// scaffold workspace → generate components → validate structure.
+/// scaffold workspace → generate components → validate the generated code on the semantic engine.
 /// </summary>
 public sealed class WorkspaceIntegrationTests : IDisposable
 {
@@ -70,7 +74,7 @@ public sealed class WorkspaceIntegrationTests : IDisposable
         generateResult.Success.Should().BeTrue();
         generateResult.GeneratedFiles.Should().HaveCount(2);
 
-        // Step 3: Write files to workspace
+        // Step 3: Write files to workspace and validate them on the semantic engine
         foreach (var file in generateResult.GeneratedFiles)
         {
             var fullPath = Path.Combine(_tempDir, file.FilePath);
@@ -79,7 +83,7 @@ public sealed class WorkspaceIntegrationTests : IDisposable
             File.WriteAllText(fullPath, file.Code);
         }
 
-        Directory.GetFiles(_tempDir, "*.cs", SearchOption.AllDirectories).Should().HaveCount(2);
+        AssertConformsToPack(pack, generateResult);
     }
 
     [Fact]
@@ -114,11 +118,11 @@ public sealed class WorkspaceIntegrationTests : IDisposable
         ordersResult.Success.Should().BeTrue();
         usersResult.Success.Should().BeTrue();
 
-        // Write both features
+        // Write both features and validate them on the semantic engine
         WriteGeneratedFiles(ordersResult);
         WriteGeneratedFiles(usersResult);
 
-        Directory.GetFiles(_tempDir, "*.cs", SearchOption.AllDirectories).Should().HaveCount(2);
+        AssertConformsToPack(pack, ordersResult, usersResult);
     }
 
     [Fact]
@@ -208,6 +212,30 @@ public sealed class WorkspaceIntegrationTests : IDisposable
         workspace.Directories.Should().HaveCount(pack.Layers.Count);
         workspace.ProjectPaths.Should().HaveCount(pack.Layers.Count);
         workspace.ProjectPaths.Should().AllSatisfy(p => p.Should().EndWith(".csproj"));
+    }
+
+    private static void AssertConformsToPack(RulePack pack, params GenerateResult[] results)
+    {
+        // Generated code may reference types that are not generated, so the compilation is not checked for errors.
+        var trees = results
+            .SelectMany(r => r.GeneratedFiles)
+            .Select(f => CSharpSyntaxTree.ParseText(f.Code, path: f.FilePath))
+            .ToList();
+        var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
+            .Split(Path.PathSeparator)
+            .Select(p => (MetadataReference)MetadataReference.CreateFromFile(p))
+            .ToList();
+        var compilation = CSharpCompilation.Create(
+            "GeneratedAssembly",
+            trees,
+            references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
+
+        var report = new ArchitectureValidator().Validate(pack, compilation);
+
+        report.Violations.Should().BeEmpty();
+        report.IsValid.Should().BeTrue();
+        report.TypesChecked.Should().BeGreaterThan(0);
     }
 
     private void WriteGeneratedFiles(GenerateResult result)
