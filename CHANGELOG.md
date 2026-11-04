@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.1.1...v0.2.0) (2026-11-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* validate no longer takes a source directory of .cs files.
+
+### Features
+
+* semantic dependency analysis and Ariadne.NET.Workspaces ([#25](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/25)) ([3f8c48d](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/3f8c48dd45ee69bf6546fb7f86536f5cddd0e626))
+
 ## [0.1.1](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.1.0...v0.1.1) (2026-11-04)
 
 
