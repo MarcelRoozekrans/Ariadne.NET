@@ -19,7 +19,12 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.9.0" />
-    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.9.0" />
+    <!--
+      The out-of-process build host, the BuildHost-netcore and BuildHost-net472 folders, ships as contentFiles of this
+      package. PrivateAssets="none" lists the dependency in the nuspec with include="All", so a package consumer gets
+      the folders in its output. The default would be a private reference whose contentFiles stop here.
+    -->
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.9.0" PrivateAssets="none" />
     <PackageReference Include="Microsoft.Build.Locator" Version="1.11.2" />
     <!-- The solution parser MSBuildWorkspace uses; read directly to know which projects a .sln or .slnx lists. -->
     <PackageReference Include="Microsoft.VisualStudio.SolutionPersistence" Version="1.0.52" />
