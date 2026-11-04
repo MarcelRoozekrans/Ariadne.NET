@@ -333,6 +333,23 @@ public sealed class SolutionLoaderTests : IDisposable
     }
 
     [Fact]
+    public async Task ArtifactsOutputLayout_MissingCompileItemUnderArtifactsObj_LoadsClean()
+    {
+        // The obj folder is found above the intermediate assembly in artifacts/obj/Art/, not beside the project file.
+        var missing = Path.Combine(_dir, "artifacts", "obj", "Art", "Gone.g.cs");
+        var project = await CreateArtifactsProjectAsync(
+            "namespace Art; public class Order { }",
+            "<ItemGroup><Compile Include=\"../artifacts/obj/Art/Gone.g.cs\" /></ItemGroup>");
+        File.Exists(missing).Should().BeFalse();
+
+        var result = await _loader.LoadAsync(project);
+
+        result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.ToString() : null);
+        using var loaded = result.Value;
+        loaded.Projects.Select(p => p.Name).Should().Equal("Art");
+    }
+
+    [Fact]
     public async Task ArtifactsOutputLayoutWithCompileError_HasNoRestoreHint()
     {
         // The assets file is found above the intermediate output, so the error is not blamed on a missing restore.
@@ -477,7 +494,7 @@ public sealed class SolutionLoaderTests : IDisposable
     }
 
     // A restored project under UseArtifactsOutput, whose assets file sits in artifacts/obj/Art/, not in obj/ beside the project.
-    private async Task<string> CreateArtifactsProjectAsync(string source)
+    private async Task<string> CreateArtifactsProjectAsync(string source, string items = "")
     {
         var project = Path.Combine(_dir, "Art", "Art.csproj");
         Directory.CreateDirectory(Path.GetDirectoryName(project)!);
@@ -486,7 +503,7 @@ public sealed class SolutionLoaderTests : IDisposable
             "<Project><PropertyGroup><UseArtifactsOutput>true</UseArtifactsOutput></PropertyGroup></Project>").ConfigureAwait(false);
         await File.WriteAllTextAsync(
             project,
-            """<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>""")
+            $"""<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>{items}</Project>""")
             .ConfigureAwait(false);
         await File.WriteAllTextAsync(Path.Combine(_dir, "Art", "Order.cs"), source).ConfigureAwait(false);
         Restore(project);
