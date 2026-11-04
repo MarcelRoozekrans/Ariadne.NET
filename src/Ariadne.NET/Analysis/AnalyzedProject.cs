@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using Microsoft.CodeAnalysis;
 
 namespace Ariadne.NET.Analysis;
@@ -9,5 +10,5 @@ namespace Ariadne.NET.Analysis;
 public sealed record AnalyzedProject(string Name, string? TargetFramework, Compilation Compilation)
 {
     /// <summary>Syntax trees produced by source generators; types declared only there are not checked.</summary>
-    public IReadOnlySet<SyntaxTree> GeneratedTrees { get; init; } = new HashSet<SyntaxTree>();
+    public IReadOnlySet<SyntaxTree> GeneratedTrees { get; init; } = FrozenSet<SyntaxTree>.Empty;
 }
