@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Runtime.InteropServices;
 using Ariadne.NET.Abstractions;
 using Microsoft.CodeAnalysis;
 
@@ -11,12 +10,21 @@ internal static class V1RoleRules
     /// <summary>Returns the type kind, accessibility and missing-interface violations, ordered by location and then rule id. Violations without a location come last, ordered by source type.</summary>
     public static IReadOnlyList<ArchitectureViolation> Check(TypeGraph graph, V1LayerMap layers, RulePack pack)
     {
+        var matches = Match(graph, layers, pack);
+        var violations = new List<ArchitectureViolation>(CheckShape(matches));
+        violations.AddRange(CheckMissingInterface(matches, [matches], pack));
+        violations.Sort(CompareViolations);
+        return violations;
+    }
+
+    /// <summary>Finds the source types of <paramref name="graph"/> that match a component role.</summary>
+    public static RoleMatches Match(TypeGraph graph, V1LayerMap layers, RulePack pack)
+    {
         ArgumentNullException.ThrowIfNull(graph);
         ArgumentNullException.ThrowIfNull(layers);
         ArgumentNullException.ThrowIfNull(pack);
 
         var matches = new List<(INamedTypeSymbol Type, ComponentRoleDefinition Role)>();
-        var matchedRoleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var type in graph.SourceTypes)
         {
             // v1 roles apply to class, struct, interface and record declarations. Enums and delegates were never matched.
@@ -29,18 +37,51 @@ internal static class V1RoleRules
             if (layer is not null && MatchRole(type.Name, layer, pack.ComponentRoles) is { } role)
             {
                 matches.Add((type, role));
+            }
+        }
+
+        return new RoleMatches(graph, matches);
+    }
+
+    /// <summary>Returns the type kind and accessibility violations of the matched types, in match order.</summary>
+    public static IReadOnlyList<ArchitectureViolation> CheckShape(RoleMatches matches)
+    {
+        ArgumentNullException.ThrowIfNull(matches);
+
+        var violations = new List<ArchitectureViolation>();
+        foreach (var (type, role) in matches.Items)
+        {
+            var location = matches.Graph.SourceTypeLocations[type];
+            CheckTypeKind(type, role, in location, violations);
+            CheckAccessibility(type, role, in location, violations);
+        }
+
+        return violations;
+    }
+
+    /// <summary>
+    /// Returns the missing-interface violations of the types in <paramref name="own"/>. An interface role counts as present
+    /// when a type in any of the graphs in <paramref name="scope"/> matches it, so the graphs can be those of several projects.
+    /// </summary>
+    public static IReadOnlyList<ArchitectureViolation> CheckMissingInterface(
+        RoleMatches own,
+        IReadOnlyCollection<RoleMatches> scope,
+        RulePack pack)
+    {
+        ArgumentNullException.ThrowIfNull(own);
+        ArgumentNullException.ThrowIfNull(scope);
+        ArgumentNullException.ThrowIfNull(pack);
+
+        var matchedRoleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var matches in scope)
+        {
+            foreach (var (_, role) in matches.Items)
+            {
                 matchedRoleNames.Add(role.Name);
             }
         }
 
         var violations = new List<ArchitectureViolation>();
-        foreach (ref readonly var match in CollectionsMarshal.AsSpan(matches))
-        {
-            var location = graph.SourceTypeLocations[match.Type];
-            CheckTypeKind(match.Type, match.Role, in location, violations);
-            CheckAccessibility(match.Type, match.Role, in location, violations);
-        }
-
         foreach (var role in pack.ComponentRoles)
         {
             if (!role.RequiresInterface
@@ -50,7 +91,7 @@ internal static class V1RoleRules
                 continue;
             }
 
-            foreach (ref readonly var match in CollectionsMarshal.AsSpan(matches))
+            foreach (var match in own.Items)
             {
                 if (ReferenceEquals(match.Role, role))
                 {
@@ -67,7 +108,6 @@ internal static class V1RoleRules
             }
         }
 
-        violations.Sort(CompareViolations);
         return violations;
     }
 
