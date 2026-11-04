@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis;
 namespace Ariadne.NET.Tests.Analysis;
 
 /// <summary>A syntax tree options provider that reports one tree as marked generated, as an analyzer config would.</summary>
-internal sealed class MarkedGeneratedOptionsProvider(SyntaxTree generatedTree) : SyntaxTreeOptionsProvider
+internal sealed class MarkedGeneratedOptionsProvider(SyntaxTree? generatedTree) : SyntaxTreeOptionsProvider
 {
     public override GeneratedKind IsGenerated(SyntaxTree tree, CancellationToken cancellationToken) =>
         tree == generatedTree ? GeneratedKind.MarkedGenerated : GeneratedKind.NotGenerated;
