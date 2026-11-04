@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.1.0...v0.1.1) (2026-11-04)
+
+
+### Documentation
+
+* **spec:** phase 2.1 semantic dependency analysis design ([#23](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/23)) ([139c227](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/139c227982c3669c3be509b855eef9941b4aa204))
+
 ## 0.1.0 (2026-11-04)
 
 
