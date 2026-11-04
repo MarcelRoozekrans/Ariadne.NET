@@ -65,7 +65,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Surface:** Backend
 **HelpWanted:** no
 **Design:** `docs/superpowers/specs/2026-11-04-phase-2.1-semantic-dependency-analysis-design.md`
-**Plan:** _to be written_
+**Plan:** `docs/superpowers/plans/2026-11-04-phase-2.1-semantic-dependency-analysis.md`
 
 ### Phase 2.2: Rule schema v2 [status: pending]
 **Note:** Consider ZeroAlloc.Specification for rule matching; extend the ZeroAlloc.Validation rules from 1.3.
