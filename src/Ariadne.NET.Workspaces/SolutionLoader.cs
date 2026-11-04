@@ -221,30 +221,35 @@ public sealed partial class SolutionLoader : ISolutionLoader
         return (csharp, other);
     }
 
-    // Drops the failures that name a skipped project file, matched by the project path the message carries.
-    private static List<string> WithoutFailuresOf(IReadOnlyList<string> failures, List<string> skippedPaths)
+    /// <summary>
+    /// Drops the failures whose subject is a skipped project file. The subject is the first quoted path in the message, where
+    /// MSBuildWorkspace puts the project it failed on; a skipped file mentioned later does not drop a failure about another project.
+    /// </summary>
+    internal static List<string> WithoutFailuresOf(IReadOnlyList<string> failures, IReadOnlyList<string> skippedPaths)
     {
-        var skipped = new HashSet<string>(skippedPaths, NamedProjects.PathComparer);
+        var skipped = new HashSet<string>(skippedPaths.Count, NamedProjects.PathComparer);
+        foreach (var path in skippedPaths)
+        {
+            skipped.Add(NamedProjects.Normalize(path));
+        }
+
         var remaining = new List<string>(failures.Count);
         foreach (var failure in failures)
         {
-            var aboutSkipped = false;
-            foreach (Match match in ProjectFilePattern().Matches(failure))
-            {
-                if (skipped.Contains(NamedProjects.Normalize(match.Value)))
-                {
-                    aboutSkipped = true;
-                    break;
-                }
-            }
-
-            if (!aboutSkipped)
+            if (SubjectPath(failure) is not { } subject || !skipped.Contains(NamedProjects.Normalize(subject)))
             {
                 remaining.Add(failure);
             }
         }
 
         return remaining;
+    }
+
+    // The first quoted, rooted path in a workspace diagnostic, which may contain spaces.
+    private static string? SubjectPath(string message)
+    {
+        var match = QuotedText().Match(message);
+        return match.Success && Path.IsPathRooted(match.Groups["path"].Value) ? match.Groups["path"].Value : null;
     }
 
     // Non-C# projects are skipped, once per project even when it has several target frameworks, with the named files that did not load.
@@ -283,9 +288,9 @@ public sealed partial class SolutionLoader : ISolutionLoader
     // A workspace diagnostic carries only a message; MSBuildWorkspace puts the project file's path in it.
     private static AriadneError LoadFailure(List<string> failures)
     {
-        var match = ProjectFilePattern().Match(failures[0]);
-        var subject = match.Success
-            ? $"Project '{Path.GetFileNameWithoutExtension(match.Value)}' did not load"
+        var path = SubjectPath(failures[0]);
+        var subject = path is not null && Path.GetExtension(path).EndsWith("proj", StringComparison.OrdinalIgnoreCase)
+            ? $"Project '{Path.GetFileNameWithoutExtension(path)}' did not load"
             : "The solution did not load completely";
         var hint = failures.Exists(f => f.Contains(ProjectCompiler.AssetsFileName, StringComparison.OrdinalIgnoreCase))
             ? ProjectCompiler.RestoreSuffix
@@ -340,8 +345,8 @@ public sealed partial class SolutionLoader : ISolutionLoader
         return files;
     }
 
-    [GeneratedRegex(@"[^\s'""]+\.[A-Za-z]+proj\b", RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 1000)]
-    private static partial Regex ProjectFilePattern();
+    [GeneratedRegex("'(?<path>[^']+)'", RegexOptions.ExplicitCapture, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex QuotedText();
 
     private static Result<LoadedSolution, AriadneError> Failure(AriadneError error) =>
         Result<LoadedSolution, AriadneError>.Failure(error);

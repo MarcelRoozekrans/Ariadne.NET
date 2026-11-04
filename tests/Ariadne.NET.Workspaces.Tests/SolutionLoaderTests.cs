@@ -275,15 +275,14 @@ public sealed class SolutionLoaderTests : IDisposable
     }
 
     [Theory]
-    [InlineData("docker-compose.dcproj")]
-    [InlineData("Shared.shproj")]
-    public async Task LanguagelessProjectFile_IsSkipped(string projectFile)
+    [InlineData("", "docker-compose.dcproj")]
+    [InlineData("", "Shared.shproj")]
+    [InlineData("My Repo", "docker-compose.dcproj")]
+    public async Task LanguagelessProjectFile_IsSkipped(string folder, string projectFile)
     {
-        await File.WriteAllTextAsync(Path.Combine(_dir, projectFile), "<Project />");
-        var solution = Path.Combine(_dir, "Mixed.slnx");
-        await File.WriteAllTextAsync(
-            solution,
-            $"""<Solution><Project Path="{FixtureProjects.Path("clean", "Shop.Domain", "Shop.Domain.csproj")}" /><Project Path="{projectFile}" /></Solution>""");
+        var directory = Directory.CreateDirectory(Path.Combine(_dir, folder)).FullName;
+        await File.WriteAllTextAsync(Path.Combine(directory, projectFile), "<Project />");
+        var solution = await WriteSolutionAsync(directory, FixtureProjects.Path("clean", "Shop.Domain", "Shop.Domain.csproj"), projectFile);
 
         var result = await _loader.LoadAsync(solution);
 
@@ -294,20 +293,37 @@ public sealed class SolutionLoaderTests : IDisposable
     }
 
     [Fact]
+    public async Task LanguagelessProjectNextToBrokenCSharp_KeepsTheCompileError()
+    {
+        await File.WriteAllTextAsync(Path.Combine(_dir, "docker-compose.dcproj"), "<Project />");
+        var solution = await WriteSolutionAsync(_dir, FixtureProjects.Path("compile-error", "Broken.csproj"), "docker-compose.dcproj");
+
+        var result = await _loader.LoadAsync(solution);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Be("Project 'Broken' has 1 compile error.");
+    }
+
+    [Fact]
+    public void FailureAboutAnotherProject_IsKeptEvenWhenItMentionsASkippedOne()
+    {
+        var shared = Path.Combine(_dir, "My Repo", "Shared.shproj");
+        var app = Path.Combine(_dir, "My Repo", "App.csproj");
+        string[] failures =
+        [
+            $"Cannot open project '{shared}' because the file extension '.shproj' is not associated with a language.",
+            $"Msbuild failed when processing the file '{app}' with message: imported project '{shared}' was not found.",
+        ];
+
+        var remaining = SolutionLoader.WithoutFailuresOf(failures, [shared]);
+
+        remaining.Should().Equal(failures[1]);
+    }
+
+    [Fact]
     public async Task ArtifactsOutputLayout_LoadsWhenRestored()
     {
-        // With UseArtifactsOutput the assets file sits in artifacts/obj/<project>/, not in obj/ beside the project file.
-        var project = Path.Combine(_dir, "Art", "Art.csproj");
-        Directory.CreateDirectory(Path.GetDirectoryName(project)!);
-        await File.WriteAllTextAsync(
-            Path.Combine(_dir, "Directory.Build.props"),
-            "<Project><PropertyGroup><UseArtifactsOutput>true</UseArtifactsOutput></PropertyGroup></Project>");
-        await File.WriteAllTextAsync(
-            project,
-            """<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>""");
-        await File.WriteAllTextAsync(Path.Combine(_dir, "Art", "Order.cs"), "namespace Art; public class Order { }");
-        Restore(project);
-        File.Exists(Path.Combine(_dir, "Art", "obj", "project.assets.json")).Should().BeFalse("the artifacts layout moves obj/");
+        var project = await CreateArtifactsProjectAsync("namespace Art; public class Order { }");
 
         var result = await _loader.LoadAsync(project);
 
@@ -317,15 +333,23 @@ public sealed class SolutionLoaderTests : IDisposable
     }
 
     [Fact]
+    public async Task ArtifactsOutputLayoutWithCompileError_HasNoRestoreHint()
+    {
+        // The assets file is found above the intermediate output, so the error is not blamed on a missing restore.
+        var project = await CreateArtifactsProjectAsync("namespace Art; public class Order { int Id = \"x\"; }");
+
+        var result = await _loader.LoadAsync(project);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Be("Project 'Art' has 1 compile error.");
+        result.Error.Detail.Should().NotContain(RestoreHint);
+    }
+
+    [Fact]
     public async Task UnrestoredProjectThatCompiles_Loads()
     {
         // A project with no packages that targets the SDK's own framework compiles completely without a restore.
-        var project = Path.Combine(_dir, "Plain", "Plain.csproj");
-        Directory.CreateDirectory(Path.GetDirectoryName(project)!);
-        await File.WriteAllTextAsync(
-            project,
-            """<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>""");
-        await File.WriteAllTextAsync(Path.Combine(_dir, "Plain", "Order.cs"), "namespace Plain; public class Order { }");
+        var project = await CreatePlainProjectAsync("Plain", "");
 
         var result = await _loader.LoadAsync(project);
 
@@ -333,6 +357,30 @@ public sealed class SolutionLoaderTests : IDisposable
         using var loaded = result.Value;
         loaded.Projects.Select(p => p.Name).Should().Equal("Plain");
         File.Exists(Path.Combine(_dir, "Plain", "obj", "project.assets.json")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ExplicitCompileItemForMissingFile_IsInvalid()
+    {
+        var project = await CreatePlainProjectAsync("Gone", """<ItemGroup><Compile Include="Gone.cs" /></ItemGroup>""");
+
+        var result = await _loader.LoadAsync(project);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Be("Project 'Gone' lists a source file that does not exist.");
+        result.Error.Detail.Should().Be("Gone.cs: file not found", "paths are relative to the loaded project's directory");
+    }
+
+    [Fact]
+    public async Task MissingCompileItemUnderObj_Loads()
+    {
+        // A target that writes a file under obj/ only during a real build leaves a Compile item the design-time build cannot see.
+        var project = await CreatePlainProjectAsync("Later", """<ItemGroup><Compile Include="obj/Generated/Later.g.cs" /></ItemGroup>""");
+
+        var result = await _loader.LoadAsync(project);
+
+        result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.ToString() : null);
+        result.Value.Dispose();
     }
 
     [Fact]
@@ -406,6 +454,45 @@ public sealed class SolutionLoaderTests : IDisposable
 
     private static bool IsUnderObj(string path) =>
         path.Contains("/obj/", StringComparison.Ordinal) || path.Contains("\\obj\\", StringComparison.Ordinal);
+
+    private static async Task<string> WriteSolutionAsync(string directory, params string[] projects)
+    {
+        var solution = Path.Combine(directory, "Mixed.slnx");
+        var entries = string.Concat(projects.Select(p => $"""<Project Path="{p}" />"""));
+        await File.WriteAllTextAsync(solution, $"<Solution>{entries}</Solution>").ConfigureAwait(false);
+        return solution;
+    }
+
+    // An unrestored net10.0 project with one hand-written type; it compiles without a restore.
+    private async Task<string> CreatePlainProjectAsync(string name, string items)
+    {
+        var project = Path.Combine(_dir, name, name + ".csproj");
+        Directory.CreateDirectory(Path.GetDirectoryName(project)!);
+        await File.WriteAllTextAsync(
+            project,
+            $"""<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>{items}</Project>""")
+            .ConfigureAwait(false);
+        await File.WriteAllTextAsync(Path.Combine(_dir, name, "Order.cs"), $"namespace {name}; public class Order {{ }}").ConfigureAwait(false);
+        return project;
+    }
+
+    // A restored project under UseArtifactsOutput, whose assets file sits in artifacts/obj/Art/, not in obj/ beside the project.
+    private async Task<string> CreateArtifactsProjectAsync(string source)
+    {
+        var project = Path.Combine(_dir, "Art", "Art.csproj");
+        Directory.CreateDirectory(Path.GetDirectoryName(project)!);
+        await File.WriteAllTextAsync(
+            Path.Combine(_dir, "Directory.Build.props"),
+            "<Project><PropertyGroup><UseArtifactsOutput>true</UseArtifactsOutput></PropertyGroup></Project>").ConfigureAwait(false);
+        await File.WriteAllTextAsync(
+            project,
+            """<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>""")
+            .ConfigureAwait(false);
+        await File.WriteAllTextAsync(Path.Combine(_dir, "Art", "Order.cs"), source).ConfigureAwait(false);
+        Restore(project);
+        File.Exists(Path.Combine(_dir, "Art", "obj", "project.assets.json")).Should().BeFalse("the artifacts layout moves obj/");
+        return project;
+    }
 
     private static void Restore(string project)
     {

@@ -71,12 +71,17 @@ internal static class ProjectCompiler
     }
 
     // MSBuildWorkspace keeps a Compile item whose file is gone as a document with empty text, so it compiles clean where a build fails.
+    // Files under the intermediate output are skipped: some targets write them only during a real build, and they are build output,
+    // not sources the rules read.
     private static AriadneError? MissingSourceFiles(Project project, string rootDirectory)
     {
+        var intermediates = IntermediateDirectories(project);
         var lines = new List<string>();
         foreach (var document in project.Documents)
         {
-            if (document.FilePath is { Length: > 0 } filePath && !File.Exists(filePath))
+            if (document.FilePath is { Length: > 0 } filePath
+                && !File.Exists(filePath)
+                && !intermediates.Exists(d => IsUnder(filePath, d)))
             {
                 lines.Add($"{Relative(rootDirectory, filePath)}: file not found");
             }
@@ -91,6 +96,39 @@ internal static class ProjectCompiler
             ? "a source file that does not exist"
             : string.Create(CultureInfo.InvariantCulture, $"{lines.Count} source files that do not exist");
         return new AriadneError(AriadneErrorCode.Invalid, $"Project '{project.Name}' lists {subject}.", string.Join('\n', lines));
+    }
+
+    // obj/ beside the project file, and the obj folder above the intermediate assembly, or that assembly's folder when none is named obj.
+    private static List<string> IntermediateDirectories(Project project)
+    {
+        var directories = new List<string>(2);
+        if (project.FilePath is { Length: > 0 } filePath)
+        {
+            directories.Add(Path.Combine(Path.GetDirectoryName(filePath)!, "obj"));
+        }
+
+        if (project.CompilationOutputInfo.AssemblyPath is { Length: > 0 } assemblyPath)
+        {
+            var assemblyDirectory = Path.GetDirectoryName(assemblyPath)!;
+            var directory = assemblyDirectory;
+            while (!string.IsNullOrEmpty(directory)
+                && !string.Equals(Path.GetFileName(directory), "obj", StringComparison.OrdinalIgnoreCase))
+            {
+                directory = Path.GetDirectoryName(directory);
+            }
+
+            directories.Add(string.IsNullOrEmpty(directory) ? assemblyDirectory : directory);
+        }
+
+        return directories;
+    }
+
+    private static bool IsUnder(string path, string directory)
+    {
+        var relative = Path.GetRelativePath(NamedProjects.Normalize(directory), NamedProjects.Normalize(path));
+        return !string.Equals(relative, ".", StringComparison.Ordinal)
+            && !relative.StartsWith("..", StringComparison.Ordinal)
+            && !Path.IsPathRooted(relative);
     }
 
     // Checked before the compile errors, so a compilation without the framework is not reported as dozens of CS0518 errors.
