@@ -130,15 +130,22 @@ public class V1LayerRulesTests
         violations.Select(v => v.Target).Should().Equal("Shop.Infrastructure.A", "Shop.Infrastructure.B");
     }
 
+    // Interim: measures with GC.GetAllocatedBytesForCurrentThread because the ZeroAlloc.TestHelpers source fails this repo's
+    // analyzers, tracked as ZeroAlloc-Net/ZeroAlloc.TestHelpers#106. Switch to AllocationGate once that issue ships.
     [Fact]
     public void LayerOf_CachedSymbol_AllocatesNothing()
     {
         var compilation = TestCompilation.Create("namespace Shop.Domain { public class Order { } }");
         var type = compilation.GetTypeByMetadataName("Shop.Domain.Order")!;
         var map = new V1LayerMap(Pack);
-        map.LayerOf(type).Should().Be("Domain");
 
-        // ZeroAlloc.TestHelpers 1.9.0 ships its AllocationGate as source that the repo's analyzers reject, so measure directly.
+        var beforeMiss = GC.GetAllocatedBytesForCurrentThread();
+        var first = map.LayerOf(type);
+        var missBytes = GC.GetAllocatedBytesForCurrentThread() - beforeMiss;
+
+        first.Should().Be("Domain");
+        missBytes.Should().BeGreaterThan(0, "the first call inserts into the cache");
+
         var before = GC.GetAllocatedBytesForCurrentThread();
         for (var i = 0; i < 1_000; i++)
         {
@@ -146,6 +153,24 @@ public class V1LayerRulesTests
         }
 
         (GC.GetAllocatedBytesForCurrentThread() - before).Should().Be(0);
+    }
+
+    [Fact]
+    public void LayerOf_TypeWithoutLayer_IsNullAndCached()
+    {
+        var compilation = TestCompilation.Create("namespace Shop.Misc { public class Thing { } }");
+        var type = compilation.GetTypeByMetadataName("Shop.Misc.Thing")!;
+        var map = new V1LayerMap(Pack);
+        map.LayerOf(type).Should().BeNull();
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < 1_000; i++)
+        {
+            map.LayerOf(type);
+        }
+
+        (GC.GetAllocatedBytesForCurrentThread() - before).Should().Be(0);
+        map.LayerOf(type).Should().BeNull();
     }
 
     private static IReadOnlyList<ArchitectureViolation> Check(string source) => Check(TestCompilation.Create(source));

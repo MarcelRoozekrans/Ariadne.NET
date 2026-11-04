@@ -37,7 +37,7 @@ internal static class V1LayerRules
 
             if (pairs.TryGetValue((edge.Source, edge.Target), out var index))
             {
-                found[index] = found[index] with { Count = found[index].Count + 1 };
+                found[index].Count++;
             }
             else
             {
@@ -47,16 +47,16 @@ internal static class V1LayerRules
         }
 
         var violations = new List<ArchitectureViolation>(found.Count);
-        foreach (ref readonly var pair in CollectionsMarshal.AsSpan(found))
+        foreach (ref var pair in CollectionsMarshal.AsSpan(found))
         {
-            violations.Add(ToViolation(in pair));
+            violations.Add(ToViolation(pair));
         }
 
         violations.Sort(CompareViolations);
         return violations;
     }
 
-    private static ArchitectureViolation ToViolation(in Pair pair)
+    private static ArchitectureViolation ToViolation(Pair pair)
     {
         var source = pair.First.Source.ToDisplayString();
         var target = pair.First.Target.ToDisplayString();
@@ -82,6 +82,7 @@ internal static class V1LayerRules
 
     private static int CompareViolations(ArchitectureViolation x, ArchitectureViolation y)
     {
+        // Every violation is built from an edge, and edges always carry a location.
         var a = x.Location!.Value;
         var b = y.Location!.Value;
         var result = string.CompareOrdinal(a.FilePath, b.FilePath);
@@ -108,7 +109,16 @@ internal static class V1LayerRules
         return result == 0 ? string.CompareOrdinal(x.Target, y.Target) : result;
     }
 
-    private sealed record Pair(TypeEdge First, string SourceLayer, string TargetLayer, int Count);
+    private sealed class Pair(TypeEdge first, string sourceLayer, string targetLayer, int count)
+    {
+        public TypeEdge First { get; } = first;
+
+        public string SourceLayer { get; } = sourceLayer;
+
+        public string TargetLayer { get; } = targetLayer;
+
+        public int Count { get; set; } = count;
+    }
 
     private sealed class PairComparer : IEqualityComparer<(INamedTypeSymbol Source, INamedTypeSymbol Target)>
     {
