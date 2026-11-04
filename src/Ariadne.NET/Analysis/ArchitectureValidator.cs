@@ -23,6 +23,8 @@ public sealed class ArchitectureValidator : IArchitectureValidator
         ArgumentNullException.ThrowIfNull(resolvedPack);
         ArgumentNullException.ThrowIfNull(projects);
 
+        RejectMixedTargetFrameworks(projects);
+
         var entries = new List<Entry>(projects.Count);
         foreach (var project in projects)
         {
@@ -70,6 +72,31 @@ public sealed class ArchitectureValidator : IArchitectureValidator
             Projects = checkedProjects,
             TypesChecked = typesChecked,
         };
+    }
+
+    // A violation found only in a null slot could not be told apart from one found everywhere, so a project is all null or all named.
+    private static void RejectMixedTargetFrameworks(IReadOnlyList<AnalyzedProject> projects)
+    {
+        var seen = new Dictionary<string, bool>(StringComparer.Ordinal);
+        foreach (var project in projects)
+        {
+            ArgumentNullException.ThrowIfNull(project, nameof(projects));
+
+            var named = project.TargetFramework is not null;
+            if (seen.TryGetValue(project.Name, out var previous))
+            {
+                if (previous != named)
+                {
+                    throw new ArgumentException(
+                        $"Project '{project.Name}' has entries with and without a target framework; the target frameworks of one project must be all null or all named.",
+                        nameof(projects));
+                }
+            }
+            else
+            {
+                seen.Add(project.Name, named);
+            }
+        }
     }
 
     // A role that requires an interface role is satisfied by a matching type in any project of the same target framework.

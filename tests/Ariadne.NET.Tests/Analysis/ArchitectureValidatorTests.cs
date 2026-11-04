@@ -83,36 +83,52 @@ public class ArchitectureValidatorTests
     }
 
     [Fact]
-    public void ViolationInSomeTargetFrameworks_KeepsEarliestLocationAndHighestCount()
+    public void MergedViolation_KeepsEarliestLocationFromOneFrameworkAndHighestCountFromAnother()
     {
+        // net8.0 sees one reference at line 7. net10.0 sees two references, the first at line 10.
         const string source = """
-            namespace MyApp.Orders.Domain;
-            public class Order
-            {
-            #if MANY
-                MyApp.Orders.Infrastructure.Db _a;
-                MyApp.Orders.Infrastructure.Db _b;
-            #else
-                private int _x;
-                MyApp.Orders.Infrastructure.Db _a;
-            #endif
-            }
             namespace MyApp.Orders.Infrastructure { public class Db { } }
+            namespace MyApp.Orders.Domain
+            {
+                public class Order
+                {
+            #if SINGLE
+                    MyApp.Orders.Infrastructure.Db _a;
+            #else
+                    int _pad;
+                    int _pad2;
+                    MyApp.Orders.Infrastructure.Db _a;
+                    MyApp.Orders.Infrastructure.Db _b;
+            #endif
+                }
+            }
             """;
-        var withMany = Compile(source.Replace("namespace MyApp.Orders.Domain;", "namespace MyApp.Orders.Domain {").Replace("namespace MyApp.Orders.Infrastructure {", "} namespace MyApp.Orders.Infrastructure {"), "MANY");
-        var without = Compile(source.Replace("namespace MyApp.Orders.Domain;", "namespace MyApp.Orders.Domain {").Replace("namespace MyApp.Orders.Infrastructure {", "} namespace MyApp.Orders.Infrastructure {"));
 
         var report = _validator.Validate(Pack,
         [
-            new AnalyzedProject("App", "net8.0", withMany),
-            new AnalyzedProject("App", "net10.0", without),
+            new AnalyzedProject("App", "net8.0", Compile(source, "SINGLE")),
+            new AnalyzedProject("App", "net10.0", Compile(source)),
         ]);
 
         var violation = report.Violations.Should().ContainSingle().Subject;
         violation.Kind.Should().Be(ViolationKind.DependencyNotAllowed);
+        violation.Location.Should().Be(new SourceLocation("Test.cs", 7, 37));
         violation.ReferenceCount.Should().Be(2);
         violation.TargetFrameworks.Should().BeEmpty();
-        violation.Location!.Value.Line.Should().Be(5);
+    }
+
+    [Fact]
+    public void ProjectMixingNullAndNamedTargetFrameworks_IsRejected()
+    {
+        var compilation = TestCompilation.Create(BrokenCommand);
+
+        var act = () => _validator.Validate(Pack,
+        [
+            new AnalyzedProject("Mixed", null, compilation),
+            new AnalyzedProject("Mixed", "net8.0", compilation),
+        ]);
+
+        act.Should().Throw<ArgumentException>().Which.Message.Should().Contain("Mixed");
     }
 
     [Fact]
