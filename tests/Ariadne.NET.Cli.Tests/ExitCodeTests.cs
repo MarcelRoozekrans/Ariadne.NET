@@ -94,6 +94,15 @@ public sealed class ExitCodeTests : IDisposable
     }
 
     [Fact]
+    public void Validate_ViolationInSomeTargetFrameworks_ListsThemAfterTheLocation()
+    {
+        var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("multitarget", "Multi.csproj"));
+
+        exitCode.Should().Be(ExitCodes.Violations);
+        stdout.Should().MatchRegex(@"(?m)^  \[DependencyNotAllowed\] Domain/Order\.cs:\d+ \(net10\.0\)\r?$");
+    }
+
+    [Fact]
     public void Print_SkippedProjectAndViolationWithoutLocation_WritesBothLines()
     {
         var report = new ArchitectureReport
@@ -124,6 +133,32 @@ public sealed class ExitCodeTests : IDisposable
             "Result: FAIL - 1 violation(s) found.",
             "  [TypeKindMismatch] Shop.Domain.Order",
             "    Order must be a record");
+    }
+
+    [Fact]
+    public void Print_ViolationInSeveralTargetFrameworks_ListsThemCommaSeparated()
+    {
+        var report = new ArchitectureReport
+        {
+            Violations =
+            [
+                new ArchitectureViolation
+                {
+                    RuleId = "r",
+                    Kind = ViolationKind.TypeKindMismatch,
+                    SourceType = "Shop.Domain.Order",
+                    Message = "Order must be a record",
+                    TargetFrameworks = ["net8.0", "net9.0"],
+                },
+            ],
+            Projects = [new CheckedProject("Shop.Domain", ["net10.0", "net8.0", "net9.0"])],
+            TypesChecked = 1,
+        };
+        using var writer = new StringWriter();
+
+        ValidateCommand.Print(writer, report, _tempDir);
+
+        writer.ToString().Split(Environment.NewLine).Should().Contain("  [TypeKindMismatch] Shop.Domain.Order (net8.0, net9.0)");
     }
 
     [Fact]

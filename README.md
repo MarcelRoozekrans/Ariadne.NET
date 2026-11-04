@@ -327,7 +327,7 @@ Checks performed:
 - **Layer dependencies**: a type in one layer may reference a type in another layer only when the rule allows it (for example, Domain cannot reference Infrastructure). A type's layer is the last namespace segment that names a layer. The report holds one violation for each source type and target type, located at the first reference, with the number of references.
 - **Component roles**: a type in a role's layer whose name ends with the role name must have the role's type kind and accessibility, and a role that requires an interface needs a matching interface role in the checked projects.
 
-Violations have the kinds `DependencyNotAllowed`, `TypeKindMismatch`, `AccessibilityMismatch` and `MissingInterface`, and the rule ids `layer/<Layer>` and `role/<Role>`. A project that targets several frameworks is checked once per framework, and a violation found in only some of them lists them. The exit code is 0 when clean, 1 for violations and 2 for an error. Ariadne never restores, so run `dotnet restore` first.
+Violations have the kinds `DependencyNotAllowed`, `TypeKindMismatch`, `AccessibilityMismatch` and `MissingInterface`, and the rule ids `layer/<Layer>` and `role/<Role>`. A project that targets several frameworks is checked once per framework, and a violation found in only some of them lists them in parentheses after its location, as in `Shop.Domain/Order.cs:7 (net10.0)`. The exit code is 0 when clean, 1 for violations and 2 for an error. Ariadne never restores, so run `dotnet restore` first.
 
 ### 7. Lint
 

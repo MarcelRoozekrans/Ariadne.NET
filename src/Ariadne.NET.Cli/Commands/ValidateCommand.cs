@@ -69,7 +69,10 @@ public static class ValidateCommand
             var where = violation.Location is { } location
                 ? $"{Path.GetRelativePath(root, location.FilePath).Replace('\\', '/')}:{location.Line}"
                 : violation.SourceType;
-            output.WriteLine($"  [{violation.Kind}] {where}");
+            var frameworks = violation.TargetFrameworks.Count > 0
+                ? $" ({string.Join(", ", violation.TargetFrameworks)})"
+                : string.Empty;
+            output.WriteLine($"  [{violation.Kind}] {where}{frameworks}");
             output.WriteLine($"    {violation.Message}");
         }
 

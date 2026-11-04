@@ -108,7 +108,7 @@ Result: FAIL - 1 violation(s) found.
     Layer 'Domain' is not allowed to depend on 'Infrastructure': Shop.Domain.Order references Shop.Infrastructure.SqlStore 3 times
 ```
 
-Paths in the report are absolute. The CLI shows them relative to the directory of the solution or project it loaded.
+Paths in the report are absolute. The CLI shows them relative to the directory of the solution or project it loaded, and puts a non-empty `TargetFrameworks` list in parentheses after the location, as in `Shop.Domain/Order.cs:7 (net10.0)`.
 
 ### Which projects are checked
 

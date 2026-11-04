@@ -69,7 +69,7 @@ ariadne validate /path/to/MyApp.csproj
 
 - Argument: `path` (default: `"."`), a `.sln`, `.slnx`, `.slnf` or `.csproj` file, or a directory that holds exactly one of them
 - Loads the projects with `ISolutionValidator` and checks each one against the rules; Ariadne never restores, so run `dotnet restore` first
-- Prints the number of types and projects checked, a `Skipped` line for each skipped project, and each violation as `[Kind] file:line` followed by its message
+- Prints the number of types and projects checked, a `Skipped` line for each skipped project, and each violation as `[Kind] file:line` followed by its message; a violation found in only some target frameworks lists them after the location, as in `[Kind] file:line (net10.0)`
 - Exit codes: 0 no violations, 1 violations, 2 error. A cancelled run prints `Cancelled.`
 
 ```
