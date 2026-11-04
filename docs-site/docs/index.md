@@ -69,14 +69,14 @@ dotnet run --project src/Ariadne.NET.Mcp.Http
 | `get_rules` | Get code feature rules |
 | `generate_component` | Generate a C# component |
 | `generate_workspace` | Scaffold project structure |
-| `validate_source` | Validate source files against rules |
+| `validate_source` | Validate a solution or project against rules |
 | `lint_source` | Lint for namespace-layer mismatches |
 
 ## Tech Stack
 
 - **.NET 10** — Runtime
 - **YamlDotNet** — YAML parsing
-- **Roslyn** — Code generation and source validation
+- **Roslyn** — Code generation and semantic validation
 - **System.CommandLine** — CLI framework
 - **ModelContextProtocol** — MCP server SDK (stdio + HTTP)
 - **ZeroAlloc.Inject** — Compile-time DI registration

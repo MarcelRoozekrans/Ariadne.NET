@@ -59,17 +59,28 @@ ariadne generate --role Entity --name Order --solution MyApp --feature Orders
 
 Prints the generated file path, namespace, type name, and full source code.
 
-### `validate` — Validate source code
+### `validate` — Validate a solution or project
 
 ```bash
-ariadne validate ./src
-ariadne validate /path/to/source
+ariadne validate
+ariadne validate MyApp.slnx
+ariadne validate /path/to/MyApp.csproj
 ```
 
-- Argument: `path` (default: `"./src"`)
-- Validates directory exists
-- Runs full two-pass validation
-- Prints files scanned and any violations
+- Argument: `path` (default: `"."`), a `.sln`, `.slnx`, `.slnf` or `.csproj` file, or a directory that holds exactly one of them
+- Loads the projects with `ISolutionValidator` and checks each one against the rules; Ariadne never restores, so run `dotnet restore` first
+- Prints the number of types and projects checked, a `Skipped` line for each skipped project, and each violation as `[Kind] file:line` followed by its message
+- Exit codes: 0 no violations, 1 violations, 2 error. A cancelled run prints `Cancelled.`
+
+```
+Checked 2 types in 2 projects
+Result: FAIL - 1 violation(s) found.
+
+  [DependencyNotAllowed] Shop.Domain/Order.cs:7
+    Layer 'Domain' is not allowed to depend on 'Infrastructure': Shop.Domain.Order references Shop.Infrastructure.SqlStore 3 times
+```
+
+File paths are shown relative to the directory of the solution or project.
 
 ### `lint` — Lint source code
 
@@ -154,7 +165,7 @@ flowchart TD
 | `get_rules` | `template?` | `IList<CodeFeatureRuleDefinition>` | Structural enforcement rules |
 | `generate_component` | `role`, `name`, `solution`, `feature`, `template?` | `GenerateResult` | Generate a C# component |
 | `generate_workspace` | `solution`, `features`, `template?` | `WorkspaceGenerateResult` | Scaffold project structure |
-| `validate_source` | `sourceDirectory`, `template?` | `SourceValidationResult` | Validate against rules |
+| `validate_source` | `path`, `template?` | `ArchitectureReport` | Validate a solution or project against rules |
 | `lint_source` | `sourceDirectory`, `template?` | `LintResult` | Lint for mismatches |
 
 **MCP Resources:**
