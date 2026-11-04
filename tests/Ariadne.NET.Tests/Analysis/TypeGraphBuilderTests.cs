@@ -254,6 +254,143 @@ public class TypeGraphBuilderTests
         edge.Location.Should().Be(new SourceLocation("Order.cs", 7, 13));
     }
 
+    [Fact]
+    public void AliasToConstructedGeneric_GivesEdgeToTypeArgument() => AssertSingleOrderToStoreAt(
+        """
+        namespace Shop.Domain
+        {
+            using Stores = System.Collections.Generic.List<Shop.Infra.Store>;
+            public class Order
+            {
+                private Stores? _stores;
+            }
+        }
+        """,
+        line: 6,
+        column: 17);
+
+    [Fact]
+    public void TupleAlias_GivesEdgeToElementType() => AssertSingleOrderToStoreAt(
+        """
+        namespace Shop.Domain
+        {
+            using Pair = (Shop.Infra.Store Store, int Count);
+            public class Order
+            {
+                private Pair _pair;
+            }
+        }
+        """,
+        line: 6,
+        column: 17);
+
+    [Fact]
+    public void DelegateAlias_GivesEdgeToTypeArgument() => AssertSingleOrderToStoreAt(
+        """
+        namespace Shop.Domain
+        {
+            using Find = System.Func<Shop.Infra.Store>;
+            public class Order
+            {
+                private Find? _find;
+            }
+        }
+        """,
+        line: 6,
+        column: 17);
+
+    [Fact]
+    public void UsingStaticOfConstructedGeneric_GivesEdgeToTypeArgument()
+    {
+        var graph = Build(
+            ("Store.cs", StoreClass + "\nnamespace Shop.Util { public static class Helper<T> { public static void Foo() { } } }"),
+            ("Order.cs", """
+                using static Shop.Util.Helper<Shop.Infra.Store>;
+
+                namespace Shop.Domain
+                {
+                    public class Order
+                    {
+                        public void Place() => Foo();
+                    }
+                }
+                """));
+
+        AssertSingleOrderToStoreAt(graph, "Order.cs", line: 7, column: 32);
+        graph.Edges.Select(Pair).Should().Contain((Order, "Shop.Util.Helper<T>"));
+    }
+
+    [Fact]
+    public void AliasToNestedType_GivesEdgesToOuterAndInner()
+    {
+        var graph = Build(
+            ("Store.cs", "namespace Shop.Infra { public class Outer { public class Inner { } } }"),
+            ("Order.cs", """
+                namespace Shop.Domain
+                {
+                    using Nested = Shop.Infra.Outer.Inner;
+                    public class Order
+                    {
+                        private Nested? _nested;
+                    }
+                }
+                """));
+
+        graph.Edges.Select(Pair).Should().Equal((Order, "Shop.Infra.Outer"), (Order, "Shop.Infra.Outer.Inner"));
+        graph.Edges.Should().OnlyContain(e => e.Location == new SourceLocation("Order.cs", 6, 17));
+    }
+
+    [Fact]
+    public void OverloadedMethodGroup_BindsThroughCandidateSymbol()
+    {
+        var graph = Build(
+            ("Store.cs", """
+                namespace Shop.Infra
+                {
+                    public class Store { public void Overloaded() { } public void Overloaded(int count) { } }
+                    public class Holder { public Store Value { get; } = new(); }
+                }
+                """),
+            ("Order.cs", """
+                namespace Shop.Domain
+                {
+                    public class Order
+                    {
+                        public string Name(Shop.Infra.Holder holder) => nameof(holder.Value.Overloaded);
+                    }
+                }
+                """));
+
+        AssertSingleOrderToStoreAt(graph, "Order.cs", line: 5, column: 77);
+    }
+
+    [Fact]
+    public void PointerElementType()
+    {
+        var graph = BuildUnsafe("""
+            namespace Shop.Domain { public unsafe class Order { private Shop.Infra.Store* _store; } }
+            """);
+
+        AssertSingleOrderToStoreAt(graph, "Order.cs", line: 1, column: 72);
+    }
+
+    [Fact]
+    public void PointerAlias_GivesEdgeToElementType()
+    {
+        var graph = BuildUnsafe("""
+            namespace Shop.Domain
+            {
+                using unsafe StorePointer = Shop.Infra.Store*;
+                public unsafe class Order
+                {
+                    private StorePointer _store;
+                }
+            }
+            """);
+
+        AssertSingleOrderToStoreAt(graph, "Order.cs", line: 6, column: 17);
+    }
+
     // No edge
 
     [Fact]
@@ -523,6 +660,27 @@ public class TypeGraphBuilderTests
 
         graph.Edges.Select(Pair).Should().Equal(("Program", Store), ("Program", Store));
         graph.SourceTypes.Select(t => t.ToDisplayString()).Should().Contain("Program");
+    }
+
+    private static void AssertSingleOrderToStoreAt(string orderSource, int line, int column) =>
+        AssertSingleOrderToStoreAt(Build(("Store.cs", StoreClass), ("Order.cs", orderSource)), "Order.cs", line, column);
+
+    private static void AssertSingleOrderToStoreAt(TypeGraph graph, string path, int line, int column)
+    {
+        var toStore = graph.Edges.Where(e => Pair(e) == (Order, Store)).ToList();
+        toStore.Should().ContainSingle();
+        toStore[0].Location.Should().Be(new SourceLocation(path, line, column));
+    }
+
+    private static TypeGraph BuildUnsafe(string orderSource)
+    {
+        var library = TestCompilation.Create(("Store.cs", "namespace Shop.Infra { public struct Store { } }"));
+        var compilation = library
+            .WithOptions(library.Options.WithAllowUnsafe(true))
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(orderSource, path: "Order.cs"));
+        compilation.GetDiagnostics().Should().NotContain(d => d.Severity == DiagnosticSeverity.Error);
+
+        return TypeGraphBuilder.Build(compilation, NoGeneratedTrees, CancellationToken.None);
     }
 
     private static void AssertOrderToStore(string source) => Edges(source).Should().Contain((Order, Store));

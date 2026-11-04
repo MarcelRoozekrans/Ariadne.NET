@@ -91,9 +91,27 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
 
     public override void VisitIdentifierName(IdentifierNameSyntax node)
     {
-        if (_source is not null && !node.IsVar)
+        if (_source is null || node.IsVar)
         {
-            AddEdge(Model.GetSymbolInfo(node, _cancellationToken), node.Span);
+            return;
+        }
+
+        // An alias target is written in the using directive, outside any type, so the use site
+        // is the only place that can record the types inside it.
+        if (Model.GetAliasInfo(node, _cancellationToken) is { } alias)
+        {
+            AddEdgesForType(alias.Target as ITypeSymbol, node.Span);
+            return;
+        }
+
+        var symbol = Resolve(Model.GetSymbolInfo(node, _cancellationToken));
+        AddEdge(NormalizeSymbol(symbol), node.Span);
+
+        // A bare name that binds into a constructed type, as through 'using static Helper<Store>;',
+        // has its type arguments written in the directive, not here.
+        if (IsBareName(node) && symbol?.ContainingType is { } containingType && IsConstructed(containingType))
+        {
+            AddEdgesForType(containingType, node.Span);
         }
     }
 
@@ -153,6 +171,7 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
 
     private INamedTypeSymbol? EnterType(SyntaxNode declaration, SyntaxToken identifier)
     {
+        // A local copy: calling the method on the readonly field makes a hidden copy, which EPS06 rejects.
         var cancellationToken = _cancellationToken;
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -194,21 +213,55 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
         return isChecked;
     }
 
-    private void AddEdge(SymbolInfo info, TextSpan span)
-    {
-        var symbol = info.Symbol;
-        if (symbol is null && info.CandidateSymbols.Length > 0)
-        {
-            symbol = info.CandidateSymbols[0];
-        }
+    private static ISymbol? Resolve(SymbolInfo info) =>
+        info.Symbol ?? (info.CandidateSymbols.Length > 0 ? info.CandidateSymbols[0] : null);
 
-        var target = NormalizeSymbol(symbol);
+    /// <summary>True when the name has no qualifier or receiver, so nothing at the use site writes its containing type.</summary>
+    private static bool IsBareName(IdentifierNameSyntax node) => node.Parent switch
+    {
+        MemberAccessExpressionSyntax memberAccess => memberAccess.Name != node,
+        QualifiedNameSyntax qualified => qualified.Right != node,
+        AliasQualifiedNameSyntax aliasQualified => aliasQualified.Name != node,
+        MemberBindingExpressionSyntax => false,
+        _ => true,
+    };
+
+    private static bool IsConstructed(INamedTypeSymbol type) =>
+        !SymbolEqualityComparer.Default.Equals(type, type.OriginalDefinition);
+
+    private void AddEdge(SymbolInfo info, TextSpan span) => AddEdge(NormalizeSymbol(Resolve(info)), span);
+
+    private void AddEdge(INamedTypeSymbol? target, TextSpan span)
+    {
         if (target is null || _source is null || SymbolEqualityComparer.Default.Equals(target, _source))
         {
             return;
         }
 
         Edges.Add(new TypeEdge(_source, target, ToLocation(span)));
+    }
+
+    /// <summary>Adds an edge to the type and to every named type inside it: element types, containing types and type arguments, recursively.</summary>
+    private void AddEdgesForType(ITypeSymbol? type, TextSpan span)
+    {
+        switch (type)
+        {
+            case IArrayTypeSymbol array:
+                AddEdgesForType(array.ElementType, span);
+                break;
+            case IPointerTypeSymbol pointer:
+                AddEdgesForType(pointer.PointedAtType, span);
+                break;
+            case INamedTypeSymbol named:
+                AddEdge(NormalizeType(named), span);
+                AddEdgesForType(named.ContainingType, span);
+                foreach (var typeArgument in named.TypeArguments)
+                {
+                    AddEdgesForType(typeArgument, span);
+                }
+
+                break;
+        }
     }
 
     private SourceLocation ToLocation(TextSpan span)
