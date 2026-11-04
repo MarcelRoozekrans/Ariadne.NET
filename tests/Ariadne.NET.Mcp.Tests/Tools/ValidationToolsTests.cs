@@ -1,12 +1,12 @@
 using Ariadne.NET.Analysis;
+using Ariadne.NET.Mcp.Tools;
+using Ariadne.NET.RuleEngine;
+using Ariadne.NET.RuleLoader;
 using Ariadne.NET.Tests.Shared;
+using Ariadne.NET.Validation;
 using Ariadne.NET.Workspaces;
 using FluentAssertions;
 using ModelContextProtocol;
-using Ariadne.NET.RuleEngine;
-using Ariadne.NET.RuleLoader;
-using Ariadne.NET.Validation;
-using Ariadne.NET.Mcp.Tools;
 
 namespace Ariadne.NET.Mcp.Tests.Tools;
 
@@ -66,7 +66,7 @@ public class ValidationToolsTests
             path: missing,
             template: "clean-architecture");
 
-        await act.Should().ThrowAsync<McpException>();
+        await act.Should().ThrowAsync<McpException>().WithMessage("Path '*' does not exist.*");
     }
 
     [Fact]
