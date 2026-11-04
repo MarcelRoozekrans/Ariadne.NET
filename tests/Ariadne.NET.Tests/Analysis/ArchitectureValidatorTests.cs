@@ -85,7 +85,7 @@ public class ArchitectureValidatorTests
     [Fact]
     public void MergedViolation_KeepsEarliestLocationFromOneFrameworkAndHighestCountFromAnother()
     {
-        // net8.0 sees one reference at line 7. net10.0 sees two references, the first at line 10.
+        // net8.0 sees one reference at line 7. net10.0 sees two references, the first at line 11.
         const string source = """
             namespace MyApp.Orders.Infrastructure { public class Db { } }
             namespace MyApp.Orders.Domain
@@ -114,6 +114,8 @@ public class ArchitectureValidatorTests
         violation.Kind.Should().Be(ViolationKind.DependencyNotAllowed);
         violation.Location.Should().Be(new SourceLocation("Test.cs", 7, 37));
         violation.ReferenceCount.Should().Be(2);
+        violation.Message.Should().Be(
+            "Layer 'Domain' is not allowed to depend on 'Infrastructure': MyApp.Orders.Domain.Order references MyApp.Orders.Infrastructure.Db 2 times");
         violation.TargetFrameworks.Should().BeEmpty();
     }
 

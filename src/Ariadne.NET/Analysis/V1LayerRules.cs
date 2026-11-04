@@ -63,10 +63,6 @@ internal static class V1LayerRules
         var message = string.Create(
             CultureInfo.InvariantCulture,
             $"Layer '{pair.SourceLayer}' is not allowed to depend on '{pair.TargetLayer}': {source} references {target}");
-        if (pair.Count > 1)
-        {
-            message = string.Create(CultureInfo.InvariantCulture, $"{message} {pair.Count} times");
-        }
 
         return new ArchitectureViolation
         {
@@ -76,9 +72,33 @@ internal static class V1LayerRules
             Target = target,
             Location = pair.First.Location,
             ReferenceCount = pair.Count,
-            Message = message,
+            Message = message + CountSuffix(pair.Count),
         };
     }
+
+    /// <summary>
+    /// Returns <paramref name="violation"/> with <paramref name="count"/> as its reference count. A dependency violation's message
+    /// states the count, so it is rebuilt to match; other kinds keep their message.
+    /// </summary>
+    public static ArchitectureViolation WithReferenceCount(ArchitectureViolation violation, int count)
+    {
+        ArgumentNullException.ThrowIfNull(violation);
+
+        if (violation.Kind != ViolationKind.DependencyNotAllowed)
+        {
+            return violation with { ReferenceCount = count };
+        }
+
+        var suffix = CountSuffix(violation.ReferenceCount);
+        var message = violation.Message.EndsWith(suffix, StringComparison.Ordinal)
+            ? violation.Message[..^suffix.Length]
+            : violation.Message;
+        return violation with { ReferenceCount = count, Message = message + CountSuffix(count) };
+    }
+
+    // The message names the count only when the source type references the target more than once.
+    private static string CountSuffix(int count) =>
+        count > 1 ? string.Create(CultureInfo.InvariantCulture, $" {count} times") : string.Empty;
 
     private static int CompareViolations(ArchitectureViolation x, ArchitectureViolation y)
     {

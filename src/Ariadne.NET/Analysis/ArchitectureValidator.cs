@@ -275,13 +275,13 @@ public sealed class ArchitectureValidator : IArchitectureValidator
             }
         }
 
-        // The earlier location wins, with its message; the reference count is the highest.
+        // The earlier location wins; the reference count is the highest, and the message is rebuilt to state that count.
         private static ArchitectureViolation Merge(ArchitectureViolation current, ArchitectureViolation candidate)
         {
             var count = Math.Max(current.ReferenceCount, candidate.ReferenceCount);
             var candidateIsEarlier = candidate.Location is { } c
                 && (current.Location is not { } l || TypeGraphBuilder.Compare(c, l) < 0);
-            return (candidateIsEarlier ? candidate : current) with { ReferenceCount = count };
+            return V1LayerRules.WithReferenceCount(candidateIsEarlier ? candidate : current, count);
         }
     }
 }
