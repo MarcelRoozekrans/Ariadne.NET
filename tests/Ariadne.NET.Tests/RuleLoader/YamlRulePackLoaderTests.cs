@@ -7,17 +7,27 @@ namespace Ariadne.NET.Tests.RuleLoader;
 
 public class YamlRulePackLoaderTests
 {
+    private const string V1Hint =
+        "'schema: 2' is required; this looks like a v1 pack. See https://marcelroozekrans.github.io/Ariadne.NET/how-it-works/rule-schema#migrating-from-v1";
+
     [Fact]
     public void LoadFromString_ShouldParseValidYaml()
     {
         var yaml = """
+            schema: 2
             name: test-pack
             version: "1.0.0"
             layers:
               - name: Domain
+                id: TP-LAYER-DOMAIN
+                because: The domain holds the business rules.
+                namespaces: ["**.Domain.**"]
                 description: "Core domain"
                 allowedDependencies: []
               - name: Application
+                id: TP-LAYER-APPLICATION
+                because: Use cases orchestrate the domain.
+                namespaces: ["**.Application.**"]
                 description: "Use cases"
                 allowedDependencies:
                   - Domain
@@ -41,7 +51,11 @@ public class YamlRulePackLoaderTests
         var pack = loader.LoadFromString(yaml).Value;
 
         pack.Name.Should().Be("test-pack");
+        pack.Schema.Should().Be(2);
         pack.Layers.Should().HaveCount(2);
+        pack.Layers[0].Id.Should().Be("TP-LAYER-DOMAIN");
+        pack.Layers[0].Because.Should().Be("The domain holds the business rules.");
+        pack.Layers[0].Namespaces.Should().Equal("**.Domain.**");
         pack.Layers[1].AllowedDependencies.Should().Contain("Domain");
         pack.ComponentRoles.Should().HaveCount(2);
         pack.ComponentRoles[1].RequiresInterface.Should().BeTrue();
@@ -62,53 +76,107 @@ public class YamlRulePackLoaderTests
     }
 
     [Fact]
-    public void LoadFromString_MalformedYaml_ReturnsInvalidWithLine()
+    public void V1Pack_FailsWithMigrationHint()
     {
-        var result = new YamlRulePackLoader().LoadFromString("name: x\nlayers: [{name: a}}");
+        var yaml = """
+            name: legacy
+            layers:
+              - name: Domain
+                allowedDependencies: []
+            """;
+
+        var result = new YamlRulePackLoader().LoadFromString(yaml);
 
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
-        result.Error.Message.Should().Be("Rule pack YAML could not be parsed: While parsing a flow sequence, did not find expected ',' or ']'.");
-        result.Error.Detail.Should().Be("line 2, column 19");
+        result.Error.Message.Should().Be("Rule pack YAML has 1 problem(s).");
+        result.Error.Detail.Should().Be($"rule pack YAML:1:1: {V1Hint}");
+    }
+
+    [Fact]
+    public void FileWithTwoProblems_DetailHasPathLineColumnPerLine()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"ariadne-two-{Guid.NewGuid():N}.yaml");
+        File.WriteAllText(path, """
+            schema: 2
+            name: shop
+            layers:
+              - name: Core
+                id: SH-LAYER-CORE
+                because: Core holds the business rules.
+                namespaces: ["**.Core.**"]
+                allowedDependancies: []
+            rules:
+              - id: SH-001
+                forbid:
+                  from: { layers: [Core] }
+                  to: { namespaces: ["System.Data.**"] }
+            """);
+
+        try
+        {
+            var result = new YamlRulePackLoader().LoadFromFile(path);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+            result.Error.Message.Should().Be($"Rule pack file '{path}' has 2 problem(s).");
+            result.Error.Detail.Should().Be(
+                $"{path}:8:5: unknown key 'allowedDependancies' in layer 'Core'; did you mean 'allowedDependencies'?\n" +
+                $"{path}:10:5: rule 'SH-001' has no 'because'");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void LoadFromString_MalformedYaml_ReturnsInvalidWithLine()
+    {
+        var result = new YamlRulePackLoader().LoadFromString("schema: 2\nlayers: [{name: a}}");
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().Be("Rule pack YAML has 1 problem(s).");
+        result.Error.Detail.Should().Be("rule pack YAML:2:19: While parsing a flow sequence, did not find expected ',' or ']'.");
     }
 
     [Fact]
     public void LoadFromString_UnclosedFlowSequence_ReportsEndOfStream()
     {
         // YamlDotNet marks an unclosed sequence at the end of the stream, one line past the last line.
-        var result = new YamlRulePackLoader().LoadFromString("name: x\nlayers: [unclosed");
+        var result = new YamlRulePackLoader().LoadFromString("schema: 2\nlayers: [unclosed");
 
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
-        result.Error.Detail.Should().Be("line 3, column 1");
+        result.Error.Detail.Should().StartWith("rule pack YAML:3:1: ");
     }
 
     [Theory]
-    [InlineData("- a\n- b")]
-    [InlineData("just a scalar")]
-    [InlineData("layers: \"text\"")]
-    public void LoadFromString_WrongShape_ReturnsInvalid(string yaml)
+    [InlineData("- a\n- b", "rule pack YAML:1:1: the pack must be a mapping")]
+    [InlineData("just a scalar", "rule pack YAML:1:1: the pack must be a mapping")]
+    [InlineData("schema: 2\nname: x\nlayers: \"text\"", "rule pack YAML:3:1: 'layers' in the pack must be a list")]
+    public void LoadFromString_WrongShape_ReturnsInvalid(string yaml, string detail)
     {
         var result = new YamlRulePackLoader().LoadFromString(yaml);
 
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
-        result.Error.Message.Should().Be("Rule pack YAML does not match the rule pack schema.");
-        result.Error.Message.Should().NotContain("Version=");
-        result.Error.Detail.Should().MatchRegex(@"^line \d+, column \d+$");
+        result.Error.Message.Should().Be("Rule pack YAML has 1 problem(s).");
+        result.Error.Detail.Should().Be(detail);
     }
 
     [Theory]
     [InlineData("")]
     [InlineData("   \n  ")]
-    [InlineData("~")]
     public void LoadFromString_Empty_ReturnsInvalid(string yaml)
     {
         var result = new YamlRulePackLoader().LoadFromString(yaml);
 
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
-        result.Error.Message.Should().Be("Rule pack YAML is empty.");
+        result.Error.Message.Should().Be("Rule pack YAML has 1 problem(s).");
+        result.Error.Detail.Should().Be("rule pack YAML:1:1: the pack is empty");
     }
 
     [Fact]
@@ -122,7 +190,8 @@ public class YamlRulePackLoaderTests
             var result = new YamlRulePackLoader().LoadFromFile(path);
 
             result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
-            result.Error.Message.Should().Be($"Rule pack file '{path}' is empty.");
+            result.Error.Message.Should().Be($"Rule pack file '{path}' has 1 problem(s).");
+            result.Error.Detail.Should().Be($"{path}:1:1: the pack is empty");
         }
         finally
         {
@@ -134,15 +203,15 @@ public class YamlRulePackLoaderTests
     public void LoadFromFile_Malformed_NamesTheFileAndKeepsLocationInDetail()
     {
         var path = Path.Combine(Path.GetTempPath(), $"ariadne-bad-{Guid.NewGuid():N}.yaml");
-        File.WriteAllText(path, "name: x\nlayers: [{name: a}}");
+        File.WriteAllText(path, "schema: 2\nlayers: [{name: a}}");
 
         try
         {
             var result = new YamlRulePackLoader().LoadFromFile(path);
 
             result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
-            result.Error.Message.Should().StartWith($"Rule pack file '{path}' could not be parsed: ");
-            result.Error.Detail.Should().Be("line 2, column 19");
+            result.Error.Message.Should().Be($"Rule pack file '{path}' has 1 problem(s).");
+            result.Error.Detail.Should().StartWith($"{path}:2:19: ");
         }
         finally
         {
@@ -161,7 +230,8 @@ public class YamlRulePackLoaderTests
             var result = new YamlRulePackLoader().LoadFromFile(path);
 
             result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
-            result.Error.Message.Should().Be($"Rule pack file '{path}' does not match the rule pack schema.");
+            result.Error.Message.Should().Be($"Rule pack file '{path}' has 1 problem(s).");
+            result.Error.Detail.Should().Be($"{path}:1:1: the pack must be a mapping");
         }
         finally
         {
@@ -174,7 +244,7 @@ public class YamlRulePackLoaderTests
     public void LoadFromFile_AccessDenied_ReturnsUnavailable()
     {
         var path = Path.Combine(Path.GetTempPath(), $"ariadne-denied-{Guid.NewGuid():N}.yaml");
-        File.WriteAllText(path, "name: x");
+        File.WriteAllText(path, "schema: 2\nname: x");
         File.SetUnixFileMode(path, UnixFileMode.None);
 
         try

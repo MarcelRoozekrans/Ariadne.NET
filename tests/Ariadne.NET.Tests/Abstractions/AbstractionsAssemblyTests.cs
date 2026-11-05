@@ -11,7 +11,7 @@ public class AbstractionsAssemblyTests
         var types = new[]
         {
             typeof(RulePack), typeof(LayerDefinition), typeof(ComponentRoleDefinition),
-            typeof(CodeFeatureRuleDefinition), typeof(NamingConventions), typeof(CSharpTypeKind),
+            typeof(RuleDefinition), typeof(TargetSelector), typeof(RuleException), typeof(NamingConventions), typeof(CSharpTypeKind),
             typeof(IRulePackLoader), typeof(IRulePackResolver), typeof(IBuiltinPackRegistry),
         };
 

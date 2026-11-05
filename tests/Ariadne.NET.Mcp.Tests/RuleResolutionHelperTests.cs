@@ -39,12 +39,17 @@ public sealed class RuleResolutionHelperTests : IDisposable
         var cacheDir = Path.Combine(_tempDir, ".architecture", ".cache", "git", "x");
         Directory.CreateDirectory(cacheDir);
         File.WriteAllText(Path.Combine(cacheDir, "x.yaml"), """
+            schema: 2
             name: x
             layers:
               - name: Kernel
+                id: X-LAYER-KERNEL
+                because: The kernel depends on nothing else.
+                namespaces: ["**.Kernel.**"]
                 allowedDependencies: []
             """);
         WriteRules("""
+            schema: 2
             name: user-rules
             extends:
               - import://x
@@ -59,7 +64,7 @@ public sealed class RuleResolutionHelperTests : IDisposable
     [Fact]
     public void Resolve_MalformedRulesFile_ReturnsInvalid()
     {
-        WriteRules("name: x\nlayers: [unclosed");
+        WriteRules("schema: 2\nname: x\nlayers: [unclosed");
 
         var result = _helper.Resolve(template: null);
 

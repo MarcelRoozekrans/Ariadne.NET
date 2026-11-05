@@ -8,7 +8,7 @@ Reference this package when your tool needs to talk about rule packs without pul
 
 All types live in the `Ariadne.NET.Abstractions` namespace.
 
-- **Schema:** `RulePack`, `LayerDefinition`, `ComponentRoleDefinition`, `CodeFeatureRuleDefinition`, `NamingConventions`, `CSharpTypeKind`
+- **Schema:** `RulePack`, `LayerDefinition`, `ComponentRoleDefinition`, `RuleDefinition`, `TargetSelector`, `RuleException`, `NamingConventions`, `CSharpTypeKind`
 - **Contracts:** `IRulePackLoader`, `IRulePackResolver`, `IBuiltinPackRegistry`, with `AriadneError` as the error type of their `Result<T, AriadneError>` returns
 
 Loading YAML, resolving `extends`, merging packs, the built-in packs and validation live in the [`Ariadne.NET`](https://www.nuget.org/packages/Ariadne.NET) engine package, which implements these contracts.

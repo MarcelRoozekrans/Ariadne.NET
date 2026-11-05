@@ -22,7 +22,6 @@ public sealed class RulePackMerger : IRulePackMerger
         var problems = new List<string>();
         var layers = new Owned<LayerDefinition>();
         var rules = new Owned<RuleDefinition>();
-        var featureRules = new Owned<CodeFeatureRuleDefinition>();
         var roles = new Dictionary<string, ComponentRoleDefinition>(StringComparer.OrdinalIgnoreCase);
 
         for (var p = 0; p < packs.Count; p++)
@@ -39,8 +38,6 @@ public sealed class RulePackMerger : IRulePackMerger
             {
                 roles[role.Name] = role;
             }
-
-            MergeFeatureRules(pack, p, featureRules, problems);
         }
 
         if (problems.Count > 0)
@@ -54,7 +51,6 @@ public sealed class RulePackMerger : IRulePackMerger
             Schema = 2,
             Layers = layers.Values(),
             ComponentRoles = roles.Values.ToList(),
-            CodeFeatureRules = featureRules.Values(),
             Rules = rules.Values(),
             NamingConventions = packs[^1].NamingConventions,
         });
@@ -138,23 +134,6 @@ public sealed class RulePackMerger : IRulePackMerger
                 Exceptions = [.. inherited.Exceptions, .. amendment.Exceptions],
                 Locked = inherited.Locked,
             });
-        }
-    }
-
-    // Removed with CodeFeatureRuleDefinition in the next task; until then the last rule with an id wins, and a locked
-    // one from another pack cannot be overridden.
-    private static void MergeFeatureRules(
-        RulePack pack, int packIndex, Owned<CodeFeatureRuleDefinition> featureRules, List<string> problems)
-    {
-        foreach (var rule in pack.CodeFeatureRules)
-        {
-            if (featureRules.TryGet(rule.Id, out var existing) && existing.Item.Locked && existing.PackIndex != packIndex)
-            {
-                problems.Add($"rule '{rule.Id}' from pack '{existing.PackName}' is locked; pack '{pack.Name}' cannot override it");
-                continue;
-            }
-
-            featureRules.Set(rule.Id, rule, packIndex, pack.Name);
         }
     }
 

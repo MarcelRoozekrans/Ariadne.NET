@@ -1,17 +1,27 @@
+schema: 2
 name: layered
 version: "1.0.0"
 author: platform-team
 
 layers:
   - name: Presentation
+    id: LAY-LAYER-PRESENTATION
+    because: Presentation talks to the business layer only, never straight to data access.
+    namespaces: ["**.Presentation.**"]
     description: "UI, API controllers, view models"
     allowedDependencies:
       - Business
   - name: Business
+    id: LAY-LAYER-BUSINESS
+    because: Business logic sits between presentation and data and calls only the layer below it.
+    namespaces: ["**.Business.**"]
     description: "Business logic, services, validation"
     allowedDependencies:
       - DataAccess
   - name: DataAccess
+    id: LAY-LAYER-DATAACCESS
+    because: Data access is the bottom layer and depends on no other layer.
+    namespaces: ["**.DataAccess.**"]
     description: "Repositories, database context, data models"
     allowedDependencies: []
 

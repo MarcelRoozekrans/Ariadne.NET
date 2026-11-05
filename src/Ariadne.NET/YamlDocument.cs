@@ -9,8 +9,9 @@ using ZeroAlloc.Results;
 namespace Ariadne.NET;
 
 /// <summary>
-/// Reads and deserialises one YAML document the way every loader does: the file-read failures, an empty document and a
-/// YamlDotNet failure all become the same errors. The loaders add their own checks on the document that comes back.
+/// Reads and deserialises one YAML document the way the reflection-based loaders do: the file-read failures, an empty
+/// document and a YamlDotNet failure all become the same errors. Rule packs use only <see cref="ReadText"/>; they are
+/// parsed by the strict pack reader instead.
 /// </summary>
 internal static class YamlDocument
 {
@@ -32,31 +33,40 @@ internal static class YamlDocument
     internal static Result<T, AriadneError> ReadFile<T>(string filePath, string fileKind, string schemaName)
         where T : class
     {
+        var text = ReadText(filePath, fileKind);
+        return text.IsFailure
+            ? Result<T, AriadneError>.Failure(text.Error)
+            : Parse<T>(text.Value, FileSubject(filePath, fileKind), schemaName);
+    }
+
+    /// <summary>
+    /// Reads the text of the file at <paramref name="filePath"/>. A missing file is NotFound; one that cannot be read
+    /// is Unavailable. Both messages start with the <see cref="FileSubject"/>.
+    /// </summary>
+    internal static Result<string, AriadneError> ReadText(string filePath, string fileKind)
+    {
         var subject = FileSubject(filePath, fileKind);
 
-        string yaml;
         try
         {
-            yaml = File.ReadAllText(filePath);
+            return Result<string, AriadneError>.Success(File.ReadAllText(filePath));
         }
         catch (FileNotFoundException)
         {
-            return NotFound<T>(subject, filePath);
+            return NotFound(subject, filePath);
         }
         catch (DirectoryNotFoundException)
         {
-            return NotFound<T>(subject, filePath);
+            return NotFound(subject, filePath);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // On Linux a path that names a directory, or a file without read permission, lands here.
-            return Result<T, AriadneError>.Failure(new AriadneError(
+            return Result<string, AriadneError>.Failure(new AriadneError(
                 AriadneErrorCode.Unavailable,
                 $"{subject} could not be read.",
                 ex.Message));
         }
-
-        return Parse<T>(yaml, subject, schemaName);
     }
 
     /// <summary>
@@ -87,6 +97,6 @@ internal static class YamlDocument
     private static Result<T, AriadneError> Empty<T>(string subject) =>
         Result<T, AriadneError>.Failure(new AriadneError(AriadneErrorCode.Invalid, $"{subject} is empty."));
 
-    private static Result<T, AriadneError> NotFound<T>(string subject, string filePath) =>
-        Result<T, AriadneError>.Failure(new AriadneError(AriadneErrorCode.NotFound, $"{subject} not found.", filePath));
+    private static Result<string, AriadneError> NotFound(string subject, string filePath) =>
+        Result<string, AriadneError>.Failure(new AriadneError(AriadneErrorCode.NotFound, $"{subject} not found.", filePath));
 }

@@ -24,7 +24,6 @@ var pack = new RulePack
 var validator = new RulePackValidator(
     new LayerDefinitionValidator(),
     new ComponentRoleDefinitionValidator(),
-    new CodeFeatureRuleDefinitionValidator(),
     new RuleDefinitionValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleExceptionValidator()),
     new LayerRetargetValidator(),
     new RuleAmendmentValidator(new RuleExceptionValidator()),

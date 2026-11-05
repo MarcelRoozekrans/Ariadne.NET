@@ -140,6 +140,106 @@ public class BuiltinPackIntegrationTests
         result.GeneratedFiles[0].Code.Should().Contain(componentName);
     }
 
+    public static TheoryData<string, string> BuiltinPackPrefixes() => new()
+    {
+        { "clean-architecture", "CA" },
+        { "cqrs", "CQRS" },
+        { "ddd-tactical", "DDD" },
+        { "event-driven", "ED" },
+        { "hexagonal-architecture", "HEX" },
+        { "layered", "LAY" },
+        { "microservice", "MS" },
+        { "modular-monolith", "MM" },
+        { "onion-architecture", "ONION" },
+        { "vertical-slice", "VS" },
+    };
+
+    [Theory]
+    [MemberData(nameof(BuiltinPackPrefixes))]
+    public void EveryBuiltinPack_LoadsAndResolves(string packName, string prefix)
+    {
+        _registry.GetAvailablePackNames().Should().HaveCount(10).And.Contain(packName);
+
+        var pack = _registry.GetPack(packName);
+        pack.IsSuccess.Should().BeTrue(pack.IsFailure ? $"{pack.Error.Message} {pack.Error.Detail}" : "");
+        pack.Value.Schema.Should().Be(2);
+
+        foreach (var layer in pack.Value.Layers)
+        {
+            var segment = layer.Name[(layer.Name.LastIndexOf('.') + 1)..];
+            layer.Id.Should().Be($"{prefix}-LAYER-{segment.ToUpperInvariant()}");
+            layer.Because.Should().NotBeNullOrWhiteSpace().And.EndWith(".");
+            layer.Namespaces.Should().Equal($"**.{segment}.**");
+            layer.Assemblies.Should().BeEmpty();
+        }
+
+        var resolved = NewResolver().Resolve(new RulePack { Name = "user", Extends = [$"builtin://{packName}"] });
+        resolved.IsSuccess.Should().BeTrue(resolved.IsFailure ? $"{resolved.Error.Message} {resolved.Error.Detail}" : "");
+    }
+
+    [Fact]
+    public void CleanArchitecturePlusCqrs_Resolves()
+    {
+        var resolved = NewResolver().Resolve(new RulePack
+        {
+            Name = "user",
+            Extends = ["builtin://clean-architecture", "builtin://cqrs"],
+        });
+
+        resolved.IsSuccess.Should().BeTrue(resolved.IsFailure ? $"{resolved.Error.Message} {resolved.Error.Detail}" : "");
+        resolved.Value.Layers.Select(l => l.Id).Should().Equal(
+            "CA-LAYER-DOMAIN", "CA-LAYER-APPLICATION", "CA-LAYER-INFRASTRUCTURE", "CA-LAYER-WEBAPI");
+        resolved.Value.ComponentRoles.Select(r => r.Name).Should().Contain("Command").And.Contain("Entity");
+    }
+
+    [Fact]
+    public void CleanArchitecturePlusMicroservice_FailsBothDefineLayer()
+    {
+        var resolved = NewResolver().Resolve(new RulePack
+        {
+            Name = "user",
+            Extends = ["builtin://clean-architecture", "builtin://microservice"],
+        });
+
+        resolved.IsFailure.Should().BeTrue();
+        resolved.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        resolved.Error.Detail!.Split('\n').Should().Contain(
+            "packs 'clean-architecture' and 'microservice' both define layer 'Domain'",
+            "packs 'clean-architecture' and 'microservice' both define layer 'Application'",
+            "packs 'clean-architecture' and 'microservice' both define layer 'Infrastructure'");
+    }
+
+    [Fact]
+    public void RepoPack_Loads()
+    {
+        var dir = AppContext.BaseDirectory;
+        while (dir is not null && !File.Exists(Path.Combine(dir, "src", "Ariadne.NET.slnx")))
+        {
+            dir = Path.GetDirectoryName(dir);
+        }
+
+        dir.Should().NotBeNull("the repository root must be reachable from the test output directory");
+
+        var loaded = new YamlRulePackLoader().LoadFromFile(Path.Combine(dir!, ".architecture", "rules.yaml"));
+        loaded.IsSuccess.Should().BeTrue(loaded.IsFailure ? $"{loaded.Error.Message} {loaded.Error.Detail}" : "");
+        loaded.Value.Extends.Should().BeEmpty();
+        loaded.Value.Layers.Select(l => (l.Name, l.Id)).Should().Equal(
+            ("Core", "ARIADNE-LAYER-CORE"),
+            ("Workspaces", "ARIADNE-LAYER-WORKSPACES"),
+            ("Host", "ARIADNE-LAYER-HOST"),
+            ("Tests", "ARIADNE-LAYER-TESTS"));
+        loaded.Value.Layers.Should().OnlyContain(l => !string.IsNullOrWhiteSpace(l.Because));
+
+        var resolved = NewResolver().Resolve(loaded.Value);
+        resolved.IsSuccess.Should().BeTrue(resolved.IsFailure ? $"{resolved.Error.Message} {resolved.Error.Detail}" : "");
+    }
+
+    private static RulePackResolver NewResolver()
+    {
+        var loader = new YamlRulePackLoader();
+        return new RulePackResolver(new BuiltinPackRegistry(loader), loader, new RulePackMerger());
+    }
+
     [Theory]
     [InlineData("clean-architecture")]
     [InlineData("hexagonal-architecture")]

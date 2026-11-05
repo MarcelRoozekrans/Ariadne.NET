@@ -31,9 +31,11 @@ public class PackResourcesTests
     {
         var result = PackResources.GetPackContent(_registry, "clean-architecture");
 
+        result.Should().StartWith("schema: 2");
         result.Should().Contain("name: clean-architecture");
         result.Should().Contain("layers:");
         result.Should().Contain("componentRoles:");
+        result.Should().NotContain("codeFeatureRules:");
     }
 
     [Fact]

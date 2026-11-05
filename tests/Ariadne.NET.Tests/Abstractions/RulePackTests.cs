@@ -107,7 +107,6 @@ public class RulePackTests
     private static RulePackValidator PackValidator() => new(
         new LayerDefinitionValidator(),
         new ComponentRoleDefinitionValidator(),
-        new CodeFeatureRuleDefinitionValidator(),
         new RuleDefinitionValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleExceptionValidator()),
         new LayerRetargetValidator(),
         new RuleAmendmentValidator(new RuleExceptionValidator()),

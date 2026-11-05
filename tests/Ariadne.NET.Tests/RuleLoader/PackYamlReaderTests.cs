@@ -81,7 +81,6 @@ public class PackYamlReaderTests
         pack.Version.Should().Be("2.1.0");
         pack.Author.Should().Be("shop-team");
         pack.Extends.Should().Equal("builtin://clean-architecture");
-        pack.CodeFeatureRules.Should().BeEmpty();
         AssertEveryLayerField(pack);
         AssertEveryRuleField(pack);
         AssertEveryRoleAndNamingField(pack);

@@ -291,32 +291,6 @@ public class RulePackMergerTests
         Problems(result).Should().Equal("pack 'first' amends rule 'R1', which no extended pack defines");
     }
 
-    // CodeFeatureRules go away with their type in the next task, together with these two tests.
-    [Fact]
-    public void FeatureRule_LockedOverride_Fails()
-    {
-        var result = _merger.Merge(
-        [
-            new RulePack { Name = "org", CodeFeatureRules = [new CodeFeatureRuleDefinition { Id = "ARCH-001", Description = "Locked", Locked = true }] },
-            new RulePack { Name = "team", CodeFeatureRules = [new CodeFeatureRuleDefinition { Id = "ARCH-001", Description = "Override" }] },
-        ]);
-
-        Problems(result).Should().Equal("rule 'ARCH-001' from pack 'org' is locked; pack 'team' cannot override it");
-    }
-
-    [Fact]
-    public void FeatureRule_UnlockedOverride_LastWins()
-    {
-        var result = _merger.Merge(
-        [
-            new RulePack { Name = "org", CodeFeatureRules = [new CodeFeatureRuleDefinition { Id = "NAMING-001", Description = "Original" }] },
-            new RulePack { Name = "team", CodeFeatureRules = [new CodeFeatureRuleDefinition { Id = "NAMING-001", Description = "Team override" }] },
-        ]);
-
-        result.IsSuccess.Should().BeTrue();
-        result.Value.CodeFeatureRules.Should().ContainSingle().Which.Description.Should().Be("Team override");
-    }
-
     [Fact]
     public void EmptyList_MergesToEmptyPack()
     {

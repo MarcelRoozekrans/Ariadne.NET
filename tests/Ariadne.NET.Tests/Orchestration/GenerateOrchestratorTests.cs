@@ -13,9 +13,9 @@ public class GenerateOrchestratorTests
         Name = "test",
         Layers =
         [
-            new LayerDefinition { Name = "Domain", AllowedDependencies = [] },
-            new LayerDefinition { Name = "Application", AllowedDependencies = ["Domain"] },
-            new LayerDefinition { Name = "Infrastructure", AllowedDependencies = ["Domain", "Application"] },
+            new LayerDefinition { Name = "Domain", Id = "TEST-LAYER-DOMAIN", Because = "Test layer Domain.", Namespaces = ["**.Domain.**"], AllowedDependencies = [] },
+            new LayerDefinition { Name = "Application", Id = "TEST-LAYER-APPLICATION", Because = "Test layer Application.", Namespaces = ["**.Application.**"], AllowedDependencies = ["Domain"] },
+            new LayerDefinition { Name = "Infrastructure", Id = "TEST-LAYER-INFRASTRUCTURE", Because = "Test layer Infrastructure.", Namespaces = ["**.Infrastructure.**"], AllowedDependencies = ["Domain", "Application"] },
         ],
         ComponentRoles =
         [
@@ -112,7 +112,7 @@ public class GenerateOrchestratorTests
         var pack = new RulePack
         {
             Name = "custom",
-            Layers = [new LayerDefinition { Name = "Domain", AllowedDependencies = [] }],
+            Layers = [new LayerDefinition { Name = "Domain", Id = "TEST-LAYER-DOMAIN", Because = "Test layer Domain.", Namespaces = ["**.Domain.**"], AllowedDependencies = [] }],
             ComponentRoles =
             [
                 new ComponentRoleDefinition { Name = "Entity", Layer = "Domain", TypeKind = CSharpTypeKind.Record, AlternativeNames = ["Aggregate"] },

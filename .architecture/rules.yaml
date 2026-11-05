@@ -1,29 +1,36 @@
+schema: 2
 name: ariadne
 version: "1.0.0"
 author: ariadne
-extends:
-  - builtin://clean-architecture
 
 layers:
   - name: Core
-    description: "Domain models, rule engine, code generation, validation"
+    id: ARIADNE-LAYER-CORE
+    because: The schema, rule engine, analysis and code generation are the library itself and must not depend on any host.
+    description: "Abstractions, rule engine, semantic analysis, code generation"
+    assemblies: ["Ariadne.NET.Abstractions", "Ariadne.NET"]
     allowedDependencies: []
+  - name: Workspaces
+    id: ARIADNE-LAYER-WORKSPACES
+    because: Loading solutions through MSBuild is an optional add-on to the core and must stay out of it.
+    description: "MSBuild workspace loading"
+    assemblies: ["Ariadne.NET.Workspaces"]
+    allowedDependencies:
+      - Core
   - name: Host
-    description: "API and CLI hosts - thin wrappers over Core"
+    id: ARIADNE-LAYER-HOST
+    because: The CLI and MCP servers are thin wrappers that compose the core and the workspace loader.
+    description: "CLI and MCP hosts"
+    assemblies: ["Ariadne.NET.Cli", "Ariadne.NET.Mcp", "Ariadne.NET.Mcp.Http"]
     allowedDependencies:
       - Core
+      - Workspaces
   - name: Tests
-    description: "Unit and integration tests"
+    id: ARIADNE-LAYER-TESTS
+    because: Tests exercise every other layer, and no shipped code may depend on them.
+    description: "Unit, integration and AOT smoke tests"
+    assemblies: ["*.Tests", "Ariadne.NET.AotSmoke"]
     allowedDependencies:
       - Core
+      - Workspaces
       - Host
-
-codeFeatureRules:
-  - id: ARIADNE-001
-    description: "Core must have zero host dependencies"
-    appliesTo:
-      layer: Core
-  - id: ARIADNE-002
-    description: "Hosts must only orchestrate, not contain business logic"
-    appliesTo:
-      layer: Host

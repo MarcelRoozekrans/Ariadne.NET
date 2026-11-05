@@ -22,6 +22,8 @@ public sealed class ExitCodeTests : IDisposable
         File.WriteAllText(
             Path.Combine(_tempDir, ".architecture", "rules.yaml"),
             """
+            schema: 2
+            name: shop
             extends:
               - builtin://clean-architecture
             """);
@@ -183,6 +185,18 @@ public sealed class ExitCodeTests : IDisposable
     }
 
     [Fact]
+    public void Init_WritesASchema2PackThatValidates()
+    {
+        Run("init", "--template", "clean-architecture+cqrs").Should().Be(ExitCodes.Success);
+
+        var written = File.ReadAllText(Path.Combine(_tempDir, ".architecture", "rules.yaml"));
+        written.Should().StartWith("schema: 2");
+        written.Should().Contain("- builtin://clean-architecture").And.Contain("- builtin://cqrs");
+
+        Run("validate", FixtureProjects.Path("clean", "Shop.slnx")).Should().Be(ExitCodes.Success);
+    }
+
+    [Fact]
     public void Init_TemplateWithoutNames_ShouldReturnErrorAndWriteStderr()
     {
         var originalError = Console.Error;
@@ -309,6 +323,8 @@ public sealed class ExitCodeTests : IDisposable
     public void Validate_RulesExtendUnknownBuiltin_ShouldReturnErrorAndWriteStderr()
     {
         WriteRules("""
+            schema: 2
+            name: shop
             extends:
               - builtin://nope
             """);
@@ -333,7 +349,7 @@ public sealed class ExitCodeTests : IDisposable
     [Fact]
     public void Validate_MalformedRules_ShouldReturnErrorWithLine()
     {
-        WriteRules("name: x\nlayers: [unclosed");
+        WriteRules("schema: 2\nname: x\nlayers: [unclosed");
         var originalError = Console.Error;
         using var error = new StringWriter();
         Console.SetError(error);
@@ -347,8 +363,9 @@ public sealed class ExitCodeTests : IDisposable
             Console.SetError(originalError);
         }
 
-        error.ToString().Should().StartWith("Error: Rule pack file '.architecture/rules.yaml' could not be parsed: ")
-            .And.Contain("line");
+        var lines = error.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        lines[0].Should().Be("Error: Rule pack file '.architecture/rules.yaml' has 1 problem(s).");
+        lines[1].Should().StartWith(".architecture/rules.yaml:4:1: ");
         error.ToString().Should().NotContain(" at ", "an expected failure prints no stack trace");
     }
 

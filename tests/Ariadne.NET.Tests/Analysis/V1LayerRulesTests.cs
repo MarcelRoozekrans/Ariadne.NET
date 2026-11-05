@@ -13,9 +13,9 @@ public class V1LayerRulesTests
         Name = "test",
         Layers =
         [
-            new LayerDefinition { Name = "Domain" },
-            new LayerDefinition { Name = "Application", AllowedDependencies = ["Domain"] },
-            new LayerDefinition { Name = "Infrastructure", AllowedDependencies = ["Domain", "Application"] },
+            new LayerDefinition { Name = "Domain", Id = "TEST-LAYER-DOMAIN", Because = "Test layer Domain.", Namespaces = ["**.Domain.**"] },
+            new LayerDefinition { Name = "Application", Id = "TEST-LAYER-APPLICATION", Because = "Test layer Application.", Namespaces = ["**.Application.**"], AllowedDependencies = ["Domain"] },
+            new LayerDefinition { Name = "Infrastructure", Id = "TEST-LAYER-INFRASTRUCTURE", Because = "Test layer Infrastructure.", Namespaces = ["**.Infrastructure.**"], AllowedDependencies = ["Domain", "Application"] },
         ],
     };
 

@@ -12,7 +12,6 @@ public sealed class RulePack
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> Extends { get; init; } = [];
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<LayerDefinition> Layers { get; init; } = [];
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<ComponentRoleDefinition> ComponentRoles { get; init; } = [];
-    [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<CodeFeatureRuleDefinition> CodeFeatureRules { get; init; } = [];
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<RuleDefinition> Rules { get; init; } = [];
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<LayerRetarget> LayerRetargets { get; init; } = [];
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<RuleAmendment> RuleAmendments { get; init; } = [];

@@ -15,14 +15,15 @@ internal sealed class PackOperations : IPackOperations
 {
     private const string BuiltinPrefix = "builtin://";
     private const string ImportPrefix = "import://";
-    private const string SchemaName = "rule pack";
+    private const string StringSubject = "Rule pack YAML";
+    private const string StringLocation = "rule pack YAML";
+    private const string FileKind = "Rule pack";
 
     // The generated validator composes the nested validators, so they are built here instead of resolved from DI:
     // ZeroAlloc.Validation.Inject would add a package and a constructor parameter for stateless objects.
     private static readonly RulePackValidator Validator = new(
         new LayerDefinitionValidator(),
         new ComponentRoleDefinitionValidator(),
-        new CodeFeatureRuleDefinitionValidator(),
         new RuleDefinitionValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleExceptionValidator()),
         new LayerRetargetValidator(),
         new RuleAmendmentValidator(new RuleExceptionValidator()),
@@ -35,11 +36,15 @@ internal sealed class PackOperations : IPackOperations
     /// <summary>Gets the instrumented operations the public pack services call.</summary>
     public static IPackOperations Instrumented { get; } = new PackOperationsInstrumented(new PackOperations());
 
-    public Result<RulePack, AriadneError> LoadFromString(string yaml) => Checked(
-        YamlDocument.Parse<RulePack>(yaml, "Rule pack YAML", SchemaName), "Rule pack YAML");
+    public Result<RulePack, AriadneError> LoadFromString(string yaml) => Read(yaml, StringSubject, StringLocation);
 
-    public Result<RulePack, AriadneError> LoadFromFile(string filePath) => Checked(
-        YamlDocument.ReadFile<RulePack>(filePath, "Rule pack", SchemaName), YamlDocument.FileSubject(filePath, "Rule pack"));
+    public Result<RulePack, AriadneError> LoadFromFile(string filePath)
+    {
+        var text = YamlDocument.ReadText(filePath, FileKind);
+        return text.IsFailure
+            ? Result<RulePack, AriadneError>.Failure(text.Error)
+            : Read(text.Value, YamlDocument.FileSubject(filePath, FileKind), filePath);
+    }
 
     public Result<RulePack, AriadneError> GetPack(string name, BuiltinPackCatalog catalog)
     {
@@ -175,9 +180,17 @@ internal sealed class PackOperations : IPackOperations
         return loader.LoadFromFile(yamlFiles[0]);
     }
 
-    /// <summary>Runs the member rules on a parsed pack; <paramref name="subject"/> names a nameless pack.</summary>
-    private static Result<RulePack, AriadneError> Checked(Result<RulePack, AriadneError> parsed, string subject) =>
-        parsed.IsFailure ? parsed : CheckMembers(parsed.Value, subject);
+    /// <summary>
+    /// Reads a pack strictly, then runs the member rules as a backstop. <paramref name="subject"/> starts the error
+    /// message and names a nameless pack; <paramref name="location"/> starts every problem line.
+    /// </summary>
+    private static Result<RulePack, AriadneError> Read(string yaml, string subject, string location)
+    {
+        var read = PackYamlReader.Read(yaml);
+        return read.IsFailure
+            ? Result<RulePack, AriadneError>.Failure(RulePackError.Problems(subject, location, read.Error))
+            : CheckMembers(read.Value, subject);
+    }
 
     /// <summary>Runs the member rules declared on the schema types; cross-references are the resolver's job.</summary>
     private static Result<RulePack, AriadneError> CheckMembers(RulePack pack, string subject)
