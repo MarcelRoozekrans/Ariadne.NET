@@ -7,10 +7,10 @@
 
 - **Milestone:** 2 — Rule engine v2 [active since 2026-11-04]
 - **Phase 2.1 — Semantic dependency analysis:** complete, released as 0.2.0.
-- **Phase 2.2 — Rule schema v2:** [status: active]. All 14 plan tasks are implemented and reviewed, and a whole-branch review plus one fix wave is done. PR #35, branch `feat/phase-2.2-rule-schema-v2`, is open and waits for CI and the owner's merge.
+- **Phase 2.2 — Rule schema v2:** [status: active]. All 14 plan tasks are implemented and reviewed, and a whole-branch review plus one fix wave is done. PR #35, branch `feat/phase-2.2-rule-schema-v2`, is open, CI is green on both OS legs, commitlint, pack-validate and aot-smoke, and it waits for the owner's merge.
   - Design: `docs/superpowers/specs/2026-11-05-phase-2.2-rule-schema-v2-design.md`
   - Plan: `docs/superpowers/plans/2026-11-05-phase-2.2-rule-schema-v2.md`
-  - Two plan checkboxes are still open on purpose, so `complete-phase` refuses until they are settled: Task 12 step 3 (actionlint never ran, it is not installed on the build VM; the first CI run is its first check) and Task 14 step 4 (CI green and the `feat!` commits showing as breaking in the release-please PR).
+  - One plan checkbox is still open on purpose, so `complete-phase` refuses until it is settled: Task 14 step 4, the `feat!` commits showing as breaking changes in the release-please PR, which can only be checked after the merge. Task 12 step 3 (actionlint) is ticked: it is not installed on the build VM, but GitHub accepted the workflow and ran the new step green.
   - Verified before the PR: Release build 0 warnings; tests 751, 45, 38 and 65 pass; `validate src/Ariadne.NET.slnx` passes on the repo's own pack; docs-site build passes.
   - Perf: the check on the repo pack is about 21% slower and allocates about 32% more than the 2.1 baseline; an empty pack allocates the same, so the cost is in the type graph. See `docs/perf/phase-2.1-baseline.md`.
 - Issues filed from this phase: #36 (child packs: amending `allowedDependencies`, locked rules sidestepped by retargeting, empty retargets) and #37 (child-layer error wording, duplicate roles, pack file size limit). #32 stays the module-isolation item.
@@ -36,7 +36,7 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 
 ## Blockers
 
-- PR #35 needs the owner's merge. It needs green CI first: both OS legs, aot-smoke and pack-validate.
+- PR #35 needs the owner's merge.
 - **actionlint false positives:** actionlint 1.7.12 reports two errors on `actions/create-github-app-token@v3` `client-id`, an actionlint metadata bug tracked as rhysd/actionlint#648 and #669. Expect exactly these two until it ships a fix.
 
 ## Follow-ups
@@ -48,6 +48,6 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 
 ## Recommended Next Step
 
-Check PR #35: `gh pr checks 35 --repo MarcelRoozekrans/Ariadne.NET`. If a CI leg fails, fix it on branch `feat/phase-2.2-rule-schema-v2` (worktree `.claude/worktrees/phase-2.2-rule-schema-v2` if it still exists, otherwise a new worktree from the branch). Once CI is green and the actionlint run on `ci.yml` shows only the two known false positives, tick Task 12 step 3 and Task 14 step 4 in the plan, and confirm the release-please PR lists the `feat!` commits as breaking. After the owner merges PR #35, run project-orchestration `complete-phase` for 2.2 on a branch from `ariadne/main`, then `start-next-phase` for Phase 2.3 (it has no design yet, so it routes to brainstorming).
+After the owner merges PR #35: check that the release-please PR lists the `feat!` commits as breaking changes, then tick Task 14 step 4 in the plan and run project-orchestration `complete-phase` for 2.2 on a branch from `ariadne/main`. Then run `start-next-phase` for Phase 2.3 (no design yet, so it routes to brainstorming). Until the merge, the only work is answering review comments on PR #35 in branch `feat/phase-2.2-rule-schema-v2`.
 
-Commit rules: conventional commits; no `Co-Authored-By` trailer or session link; no nested parentheses in commit bodies; breaking commits carry `!` and a `BREAKING CHANGE` footer. Shared VM: one build or test at a time, no local AOT publish.
+Commit rules: conventional commits; no `Co-Authored-By` trailer or session link; no nested parentheses in commit bodies; keep every footer line under 100 characters, because commitlint rejects longer ones; breaking commits carry `!` and a `BREAKING CHANGE` footer. Shared VM: one build or test at a time, no local AOT publish.
