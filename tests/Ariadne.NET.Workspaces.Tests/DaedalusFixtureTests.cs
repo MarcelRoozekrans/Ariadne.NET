@@ -8,6 +8,7 @@ using FluentAssertions;
 namespace Ariadne.NET.Workspaces.Tests;
 
 /// <summary>Checks the Daedalus-shaped fixture solutions against the schema 2 pack that extends the clean-architecture built-in.</summary>
+[Collection(FixtureSolutionCollection.Name)]
 public sealed class DaedalusFixtureTests
 {
     // Copied from the pinned clean-architecture built-in, layer CA-LAYER-DOMAIN.

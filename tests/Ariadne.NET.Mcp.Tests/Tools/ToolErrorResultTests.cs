@@ -6,6 +6,7 @@ namespace Ariadne.NET.Mcp.Tests.Tools;
 /// A pack that cannot be resolved, or a solution or project that cannot be loaded, must reach the MCP client as a
 /// tool error result, not as an exception or a JSON-RPC error, so the model sees the message and can correct its call.
 /// </summary>
+[Collection(FixtureSolutionCollection.Name)]
 public sealed class ToolErrorResultTests : IAsyncLifetime
 {
     private McpClientHarness _harness = null!;

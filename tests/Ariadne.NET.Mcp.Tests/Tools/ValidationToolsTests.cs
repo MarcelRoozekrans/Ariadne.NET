@@ -9,6 +9,7 @@ using ModelContextProtocol;
 
 namespace Ariadne.NET.Mcp.Tests.Tools;
 
+[Collection(FixtureSolutionCollection.Name)]
 public class ValidationToolsTests
 {
     private readonly RuleResolutionHelper _helper;
