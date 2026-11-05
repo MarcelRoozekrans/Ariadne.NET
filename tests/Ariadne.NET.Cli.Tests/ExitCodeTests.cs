@@ -203,8 +203,15 @@ public sealed class ExitCodeTests : IDisposable
     [InlineData("true")]
     [InlineData("2")]
     [InlineData("#tag")]
-    [InlineData("a: b")]
-    public void Init_InADirectoryWhoseNameIsNotAPlainYamlString_WritesALoadablePack(string directoryName)
+    public void Init_InADirectoryWhoseNameIsNotAPlainYamlString_WritesALoadablePack(string directoryName) =>
+        AssertInitWritesALoadablePackIn(directoryName);
+
+    // A colon is not valid in a Windows directory name, so this row only runs on Unix.
+    [UnixFact]
+    public void Init_InADirectoryWhoseNameContainsAColon_WritesALoadablePack() =>
+        AssertInitWritesALoadablePackIn("a: b");
+
+    private void AssertInitWritesALoadablePackIn(string directoryName)
     {
         var directory = Path.Combine(_tempDir, directoryName);
         Directory.CreateDirectory(directory);
