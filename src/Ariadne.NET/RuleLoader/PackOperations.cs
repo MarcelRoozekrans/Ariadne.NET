@@ -100,7 +100,8 @@ internal sealed class PackOperations : IPackOperations
 
         packs.Add(userPack);
 
-        return RulePackReferenceCheck.Check(merger.Merge(packs));
+        var merged = merger.Merge(packs);
+        return merged.IsFailure ? merged : RulePackReferenceCheck.Check(merged.Value);
     }
 
     private static Result<RulePack, AriadneError> LoadReference(

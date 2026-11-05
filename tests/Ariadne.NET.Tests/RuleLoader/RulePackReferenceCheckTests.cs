@@ -115,4 +115,61 @@ public class RulePackReferenceCheckTests
 
         Resolve(pack).Error.Detail!.Split('\n').Should().HaveCount(2);
     }
+
+    [Fact]
+    public void DuplicateIdAcrossLayerAndRule_Fails()
+    {
+        var pack = new RulePack
+        {
+            Name = "p",
+            Layers = [new LayerDefinition { Name = "Domain", Id = "X-1" }],
+            Rules = [Rule("X-1", ["Domain"], ["Domain"])],
+        };
+
+        Resolve(pack).Error.Detail.Should().Be("duplicate id 'X-1'");
+    }
+
+    [Fact]
+    public void EmptyIds_AreNotDuplicates()
+    {
+        var pack = Pack([new LayerDefinition { Name = "Domain" }, new LayerDefinition { Name = "App" }]);
+
+        Resolve(pack).IsSuccess.Should().BeTrue("v1 layers have no id");
+    }
+
+    [Fact]
+    public void RuleUnknownLayer_Fails()
+    {
+        var pack = new RulePack
+        {
+            Name = "p",
+            Layers = [new LayerDefinition { Name = "Domain", Id = "L-1" }],
+            Rules = [Rule("R-1", ["domain", "Ghost"], ["Nope"])],
+        };
+
+        Resolve(pack).Error.Detail!.Split('\n').Should().Equal(
+            "rule 'R-1' refers to unknown layer 'Ghost'",
+            "rule 'R-1' refers to unknown layer 'Nope'");
+    }
+
+    [Fact]
+    public void RoleOnlyPack_LoadsAlone()
+    {
+        var pack = new RulePack
+        {
+            Name = "cqrs",
+            ComponentRoles = [new ComponentRoleDefinition { Name = "Command", Layer = "Application" }],
+        };
+
+        Resolve(pack).IsSuccess.Should().BeTrue();
+    }
+
+    private static RuleDefinition Rule(string id, string[] fromLayers, string[] toLayers) => new()
+    {
+        Id = id,
+        Because = "because",
+        Kind = RuleKind.Forbid,
+        From = new TargetSelector { Layers = fromLayers },
+        To = new TargetSelector { Layers = toLayers },
+    };
 }

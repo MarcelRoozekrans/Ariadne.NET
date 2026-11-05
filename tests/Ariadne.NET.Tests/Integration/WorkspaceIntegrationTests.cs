@@ -157,7 +157,7 @@ public sealed class WorkspaceIntegrationTests : IDisposable
         var merger = new RulePackMerger();
         var basePack = _registry.GetPack("clean-architecture").Value;
         var cqrsPack = _registry.GetPack("cqrs").Value;
-        var merged = merger.Merge([basePack, cqrsPack]);
+        var merged = merger.Merge([basePack, cqrsPack]).Value;
 
         // Workspace with merged pack should include layers from both packs
         var workspace = _workspaceOrchestrator.GenerateWorkspace(merged, new WorkspaceGenerateRequest

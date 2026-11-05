@@ -21,6 +21,9 @@ internal static class RulePackReferenceCheck
         var layerNames = CollectNames(mergedPack.Layers.Select(static l => l.Name), "Layers", "layer", failures);
         var roleNames = CollectNames(mergedPack.ComponentRoles.Select(static r => r.Name), "ComponentRoles", "role", failures);
 
+        CheckIds(mergedPack, failures);
+        CheckRuleLayers(mergedPack, layerNames, failures);
+
         for (var i = 0; i < mergedPack.Layers.Count; i++)
         {
             var dependencies = mergedPack.Layers[i].AllowedDependencies;
@@ -54,6 +57,39 @@ internal static class RulePackReferenceCheck
         return failures.Count == 0
             ? Result<RulePack, AriadneError>.Success(mergedPack)
             : Result<RulePack, AriadneError>.Failure(RulePackError.Invalid(mergedPack.Name, failures));
+    }
+
+    // v1 YAML still loads without ids, so an empty id is "none" and never collides.
+    private static void CheckIds(RulePack pack, List<string> failures)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var id in pack.Layers.Select(static l => l.Id).Concat(pack.Rules.Select(static r => r.Id)))
+        {
+            if (!string.IsNullOrEmpty(id) && !seen.Add(id))
+            {
+                failures.Add($"duplicate id '{id}'");
+            }
+        }
+    }
+
+    private static void CheckRuleLayers(RulePack pack, HashSet<string> layerNames, List<string> failures)
+    {
+        foreach (var rule in pack.Rules)
+        {
+            CheckTargetLayers(rule.Id, rule.From, layerNames, failures);
+            CheckTargetLayers(rule.Id, rule.To, layerNames, failures);
+        }
+    }
+
+    private static void CheckTargetLayers(string ruleId, TargetSelector target, HashSet<string> layerNames, List<string> failures)
+    {
+        foreach (var name in target.Layers)
+        {
+            if (!Contains(layerNames, name))
+            {
+                failures.Add($"rule '{ruleId}' refers to unknown layer '{name}'");
+            }
+        }
     }
 
     private static HashSet<string> CollectNames(IEnumerable<string> names, string path, string kind, List<string> failures)

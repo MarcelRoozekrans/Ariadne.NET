@@ -1,124 +1,204 @@
 using Ariadne.NET.Abstractions;
+using Ariadne.NET.RuleLoader;
 
 using ZeroAlloc.Inject;
+using ZeroAlloc.Results;
 
 namespace Ariadne.NET.RuleEngine;
 
 [Singleton]
 public sealed class RulePackMerger : IRulePackMerger
 {
-    public RulePack Merge(IReadOnlyList<RulePack> packs)
-    {
-        return MergeWithDiagnostics(packs).MergedPack;
-    }
-
-    public MergeResult MergeWithDiagnostics(IReadOnlyList<RulePack> packs)
+    public Result<RulePack, AriadneError> Merge(IReadOnlyList<RulePack> packs)
     {
         ArgumentNullException.ThrowIfNull(packs);
 
         if (packs.Count == 0)
         {
-            return new MergeResult
-            {
-                MergedPack = new RulePack { Name = "" },
-                Warnings = [],
-            };
+            return Result<RulePack, AriadneError>.Success(new RulePack { Name = "" });
         }
 
-        var warnings = new List<MergeWarning>();
-        var mergedName = string.Join("+", packs.Select(p => p.Name));
-        var mergedLayers = MergeLayers(packs);
-        var mergedRoles = MergeComponentRoles(packs);
-        var mergedFeatureRules = MergeCodeFeatureRules(packs, warnings);
-        var mergedNaming = packs[^1].NamingConventions;
+        var mergedName = string.Join("+", packs.Select(static p => p.Name));
+        var problems = new List<string>();
+        var layers = new Owned<LayerDefinition>();
+        var rules = new Owned<RuleDefinition>();
+        var featureRules = new Owned<CodeFeatureRuleDefinition>();
+        var roles = new Dictionary<string, ComponentRoleDefinition>(StringComparer.OrdinalIgnoreCase);
 
-        var mergedPack = new RulePack
+        for (var p = 0; p < packs.Count; p++)
         {
-            Name = mergedName,
-            Layers = mergedLayers,
-            ComponentRoles = mergedRoles,
-            CodeFeatureRules = mergedFeatureRules,
-            NamingConventions = mergedNaming,
-        };
+            var pack = packs[p];
 
-        return new MergeResult
-        {
-            MergedPack = mergedPack,
-            Warnings = warnings,
-        };
-    }
+            // Retargets and amendments see only what earlier packs defined.
+            ApplyRetargets(pack, layers, problems);
+            ApplyAmendments(pack, rules, problems);
 
-    private static IList<LayerDefinition> MergeLayers(IReadOnlyList<RulePack> packs)
-    {
-        var layerMap = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
-        var layerDescriptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            AddDefinitions(pack, p, layers, rules, problems);
 
-        foreach (var pack in packs)
-        {
-            foreach (var layer in pack.Layers)
-            {
-                if (!layerMap.TryGetValue(layer.Name, out var deps))
-                {
-                    deps = [];
-                    layerMap[layer.Name] = deps;
-                }
-
-                foreach (var dep in layer.AllowedDependencies)
-                {
-                    if (!deps.Contains(dep, StringComparer.OrdinalIgnoreCase))
-                    {
-                        deps.Add(dep);
-                    }
-                }
-
-                layerDescriptions[layer.Name] = layer.Description;
-            }
-        }
-
-        return layerMap.Select(kvp => new LayerDefinition
-        {
-            Name = kvp.Key,
-            Description = layerDescriptions[kvp.Key],
-            AllowedDependencies = kvp.Value,
-        }).ToList();
-    }
-
-    private static IList<ComponentRoleDefinition> MergeComponentRoles(IReadOnlyList<RulePack> packs)
-    {
-        var roleMap = new Dictionary<string, ComponentRoleDefinition>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var pack in packs)
-        {
             foreach (var role in pack.ComponentRoles)
             {
-                roleMap[role.Name] = role;
+                roles[role.Name] = role;
             }
+
+            MergeFeatureRules(pack, p, featureRules, problems);
         }
 
-        return roleMap.Values.ToList();
+        if (problems.Count > 0)
+        {
+            return Result<RulePack, AriadneError>.Failure(RulePackError.Invalid(mergedName, problems));
+        }
+
+        return Result<RulePack, AriadneError>.Success(new RulePack
+        {
+            Name = mergedName,
+            Schema = 2,
+            Layers = layers.Values(),
+            ComponentRoles = roles.Values.ToList(),
+            CodeFeatureRules = featureRules.Values(),
+            Rules = rules.Values(),
+            NamingConventions = packs[^1].NamingConventions,
+        });
     }
 
-    private static IList<CodeFeatureRuleDefinition> MergeCodeFeatureRules(
-        IReadOnlyList<RulePack> packs,
-        List<MergeWarning> warnings)
+    private static void AddDefinitions(
+        RulePack pack, int packIndex, Owned<LayerDefinition> layers, Owned<RuleDefinition> rules, List<string> problems)
     {
-        var ruleMap = new Dictionary<string, CodeFeatureRuleDefinition>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var pack in packs)
+        foreach (var layer in pack.Layers)
         {
-            foreach (var rule in pack.CodeFeatureRules)
+            if (layers.TryGet(layer.Name, out var existing) && existing.PackIndex != packIndex)
             {
-                if (ruleMap.TryGetValue(rule.Id, out var existing) && existing.Locked)
-                {
-                    warnings.Add(new MergeWarning(
-                        $"Rule '{rule.Id}' is locked and cannot be overridden by pack '{pack.Name}'."));
-                    continue;
-                }
-
-                ruleMap[rule.Id] = rule;
+                problems.Add($"packs '{existing.PackName}' and '{pack.Name}' both define layer '{layer.Name}'");
+                continue;
             }
+
+            layers.Add(layer.Name, layer, packIndex, pack.Name);
         }
 
-        return ruleMap.Values.ToList();
+        foreach (var rule in pack.Rules)
+        {
+            if (rules.TryGet(rule.Id, out var existing) && existing.PackIndex != packIndex)
+            {
+                problems.Add($"packs '{existing.PackName}' and '{pack.Name}' both define rule '{rule.Id}'");
+                continue;
+            }
+
+            rules.Add(rule.Id, rule, packIndex, pack.Name);
+        }
+    }
+
+    private static void ApplyRetargets(RulePack pack, Owned<LayerDefinition> layers, List<string> problems)
+    {
+        foreach (var retarget in pack.LayerRetargets)
+        {
+            if (!layers.TryGet(retarget.Name, out var target))
+            {
+                problems.Add($"pack '{pack.Name}' retargets layer '{retarget.Name}', which no extended pack defines");
+                continue;
+            }
+
+            var inherited = target.Item;
+            layers.Replace(retarget.Name, new LayerDefinition
+            {
+                Name = inherited.Name,
+                Id = inherited.Id,
+                Because = inherited.Because,
+                Description = inherited.Description,
+                AllowedDependencies = inherited.AllowedDependencies,
+                Namespaces = retarget.Namespaces,
+                Assemblies = retarget.Assemblies,
+            });
+        }
+    }
+
+    private static void ApplyAmendments(RulePack pack, Owned<RuleDefinition> rules, List<string> problems)
+    {
+        foreach (var amendment in pack.RuleAmendments)
+        {
+            if (!rules.TryGet(amendment.Id, out var target))
+            {
+                problems.Add($"pack '{pack.Name}' amends rule '{amendment.Id}', which no extended pack defines");
+                continue;
+            }
+
+            var inherited = target.Item;
+            if (inherited.Locked)
+            {
+                problems.Add($"rule '{inherited.Id}' from pack '{target.PackName}' is locked; pack '{pack.Name}' cannot add exceptions");
+                continue;
+            }
+
+            rules.Replace(amendment.Id, new RuleDefinition
+            {
+                Id = inherited.Id,
+                Because = inherited.Because,
+                Description = inherited.Description,
+                Kind = inherited.Kind,
+                From = inherited.From,
+                To = inherited.To,
+                Exceptions = [.. inherited.Exceptions, .. amendment.Exceptions],
+                Locked = inherited.Locked,
+            });
+        }
+    }
+
+    // Removed with CodeFeatureRuleDefinition in the next task; until then the last rule with an id wins, and a locked
+    // one from another pack cannot be overridden.
+    private static void MergeFeatureRules(
+        RulePack pack, int packIndex, Owned<CodeFeatureRuleDefinition> featureRules, List<string> problems)
+    {
+        foreach (var rule in pack.CodeFeatureRules)
+        {
+            if (featureRules.TryGet(rule.Id, out var existing) && existing.Item.Locked && existing.PackIndex != packIndex)
+            {
+                problems.Add($"rule '{rule.Id}' from pack '{existing.PackName}' is locked; pack '{pack.Name}' cannot override it");
+                continue;
+            }
+
+            featureRules.Set(rule.Id, rule, packIndex, pack.Name);
+        }
+    }
+
+    private sealed record Entry<T>(T Item, int PackIndex, string PackName);
+
+    /// <summary>Items by case-insensitive key, in first-defined order, each with the pack that defined it.</summary>
+    private sealed class Owned<T>
+    {
+        private readonly Dictionary<string, Entry<T>> _byKey = new(StringComparer.OrdinalIgnoreCase);
+        private readonly List<Entry<T>> _ordered = [];
+
+        public bool TryGet(string key, out Entry<T> entry) => _byKey.TryGetValue(key, out entry!);
+
+        public void Add(string key, T item, int packIndex, string packName)
+        {
+            var entry = new Entry<T>(item, packIndex, packName);
+            _ordered.Add(entry);
+            _byKey.TryAdd(key, entry);
+        }
+
+        public void Set(string key, T item, int packIndex, string packName)
+        {
+            if (!_byKey.TryGetValue(key, out var old))
+            {
+                Add(key, item, packIndex, packName);
+                return;
+            }
+
+            Swap(key, old, new Entry<T>(item, packIndex, packName));
+        }
+
+        // Keeps the defining pack: a retarget or amendment changes the item, not who owns it.
+        public void Replace(string key, T item)
+        {
+            var old = _byKey[key];
+            Swap(key, old, old with { Item = item });
+        }
+
+        public List<T> Values() => _ordered.Select(static e => e.Item).ToList();
+
+        private void Swap(string key, Entry<T> old, Entry<T> replacement)
+        {
+            _ordered[_ordered.IndexOf(old)] = replacement;
+            _byKey[key] = replacement;
+        }
     }
 }
