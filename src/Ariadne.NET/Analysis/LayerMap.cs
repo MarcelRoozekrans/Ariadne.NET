@@ -5,8 +5,10 @@ namespace Ariadne.NET.Analysis;
 
 /// <summary>
 /// Maps types to the layers of a rule pack by the layers' namespace and assembly selectors. One instance serves one
-/// single-threaded check, which may span several compilations: a symbol of one compilation never equals one of another,
-/// and equal symbols have the same names, so a cached layer is right for every project of the run.
+/// single-threaded check, which may span several compilations. Symbols of different compilations can compare equal, for
+/// instance when two projects reference a third through a compilation reference and share its source symbols, but a
+/// cached layer depends only on the type's namespace and assembly name, which equal symbols share, so it is right for
+/// every project of the run.
 /// </summary>
 internal sealed class LayerMap
 {
