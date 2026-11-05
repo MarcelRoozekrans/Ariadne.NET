@@ -72,7 +72,8 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Goal:** A versioned, strict schema with namespace and assembly selectors, `forbid` and `allowOnly` at layer, namespace and type level, per-rule exceptions and a required `because`, with the built-in packs, this repo's pack and every engine part that reads a pack migrated to it.
 **Surface:** Backend
 **HelpWanted:** no
-**Plan:** _to be written_
+**Design:** `docs/superpowers/specs/2026-11-05-phase-2.2-rule-schema-v2-design.md`
+**Plan:** `docs/superpowers/plans/2026-11-05-phase-2.2-rule-schema-v2.md`
 
 ### Phase 2.3: Enforce placement and code-feature rules [status: pending]
 **Note:** Consider ZeroAlloc.Specification for placement and code-feature matching.
