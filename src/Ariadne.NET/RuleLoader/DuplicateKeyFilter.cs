@@ -6,10 +6,15 @@ namespace Ariadne.NET.RuleLoader;
 /// <summary>
 /// Passes parser events through, but drops the second and later occurrence of a scalar key in a mapping together
 /// with its value, recording it by the mapping's start. The representation model would otherwise stop at the first
-/// duplicate with an exception and no other problem would be reported.
+/// duplicate with an exception and no other problem would be reported. It also stops a document that nests deeper
+/// than <see cref="MaxDepth"/>: the representation model builds its node tree recursively, and a stack overflow
+/// cannot be caught.
 /// </summary>
 internal sealed class DuplicateKeyFilter(IParser inner) : IParser
 {
+    /// <summary>The deepest nesting of mappings and sequences a pack may have, far above anything the schema allows.</summary>
+    public const int MaxDepth = 32;
+
     private readonly Stack<Frame> _frames = new();
 
     /// <summary>The repeated keys, by the start of the mapping that holds them.</summary>
@@ -89,10 +94,10 @@ internal sealed class DuplicateKeyFilter(IParser inner) : IParser
                 _frames.Clear();
                 break;
             case MappingStart mapping:
-                _frames.Push(new Frame(isMapping: true, mapping.Start));
+                Push(new Frame(isMapping: true, mapping.Start), mapping);
                 break;
             case SequenceStart sequence:
-                _frames.Push(new Frame(isMapping: false, sequence.Start));
+                Push(new Frame(isMapping: false, sequence.Start), sequence);
                 break;
             case MappingEnd or SequenceEnd:
                 _frames.Pop();
@@ -102,6 +107,16 @@ internal sealed class DuplicateKeyFilter(IParser inner) : IParser
                 Completed();
                 break;
         }
+    }
+
+    private void Push(Frame frame, ParsingEvent collection)
+    {
+        if (_frames.Count >= MaxDepth)
+        {
+            throw new YamlException(collection.Start, collection.End, $"the pack nests deeper than {MaxDepth} levels");
+        }
+
+        _frames.Push(frame);
     }
 
     // A node finished: in a mapping, a key is followed by its value and a value by the next key.

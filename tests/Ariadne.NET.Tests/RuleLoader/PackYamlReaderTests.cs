@@ -753,6 +753,73 @@ public class PackYamlReaderTests
     }
 
     [Fact]
+    public void DeepNesting_StopsAtTheLimit()
+    {
+        // The root mapping is level 1, so the 32nd '[' opens level 33; it sits at column 4 + 31.
+        var yaml = "schema: 2\nname: shop\nx: " + new string('[', 40) + new string(']', 40) + "\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(3, 35, "the pack nests deeper than 32 levels"));
+    }
+
+    [Fact]
+    public void VeryDeepNesting_IsAProblemNotACrash()
+    {
+        var yaml = "schema: 2\nname: shop\nx: " + new string('[', 200_000) + new string(']', 200_000) + "\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(3, 35, "the pack nests deeper than 32 levels"));
+    }
+
+    [Fact]
+    public void AliasExpansion_StopsAtTheBudget()
+    {
+        // 100 rules, each with 100 exceptions, each with 100 namespaces: a million entries from a few kilobytes.
+        const int k = 100;
+        var yaml = new System.Text.StringBuilder()
+            .Append("schema: 2\nname: shop\nrules:\n")
+            .Append("  - &r\n    id: R1\n    because: x\n    forbid: {from: {layers: [A]}, to: {layers: [B]}}\n")
+            .Append("    exceptions:\n      - &e\n        because: y\n        namespaces: [")
+            .AppendJoin(", ", Enumerable.Repeat("a", k))
+            .Append("]\n");
+        for (var i = 1; i < k; i++)
+        {
+            yaml.Append("      - *e\n");
+        }
+
+        for (var i = 1; i < k; i++)
+        {
+            yaml.Append("  - *r\n");
+        }
+
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var problems = Problems(yaml.ToString());
+        watch.Stop();
+
+        problems.Should().ContainSingle()
+            .Which.Message.Should().Be("the pack expands to more than 100000 entries");
+        problems[0].Line.Should().Be(11, "the budget runs out inside the aliased namespaces list");
+        watch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public void ProblemInANodeReachedTwiceByAlias_ReportedOnce()
+    {
+        var yaml = """
+            schema: 2
+            name: shop
+            layers:
+              - &core
+                name: Core
+                id: SH-CORE
+                because: x
+                namespaces: ["a..b"]
+              - *core
+            """;
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(8, 18, "'a..b' in layer 'Core' is not a valid pattern: pattern 'a..b' has an empty segment"));
+    }
+
+    [Fact]
     public void LayersEntryNotAMapping_Fails()
     {
         Problems("schema: 2\nname: shop\nlayers: [1]\n").Should().Equal(

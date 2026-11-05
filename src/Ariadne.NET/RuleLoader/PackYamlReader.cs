@@ -53,6 +53,12 @@ internal static class PackYamlReader
 
     private static readonly string TypeKindNames = string.Join(", ", Enum.GetNames<CSharpTypeKind>());
 
+    /// <summary>
+    /// The most entries one read visits, counting a node again each time an alias reaches it. Aliases may nest, so a few
+    /// kilobytes could otherwise expand to billions of entries.
+    /// </summary>
+    internal const int MaxEntries = 100_000;
+
     /// <summary>Reads one pack file.</summary>
     /// <param name="yaml">The file's text. A leading UTF-8 BOM is ignored; LF and CRLF give the same positions.</param>
     /// <returns>The pack, or every problem found, in document order.</returns>
@@ -117,6 +123,8 @@ internal static class PackYamlReader
     {
         private readonly List<PackProblem> _problems = [];
         private bool _hasExtends;
+        private int _visited;
+        private bool _exhausted;
 
         public Result<RulePack, IReadOnlyList<PackProblem>> Read(YamlStream stream)
         {
@@ -141,7 +149,8 @@ internal static class PackYamlReader
                 }
             }
 
-            PackProblem[] ordered = [.. _problems.OrderBy(p => p.Line).ThenBy(p => p.Column)];
+            // A node reached again through an alias reports the same problems again; each is kept once.
+            PackProblem[] ordered = [.. _problems.Distinct().OrderBy(p => p.Line).ThenBy(p => p.Column)];
             return Result<RulePack, IReadOnlyList<PackProblem>>.Failure(ordered);
         }
 
@@ -201,7 +210,7 @@ internal static class PackYamlReader
             var layers = new List<LayerDefinition>();
             var retargets = new List<LayerRetarget>();
             var items = Items(packFields, "layers", packWhere);
-            for (var i = 0; i < items.Count; i++)
+            for (var i = 0; i < items.Count && Visit(items[i]); i++)
             {
                 ReadLayer(items[i], i, layers, retargets);
             }
@@ -214,7 +223,7 @@ internal static class PackYamlReader
             var rules = new List<RuleDefinition>();
             var amendments = new List<RuleAmendment>();
             var items = Items(packFields, "rules", packWhere);
-            for (var i = 0; i < items.Count; i++)
+            for (var i = 0; i < items.Count && Visit(items[i]); i++)
             {
                 ReadRule(items[i], i, rules, amendments);
             }
@@ -226,7 +235,7 @@ internal static class PackYamlReader
         {
             var roles = new List<ComponentRoleDefinition>();
             var items = Items(packFields, "componentRoles", packWhere);
-            for (var i = 0; i < items.Count; i++)
+            for (var i = 0; i < items.Count && Visit(items[i]); i++)
             {
                 ReadRole(items[i], i, roles);
             }
@@ -406,7 +415,7 @@ internal static class PackYamlReader
         {
             var exceptions = new List<RuleException>();
             var items = Items(ruleFields, "exceptions", ruleWhere);
-            for (var i = 0; i < items.Count; i++)
+            for (var i = 0; i < items.Count && Visit(items[i]); i++)
             {
                 if (items[i] is not YamlMappingNode map)
                 {
@@ -527,6 +536,11 @@ internal static class PackYamlReader
             var fields = new Dictionary<string, Field>(StringComparer.Ordinal);
             foreach (var (keyNode, value) in mapping.Children)
             {
+                if (!Visit(keyNode))
+                {
+                    return fields;
+                }
+
                 if (keyNode is not YamlScalarNode { Value: { } key } scalar)
                 {
                     Add(keyNode, $"a key in {where} must be a string");
@@ -565,6 +579,11 @@ internal static class PackYamlReader
         // Repeats inside a mapping the walk never reached, such as one under an unknown key: never silently dropped.
         private void ReportUnvisitedDuplicates()
         {
+            if (_exhausted)
+            {
+                return;
+            }
+
             foreach (var seen in duplicates.Values)
             {
                 foreach (ref readonly var duplicate in CollectionsMarshal.AsSpan(seen))
@@ -644,6 +663,11 @@ internal static class PackYamlReader
                 var values = new List<string>(sequence.Children.Count);
                 foreach (var item in sequence.Children)
                 {
+                    if (!Visit(item))
+                    {
+                        return null;
+                    }
+
                     if (item is not YamlScalarNode scalar || IsNull(scalar) || scalar.Value is null)
                     {
                         values = null;
@@ -702,8 +726,32 @@ internal static class PackYamlReader
             return [];
         }
 
+        // Counts one visit. Once the budget is spent it reports that once, at this node, and the walk stops adding problems.
+        private bool Visit(YamlNode node)
+        {
+            if (_exhausted)
+            {
+                return false;
+            }
+
+            if (++_visited <= MaxEntries)
+            {
+                return true;
+            }
+
+            Add(node, $"the pack expands to more than {MaxEntries} entries");
+            _exhausted = true;
+            return false;
+        }
+
+        // Nothing is added once the budget is spent: what is left of the walk only sees a partial pack.
         private void Add(YamlNode node, string message)
         {
+            if (_exhausted)
+            {
+                return;
+            }
+
             var (line, column) = DuplicateKeyFilter.Position(node.Start);
             _problems.Add(new PackProblem(line, column, message));
         }
