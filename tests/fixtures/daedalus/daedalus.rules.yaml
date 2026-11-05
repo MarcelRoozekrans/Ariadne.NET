@@ -1,0 +1,57 @@
+schema: 2
+name: daedalus
+version: "1.0.0"
+author: platform-team
+extends:
+  - builtin://clean-architecture
+
+layers:
+  - name: Domain
+    assemblies: ["Daedalus.Domain"]
+  - name: Application
+    assemblies: ["Daedalus.Application"]
+  - name: Infrastructure
+    assemblies: ["Daedalus.Infrastructure"]
+  - name: WebApi
+    assemblies: ["Daedalus.Api"]
+  - name: Agents
+    id: DAE-LAYER-AGENTS
+    because: Agent code is isolated in its own layer, which only the composition root wires up.
+    namespaces: ["Daedalus.Agents.Runtime.**"]
+    description: "Agent implementations and retrieval"
+    allowedDependencies: []
+
+rules:
+  - id: DAE-NO-EFCORE-IN-DOMAIN
+    because: The domain stays free of persistence frameworks, so it can be tested and reused without a database.
+    forbid:
+      from:
+        layers: [Domain]
+      to:
+        namespaces: ["Microsoft.EntityFrameworkCore.**"]
+  - id: DAE-APP-NOT-ON-AGENTS
+    because: Use cases reach agents only through interfaces they own, so the application never depends on agent code.
+    forbid:
+      from:
+        layers: [Application]
+      to:
+        assemblies: ["Daedalus.Agents"]
+  - id: DAE-RAGNET-ONLY-IN-AGENTS
+    because: Retrieval stays inside the agents layer, so no other layer takes a dependency on Rag.NET.
+    allowOnly:
+      from:
+        layers: [Agents]
+      to:
+        assemblies: ["Rag.NET*"]
+  - id: DAE-SUBAGENT-RUNNER
+    because: Only the executor uses the subagent runner directly, and the registered composition code wires it.
+    allowOnly:
+      from:
+        types: ["Daedalus.Application.Agents.SubagentRunExecutor"]
+      to:
+        types: ["Daedalus.Application.Agents.ISubagentRunner"]
+    exceptions:
+      - types: ["Daedalus.Infrastructure.Agents.SubagentRunner"]
+        because: The runner implements the interface it serves.
+      - types: ["Daedalus.Api.Composition.AgentRegistration"]
+        because: The composition root creates and registers the runner.
