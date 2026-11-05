@@ -284,6 +284,61 @@ public class ArchitectureValidatorTests
     }
 
     [Fact]
+    public void OverlappedType_ReferencedByTwoOtherProjects_ReportedOnceWithLocation()
+    {
+        var references = TestCompilation.Create("class C { }").References.ToList();
+        var core = CSharpCompilation.Create(
+            "Core",
+            [CSharpSyntaxTree.ParseText("namespace Shop.Domain.Application { public class Order { } }", path: "Order.cs")],
+            references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        CSharpCompilation User(string name) => CSharpCompilation.Create(
+            name,
+            [CSharpSyntaxTree.ParseText($"namespace {name}.Web {{ public class Page {{ public Shop.Domain.Application.Order? Order; }} }}", path: $"{name}.cs")],
+            [.. references, core.ToMetadataReference()],
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
+
+        var report = _validator.Validate(Pack,
+        [
+            new AnalyzedProject("Core", null, core),
+            new AnalyzedProject("B", null, User("B")),
+            new AnalyzedProject("C", null, User("C")),
+        ]);
+
+        var v = report.Violations.Should().ContainSingle().Subject;
+        v.Kind.Should().Be(ViolationKind.LayerOverlap);
+        v.SourceType.Should().Be("Shop.Domain.Application.Order");
+        v.Location.Should().NotBeNull();
+        v.Location!.Value.FilePath.Should().Be("Order.cs");
+    }
+
+    [Fact]
+    public void OverlappedMetadataType_ReferencedByTwoProjects_ReportedOnce()
+    {
+        var references = TestCompilation.Create("class C { }").References.ToList();
+        var library = CSharpCompilation.Create(
+            "Library",
+            [CSharpSyntaxTree.ParseText("namespace Shop.Domain.Application { public class Order { } }")],
+            references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        CSharpCompilation User(string name) => CSharpCompilation.Create(
+            name,
+            [CSharpSyntaxTree.ParseText($"namespace {name}.Web {{ public class Page {{ public Shop.Domain.Application.Order? Order; }} }}", path: $"{name}.cs")],
+            [.. references, library.ToMetadataReference()],
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
+
+        var report = _validator.Validate(Pack,
+        [
+            new AnalyzedProject("B", null, User("B")),
+            new AnalyzedProject("C", null, User("C")),
+        ]);
+
+        var v = report.Violations.Should().ContainSingle().Subject;
+        v.Kind.Should().Be(ViolationKind.LayerOverlap);
+        v.Location.Should().BeNull();
+    }
+
+    [Fact]
     public void NullArguments_Throw()
     {
         var compilation = TestCompilation.Create("class C { }");

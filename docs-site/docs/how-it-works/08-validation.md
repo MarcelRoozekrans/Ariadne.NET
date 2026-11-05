@@ -63,7 +63,7 @@ A type's layer comes from the selectors of the pack's layers: a type belongs to 
 
 **Layer rule.** An edge between two layers is a violation when the target layer is not in the source layer's `allowedDependencies`. The check is open-world: an edge to a type that no layer covers is not checked. All edges from one source type to one target type make one violation, located at the first reference, with a count of the references. It carries the source layer's `id` and `because`.
 
-**Layer overlap.** A type that two or more layers cover is reported once, as `LayerOverlap`, with the covering layers named in the message. Source types are located at their declaration. A metadata type is reported once, without a location, when it is the target of a checked edge. It fails `validate` like any other violation.
+**Layer overlap.** A type that two or more layers cover is reported once, as `LayerOverlap`, with the covering layers named in the message. Source types are located at their declaration. A metadata type is reported once, without a location, when it is the target of a checked edge. Once means once per run: a source type that other analysed projects reference is reported only at its declaration, and a metadata type that several projects reference is reported a single time. It fails `validate` like any other violation.
 
 **Forbid rules.** A `forbid` rule is violated by an edge from a type in `from` to a type in `to`, unless an exception matches the source type. The `from` and `to` targets are layers, or selectors over namespaces, assemblies and types. The rule applies whether or not the two types are in the same layer. One violation per rule, source type and target type, located at the first reference, with a count. Kind `ForbiddenDependency`.
 

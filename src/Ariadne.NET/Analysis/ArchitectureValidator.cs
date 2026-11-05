@@ -48,6 +48,30 @@ public sealed class ArchitectureValidator : IArchitectureValidator
 
         AddMissingInterfaceViolations(entries, resolvedPack);
 
+        var ordered = GroupByProject(entries);
+        var allViolations = new List<ArchitectureViolation>();
+        var checkedProjects = new List<CheckedProject>(ordered.Count);
+        var typesChecked = 0;
+        foreach (ref readonly var group in CollectionsMarshal.AsSpan(ordered))
+        {
+            group.AddMergedViolations(allViolations);
+            checkedProjects.Add(new CheckedProject(group.Name, group.TargetFrameworks()));
+            typesChecked += group.TypesChecked;
+        }
+
+        KeepOneOverlapPerType(allViolations);
+        allViolations.Sort(CompareViolations);
+        return new ArchitectureReport
+        {
+            Violations = allViolations,
+            Projects = checkedProjects,
+            TypesChecked = typesChecked,
+        };
+    }
+
+    // The entries of each project, in the order the projects first appear.
+    private static List<ProjectGroup> GroupByProject(List<Entry> entries)
+    {
         var groups = new Dictionary<string, ProjectGroup>(StringComparer.Ordinal);
         var ordered = new List<ProjectGroup>();
         foreach (ref readonly var entry in CollectionsMarshal.AsSpan(entries))
@@ -62,23 +86,38 @@ public sealed class ArchitectureValidator : IArchitectureValidator
             group.Add(entry);
         }
 
-        var allViolations = new List<ArchitectureViolation>();
-        var checkedProjects = new List<CheckedProject>(ordered.Count);
-        var typesChecked = 0;
-        foreach (ref readonly var group in CollectionsMarshal.AsSpan(ordered))
+        return ordered;
+    }
+
+    // A type that several layers cover is found where it is declared, with its location, and again as a target in every
+    // project that references it, without one. It is one problem: an unlocated overlap is dropped when the run holds a
+    // located one for the same type, and kept once otherwise.
+    private static void KeepOneOverlapPerType(List<ArchitectureViolation> violations)
+    {
+        var located = new HashSet<string>(StringComparer.Ordinal);
+        foreach (ref readonly var violation in CollectionsMarshal.AsSpan(violations))
         {
-            group.AddMergedViolations(allViolations);
-            checkedProjects.Add(new CheckedProject(group.Name, group.TargetFrameworks()));
-            typesChecked += group.TypesChecked;
+            if (violation is { Kind: ViolationKind.LayerOverlap, Location: not null })
+            {
+                located.Add(violation.SourceType);
+            }
         }
 
-        allViolations.Sort(CompareViolations);
-        return new ArchitectureReport
+        var unlocated = new HashSet<string>(StringComparer.Ordinal);
+        var kept = 0;
+        for (var i = 0; i < violations.Count; i++)
         {
-            Violations = allViolations,
-            Projects = checkedProjects,
-            TypesChecked = typesChecked,
-        };
+            var violation = violations[i];
+            if (violation is { Kind: ViolationKind.LayerOverlap, Location: null }
+                && (located.Contains(violation.SourceType) || !unlocated.Add(violation.SourceType)))
+            {
+                continue;
+            }
+
+            violations[kept++] = violation;
+        }
+
+        violations.RemoveRange(kept, violations.Count - kept);
     }
 
     // A violation found only in a null slot could not be told apart from one found everywhere, so a project is all null or all named.
