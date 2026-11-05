@@ -19,7 +19,7 @@ internal static class PackText
     /// <returns>The text to put in the message.</returns>
     public static string Show(string? value) => Format(value ?? string.Empty, MaxLength);
 
-    /// <summary>The text escaped but not cut, for a message the YAML parser wrote around pack text.</summary>
+    /// <summary>The text escaped but not cut, for a message that is already bounded but may quote pack text.</summary>
     /// <param name="value">The message.</param>
     /// <returns>The escaped message.</returns>
     public static string Escape(string value) => Format(value, int.MaxValue);
@@ -32,9 +32,14 @@ internal static class PackText
         }
 
         var builder = new StringBuilder(value.Length + Cut.Length);
-        foreach (var c in value)
+        for (var i = 0; i < value.Length; i++)
         {
-            if (IsUnsafe(c))
+            var c = value[i];
+            if (IsPair(value, i))
+            {
+                builder.Append(c).Append(value[++i]);
+            }
+            else if (IsUnsafe(c))
             {
                 builder.Append("\\u").Append(((int)c).ToString("x4", CultureInfo.InvariantCulture));
             }
@@ -60,9 +65,13 @@ internal static class PackText
 
     private static bool NeedsEscape(string value)
     {
-        foreach (var c in value)
+        for (var i = 0; i < value.Length; i++)
         {
-            if (IsUnsafe(c))
+            if (IsPair(value, i))
+            {
+                i++;
+            }
+            else if (IsUnsafe(value[i]))
             {
                 return true;
             }
@@ -71,8 +80,14 @@ internal static class PackText
         return false;
     }
 
+    // A high surrogate followed by a low one is one character, such as an emoji, and is shown as is.
+    private static bool IsPair(string value, int index) =>
+        char.IsHighSurrogate(value[index]) && index + 1 < value.Length && char.IsLowSurrogate(value[index + 1]);
+
     // Control characters move the cursor or start escape sequences; format characters such as a right-to-left override
-    // reorder what the reader sees.
+    // reorder what the reader sees; line and paragraph separators break lines; a lone surrogate is not text at all.
     private static bool IsUnsafe(char c) =>
-        char.IsControl(c) || CharUnicodeInfo.GetUnicodeCategory(c) == UnicodeCategory.Format;
+        char.IsControl(c)
+        || char.IsSurrogate(c)
+        || CharUnicodeInfo.GetUnicodeCategory(c) is UnicodeCategory.Format or UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator;
 }

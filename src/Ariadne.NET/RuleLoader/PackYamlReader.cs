@@ -77,7 +77,8 @@ internal static class PackYamlReader
         catch (YamlException ex)
         {
             var (line, column) = DuplicateKeyFilter.Position(ex.Start);
-            return Result<RulePack, IReadOnlyList<PackProblem>>.Failure([new PackProblem(line, column, PackText.Escape(ex.Message))]);
+            // The parser's message may quote pack text, such as an anchor name, so it is shown like pack text.
+            return Result<RulePack, IReadOnlyList<PackProblem>>.Failure([new PackProblem(line, column, PackText.Show(ex.Message))]);
         }
 
         return new Walk(parser.Duplicates).Read(stream);

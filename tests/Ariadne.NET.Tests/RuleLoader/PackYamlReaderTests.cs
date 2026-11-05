@@ -642,6 +642,16 @@ public class PackYamlReaderTests
     }
 
     [Fact]
+    public void UnknownAlias_WithAVeryLongName_GivesABoundedMessage()
+    {
+        var anchor = new string('a', 5_000);
+
+        var problem = Problems($"schema: 2\nname: *{anchor}\n").Should().ContainSingle().Subject;
+
+        problem.Message.Should().Be("The anchor '" + new string('a', 68) + "...");
+    }
+
+    [Fact]
     public void CrlfAndBom_SamePositionsAsLf()
     {
         var lf = string.Join('\n', (string[])[
