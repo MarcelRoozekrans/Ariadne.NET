@@ -140,7 +140,6 @@ public sealed class WorkspaceIntegrationTests : IDisposable
         });
 
         generateResult.Success.Should().BeTrue();
-        WriteGeneratedFiles(generateResult);
 
         AssertConformsToPack(pack, generateResult);
     }

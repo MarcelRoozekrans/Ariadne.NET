@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A pattern-agnostic architecture governance engine for .NET. Architecture patterns (clean, hexagonal, CQRS, …) are declarative YAML **rule packs**; the engine resolves and merges them, then uses them to generate correctly placed C# components (Roslyn) and to validate existing solutions (semantic type graph) and lint existing source. Core principle: *AI generates behavior, the engine governs structure.*
+A pattern-agnostic architecture governance engine for .NET. Architecture patterns (clean, hexagonal, CQRS, …) are declarative YAML **rule packs**; the engine resolves and merges them, then uses them to generate correctly placed C# components (Roslyn) and to validate existing solutions (semantic type graph). Core principle: *AI generates behavior, the engine governs structure.*
 
 ## Commands
 
@@ -20,7 +20,7 @@ dotnet test src/Ariadne.NET.slnx --filter "FullyQualifiedName~RulePackMergerTest
 dotnet test src/Ariadne.NET.slnx --filter "FullyQualifiedName=Ariadne.NET.Tests.RuleEngine.RulePackMergerTests.<Method>"
 
 # Run hosts
-dotnet run --project src/Ariadne.NET.Cli -- <init|rules|roles|generate|validate|lint|sync> [...]   # validate takes a .sln, .slnx, .slnf or .csproj, default .
+dotnet run --project src/Ariadne.NET.Cli -- <init|rules|roles|generate|validate|sync> [...]   # validate takes a .sln, .slnx, .slnf or .csproj, default .
 dotnet run --project src/Ariadne.NET.Mcp        # MCP over stdio
 dotnet run --project src/Ariadne.NET.Mcp.Http   # MCP over HTTP at /mcp
 
@@ -46,7 +46,7 @@ CI (`.github/workflows/ci.yml`) builds and tests on ubuntu and windows, with a c
 
 ### Pipeline
 
-`RulePackResolver` → `RulePackMerger` → `LayerInferenceEngine` → `CodeGeneratorService`, wired by `GenerateOrchestrator` (components) and `WorkspaceOrchestrator` (solution scaffolding). Validation is a separate path: `ISolutionValidator` (Workspaces) loads the projects, then `IArchitectureValidator` (`Analysis/`) builds a `TypeGraph` per compilation, one edge per type reference somebody wrote, and checks it with `LayerRules` and `RoleRules`. `var` and unused usings give no edge, generated code is never a source, and a project is checked once per target framework. A layer violation is one per source and target type, with the layer id (or the joined ids for an overlap) or `role/<Role>` as rule id. `Validation/` holds only `Linter`, which parses files and checks namespaces against directory layers. `docs/perf/phase-2.1-baseline.md` holds the load and check baseline from `tools/perf`.
+`RulePackResolver` → `RulePackMerger` → `LayerInferenceEngine` → `CodeGeneratorService`, wired by `GenerateOrchestrator` (components) and `WorkspaceOrchestrator` (solution scaffolding). Validation is a separate path: `ISolutionValidator` (Workspaces) loads the projects, then `IArchitectureValidator` (`Analysis/`) builds a `TypeGraph` per compilation, one edge per type reference somebody wrote, and checks it with `LayerRules` and `RoleRules`. `var` and unused usings give no edge, generated code is never a source, and a project is checked once per target framework. A layer violation is one per source and target type, with the layer id (or the joined ids for an overlap) or `role/<Role>` as rule id. `docs/perf/phase-2.1-baseline.md` holds the load and check baseline from `tools/perf`.
 
 - **Resolution:** a user pack (usually `.architecture/rules.yaml`) lists `extends:` references. `builtin://<name>` loads an embedded pack from `src/Ariadne.NET/BuiltinPacks/*.yaml` (registered via `EmbeddedResource`; adding a YAML file there adds a template). `import://<name>` loads from `.architecture/.cache/git/<name>/` and requires a working directory — populated by `ariadne sync` from `.architecture/imports.yaml` (`Sync/`: git CLI provider, semver tag ranges). Anything else is an `Invalid` Result. The user pack is merged last.
 - **Validation:** at load, each pack's member rules run through the five `*Validator` types that ZeroAlloc.Validation generates in Abstractions: non-empty names, layers and ids, a defined `typeKind`, no null list entries. After every resolve, `RulePackReferenceCheck` checks cross-references on the merged pack: duplicate layer or role names, unknown layers in `allowedDependencies`, a role's unknown layer, an unknown `interfaceRole`. Both report `Rule pack '{name}' is invalid.` with one `path: reason` line per failure as Detail, built by `RulePackError`. A role-only pack (`cqrs`, `ddd-tactical`) has no layers and resolves on its own, but should be combined with a base pack that declares the layers its roles name; when the merged pack declares at least one layer, a role naming an undeclared layer is an `Invalid` error.
@@ -75,7 +75,7 @@ Expected failures are values, not exceptions. The loader, resolver, registry, `T
 - String-keyed dictionaries and string comparisons need an explicit `StringComparer`/`StringComparison` (MA0002 etc.); the engine uses `OrdinalIgnoreCase` for names.
 - One type per file (MA0048) — this is why records/enums each have their own file.
 - `ConfigureAwait(false)` on awaits.
-- Tests: xUnit + FluentAssertions (+ NSubstitute in `Ariadne.NET.Tests`). Test folders mirror the source namespaces (Abstractions types are tested under `tests/Ariadne.NET.Tests/Abstractions/`, the validator under `Analysis/`, and `Validation/` holds only the linter tests); `tests/Ariadne.NET.Workspaces.Tests` loads the fixture solutions in `tests/fixtures`; MCP tool tests construct the real services directly rather than via DI.
+- Tests: xUnit + FluentAssertions (+ NSubstitute in `Ariadne.NET.Tests`). Test folders mirror the source namespaces (Abstractions types are tested under `tests/Ariadne.NET.Tests/Abstractions/`, the validator under `Analysis/`); `tests/Ariadne.NET.Workspaces.Tests` loads the fixture solutions in `tests/fixtures`; MCP tool tests construct the real services directly rather than via DI.
 
 ## Docs
 
