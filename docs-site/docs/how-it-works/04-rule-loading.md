@@ -25,6 +25,9 @@ IRulePackLoader
 - `schema: 2` and `name` are required; each layer, rule and exception has its own required keys (see [Rule Schema](03-rule-schema.md))
 - values must have the right type, selectors must hold at least one value, and every glob must compile
 - a leading byte order mark is ignored, and LF and CRLF files give the same positions
+- anchors and aliases resolve; a problem in a node that several aliases reach is listed once
+
+**Limits.** A pack may nest mappings and sequences at most 32 levels deep, counting the top-level mapping as one; deeper nesting is one problem, "the pack nests deeper than 32 levels", at the collection that crosses the limit. One read visits at most 100,000 entries, and a node reached again through an alias counts again; a pack that expands beyond that is one problem, "the pack expands to more than 100000 entries", at the entry where the budget ran out, and reading stops there. Both limits sit far above any real pack and keep a hostile pack from exhausting the stack or memory. Text from the pack that a message quotes, such as a key, a name or a pattern, is cut to 80 characters with `...`, and control characters in it are shown escaped, such as `\u001b`.
 
 **Failures** come back as an `AriadneError`, never as an exception. `LoadFromFile` names the file in the message:
 - malformed YAML: `Invalid`, one problem at the parser's position
