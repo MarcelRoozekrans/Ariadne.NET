@@ -3,12 +3,17 @@ using Microsoft.CodeAnalysis;
 
 namespace Ariadne.NET.Analysis;
 
-/// <summary>Tests whether a type is selected by a rule target: a list of layers, or a namespace, assembly and type selector.</summary>
+/// <summary>
+/// Tests whether a type is selected by a rule target: a list of layers, or a namespace, assembly and type selector. The
+/// answer is cached per symbol, so a type that many edges touch is matched once. Like the layer map it uses, one instance
+/// serves one single-threaded check.
+/// </summary>
 internal sealed class TargetMatcher
 {
     private readonly LayerMap _layerMap;
     private readonly HashSet<string> _layers;
     private readonly TypeSelector _selector;
+    private readonly Dictionary<INamedTypeSymbol, bool> _cache = new(SymbolEqualityComparer.Default);
 
     private TargetMatcher(LayerMap layerMap, HashSet<string> layers, TypeSelector selector)
     {
@@ -45,11 +50,13 @@ internal sealed class TargetMatcher
     {
         ArgumentNullException.ThrowIfNull(type);
 
-        if (_layers.Count > 0 && _layerMap.LayerOf(type) is { } layer && _layers.Contains(layer))
+        if (!_cache.TryGetValue(type, out var matches))
         {
-            return true;
+            matches = (_layers.Count > 0 && _layerMap.LayerOf(type) is { } layer && _layers.Contains(layer))
+                || (!_selector.IsEmpty && _selector.Matches(type, _layerMap.Names));
+            _cache.Add(type, matches);
         }
 
-        return !_selector.IsEmpty && _selector.Matches(type);
+        return matches;
     }
 }

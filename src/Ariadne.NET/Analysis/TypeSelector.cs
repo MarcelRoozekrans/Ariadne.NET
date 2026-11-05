@@ -42,12 +42,14 @@ internal sealed class TypeSelector
 
     /// <summary>Whether the type satisfies every non-empty list. Ordinal and case-sensitive.</summary>
     /// <param name="type">The type to test.</param>
+    /// <param name="names">The names of the check, so each type's namespace and full name are built once.</param>
     /// <returns>True when the type is selected.</returns>
-    public bool Matches(INamedTypeSymbol type)
+    public bool Matches(INamedTypeSymbol type, TypeNames names)
     {
         ArgumentNullException.ThrowIfNull(type);
+        ArgumentNullException.ThrowIfNull(names);
 
-        if (_namespaces.Length > 0 && !AnyMatch(_namespaces, type.ContainingNamespace is { IsGlobalNamespace: false } ns ? ns.ToDisplayString() : string.Empty))
+        if (_namespaces.Length > 0 && !AnyMatch(_namespaces, names.NamespaceOf(type)))
         {
             return false;
         }
@@ -57,7 +59,7 @@ internal sealed class TypeSelector
             return false;
         }
 
-        return _types.Length == 0 || AnyMatch(_types, FullName(type));
+        return _types.Length == 0 || AnyMatch(_types, names.FullNameOf(type));
     }
 
     private static Glob[] Compile(IList<string> patterns, Func<string, ZeroAlloc.Results.Result<Glob, string>> compile)
@@ -88,14 +90,5 @@ internal sealed class TypeSelector
         }
 
         return false;
-    }
-
-    // Namespace, containing types and Name joined with dots. Name carries no arity, so Foo<T> is Foo.
-    private static string FullName(INamedTypeSymbol type)
-    {
-        var prefix = type.ContainingType is { } outer
-            ? FullName(outer)
-            : type.ContainingNamespace is { IsGlobalNamespace: false } ns ? ns.ToDisplayString() : string.Empty;
-        return prefix.Length == 0 ? type.Name : string.Concat(prefix, ".", type.Name);
     }
 }

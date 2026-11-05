@@ -25,10 +25,11 @@ public sealed class ArchitectureValidator : IArchitectureValidator
 
         RejectMixedTargetFrameworks(projects);
 
-        // The matchers depend on the pack only, so one set serves every project.
-        var ruleLayers = new LayerMap(resolvedPack);
-        var forbid = ForbidRules.Compile(ruleLayers, resolvedPack);
-        var allowOnly = AllowOnlyRules.Compile(ruleLayers, resolvedPack);
+        // The layer map and the matchers depend on the pack only, so one set serves every project, and a type's layer,
+        // names and matches are worked out once per run.
+        var layers = new LayerMap(resolvedPack);
+        var forbid = ForbidRules.Compile(layers, resolvedPack);
+        var allowOnly = AllowOnlyRules.Compile(layers, resolvedPack);
 
         var entries = new List<Entry>(projects.Count);
         foreach (var project in projects)
@@ -37,7 +38,6 @@ public sealed class ArchitectureValidator : IArchitectureValidator
             cancellationToken.ThrowIfCancellationRequested();
 
             var graph = TypeGraphBuilder.Build(project.Compilation, project.GeneratedTrees, cancellationToken);
-            var layers = new LayerMap(resolvedPack);
             var violations = new List<ArchitectureViolation>(LayerRules.Check(graph, layers, resolvedPack));
             violations.AddRange(forbid.Check(graph));
             violations.AddRange(allowOnly.Check(graph));

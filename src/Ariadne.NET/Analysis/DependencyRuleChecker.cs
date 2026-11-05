@@ -82,7 +82,7 @@ internal sealed class DependencyRuleChecker
             exceptions[i] = TypeSelector.From(exception.Namespaces, exception.Assemblies, exception.Types);
         }
 
-        return new Compiled(rule, TargetMatcher.From(rule.From, layers), TargetMatcher.From(rule.To, layers), exceptions);
+        return new Compiled(rule, TargetMatcher.From(rule.From, layers), TargetMatcher.From(rule.To, layers), exceptions, layers.Names);
     }
 
     private static ArchitectureViolation ToViolation(Pair pair)
@@ -108,8 +108,11 @@ internal sealed class DependencyRuleChecker
         };
     }
 
-    private sealed class Compiled(RuleDefinition rule, TargetMatcher from, TargetMatcher to, TypeSelector[] exceptions)
+    private sealed class Compiled(RuleDefinition rule, TargetMatcher from, TargetMatcher to, TypeSelector[] exceptions, TypeNames names)
     {
+        // Whether an exception covers a source type, cached per symbol: a violating type is usually seen on many edges.
+        private readonly Dictionary<INamedTypeSymbol, bool> _excepted = new(SymbolEqualityComparer.Default);
+
         public RuleDefinition Rule { get; } = rule;
 
         public bool Violates(in TypeEdge edge)
@@ -127,15 +130,32 @@ internal sealed class DependencyRuleChecker
                 return false;
             }
 
-            foreach (var exception in exceptions)
+            return !IsExcepted(edge.Source);
+        }
+
+        private bool IsExcepted(INamedTypeSymbol source)
+        {
+            if (exceptions.Length == 0)
             {
-                if (exception.Matches(edge.Source))
-                {
-                    return false;
-                }
+                return false;
             }
 
-            return true;
+            if (!_excepted.TryGetValue(source, out var excepted))
+            {
+                excepted = false;
+                foreach (var exception in exceptions)
+                {
+                    if (exception.Matches(source, names))
+                    {
+                        excepted = true;
+                        break;
+                    }
+                }
+
+                _excepted.Add(source, excepted);
+            }
+
+            return excepted;
         }
     }
 

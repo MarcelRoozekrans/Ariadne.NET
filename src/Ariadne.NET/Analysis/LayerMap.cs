@@ -3,13 +3,20 @@ using Microsoft.CodeAnalysis;
 
 namespace Ariadne.NET.Analysis;
 
-/// <summary>Maps types to the layers of a rule pack by the layers' namespace and assembly selectors. One instance serves one single-threaded check.</summary>
+/// <summary>
+/// Maps types to the layers of a rule pack by the layers' namespace and assembly selectors. One instance serves one
+/// single-threaded check, which may span several compilations: a symbol of one compilation never equals one of another,
+/// and equal symbols have the same names, so a cached layer is right for every project of the run.
+/// </summary>
 internal sealed class LayerMap
 {
     private static readonly IReadOnlyList<string> NoLayers = [];
 
     private readonly (string Name, TypeSelector Selector)[] _layers;
     private readonly Dictionary<ISymbol, IReadOnlyList<string>> _cache = new(SymbolEqualityComparer.Default);
+
+    /// <summary>The type names of the check, shared with the rule selectors that use this map.</summary>
+    public TypeNames Names { get; } = new();
 
     /// <summary>Compiles the selector of every layer once. A layer without namespaces and assemblies selects nothing.</summary>
     /// <param name="pack">The pack whose layers to map to.</param>
@@ -54,7 +61,7 @@ internal sealed class LayerMap
         List<string>? matches = null;
         foreach (var (name, selector) in _layers)
         {
-            if (selector.Matches(type))
+            if (selector.Matches(type, Names))
             {
                 (matches ??= []).Add(name);
             }

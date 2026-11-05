@@ -17,8 +17,8 @@ public class TypeSelectorTests
         var compilation = TestCompilation.Create("namespace Shop.Domain.Orders { public class Order { } }");
         var order = Find(compilation, "Shop.Domain.Orders.Order");
 
-        TypeSelector.From(["**.Domain.**"], [], []).Matches(order).Should().BeTrue();
-        TypeSelector.From(["**.Infrastructure.**"], [], []).Matches(order).Should().BeFalse();
+        TypeSelector.From(["**.Domain.**"], [], []).Matches(order, new TypeNames()).Should().BeTrue();
+        TypeSelector.From(["**.Infrastructure.**"], [], []).Matches(order, new TypeNames()).Should().BeFalse();
     }
 
     [Fact]
@@ -27,8 +27,8 @@ public class TypeSelectorTests
         var compilation = TestCompilation.Create("namespace N { public class A { } }");
         var a = Find(compilation, "N.A");
 
-        TypeSelector.From([], ["TestAssembly"], []).Matches(a).Should().BeTrue();
-        TypeSelector.From([], ["Other*"], []).Matches(a).Should().BeFalse();
+        TypeSelector.From([], ["TestAssembly"], []).Matches(a, new TypeNames()).Should().BeTrue();
+        TypeSelector.From([], ["Other*"], []).Matches(a, new TypeNames()).Should().BeFalse();
     }
 
     [Fact]
@@ -37,8 +37,8 @@ public class TypeSelectorTests
         var compilation = TestCompilation.Create("namespace N { public class Foo<T> { } }");
         var foo = Find(compilation, "N.Foo`1");
 
-        TypeSelector.From([], [], ["N.Foo"]).Matches(foo).Should().BeTrue();
-        TypeSelector.From([], [], ["N.Foo`1"]).Matches(foo).Should().BeFalse();
+        TypeSelector.From([], [], ["N.Foo"]).Matches(foo, new TypeNames()).Should().BeTrue();
+        TypeSelector.From([], [], ["N.Foo`1"]).Matches(foo, new TypeNames()).Should().BeFalse();
     }
 
     [Fact]
@@ -47,9 +47,9 @@ public class TypeSelectorTests
         var compilation = TestCompilation.Create("public class Outer { public class Inner { } }");
         var inner = Find(compilation, "Outer+Inner");
 
-        TypeSelector.From([], [], ["Outer.Inner"]).Matches(inner).Should().BeTrue();
-        TypeSelector.From([], [], ["**.Inner"]).Matches(inner).Should().BeTrue();
-        TypeSelector.From([], [], ["Inner"]).Matches(inner).Should().BeFalse();
+        TypeSelector.From([], [], ["Outer.Inner"]).Matches(inner, new TypeNames()).Should().BeTrue();
+        TypeSelector.From([], [], ["**.Inner"]).Matches(inner, new TypeNames()).Should().BeTrue();
+        TypeSelector.From([], [], ["Inner"]).Matches(inner, new TypeNames()).Should().BeFalse();
     }
 
     [Fact]
@@ -58,8 +58,8 @@ public class TypeSelectorTests
         var compilation = TestCompilation.Create("namespace N { public class Outer { public class Inner { } } }");
         var inner = Find(compilation, "N.Outer+Inner");
 
-        TypeSelector.From([], [], ["N.Outer.Inner"]).Matches(inner).Should().BeTrue();
-        TypeSelector.From([], [], ["N.Inner"]).Matches(inner).Should().BeFalse();
+        TypeSelector.From([], [], ["N.Outer.Inner"]).Matches(inner, new TypeNames()).Should().BeTrue();
+        TypeSelector.From([], [], ["N.Inner"]).Matches(inner, new TypeNames()).Should().BeFalse();
     }
 
     [Fact]
@@ -68,10 +68,10 @@ public class TypeSelectorTests
         var compilation = TestCompilation.Create("public class Loose { }");
         var loose = Find(compilation, "Loose");
 
-        TypeSelector.From(["**"], [], []).Matches(loose).Should().BeTrue();
-        TypeSelector.From(["*"], [], []).Matches(loose).Should().BeFalse();
-        TypeSelector.From(["Shop"], [], []).Matches(loose).Should().BeFalse();
-        TypeSelector.From([], [], ["Loose"]).Matches(loose).Should().BeTrue();
+        TypeSelector.From(["**"], [], []).Matches(loose, new TypeNames()).Should().BeTrue();
+        TypeSelector.From(["*"], [], []).Matches(loose, new TypeNames()).Should().BeFalse();
+        TypeSelector.From(["Shop"], [], []).Matches(loose, new TypeNames()).Should().BeFalse();
+        TypeSelector.From([], [], ["Loose"]).Matches(loose, new TypeNames()).Should().BeTrue();
     }
 
     [Fact]
@@ -80,9 +80,9 @@ public class TypeSelectorTests
         var compilation = TestCompilation.Create("namespace Shop.Domain { public class A { } }");
         var a = Find(compilation, "Shop.Domain.A");
 
-        TypeSelector.From(["Shop.**"], ["TestAssembly"], []).Matches(a).Should().BeTrue();
-        TypeSelector.From(["Shop.**"], ["Other"], []).Matches(a).Should().BeFalse();
-        TypeSelector.From(["Other.**"], ["TestAssembly"], []).Matches(a).Should().BeFalse();
+        TypeSelector.From(["Shop.**"], ["TestAssembly"], []).Matches(a, new TypeNames()).Should().BeTrue();
+        TypeSelector.From(["Shop.**"], ["Other"], []).Matches(a, new TypeNames()).Should().BeFalse();
+        TypeSelector.From(["Other.**"], ["TestAssembly"], []).Matches(a, new TypeNames()).Should().BeFalse();
     }
 
     [Fact]
@@ -91,7 +91,7 @@ public class TypeSelectorTests
         var compilation = TestCompilation.Create("namespace Shop.Domain { public class A { } }");
         var a = Find(compilation, "Shop.Domain.A");
 
-        TypeSelector.From(["Other", "Shop.Domain"], [], []).Matches(a).Should().BeTrue();
+        TypeSelector.From(["Other", "Shop.Domain"], [], []).Matches(a, new TypeNames()).Should().BeTrue();
     }
 
     [Fact]
@@ -99,7 +99,7 @@ public class TypeSelectorTests
     {
         var compilation = TestCompilation.Create("namespace N { public class A { } }");
 
-        TypeSelector.From([], [], []).Matches(Find(compilation, "N.A")).Should().BeTrue();
+        TypeSelector.From([], [], []).Matches(Find(compilation, "N.A"), new TypeNames()).Should().BeTrue();
     }
 
     [Fact]
@@ -114,7 +114,7 @@ public class TypeSelectorTests
     public void NullArguments_Throw()
     {
         ((Action)(() => TypeSelector.From(null!, [], []))).Should().Throw<ArgumentNullException>();
-        ((Action)(() => TypeSelector.From([], [], []).Matches(null!))).Should().Throw<ArgumentNullException>();
+        ((Action)(() => TypeSelector.From([], [], []).Matches(null!, new TypeNames()))).Should().Throw<ArgumentNullException>();
     }
 
     [Fact]
@@ -122,7 +122,7 @@ public class TypeSelectorTests
     {
         var a = Find(TestCompilation.Create("namespace N { public class A { } }"), "N.A");
 
-        TypeSelector.From([], ["Other", "TestAssembly"], []).Matches(a).Should().BeTrue();
+        TypeSelector.From([], ["Other", "TestAssembly"], []).Matches(a, new TypeNames()).Should().BeTrue();
     }
 
     [Fact]
@@ -130,7 +130,7 @@ public class TypeSelectorTests
     {
         var a = Find(TestCompilation.Create("namespace N { public class A { } }"), "N.A");
 
-        TypeSelector.From([], [], ["N.B", "N.A"]).Matches(a).Should().BeTrue();
+        TypeSelector.From([], [], ["N.B", "N.A"]).Matches(a, new TypeNames()).Should().BeTrue();
     }
 
     [Fact]
@@ -138,9 +138,9 @@ public class TypeSelectorTests
     {
         var a = Find(TestCompilation.Create("namespace Shop.Domain { public class A { } }"), "Shop.Domain.A");
 
-        TypeSelector.From(["shop.domain"], [], []).Matches(a).Should().BeFalse();
-        TypeSelector.From([], ["testassembly"], []).Matches(a).Should().BeFalse();
-        TypeSelector.From([], [], ["shop.domain.a"]).Matches(a).Should().BeFalse();
+        TypeSelector.From(["shop.domain"], [], []).Matches(a, new TypeNames()).Should().BeFalse();
+        TypeSelector.From([], ["testassembly"], []).Matches(a, new TypeNames()).Should().BeFalse();
+        TypeSelector.From([], [], ["shop.domain.a"]).Matches(a, new TypeNames()).Should().BeFalse();
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public class TypeSelectorTests
         var constructed = (INamedTypeSymbol)((IFieldSymbol)Find(compilation, "N.User").GetMembers("F")[0]).Type;
 
         constructed.IsDefinition.Should().BeFalse();
-        TypeSelector.From([], [], ["N.Foo"]).Matches(constructed).Should().BeTrue();
+        TypeSelector.From([], [], ["N.Foo"]).Matches(constructed, new TypeNames()).Should().BeTrue();
     }
 
     [Fact]
@@ -159,7 +159,7 @@ public class TypeSelectorTests
         var compilation = TestCompilation.Create("namespace N { public class Outer<T> { public class Inner<U> { } } }");
         var inner = Find(compilation, "N.Outer`1+Inner`1");
 
-        TypeSelector.From([], [], ["N.Outer.Inner"]).Matches(inner).Should().BeTrue();
+        TypeSelector.From([], [], ["N.Outer.Inner"]).Matches(inner, new TypeNames()).Should().BeTrue();
     }
 
     [Fact]
@@ -174,7 +174,7 @@ public class TypeSelectorTests
             library.Options);
         var widget = Find(consumer, "Lib.Core.Widget");
 
-        TypeSelector.From(["Lib.**"], ["TestAssembly"], ["Lib.Core.Widget"]).Matches(widget).Should().BeTrue();
-        TypeSelector.From([], ["Consumer"], []).Matches(widget).Should().BeFalse();
+        TypeSelector.From(["Lib.**"], ["TestAssembly"], ["Lib.Core.Widget"]).Matches(widget, new TypeNames()).Should().BeTrue();
+        TypeSelector.From([], ["Consumer"], []).Matches(widget, new TypeNames()).Should().BeFalse();
     }
 }
