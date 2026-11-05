@@ -197,6 +197,26 @@ public sealed class ExitCodeTests : IDisposable
         Run("validate", FixtureProjects.Path("clean", "Shop.slnx")).Should().Be(ExitCodes.Success);
     }
 
+    [Theory]
+    [InlineData("null")]
+    [InlineData("~")]
+    [InlineData("true")]
+    [InlineData("2")]
+    [InlineData("#tag")]
+    [InlineData("a: b")]
+    public void Init_InADirectoryWhoseNameIsNotAPlainYamlString_WritesALoadablePack(string directoryName)
+    {
+        var directory = Path.Combine(_tempDir, directoryName);
+        Directory.CreateDirectory(directory);
+        Directory.SetCurrentDirectory(directory);
+
+        Run("init").Should().Be(ExitCodes.Success);
+
+        var loaded = new Ariadne.NET.RuleLoader.YamlRulePackLoader().LoadFromFile(Path.Combine(directory, ".architecture", "rules.yaml"));
+        loaded.IsSuccess.Should().BeTrue(loaded.IsFailure ? $"{loaded.Error.Message} {loaded.Error.Detail}" : "");
+        loaded.Value.Name.Should().Be(directoryName);
+    }
+
     [Fact]
     public void Init_TemplateWithoutNames_ShouldReturnErrorAndWriteStderr()
     {

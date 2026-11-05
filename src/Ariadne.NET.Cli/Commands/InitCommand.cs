@@ -53,8 +53,10 @@ public static class InitCommand
                 ["extends"] = extendsList,
             };
 
+            // The name comes from the directory, so it may read as another YAML type, such as null, ~, true or 2.
             var serializer = new SerializerBuilder()
                 .WithNamingConvention(CamelCaseNamingConvention.Instance)
+                .WithQuotingNecessaryStrings()
                 .Build();
 
             Directory.CreateDirectory(".architecture");
