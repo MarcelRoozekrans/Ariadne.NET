@@ -5,5 +5,11 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <!-- Application to Domain is an allowed edge, so the clean variant shows that it stays silent. The broken variant
+       leaves this reference out: its Domain references Infrastructure, which references Application, so it would be a
+       project cycle. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Daedalus.Domain\Daedalus.Domain.csproj" />
+  </ItemGroup>
 
 </Project>
