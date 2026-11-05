@@ -1,27 +1,43 @@
+schema: 2
 name: onion-architecture
 version: "1.0.0"
 author: platform-team
 
 layers:
   - name: DomainModel
+    id: ONION-LAYER-DOMAINMODEL
+    because: The domain model is the centre of the onion and depends on no other layer.
+    namespaces: ["**.DomainModel.**"]
     description: "Entities, value objects, domain enums"
     allowedDependencies: []
   - name: DomainServices
+    id: ONION-LAYER-DOMAINSERVICES
+    because: Domain services and repository contracts wrap the domain model and depend only on it.
+    namespaces: ["**.DomainServices.**"]
     description: "Domain service interfaces, repository contracts, domain events"
     allowedDependencies:
       - DomainModel
   - name: ApplicationServices
+    id: ONION-LAYER-APPLICATIONSERVICES
+    because: Application services orchestrate the domain rings and depend only on layers further in.
+    namespaces: ["**.ApplicationServices.**"]
     description: "Use cases, orchestration, application-level interfaces"
     allowedDependencies:
       - DomainModel
       - DomainServices
   - name: Infrastructure
+    id: ONION-LAYER-INFRASTRUCTURE
+    because: Infrastructure is an outer ring that implements the contracts of the inner rings.
+    namespaces: ["**.Infrastructure.**"]
     description: "Persistence, external services, messaging"
     allowedDependencies:
       - DomainModel
       - DomainServices
       - ApplicationServices
   - name: Presentation
+    id: ONION-LAYER-PRESENTATION
+    because: Presentation is an outer ring that uses the inner rings and never depends on infrastructure.
+    namespaces: ["**.Presentation.**"]
     description: "API controllers, UI, view models"
     allowedDependencies:
       - DomainModel
@@ -107,17 +123,6 @@ componentRoles:
     typeKind: Class
     requiresInterface: false
     description: "View model for UI binding"
-
-codeFeatureRules:
-  - id: CODE-001
-    description: "Interface-required roles must have a matching interface"
-    appliesTo:
-      requiresInterface: true
-  - id: CODE-002
-    description: "Implementations with required interfaces should be internal"
-    appliesTo:
-      requiresInterface: true
-      isInterface: false
 
 namingConventions:
   namespace: "{SolutionName}.{Feature}.{Layer}"

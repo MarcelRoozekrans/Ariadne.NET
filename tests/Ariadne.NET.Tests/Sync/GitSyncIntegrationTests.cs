@@ -54,6 +54,7 @@ public sealed class GitSyncIntegrationTests : IDisposable
 
         // 4. Create .architecture/rules.yaml with extends: [import://shared-rules]
         var rulesYaml = """
+            schema: 2
             name: my-project
             extends:
               - import://shared-rules
@@ -82,13 +83,20 @@ public sealed class GitSyncIntegrationTests : IDisposable
         Directory.CreateDirectory(cacheDir);
 
         var sharedPackYaml = """
+            schema: 2
             name: shared-rules
             version: "1.0.0"
             layers:
               - name: Domain
+                id: SHARED-LAYER-DOMAIN
+                because: The domain depends on nothing else.
+                namespaces: ["**.Domain.**"]
                 description: Core domain layer
                 allowedDependencies: []
               - name: Application
+                id: SHARED-LAYER-APPLICATION
+                because: Use cases build on the domain only.
+                namespaces: ["**.Application.**"]
                 description: Application layer
                 allowedDependencies:
                   - Domain

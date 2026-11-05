@@ -64,13 +64,12 @@ dotnet run --project src/Ariadne.NET.Mcp.Http
 | Tool | Description |
 |------|-------------|
 | `list_templates` | List available architecture templates |
-| `get_layers` | Get layer definitions with allowed dependencies |
+| `get_layers` | Get layers with their id, selectors, allowed dependencies and because |
 | `get_component_roles` | Get available component roles |
-| `get_rules` | Get code feature rules |
+| `get_rules` | Get the forbid and allowOnly rules |
 | `generate_component` | Generate a C# component |
 | `generate_workspace` | Scaffold project structure |
 | `validate_source` | Validate a solution or project against rules |
-| `lint_source` | Lint for namespace-layer mismatches |
 
 ## Tech Stack
 

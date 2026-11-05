@@ -2,9 +2,9 @@
 sidebar_position: 8
 ---
 
-# Validation and Linting
+# Validation
 
-The engine checks existing code at two levels: validation (deep) and linting (shallow). Validation uses the compiler's semantic model on a loaded solution. The linter parses files with Roslyn and compares namespaces with directories.
+The engine checks existing code with the compiler's semantic model on a loaded solution. There is one engine: the layer, rule and role checks all run on the same type graph.
 
 ## Semantic Validation
 
@@ -25,7 +25,7 @@ It loads `path` with `ISolutionLoader`, passes the compilations to `IArchitectur
 flowchart LR
     A["path<br/>.sln .slnx .slnf .csproj"] --> B["ISolutionLoader<br/><i>one compilation per project<br/>and target framework</i>"]
     B --> C["TypeGraphBuilder<br/><i>one edge per type reference</i>"]
-    C --> D["Layer rule<br/>Role rules"]
+    C --> D["Layer rules<br/>forbid and allowOnly rules<br/>Role rules"]
     D --> E["ArchitectureReport"]
 ```
 
@@ -57,11 +57,19 @@ Generated code is never a source: it produces no edges and its types are not che
 
 ### Layer of a type
 
-A type's layer is the last segment of its namespace that equals a layer name, ignoring case. This applies to source types and to types from referenced assemblies. A type with no such segment has no layer, and it is not constrained as a source or as a target.
+A type's layer comes from the selectors of the pack's layers: a type belongs to a layer when it matches each non-empty list the layer has. Within a list any value may match, so a layer with both `namespaces` and `assemblies` covers a type only when its namespace matches one of the globs and its assembly name matches one of the patterns. Matching is ordinal and case-sensitive. This applies to source types and to types from referenced assemblies. A type that no layer covers has no layer, and a type that two layers cover is reported as a `LayerOverlap` and is left out of the dependency check. See [Rule Schema](03-rule-schema.md#selectors) for the glob grammar.
 
 ### Rules
 
-**Layer rule.** An edge between two layers is a violation when the target layer is not in the source layer's `allowedDependencies`. All edges from one source type to one target type make one violation, located at the first reference, with a count of the references.
+**Layer rule.** An edge between two layers is a violation when the target layer is not in the source layer's `allowedDependencies`. The check is open-world: an edge to a type that no layer covers is not checked. All edges from one source type to one target type make one violation, located at the first reference, with a count of the references. It carries the source layer's `id` and `because`.
+
+**Layer overlap.** A type that two or more layers cover is reported once, as `LayerOverlap`, with the covering layers named in the message. Source types are located at their declaration. A metadata type is reported once, without a location, when it is the target of a checked edge. Once means once per run: a source type that other analysed projects reference is reported only at its declaration, and a metadata type that several projects reference is reported a single time. It fails `validate` like any other violation.
+
+**Forbid rules.** A `forbid` rule is violated by an edge from a type in `from` to a type in `to`, unless an exception matches the source type. The `from` and `to` targets are layers, or selectors over namespaces, assemblies and types. The rule applies whether or not the two types are in the same layer. One violation per rule, source type and target type, located at the first reference, with a count. Kind `ForbiddenDependency`.
+
+**Allow-only rules.** An `allowOnly` rule is violated by an edge to a type in `to` from a source that is neither in `from` nor in `to` itself, unless an exception matches the source type. Kind `DependencyNotPermitted`, aggregated as for `forbid`.
+
+Both kinds carry the rule's `id` and `because`. A selector that matches no type in the solution is not an error; the rule has nothing to check.
 
 **Role rules.** A source type in a role's layer whose name ends with the role name or one of its `alternativeNames` matches the role. Nested types are included. Enums and delegates are never matched to a role. Each match is checked for:
 
@@ -73,7 +81,7 @@ A type's layer is the last segment of its namespace that equals a layer name, ig
 
 The type kind is read from the symbol, so `record` and `record struct` are told apart. Accessibility is the declared accessibility, and a top-level type with no access modifier counts as internal. A nested one is private.
 
-Two verdicts differ from the old validator, which looked at `using` directives and keywords in the file text. A top-level type with no access modifier now passes an `internal` role, where it used to be reported as public. An unused `using` is no longer a dependency.
+Role violations have the rule id `role/<Role>` and no `because`.
 
 ### The report
 
@@ -81,22 +89,23 @@ Two verdicts differ from the old validator, which looked at `using` directives a
 ArchitectureReport
   ├── IsValid: bool                          (true when there are no violations)
   ├── Violations: IReadOnlyList<ArchitectureViolation>
-  │     ├── RuleId: string                   (layer/<Layer> or role/<Role>)
-  │     ├── Kind: ViolationKind              (DependencyNotAllowed, TypeKindMismatch,
+  │     ├── RuleId: string                   (a layer id, a rule id or role/<Role>)
+  │     ├── Kind: ViolationKind              (DependencyNotAllowed, ForbiddenDependency,
+  │     │                                     DependencyNotPermitted, LayerOverlap, TypeKindMismatch,
   │     │                                     AccessibilityMismatch, MissingInterface)
   │     ├── SourceType: string               (fully qualified name)
-  │     ├── Target: string?                  (the type depended on, absent for role checks)
+  │     ├── Target: string?                  (the type depended on, absent for role and overlap checks)
   │     ├── Location: SourceLocation?        (file path, line, column; the first reference)
   │     ├── ReferenceCount: int
   │     ├── TargetFrameworks: IReadOnlyList<string>
-  │     ├── Because: string                  (reserved for schema v2; always empty for now)
+  │     ├── Because: string                  (the layer's or rule's because; empty for role checks)
   │     └── Message: string
   ├── Projects: IReadOnlyList<CheckedProject>   (name and target frameworks)
   ├── SkippedProjects: IReadOnlyList<SkippedProject>  (name and reason)
   └── TypesChecked: int
 ```
 
-A missing interface has no location, because no single reference caused it. `TargetFrameworks` is empty when the violation occurs in every target framework of the project, and otherwise lists the ones it occurs in.
+A missing interface has no location, because no single reference caused it. A `LayerOverlap` on a metadata type has none either. `TargetFrameworks` is empty when the violation occurs in every target framework of the project, and otherwise lists the ones it occurs in.
 
 The CLI prints a report like this:
 
@@ -136,55 +145,4 @@ The `BuildHost-*` folders that the workspace needs come with the package.
 
 ### Performance
 
-The load and check times and the allocations of the check on this repository's own solution are recorded in `docs/perf/phase-2.1-baseline.md`.
-
-## Linter — Shallow Validation
-
-**Interface:** `ILinter`
-**Implementation:** `Linter`
-
-Performs a lighter check focused on namespace-vs-directory consistency. Does not check dependencies, type kinds, or interface requirements.
-
-```
-ILinter
-  └── Lint(RulePack resolvedPack, string sourceDirectory) → LintResult
-```
-
-**Algorithm:**
-
-```mermaid
-flowchart TD
-    A["For each *.cs file (recursive)"] --> B["Parse with Roslyn<br/>Extract namespace"]
-    B --> C["Detect layer from<br/>namespace segments"]
-    B --> D["Detect layer from<br/>file path segments"]
-    C --> E{"Compare layers"}
-    D --> E
-    E -->|"Both null"| F["UnrecognizedLayer"]
-    E -->|"Both non-null<br/>and different"| G["NamespaceMismatch"]
-    E -->|"Match or<br/>one is null"| H["Clean"]
-```
-
-**Example violation:**
-
-```
-File:       src/MyApp.Orders.Domain/OrderRepository.cs
-Namespace:  MyApp.Orders.Infrastructure   ← layer = Infrastructure
-Directory:  src/MyApp.Orders.Domain/       ← layer = Domain
-
-→ NamespaceMismatch: "Namespace implies layer 'Infrastructure' but directory implies 'Domain'"
-```
-
-**Result model:**
-
-```
-LintResult
-  ├── IsClean: bool
-  ├── Violations: IReadOnlyList<LintViolation>
-  │     ├── FilePath: string
-  │     ├── Category: string
-  │     └── Message: string
-  └── FilesScanned: int
-```
-
----
-
+The load and check times and the allocations of the check on this repository's own solution are recorded in `docs/perf/phase-2.1-baseline.md`, with the phase 2.2 re-measurement in its own section.

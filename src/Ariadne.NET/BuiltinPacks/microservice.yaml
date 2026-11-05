@@ -1,29 +1,45 @@
+schema: 2
 name: microservice
 version: "1.0.0"
 author: platform-team
 
 layers:
   - name: Domain
+    id: MS-LAYER-DOMAIN
+    because: The domain is the innermost layer of the service and depends on nothing else.
+    namespaces: ["**.Domain.**"]
     description: "Entities, aggregates, value objects, domain events"
     allowedDependencies: []
   - name: Application
+    id: MS-LAYER-APPLICATION
+    because: Use cases orchestrate the domain and speak the service's public contracts.
+    namespaces: ["**.Application.**"]
     description: "Use cases, handlers, application services"
     allowedDependencies:
       - Domain
       - Contracts
   - name: Infrastructure
+    id: MS-LAYER-INFRASTRUCTURE
+    because: Infrastructure implements persistence and messaging for the inner layers and the contracts.
+    namespaces: ["**.Infrastructure.**"]
     description: "Persistence, messaging, external service clients"
     allowedDependencies:
       - Domain
       - Application
       - Contracts
   - name: Api
+    id: MS-LAYER-API
+    because: The API exposes the service's use cases and must not reach into its infrastructure.
+    namespaces: ["**.Api.**"]
     description: "Controllers, gRPC services, middleware"
     allowedDependencies:
       - Domain
       - Application
       - Contracts
   - name: Contracts
+    id: MS-LAYER-CONTRACTS
+    because: Contracts are the service's public surface, shared with other services, so they depend on nothing internal.
+    namespaces: ["**.Contracts.**"]
     description: "Shared DTOs, integration events, public API models"
     allowedDependencies: []
 
@@ -118,17 +134,6 @@ componentRoles:
     typeKind: Record
     requiresInterface: false
     description: "Public API response model"
-
-codeFeatureRules:
-  - id: CODE-001
-    description: "Interface-required roles must have a matching interface"
-    appliesTo:
-      requiresInterface: true
-  - id: CODE-002
-    description: "Implementations with required interfaces should be internal"
-    appliesTo:
-      requiresInterface: true
-      isInterface: false
 
 namingConventions:
   namespace: "{SolutionName}.{Feature}.{Layer}"

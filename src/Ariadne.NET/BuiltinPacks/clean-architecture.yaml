@@ -1,21 +1,34 @@
+schema: 2
 name: clean-architecture
 version: "1.0.0"
 author: platform-team
 
 layers:
   - name: Domain
+    id: CA-LAYER-DOMAIN
+    because: The domain is the core of the architecture and depends on no other layer.
+    namespaces: ["**.Domain.**"]
     description: "Entities, value objects, domain services"
     allowedDependencies: []
   - name: Application
+    id: CA-LAYER-APPLICATION
+    because: Use cases orchestrate the domain and reach outward only through interfaces they own.
+    namespaces: ["**.Application.**"]
     description: "Use cases, commands, queries, DTOs"
     allowedDependencies:
       - Domain
   - name: Infrastructure
+    id: CA-LAYER-INFRASTRUCTURE
+    because: Infrastructure implements the interfaces the inner layers define, so it may depend on them.
+    namespaces: ["**.Infrastructure.**"]
     description: "Repositories, external services, persistence"
     allowedDependencies:
       - Domain
       - Application
   - name: WebApi
+    id: CA-LAYER-WEBAPI
+    because: The web API is the outermost layer and composes everything beneath it.
+    namespaces: ["**.WebApi.**"]
     description: "Controllers, middleware, filters"
     allowedDependencies:
       - Domain
@@ -127,17 +140,6 @@ componentRoles:
     typeKind: Class
     requiresInterface: false
     description: "HTTP middleware"
-
-codeFeatureRules:
-  - id: CODE-001
-    description: "Interface-required roles must have a matching interface"
-    appliesTo:
-      requiresInterface: true
-  - id: CODE-002
-    description: "Implementations with required interfaces should be internal"
-    appliesTo:
-      requiresInterface: true
-      isInterface: false
 
 namingConventions:
   namespace: "{SolutionName}.{Feature}.{Layer}"

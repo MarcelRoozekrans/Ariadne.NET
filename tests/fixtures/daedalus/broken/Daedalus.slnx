@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="Daedalus.Domain/Daedalus.Domain.csproj" />
+  <Project Path="Daedalus.Application/Daedalus.Application.csproj" />
+  <Project Path="Daedalus.Infrastructure/Daedalus.Infrastructure.csproj" />
+  <Project Path="Daedalus.Api/Daedalus.Api.csproj" />
+  <Project Path="Daedalus.Agents/Daedalus.Agents.csproj" />
+  <Project Path="Rag.NET/Rag.NET.csproj" />
+  <Project Path="Stub.EntityFrameworkCore/Stub.EntityFrameworkCore.csproj" />
+</Solution>

@@ -16,7 +16,6 @@ graph TD
             CodeGeneration["CodeGeneration<br/><i>Roslyn C# generator</i>"]
             Orchestration["Orchestration<br/><i>Generate + workspace</i>"]
             Analysis["Analysis<br/><i>Type graph, architecture validator</i>"]
-            Validation["Validation<br/><i>Namespace linting</i>"]
             Sync["Sync<br/><i>Git sync, semver, caching</i>"]
             BuiltinPacks["BuiltinPacks<br/><i>10 embedded YAML templates</i>"]
         end
@@ -44,7 +43,7 @@ flowchart TD
 
     subgraph Core["Ariadne.NET Pipeline"]
         B["1. RulePackResolver<br/><i>Parse extends references<br/>(builtin://, import://)<br/>Load referenced packs</i>"]
-        B --> C["2. RulePackMerger<br/><i>Combine layers (union deps)<br/>Roles (last wins)<br/>Rules (locked protection)</i>"]
+        B --> C["2. RulePackMerger<br/><i>Layers and rules defined once (conflicts fail)<br/>Retarget selectors, add exceptions<br/>Roles (last wins)</i>"]
         C --> D["3. LayerInferenceEngine<br/><i>Map role name → layer<br/>Primary + alternative names<br/>Ambiguity detection</i>"]
         D --> E["4. CodeGeneratorService<br/><i>Roslyn SyntaxFactory →<br/>formatted C# output</i>"]
     end
@@ -52,7 +51,7 @@ flowchart TD
     E --> G["Generated File<br/><i>path, namespace, type, code</i>"]
 ```
 
-Validation is a separate path. `ISolutionValidator` in `Ariadne.NET.Workspaces` loads a solution into compilations, and `IArchitectureValidator` in `Ariadne.NET` builds a type graph per compilation and checks it against the resolved pack. See [Validation and Linting](08-validation.md).
+Validation is a separate path. `ISolutionValidator` in `Ariadne.NET.Workspaces` loads a solution into compilations, and `IArchitectureValidator` in `Ariadne.NET` builds a type graph per compilation and checks it against the resolved pack. See [Validation](08-validation.md).
 
 ## Dependency Flow
 
@@ -70,7 +69,7 @@ graph LR
     Core --> Abs["Ariadne.NET.Abstractions"]
 ```
 
-Within `Ariadne.NET`, the namespaces depend on each other as follows. `Analysis` and `Validation` depend only on Abstractions, and `Telemetry` holds the instrumented pack and sync interfaces, so the pack and sync code and `Telemetry` reference each other.
+Within `Ariadne.NET`, the namespaces depend on each other as follows. `Analysis` depends only on Abstractions, and `Telemetry` holds the instrumented pack and sync interfaces, so the pack and sync code and `Telemetry` reference each other.
 
 ```mermaid
 graph TD
@@ -84,7 +83,6 @@ graph TD
     Telemetry --> RuleEngine
     RuleLoader --> Abstractions["Ariadne.NET.Abstractions<br/><i>(separate package — ZeroAlloc.Results + Validation only)</i>"]
     Analysis --> Abstractions
-    Validation --> Abstractions
 ```
 
 ---

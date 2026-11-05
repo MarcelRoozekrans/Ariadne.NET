@@ -6,6 +6,7 @@ namespace Ariadne.NET.Mcp.Tests.Tools;
 /// A pack that cannot be resolved, or a solution or project that cannot be loaded, must reach the MCP client as a
 /// tool error result, not as an exception or a JSON-RPC error, so the model sees the message and can correct its call.
 /// </summary>
+[Collection(FixtureSolutionCollection.Name)]
 public sealed class ToolErrorResultTests : IAsyncLifetime
 {
     private McpClientHarness _harness = null!;
@@ -18,12 +19,19 @@ public sealed class ToolErrorResultTests : IAsyncLifetime
         "generate_component",
         "generate_workspace",
         "validate_source",
-        "lint_source",
     };
 
     public async Task InitializeAsync() => _harness = await McpClientHarness.StartAsync().ConfigureAwait(false);
 
     public async Task DisposeAsync() => await _harness.DisposeAsync().ConfigureAwait(false);
+
+    [Fact]
+    public async Task ToolList_DoesNotContainLintSource()
+    {
+        var tools = await _harness.Client.ListToolsAsync();
+
+        tools.Select(t => t.Name).Should().Contain("validate_source").And.NotContain("lint_source");
+    }
 
     [Theory]
     [MemberData(nameof(PackResolvingTools))]
@@ -103,9 +111,6 @@ public sealed class ToolErrorResultTests : IAsyncLifetime
                 break;
             case "validate_source":
                 arguments["path"] = Path.GetTempPath();
-                break;
-            case "lint_source":
-                arguments["sourceDirectory"] = Path.GetTempPath();
                 break;
         }
 

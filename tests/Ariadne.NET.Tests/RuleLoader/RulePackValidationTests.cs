@@ -13,99 +13,109 @@ public class RulePackValidationTests
         new(new BuiltinPackRegistry(new YamlRulePackLoader()), new YamlRulePackLoader(), new Ariadne.NET.RuleEngine.RulePackMerger());
 
     [Fact]
-    public void Layer_with_a_name_loads()
+    public void Layer_with_a_name_id_because_and_selector_loads()
     {
         var result = _loader.LoadFromString("""
+            schema: 2
             name: p
             layers:
               - name: Domain
+                id: P-LAYER-DOMAIN
+                because: The domain holds the business rules.
+                namespaces: ["**.Domain.**"]
             """);
 
         result.IsSuccess.Should().BeTrue();
     }
 
     [Fact]
-    public void Empty_layer_name_is_invalid_and_the_detail_names_the_path()
+    public void Empty_layer_name_is_invalid_and_the_detail_names_the_line()
     {
         var result = _loader.LoadFromString("""
+            schema: 2
             name: p
             layers:
               - name: ""
+                id: P-LAYER-X
+                because: b
+                namespaces: ["**.X.**"]
             """);
 
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
-        result.Error.Message.Should().Be("Rule pack 'p' is invalid.");
-        result.Error.Detail.Should().Contain("Layers[0].Name");
+        result.Error.Message.Should().Be("Rule pack YAML has 1 problem(s).");
+        result.Error.Detail.Should().Be("rule pack YAML:4:5: layers[0] has no 'name'");
     }
 
     [Fact]
     public void Missing_layer_name_is_invalid()
     {
         var result = _loader.LoadFromString("""
+            schema: 2
             name: p
             layers:
               - description: no name
+                id: P-LAYER-X
+                because: b
+                namespaces: ["**.X.**"]
             """);
 
-        result.Error.Detail.Should().Contain("Layers[0].Name");
+        result.Error.Detail.Should().Be("rule pack YAML:4:5: layers[0] has no 'name'");
     }
 
     [Fact]
     public void Role_without_name_or_layer_is_invalid()
     {
         var result = _loader.LoadFromString("""
+            schema: 2
             name: p
             componentRoles:
               - name: ""
                 layer: ""
             """);
 
-        result.Error.Detail.Should().Contain("ComponentRoles[0].Name").And.Contain("ComponentRoles[0].Layer");
-    }
-
-    [Fact]
-    public void Code_feature_rule_without_an_id_is_invalid()
-    {
-        var result = _loader.LoadFromString("""
-            name: p
-            codeFeatureRules:
-              - id: ""
-                description: d
-            """);
-
-        result.Error.Detail.Should().Contain("CodeFeatureRules[0].Id");
+        result.Error.Detail.Should().Contain("componentRoles[0] has no 'name'").And.Contain("componentRoles[0] has no 'layer'");
     }
 
     [Fact]
     public void Every_failure_is_listed_on_its_own_line()
     {
         var result = _loader.LoadFromString("""
+            schema: 2
             name: p
             layers:
               - name: ""
+                id: P-LAYER-A
+                because: b
+                namespaces: ["**.A.**"]
               - name: ""
+                id: P-LAYER-B
+                because: b
+                namespaces: ["**.B.**"]
             """);
 
         result.Error.Detail!.Split('\n').Should().HaveCount(2)
-            .And.OnlyContain(line => line.Contains(": "));
+            .And.OnlyContain(line => line.StartsWith("rule pack YAML:", StringComparison.Ordinal));
     }
 
     [Fact]
-    public void Pack_without_a_name_loads_because_extends_only_files_have_none()
+    public void Pack_without_a_name_is_invalid()
     {
         var result = _loader.LoadFromString("""
+            schema: 2
             extends:
               - builtin://clean-architecture
             """);
 
-        result.IsSuccess.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Detail.Should().Be("rule pack YAML:1:1: the pack has no 'name'");
     }
 
     [Fact]
     public void Partial_user_pack_loads()
     {
         const string Yaml = """
+            schema: 2
             name: partial
             extends:
               - builtin://clean-architecture
@@ -122,22 +132,34 @@ public class RulePackValidationTests
     }
 
     [Fact]
-    public void LoadFromFile_reports_member_rule_failures()
+    public void LoadFromFile_reports_problems_with_the_path()
     {
         var path = Path.Combine(Path.GetTempPath(), $"ariadne-validation-{Guid.NewGuid():N}.yaml");
-        File.WriteAllText(path, "name: p\nlayers:\n  - name: \"\"\n");
+        File.WriteAllText(path, "schema: 2\nname: p\nlayers:\n  - name: \"\"\n    id: P-X\n    because: b\n    namespaces: [\"**.X.**\"]\n");
 
         try
         {
             var result = _loader.LoadFromFile(path);
 
             result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
-            result.Error.Detail.Should().Contain("Layers[0].Name");
+            result.Error.Message.Should().Be($"Rule pack file '{path}' has 1 problem(s).");
+            result.Error.Detail.Should().Be($"{path}:4:5: layers[0] has no 'name'");
         }
         finally
         {
             File.Delete(path);
         }
+    }
+
+    [Fact]
+    public void Empty_naming_convention_is_caught_by_the_member_rules()
+    {
+        // The reader accepts an empty string; the ZeroAlloc.Validation backstop on the model still rejects it.
+        var result = _loader.LoadFromString("schema: 2\nname: p\nnamingConventions:\n  namespace: \"\"\n");
+
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().Be("Rule pack 'p' is invalid.");
+        result.Error.Detail.Should().Be("NamingConventions.Namespace: Namespace must not be empty.");
     }
 
     public static TheoryData<string> BuiltinPackNames()
@@ -193,17 +215,17 @@ public class RulePackValidationTests
     }
 
     [Fact]
-    public void Nameless_pack_from_a_file_failing_a_member_rule_names_the_file()
+    public void Nameless_pack_from_a_file_names_the_file()
     {
         var path = Path.Combine(Path.GetTempPath(), $"ariadne-nameless-{Guid.NewGuid():N}.yaml");
-        File.WriteAllText(path, "layers:\n  - name: \"\"\n");
+        File.WriteAllText(path, "schema: 2\n");
 
         try
         {
             var result = _loader.LoadFromFile(path);
 
-            result.Error.Message.Should().Be($"Rule pack file '{path}' is invalid.");
-            result.Error.Detail.Should().Contain("Layers[0].Name");
+            result.Error.Message.Should().Be($"Rule pack file '{path}' has 1 problem(s).");
+            result.Error.Detail.Should().Be($"{path}:1:1: the pack has no 'name'");
         }
         finally
         {
@@ -212,11 +234,11 @@ public class RulePackValidationTests
     }
 
     [Fact]
-    public void Nameless_pack_from_a_string_failing_a_member_rule_says_yaml()
+    public void Nameless_pack_from_a_string_says_yaml()
     {
-        var result = _loader.LoadFromString("layers:\n  - name: \"\"\n");
+        var result = _loader.LoadFromString("schema: 2\n");
 
-        result.Error.Message.Should().Be("Rule pack YAML is invalid.");
+        result.Error.Message.Should().Be("Rule pack YAML has 1 problem(s).");
     }
 
     [Fact]
@@ -248,39 +270,39 @@ public class RulePackValidationTests
     }
 
     [Theory]
-    [InlineData("name: p\nextends: ~\n", "Extends: Extends must not be null.")]
-    [InlineData("name: p\nextends:\n  - ~\n", "Extends: Extends must not contain null entries.")]
-    [InlineData("name: p\nlayers: ~\n", "Layers: Layers must not be null.")]
-    [InlineData("name: p\nlayers:\n  - ~\n", "Layers: Layers must not contain null entries.")]
-    [InlineData("name: p\ncomponentRoles: ~\n", "ComponentRoles: ComponentRoles must not be null.")]
-    [InlineData("name: p\ncomponentRoles:\n  - ~\n", "ComponentRoles: ComponentRoles must not contain null entries.")]
-    [InlineData("name: p\ncodeFeatureRules: ~\n", "CodeFeatureRules: CodeFeatureRules must not be null.")]
-    [InlineData("name: p\ncodeFeatureRules:\n  - ~\n", "CodeFeatureRules: CodeFeatureRules must not contain null entries.")]
-    [InlineData("name: p\nnamingConventions: ~\n", "NamingConventions: NamingConventions must not be null.")]
-    [InlineData("name: p\nlayers:\n  - name: A\n    allowedDependencies: ~\n", "Layers[0].AllowedDependencies: AllowedDependencies must not be null.")]
-    [InlineData("name: p\nlayers:\n  - name: A\n    allowedDependencies:\n      - ~\n", "Layers[0].AllowedDependencies: AllowedDependencies must not contain null entries.")]
-    [InlineData("name: p\ncomponentRoles:\n  - name: R\n    layer: L\n    alternativeNames: ~\n", "ComponentRoles[0].AlternativeNames: AlternativeNames must not be null.")]
-    [InlineData("name: p\ncomponentRoles:\n  - name: R\n    layer: L\n    alternativeNames:\n      - ~\n", "ComponentRoles[0].AlternativeNames: AlternativeNames must not contain null entries.")]
-    [InlineData("name: p\ncomponentRoles:\n  - name: R\n    layer: L\n    accessibility: ~\n", "ComponentRoles[0].Accessibility: Accessibility must not be null.")]
-    [InlineData("name: p\nnamingConventions:\n  namespace: ~\n", "NamingConventions.Namespace: Namespace must not be empty.")]
-    [InlineData("name: p\nnamingConventions:\n  filePath: ~\n", "NamingConventions.FilePath: FilePath must not be empty.")]
-    public void Null_yaml_members_are_invalid_and_never_throw(string yaml, string expectedLine)
+    [InlineData("extends: ~\n", "3:1: 'extends' in the pack must be a list of strings")]
+    [InlineData("extends:\n  - ~\n", "3:1: 'extends' in the pack must be a list of strings")]
+    [InlineData("layers: ~\n", "3:1: 'layers' in the pack must be a list")]
+    [InlineData("layers:\n  - ~\n", "4:5: 'layers[0]' in the pack must be a mapping")]
+    [InlineData("componentRoles: ~\n", "3:1: 'componentRoles' in the pack must be a list")]
+    [InlineData("componentRoles:\n  - ~\n", "4:5: 'componentRoles[0]' in the pack must be a mapping")]
+    [InlineData("namingConventions: ~\n", "3:1: 'namingConventions' in the pack must be a mapping")]
+    [InlineData("layers:\n  - name: A\n    id: P-A\n    because: b\n    namespaces: [\"**.A.**\"]\n    allowedDependencies: ~\n", "8:5: 'allowedDependencies' in layer 'A' must be a list of strings")]
+    [InlineData("layers:\n  - name: A\n    id: P-A\n    because: b\n    namespaces: [\"**.A.**\"]\n    allowedDependencies:\n      - ~\n", "8:5: 'allowedDependencies' in layer 'A' must be a list of strings")]
+    [InlineData("componentRoles:\n  - name: R\n    layer: L\n    alternativeNames: ~\n", "6:5: 'alternativeNames' in role 'R' must be a list of strings")]
+    [InlineData("componentRoles:\n  - name: R\n    layer: L\n    alternativeNames:\n      - ~\n", "6:5: 'alternativeNames' in role 'R' must be a list of strings")]
+    [InlineData("componentRoles:\n  - name: R\n    layer: L\n    accessibility: ~\n", "6:5: 'accessibility' in role 'R' must be a string")]
+    [InlineData("namingConventions:\n  namespace: ~\n", "4:3: 'namespace' in the namingConventions must be a string")]
+    [InlineData("namingConventions:\n  filePath: ~\n", "4:3: 'filePath' in the namingConventions must be a string")]
+    public void Null_yaml_members_are_invalid_and_never_throw(string body, string expectedProblem)
     {
-        var loaded = _loader.LoadFromString(yaml);
+        var loaded = _loader.LoadFromString("schema: 2\nname: p\n" + body);
 
         loaded.IsFailure.Should().BeTrue();
         loaded.Error.Code.Should().Be(AriadneErrorCode.Invalid);
-        loaded.Error.Message.Should().Be("Rule pack 'p' is invalid.");
-        loaded.Error.Detail!.Split('\n').Should().Contain(expectedLine);
+        loaded.Error.Message.Should().Be("Rule pack YAML has 1 problem(s).");
+        loaded.Error.Detail.Should().Be("rule pack YAML:" + expectedProblem);
     }
 
     [Fact]
-    public void Null_and_member_failures_come_back_in_one_error()
+    public void Problems_in_several_entries_come_back_in_one_error()
     {
-        var result = _loader.LoadFromString("name: p\nlayers:\n  - name: \"\"\ncomponentRoles: ~\n");
+        var result = _loader.LoadFromString("schema: 2\nname: p\nlayers:\n  - name: \"\"\n    id: P-A\n    because: b\n    namespaces: [\"**.A.**\"]\ncomponentRoles: ~\n");
 
-        result.Error.Detail!.Split('\n').Should().HaveCount(2);
-        result.Error.Detail.Should().Contain("Layers[0].Name").And.Contain("ComponentRoles");
+        result.Error.Message.Should().Be("Rule pack YAML has 2 problem(s).");
+        result.Error.Detail!.Split('\n').Should().Equal(
+            "rule pack YAML:4:5: layers[0] has no 'name'",
+            "rule pack YAML:8:1: 'componentRoles' in the pack must be a list");
     }
 
     [Fact]
@@ -299,6 +321,7 @@ public class RulePackValidationTests
     public void Role_with_a_named_type_kind_loads()
     {
         var result = _loader.LoadFromString("""
+            schema: 2
             name: p
             componentRoles:
               - name: Command
@@ -314,6 +337,7 @@ public class RulePackValidationTests
     public void Role_with_an_undefined_type_kind_is_invalid()
     {
         var result = _loader.LoadFromString("""
+            schema: 2
             name: p
             componentRoles:
               - name: Command
@@ -322,7 +346,8 @@ public class RulePackValidationTests
             """);
 
         result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
-        result.Error.Message.Should().Be("Rule pack 'p' is invalid.");
-        result.Error.Detail.Should().StartWith("ComponentRoles[0].TypeKind: ");
+        result.Error.Message.Should().Be("Rule pack YAML has 1 problem(s).");
+        result.Error.Detail.Should().Be(
+            "rule pack YAML:6:5: typeKind '99' in role 'Command' must be one of Class, Interface, Record, Struct, RecordStruct");
     }
 }

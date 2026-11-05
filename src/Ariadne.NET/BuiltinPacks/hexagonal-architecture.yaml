@@ -1,16 +1,26 @@
+schema: 2
 name: hexagonal-architecture
 version: "1.0.0"
 author: platform-team
 
 layers:
   - name: Core
+    id: HEX-LAYER-CORE
+    because: The core holds the business logic and must not depend on ports or adapters.
+    namespaces: ["**.Core.**"]
     description: "Domain entities, domain services"
     allowedDependencies: []
   - name: Ports
+    id: HEX-LAYER-PORTS
+    because: Ports are the interfaces through which the core talks to the outside world, so they depend only on the core.
+    namespaces: ["**.Ports.**"]
     description: "Interfaces — driving and driven ports"
     allowedDependencies:
       - Core
   - name: Adapters
+    id: HEX-LAYER-ADAPTERS
+    because: Adapters connect the outside world to the ports, so they may depend on ports and core but nothing depends on them.
+    namespaces: ["**.Adapters.**"]
     description: "Implementations — primary and secondary adapters"
     allowedDependencies:
       - Core

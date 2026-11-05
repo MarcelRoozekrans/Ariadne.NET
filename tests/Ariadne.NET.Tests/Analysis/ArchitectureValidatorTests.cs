@@ -1,5 +1,7 @@
 using Ariadne.NET.Abstractions;
 using Ariadne.NET.Analysis;
+using Ariadne.NET.RuleEngine;
+using Ariadne.NET.RuleLoader;
 using FluentAssertions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -13,9 +15,9 @@ public class ArchitectureValidatorTests
         Name = "test",
         Layers =
         [
-            new LayerDefinition { Name = "Domain", AllowedDependencies = [] },
-            new LayerDefinition { Name = "Application", AllowedDependencies = ["Domain"] },
-            new LayerDefinition { Name = "Infrastructure", AllowedDependencies = ["Domain", "Application"] },
+            new LayerDefinition { Name = "Domain", Id = "TEST-LAYER-DOMAIN", Because = "Test layer Domain.", Namespaces = ["**.Domain.**"], AllowedDependencies = [] },
+            new LayerDefinition { Name = "Application", Id = "TEST-LAYER-APPLICATION", Because = "Test layer Application.", Namespaces = ["**.Application.**"], AllowedDependencies = ["Domain"] },
+            new LayerDefinition { Name = "Infrastructure", Id = "TEST-LAYER-INFRASTRUCTURE", Because = "Test layer Infrastructure.", Namespaces = ["**.Infrastructure.**"], AllowedDependencies = ["Domain", "Application"] },
         ],
         ComponentRoles =
         [
@@ -257,6 +259,86 @@ public class ArchitectureValidatorTests
     }
 
     [Fact]
+    public void RetargetIntoOverlap_ReportsLayerOverlap()
+    {
+        var loader = new YamlRulePackLoader();
+        var resolver = new RulePackResolver(new BuiltinPackRegistry(loader), loader, new RulePackMerger());
+        var child = new RulePack
+        {
+            Name = "child",
+            Extends = ["builtin://clean-architecture"],
+            LayerRetargets = [new LayerRetarget { Name = "Application", Namespaces = ["**.Domain.**"] }],
+        };
+        var resolved = resolver.Resolve(child);
+        resolved.IsSuccess.Should().BeTrue();
+
+        var report = _validator.Validate(
+            resolved.Value,
+            TestCompilation.Create("namespace Shop.Domain { public class Order { } }"));
+
+        var v = report.Violations.Should().ContainSingle().Subject;
+        v.Kind.Should().Be(ViolationKind.LayerOverlap);
+        v.RuleId.Should().Be("CA-LAYER-DOMAIN+CA-LAYER-APPLICATION");
+        v.SourceType.Should().Be("Shop.Domain.Order");
+        v.Message.Should().Be("Type 'Shop.Domain.Order' is covered by layers 'Domain', 'Application'");
+    }
+
+    [Fact]
+    public void OverlappedType_ReferencedByTwoOtherProjects_ReportedOnceWithLocation()
+    {
+        var references = TestCompilation.Create("class C { }").References.ToList();
+        var core = CSharpCompilation.Create(
+            "Core",
+            [CSharpSyntaxTree.ParseText("namespace Shop.Domain.Application { public class Order { } }", path: "Order.cs")],
+            references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        CSharpCompilation User(string name) => CSharpCompilation.Create(
+            name,
+            [CSharpSyntaxTree.ParseText($"namespace {name}.Web {{ public class Page {{ public Shop.Domain.Application.Order? Order; }} }}", path: $"{name}.cs")],
+            [.. references, core.ToMetadataReference()],
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
+
+        var report = _validator.Validate(Pack,
+        [
+            new AnalyzedProject("Core", null, core),
+            new AnalyzedProject("B", null, User("B")),
+            new AnalyzedProject("C", null, User("C")),
+        ]);
+
+        var v = report.Violations.Should().ContainSingle().Subject;
+        v.Kind.Should().Be(ViolationKind.LayerOverlap);
+        v.SourceType.Should().Be("Shop.Domain.Application.Order");
+        v.Location.Should().NotBeNull();
+        v.Location!.Value.FilePath.Should().Be("Order.cs");
+    }
+
+    [Fact]
+    public void OverlappedMetadataType_ReferencedByTwoProjects_ReportedOnce()
+    {
+        var references = TestCompilation.Create("class C { }").References.ToList();
+        var library = CSharpCompilation.Create(
+            "Library",
+            [CSharpSyntaxTree.ParseText("namespace Shop.Domain.Application { public class Order { } }")],
+            references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        CSharpCompilation User(string name) => CSharpCompilation.Create(
+            name,
+            [CSharpSyntaxTree.ParseText($"namespace {name}.Web {{ public class Page {{ public Shop.Domain.Application.Order? Order; }} }}", path: $"{name}.cs")],
+            [.. references, library.ToMetadataReference()],
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
+
+        var report = _validator.Validate(Pack,
+        [
+            new AnalyzedProject("B", null, User("B")),
+            new AnalyzedProject("C", null, User("C")),
+        ]);
+
+        var v = report.Violations.Should().ContainSingle().Subject;
+        v.Kind.Should().Be(ViolationKind.LayerOverlap);
+        v.Location.Should().BeNull();
+    }
+
+    [Fact]
     public void NullArguments_Throw()
     {
         var compilation = TestCompilation.Create("class C { }");
@@ -267,6 +349,50 @@ public class ArchitectureValidatorTests
         ((Action)(() => _validator.Validate(null!, projects))).Should().Throw<ArgumentNullException>();
         ((Action)(() => _validator.Validate(Pack, (IReadOnlyList<AnalyzedProject>)null!))).Should().Throw<ArgumentNullException>();
         ((Action)(() => _validator.Validate(Pack, [null!]))).Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void DependencyRules_TwoFrameworks_MergeToOneViolationWithHighestCount()
+    {
+        const string source = """
+            namespace Web { public class Client { } }
+            namespace Shop.Domain
+            {
+                public class Order
+                {
+                    public Web.Client? A;
+            #if MANY
+                    public Web.Client? B;
+                    public Web.Client? C;
+            #endif
+                }
+            }
+            """;
+        var pack = new RulePack
+        {
+            Name = "test",
+            Layers = [new LayerDefinition { Name = "Domain", Id = "L-DOMAIN", Because = "Domain.", Namespaces = ["**.Domain.**"] }],
+            Rules =
+            [
+                new RuleDefinition { Id = "R-FORBID", Because = "No web.", Kind = RuleKind.Forbid, From = new TargetSelector { Layers = ["Domain"] }, To = new TargetSelector { Namespaces = ["Web"] } },
+                new RuleDefinition { Id = "R-ONLY", Because = "Only hosts.", Kind = RuleKind.AllowOnly, From = new TargetSelector { Namespaces = ["Hosts"] }, To = new TargetSelector { Namespaces = ["Web"] } },
+            ],
+        };
+
+        var report = _validator.Validate(pack,
+        [
+            new AnalyzedProject("App", "net8.0", Compile(source)),
+            new AnalyzedProject("App", "net10.0", Compile(source, "MANY")),
+        ]);
+
+        report.Violations.Should().HaveCount(2);
+        var forbid = report.Violations.First(v => v.Kind == ViolationKind.ForbiddenDependency);
+        forbid.ReferenceCount.Should().Be(3);
+        forbid.Message.Should().Be("Rule 'R-FORBID' forbids this dependency: Shop.Domain.Order references Web.Client 3 times");
+        var only = report.Violations.First(v => v.Kind == ViolationKind.DependencyNotPermitted);
+        only.ReferenceCount.Should().Be(3);
+        only.Message.Should().Be("Rule 'R-ONLY' allows only selected types to depend on Web.Client: Shop.Domain.Order references Web.Client 3 times");
+        report.Violations.Should().OnlyContain(v => v.TargetFrameworks.Count == 0);
     }
 
     private static CSharpCompilation Compile(string source, params string[] symbols)
