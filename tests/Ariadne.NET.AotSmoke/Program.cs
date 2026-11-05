@@ -5,7 +5,7 @@ using ZeroAlloc.Results;
 var pack = new RulePack
 {
     Name = "aot-smoke",
-    Layers = [new LayerDefinition { Name = "Domain" }],
+    Layers = [new LayerDefinition { Name = "Domain", Id = "AOT-DOMAIN", Because = "Smoke layer.", Namespaces = ["Domain.**"] }],
     ComponentRoles = [new ComponentRoleDefinition { Name = "Entity", Layer = "Domain" }],
     Rules =
     [

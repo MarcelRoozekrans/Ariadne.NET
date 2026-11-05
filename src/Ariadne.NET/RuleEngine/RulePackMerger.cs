@@ -163,17 +163,6 @@ public sealed class RulePackMerger : IRulePackMerger
             _ordered.Add(new Entry<T>(item, packIndex, packName));
         }
 
-        public void Set(string key, T item, int packIndex, string packName)
-        {
-            if (_indexByKey.TryGetValue(key, out var index))
-            {
-                _ordered[index] = new Entry<T>(item, packIndex, packName);
-                return;
-            }
-
-            Add(key, item, packIndex, packName);
-        }
-
         // Keeps the defining pack: a retarget or amendment changes the item, not who owns it.
         public void Replace(string key, T item)
         {

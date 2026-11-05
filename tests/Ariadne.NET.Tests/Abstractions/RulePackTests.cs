@@ -93,6 +93,16 @@ public class RulePackTests
         new RuleAmendmentValidator(new RuleExceptionValidator()).Validate(amendment).IsValid.Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData("", "Kept apart.")]
+    [InlineData("L-DOMAIN", "")]
+    public void Layer_WithoutIdOrBecause_FailsValidation(string id, string because)
+    {
+        var layer = new LayerDefinition { Name = "Domain", Id = id, Because = because, Namespaces = ["**.Domain.**"] };
+
+        new LayerDefinitionValidator().Validate(layer).IsValid.Should().BeFalse();
+    }
+
     [Fact]
     public void LayerRetarget_WithoutName_FailsValidation()
     {

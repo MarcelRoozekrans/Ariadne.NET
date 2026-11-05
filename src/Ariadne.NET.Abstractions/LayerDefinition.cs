@@ -6,8 +6,8 @@ namespace Ariadne.NET.Abstractions;
 public sealed class LayerDefinition
 {
     [NotEmpty] public required string Name { get; init; }
-    public string Id { get; init; } = "";
-    public string Because { get; init; } = "";
+    [NotEmpty] public string Id { get; init; } = "";
+    [NotEmpty] public string Because { get; init; } = "";
     public string Description { get; init; } = "";
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> AllowedDependencies { get; init; } = [];
 

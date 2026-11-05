@@ -19,15 +19,18 @@ public class RulePackReferenceCheckTests
         new()
         {
             Name = "p",
-            Layers = layers ?? [new LayerDefinition { Name = "Domain" }],
+            Layers = layers ?? [Layer("Domain")],
             ComponentRoles = roles ?? [],
         };
+
+    private static LayerDefinition Layer(string name, params string[] allowed) =>
+        new() { Name = name, Id = "L-" + name, Because = name + ".", AllowedDependencies = [.. allowed] };
 
     [Fact]
     public void Consistent_pack_passes()
     {
         var pack = Pack(
-            [new LayerDefinition { Name = "Domain" }, new LayerDefinition { Name = "App", AllowedDependencies = ["domain"] }],
+            [Layer("Domain"), Layer("App", "domain")],
             [
                 new ComponentRoleDefinition { Name = "Entity", Layer = "Domain" },
                 new ComponentRoleDefinition { Name = "Service", Layer = "APP", RequiresInterface = true, InterfaceRole = "entity" },
@@ -39,7 +42,7 @@ public class RulePackReferenceCheckTests
     [Fact]
     public void Unknown_allowed_dependency_is_invalid_and_named()
     {
-        var pack = Pack([new LayerDefinition { Name = "App", AllowedDependencies = ["Ghost"] }]);
+        var pack = Pack([Layer("App", "Ghost")]);
 
         var result = Resolve(pack);
 
@@ -88,7 +91,7 @@ public class RulePackReferenceCheckTests
     [Fact]
     public void Layer_names_differing_only_in_case_are_duplicates()
     {
-        var pack = Pack([new LayerDefinition { Name = "Domain" }, new LayerDefinition { Name = "DOMAIN" }]);
+        var pack = Pack([Layer("Domain"), new LayerDefinition { Name = "DOMAIN", Id = "L-DOMAIN-2", Because = "x" }]);
 
         Resolve(pack).Error.Detail
             .Should().Be("Layers[1].Name: duplicate layer name 'DOMAIN'.");
@@ -111,7 +114,7 @@ public class RulePackReferenceCheckTests
     public void Every_failure_is_listed_on_its_own_line()
     {
         var pack = Pack(
-            [new LayerDefinition { Name = "App", AllowedDependencies = ["X", "Y"] }]);
+            [Layer("App", "X", "Y")]);
 
         Resolve(pack).Error.Detail!.Split('\n').Should().HaveCount(2);
     }
@@ -130,11 +133,19 @@ public class RulePackReferenceCheckTests
     }
 
     [Fact]
-    public void EmptyIds_AreNotDuplicates()
+    public void EmptyIds_AreEachReported_NotAsDuplicates()
     {
-        var pack = Pack([new LayerDefinition { Name = "Domain" }, new LayerDefinition { Name = "App" }]);
+        var pack = new RulePack
+        {
+            Name = "p",
+            Layers = [new LayerDefinition { Name = "Domain" }, new LayerDefinition { Name = "App" }],
+            Rules = [Rule("", ["Domain"], ["App"])],
+        };
 
-        Resolve(pack).IsSuccess.Should().BeTrue("v1 layers have no id");
+        Resolve(pack).Error.Detail!.Split('\n').Should().Equal(
+            "Layers[0].Id: Id must not be empty.",
+            "Layers[1].Id: Id must not be empty.",
+            "Rules[0].Id: Id must not be empty.");
     }
 
     [Fact]

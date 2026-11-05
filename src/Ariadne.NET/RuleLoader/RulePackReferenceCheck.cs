@@ -59,16 +59,31 @@ internal static class RulePackReferenceCheck
             : Result<RulePack, AriadneError>.Failure(RulePackError.Invalid(mergedPack.Name, failures));
     }
 
-    // v1 YAML still loads without ids, so an empty id is "none" and never collides.
+    // Layers and rules share one id space. A loaded pack always has ids, but a pack built in code reaches the resolver
+    // without the load-time member rules, so an empty id is reported here, once, rather than as a duplicate of another.
     private static void CheckIds(RulePack pack, List<string> failures)
     {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var id in pack.Layers.Select(static l => l.Id).Concat(pack.Rules.Select(static r => r.Id)))
+        for (var i = 0; i < pack.Layers.Count; i++)
         {
-            if (!string.IsNullOrEmpty(id) && !seen.Add(id))
-            {
-                failures.Add($"duplicate id '{id}'");
-            }
+            CheckId(pack.Layers[i].Id, "Layers", i, seen, failures);
+        }
+
+        for (var i = 0; i < pack.Rules.Count; i++)
+        {
+            CheckId(pack.Rules[i].Id, "Rules", i, seen, failures);
+        }
+    }
+
+    private static void CheckId(string? id, string path, int index, HashSet<string> seen, List<string> failures)
+    {
+        if (string.IsNullOrEmpty(id))
+        {
+            failures.Add($"{path}[{index}].Id: Id must not be empty.");
+        }
+        else if (!seen.Add(id))
+        {
+            failures.Add($"duplicate id '{id}'");
         }
     }
 

@@ -6,6 +6,10 @@ namespace Ariadne.NET.Abstractions;
 public sealed class RulePack
 {
     public required string Name { get; init; }
+    /// <summary>
+    /// The schema version, always 2. The reader accepts only <c>schema: 2</c> and the merger sets 2, so nothing else reads
+    /// this value; it records which schema the pack was written for.
+    /// </summary>
     public int Schema { get; init; } = 2;
     public string Version { get; init; } = "1.0.0";
     public string Author { get; init; } = "";

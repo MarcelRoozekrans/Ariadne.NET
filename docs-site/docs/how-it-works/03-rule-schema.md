@@ -303,7 +303,7 @@ The result is an `AriadneError` with code `Invalid`. Its message gives the count
 
 The reader checks, in one pass: unknown keys (with a did-you-mean when an allowed key is within edit distance 2), duplicate keys, missing required keys, values of the wrong type, empty selectors and invalid patterns. When `schema` is missing or is not `2`, that is the only problem reported, because the rest of the file has another meaning.
 
-Checks that need the whole pack run after the merge: unknown layers in `allowedDependencies`, rule targets and roles; duplicate layer, role and rule ids; layers or rules defined by two packs; retargets and amendments of things no parent defines; and amendments of locked rules.
+Checks that need the whole pack run after the merge: unknown layers in `allowedDependencies`, rule targets and roles; duplicate layer, role and rule ids; an empty layer or rule id, which only a pack built in code can have; layers or rules defined by two packs; retargets and amendments of things no parent defines; and amendments of locked rules.
 
 ## Migrating from v1
 
