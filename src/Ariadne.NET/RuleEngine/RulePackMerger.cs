@@ -163,42 +163,45 @@ public sealed class RulePackMerger : IRulePackMerger
     /// <summary>Items by case-insensitive key, in first-defined order, each with the pack that defined it.</summary>
     private sealed class Owned<T>
     {
-        private readonly Dictionary<string, Entry<T>> _byKey = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, int> _indexByKey = new(StringComparer.OrdinalIgnoreCase);
         private readonly List<Entry<T>> _ordered = [];
 
-        public bool TryGet(string key, out Entry<T> entry) => _byKey.TryGetValue(key, out entry!);
+        public bool TryGet(string key, out Entry<T> entry)
+        {
+            if (_indexByKey.TryGetValue(key, out var index))
+            {
+                entry = _ordered[index];
+                return true;
+            }
+
+            entry = null!;
+            return false;
+        }
 
         public void Add(string key, T item, int packIndex, string packName)
         {
-            var entry = new Entry<T>(item, packIndex, packName);
-            _ordered.Add(entry);
-            _byKey.TryAdd(key, entry);
+            _indexByKey.TryAdd(key, _ordered.Count);
+            _ordered.Add(new Entry<T>(item, packIndex, packName));
         }
 
         public void Set(string key, T item, int packIndex, string packName)
         {
-            if (!_byKey.TryGetValue(key, out var old))
+            if (_indexByKey.TryGetValue(key, out var index))
             {
-                Add(key, item, packIndex, packName);
+                _ordered[index] = new Entry<T>(item, packIndex, packName);
                 return;
             }
 
-            Swap(key, old, new Entry<T>(item, packIndex, packName));
+            Add(key, item, packIndex, packName);
         }
 
         // Keeps the defining pack: a retarget or amendment changes the item, not who owns it.
         public void Replace(string key, T item)
         {
-            var old = _byKey[key];
-            Swap(key, old, old with { Item = item });
+            var index = _indexByKey[key];
+            _ordered[index] = _ordered[index] with { Item = item };
         }
 
         public List<T> Values() => _ordered.Select(static e => e.Item).ToList();
-
-        private void Swap(string key, Entry<T> old, Entry<T> replacement)
-        {
-            _ordered[_ordered.IndexOf(old)] = replacement;
-            _byKey[key] = replacement;
-        }
     }
 }
