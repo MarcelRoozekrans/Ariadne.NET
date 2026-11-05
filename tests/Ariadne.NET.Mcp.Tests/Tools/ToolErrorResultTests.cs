@@ -18,12 +18,19 @@ public sealed class ToolErrorResultTests : IAsyncLifetime
         "generate_component",
         "generate_workspace",
         "validate_source",
-        "lint_source",
     };
 
     public async Task InitializeAsync() => _harness = await McpClientHarness.StartAsync().ConfigureAwait(false);
 
     public async Task DisposeAsync() => await _harness.DisposeAsync().ConfigureAwait(false);
+
+    [Fact]
+    public async Task ToolList_DoesNotContainLintSource()
+    {
+        var tools = await _harness.Client.ListToolsAsync();
+
+        tools.Select(t => t.Name).Should().Contain("validate_source").And.NotContain("lint_source");
+    }
 
     [Theory]
     [MemberData(nameof(PackResolvingTools))]
@@ -103,9 +110,6 @@ public sealed class ToolErrorResultTests : IAsyncLifetime
                 break;
             case "validate_source":
                 arguments["path"] = Path.GetTempPath();
-                break;
-            case "lint_source":
-                arguments["sourceDirectory"] = Path.GetTempPath();
                 break;
         }
 

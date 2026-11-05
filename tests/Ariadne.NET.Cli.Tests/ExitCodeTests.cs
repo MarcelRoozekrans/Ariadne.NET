@@ -234,20 +234,9 @@ public sealed class ExitCodeTests : IDisposable
     }
 
     [Fact]
-    public void Lint_NamespaceMismatch_ShouldReturnViolations()
+    public void Lint_CommandIsRemoved_ShouldNotBeRegistered()
     {
-        WriteSource("MyApp.Orders.Domain", "Order.cs", """
-            namespace MyApp.Orders.Application;
-            public class Order { }
-            """);
-
-        Run("lint", "src").Should().Be(ExitCodes.Violations);
-    }
-
-    [Fact]
-    public void Lint_MissingDirectory_ShouldReturnError()
-    {
-        Run("lint", "does-not-exist").Should().Be(ExitCodes.Error);
+        CliRootCommand.Create(_provider).Subcommands.Select(c => c.Name).Should().NotContain("lint");
     }
 
     [Fact]

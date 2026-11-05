@@ -3,7 +3,6 @@ using Ariadne.NET.Analysis;
 using Ariadne.NET.CodeGeneration;
 using Ariadne.NET.Orchestration;
 using Ariadne.NET.RuleEngine;
-using Ariadne.NET.Validation;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -25,8 +24,18 @@ public class ServiceRegistrationTests
         provider.GetService<ILayerInferenceEngine>().Should().NotBeNull();
         provider.GetService<ICodeGeneratorService>().Should().NotBeNull();
         provider.GetService<IGenerateOrchestrator>().Should().NotBeNull();
-        provider.GetService<ILinter>().Should().NotBeNull();
         provider.GetService<IWorkspaceOrchestrator>().Should().NotBeNull();
+    }
+
+    [Fact]
+    public void AddAriadneNETServices_DoesNotRegisterILinter()
+    {
+        typeof(IGenerateOrchestrator).Assembly.GetType("Ariadne.NET.Validation.ILinter").Should().BeNull();
+
+        var services = new ServiceCollection();
+        services.AddAriadneNETServices();
+
+        services.Select(d => d.ServiceType.Name).Should().NotContain("ILinter");
     }
 
     [Fact]

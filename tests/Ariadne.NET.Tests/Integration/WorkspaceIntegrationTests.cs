@@ -7,7 +7,6 @@ using Ariadne.NET.CodeGeneration;
 using Ariadne.NET.Orchestration;
 using Ariadne.NET.RuleEngine;
 using Ariadne.NET.RuleLoader;
-using Ariadne.NET.Validation;
 
 namespace Ariadne.NET.Tests.Integration;
 
@@ -21,7 +20,6 @@ public sealed class WorkspaceIntegrationTests : IDisposable
     private readonly BuiltinPackRegistry _registry;
     private readonly WorkspaceOrchestrator _workspaceOrchestrator;
     private readonly GenerateOrchestrator _generateOrchestrator;
-    private readonly Linter _linter;
 
     public WorkspaceIntegrationTests()
     {
@@ -34,7 +32,6 @@ public sealed class WorkspaceIntegrationTests : IDisposable
         _generateOrchestrator = new GenerateOrchestrator(
             new LayerInferenceEngine(),
             new CodeGeneratorService());
-        _linter = new Linter();
     }
 
     public void Dispose()
@@ -126,7 +123,7 @@ public sealed class WorkspaceIntegrationTests : IDisposable
     }
 
     [Fact]
-    public void ScaffoldThenLint_GeneratedCode_ShouldPassLint()
+    public void ScaffoldThenValidate_GeneratedCode_ShouldConformToPack()
     {
         var pack = _registry.GetPack("clean-architecture").Value;
 
@@ -145,10 +142,7 @@ public sealed class WorkspaceIntegrationTests : IDisposable
         generateResult.Success.Should().BeTrue();
         WriteGeneratedFiles(generateResult);
 
-        var lintResult = _linter.Lint(pack, _tempDir);
-
-        lintResult.IsClean.Should().BeTrue();
-        lintResult.FilesScanned.Should().Be(3);
+        AssertConformsToPack(pack, generateResult);
     }
 
     [Fact]
