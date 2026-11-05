@@ -114,6 +114,37 @@ public class AllowOnlyRulesTests
         v.Target.Should().Be("Core.Agents.ISubagentRunner");
     }
 
+    [Fact]
+    public void SeveralReferencesFromOneSource_OneViolationWithCount()
+    {
+        var pack = PackWith(Rule(new TargetSelector { Layers = ["Hosts"] }, Runner));
+
+        var v = Check(RunnerSource + "namespace App.Misc { public class Thing { public Core.Agents.ISubagentRunner? A; public Core.Agents.ISubagentRunner? B; public Core.Agents.ISubagentRunner? C; } }", pack)
+            .Should().ContainSingle().Subject;
+
+        v.ReferenceCount.Should().Be(3);
+        v.Message.Should().EndWith("references Core.Agents.ISubagentRunner 3 times");
+    }
+
+    [Fact]
+    public void EmptyFrom_EveryNonTargetSourceViolates()
+    {
+        var pack = PackWith(Rule(new TargetSelector(), Runner));
+
+        Check(RunnerSource + "namespace App.Hosts { public class Host { public Core.Agents.ISubagentRunner? R; } }", pack)
+            .Should().ContainSingle().Which.SourceType.Should().Be("App.Hosts.Host");
+    }
+
+    [Fact]
+    public void ForbidRule_IsIgnored()
+    {
+        var rule = Rule(new TargetSelector { Layers = ["Hosts"] }, Runner);
+        var pack = PackWith(new RuleDefinition { Id = rule.Id, Because = rule.Because, Kind = RuleKind.Forbid, From = new TargetSelector { Layers = ["Hosts"] }, To = Runner });
+
+        Check(RunnerSource + "namespace App.Misc { public class Thing { public Core.Agents.ISubagentRunner? R; } }", pack)
+            .Should().BeEmpty();
+    }
+
     private static IReadOnlyList<ArchitectureViolation> Check(string source, RulePack pack) =>
         Check(TestCompilation.Create(source), pack);
 

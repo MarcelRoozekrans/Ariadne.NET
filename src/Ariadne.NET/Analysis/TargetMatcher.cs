@@ -17,14 +17,20 @@ internal sealed class TargetMatcher
         _selector = selector;
     }
 
-    /// <summary>Compiles the target once. A target that selects nothing at all matches no type.</summary>
+    /// <summary>Compiles the target once. A target that selects nothing at all matches no type, so an empty from never fires a forbid rule and selects no source of an allowOnly rule.</summary>
     /// <param name="target">The target to compile.</param>
     /// <param name="layers">The layer map that resolves layer names.</param>
     /// <returns>The matcher.</returns>
+    /// <exception cref="ArgumentException">The target mixes layers with namespaces, assemblies or types.</exception>
     public static TargetMatcher From(TargetSelector target, LayerMap layers)
     {
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(layers);
+
+        if (target.Layers.Count > 0 && (target.Namespaces.Count > 0 || target.Assemblies.Count > 0 || target.Types.Count > 0))
+        {
+            throw new ArgumentException("A target selects either layers or namespaces, assemblies and types, not both.", nameof(target));
+        }
 
         return new TargetMatcher(
             layers,

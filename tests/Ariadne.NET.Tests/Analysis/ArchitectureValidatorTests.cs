@@ -296,6 +296,50 @@ public class ArchitectureValidatorTests
         ((Action)(() => _validator.Validate(Pack, [null!]))).Should().Throw<ArgumentNullException>();
     }
 
+    [Fact]
+    public void DependencyRules_TwoFrameworks_MergeToOneViolationWithHighestCount()
+    {
+        const string source = """
+            namespace Web { public class Client { } }
+            namespace Shop.Domain
+            {
+                public class Order
+                {
+                    public Web.Client? A;
+            #if MANY
+                    public Web.Client? B;
+                    public Web.Client? C;
+            #endif
+                }
+            }
+            """;
+        var pack = new RulePack
+        {
+            Name = "test",
+            Layers = [new LayerDefinition { Name = "Domain", Id = "L-DOMAIN", Because = "Domain.", Namespaces = ["**.Domain.**"] }],
+            Rules =
+            [
+                new RuleDefinition { Id = "R-FORBID", Because = "No web.", Kind = RuleKind.Forbid, From = new TargetSelector { Layers = ["Domain"] }, To = new TargetSelector { Namespaces = ["Web"] } },
+                new RuleDefinition { Id = "R-ONLY", Because = "Only hosts.", Kind = RuleKind.AllowOnly, From = new TargetSelector { Namespaces = ["Hosts"] }, To = new TargetSelector { Namespaces = ["Web"] } },
+            ],
+        };
+
+        var report = _validator.Validate(pack,
+        [
+            new AnalyzedProject("App", "net8.0", Compile(source)),
+            new AnalyzedProject("App", "net10.0", Compile(source, "MANY")),
+        ]);
+
+        report.Violations.Should().HaveCount(2);
+        var forbid = report.Violations.First(v => v.Kind == ViolationKind.ForbiddenDependency);
+        forbid.ReferenceCount.Should().Be(3);
+        forbid.Message.Should().Be("Rule 'R-FORBID' forbids this dependency: Shop.Domain.Order references Web.Client 3 times");
+        var only = report.Violations.First(v => v.Kind == ViolationKind.DependencyNotPermitted);
+        only.ReferenceCount.Should().Be(3);
+        only.Message.Should().Be("Rule 'R-ONLY' allows only selected types to depend on Web.Client: Shop.Domain.Order references Web.Client 3 times");
+        report.Violations.Should().OnlyContain(v => v.TargetFrameworks.Count == 0);
+    }
+
     private static CSharpCompilation Compile(string source, params string[] symbols)
     {
         var tree = CSharpSyntaxTree.ParseText(

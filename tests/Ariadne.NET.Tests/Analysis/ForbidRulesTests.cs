@@ -124,6 +124,50 @@ public class ForbidRulesTests
         v.Because.Should().Be("Domain stays free of web code.");
     }
 
+    [Fact]
+    public void EmptyFrom_FiresNothing()
+    {
+        var pack = PackWith(Rule(new TargetSelector(), new TargetSelector { Namespaces = ["Web.**"] }));
+
+        Check("""
+            namespace Web.Http { public class Client { } }
+            namespace Shop.Domain { public class Order { public Web.Http.Client? C; } }
+            """, pack).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void EmptyTo_FiresNothing()
+    {
+        var pack = PackWith(Rule(new TargetSelector { Layers = ["Domain"] }, new TargetSelector()));
+
+        Check("""
+            namespace Web.Http { public class Client { } }
+            namespace Shop.Domain { public class Order { public Web.Http.Client? C; } }
+            """, pack).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AllowOnlyRule_IsIgnored()
+    {
+        var rule = Rule(new TargetSelector { Layers = ["Domain"] }, new TargetSelector { Namespaces = ["Web.**"] }) ;
+        var pack = PackWith(new RuleDefinition { Id = rule.Id, Because = rule.Because, Kind = RuleKind.AllowOnly, From = rule.From, To = rule.To });
+
+        Check("""
+            namespace Web.Http { public class Client { } }
+            namespace Shop.Domain { public class Order { public Web.Http.Client? C; } }
+            """, pack).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TargetMixingLayersAndNamespaces_Throws()
+    {
+        var pack = PackWith(Rule(new TargetSelector { Layers = ["Domain"], Namespaces = ["Web.**"] }, new TargetSelector { Namespaces = ["Web.**"] }));
+
+        var act = () => Check("namespace Shop.Domain { public class Order { } }", pack);
+
+        act.Should().Throw<ArgumentException>();
+    }
+
     private static IReadOnlyList<ArchitectureViolation> Check(string source, RulePack pack) =>
         Check(TestCompilation.Create(source), pack);
 
