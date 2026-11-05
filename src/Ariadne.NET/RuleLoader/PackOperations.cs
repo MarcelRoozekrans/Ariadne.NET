@@ -59,7 +59,7 @@ internal sealed class PackOperations : IPackOperations
             {
                 return Result<RulePack, AriadneError>.Failure(new AriadneError(
                     AriadneErrorCode.NotFound,
-                    $"Built-in pack '{name}' not found.",
+                    $"Built-in pack '{PackText.Show(name)}' not found.",
                     $"Available packs: {string.Join(", ", BuiltinPackCatalog.Names)}"));
             }
 
@@ -124,7 +124,7 @@ internal sealed class PackOperations : IPackOperations
 
         return Result<RulePack, AriadneError>.Failure(new AriadneError(
             AriadneErrorCode.Invalid,
-            $"Unsupported extends reference: '{reference}'. Only 'builtin://' and 'import://' references are currently supported."));
+            $"Unsupported extends reference: '{PackText.Show(reference)}'. Only 'builtin://' and 'import://' references are currently supported."));
     }
 
     private static Result<RulePack, AriadneError> LoadImportedPack(string importName, string? workingDirectory, IRulePackLoader loader)

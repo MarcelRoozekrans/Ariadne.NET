@@ -12,7 +12,7 @@ internal static class RulePackError
     /// </summary>
     internal static AriadneError Invalid(string? packName, IEnumerable<string> failures, string unnamedSubject = "Rule pack")
     {
-        var label = string.Join('+', (packName ?? "").Split('+', StringSplitOptions.RemoveEmptyEntries));
+        var label = string.Join('+', (packName ?? "").Split('+', StringSplitOptions.RemoveEmptyEntries).Select(PackText.Show));
         var message = label.Length == 0 ? $"{unnamedSubject} is invalid." : $"Rule pack '{label}' is invalid.";
         return new AriadneError(AriadneErrorCode.Invalid, message, string.Join('\n', failures));
     }

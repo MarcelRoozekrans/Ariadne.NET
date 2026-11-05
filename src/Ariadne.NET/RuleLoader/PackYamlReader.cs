@@ -77,7 +77,7 @@ internal static class PackYamlReader
         catch (YamlException ex)
         {
             var (line, column) = DuplicateKeyFilter.Position(ex.Start);
-            return Result<RulePack, IReadOnlyList<PackProblem>>.Failure([new PackProblem(line, column, ex.Message)]);
+            return Result<RulePack, IReadOnlyList<PackProblem>>.Failure([new PackProblem(line, column, PackText.Escape(ex.Message))]);
         }
 
         return new Walk(parser.Duplicates).Read(stream);
@@ -251,7 +251,7 @@ internal static class PackYamlReader
                 return;
             }
 
-            var where = PeekString(map, "name") is { } known ? $"layer '{known}'" : $"layers[{index}]";
+            var where = PeekString(map, "name") is { } known ? $"layer '{PackText.Show(known)}'" : $"layers[{index}]";
             var before = _problems.Count;
             var fields = Fields(map, LayerKeys, where);
             var name = RequiredString(fields, "name", where, map);
@@ -305,7 +305,7 @@ internal static class PackYamlReader
                 return;
             }
 
-            var where = PeekString(map, "id") is { } known ? $"rule '{known}'" : $"rules[{index}]";
+            var where = PeekString(map, "id") is { } known ? $"rule '{PackText.Show(known)}'" : $"rules[{index}]";
             var before = _problems.Count;
             var fields = Fields(map, RuleKeys, where);
             var id = RequiredString(fields, "id", where, map);
@@ -458,7 +458,7 @@ internal static class PackYamlReader
                 return;
             }
 
-            var where = PeekString(map, "name") is { } known ? $"role '{known}'" : $"componentRoles[{index}]";
+            var where = PeekString(map, "name") is { } known ? $"role '{PackText.Show(known)}'" : $"componentRoles[{index}]";
             var before = _problems.Count;
             var fields = Fields(map, RoleKeys, where);
             var name = RequiredString(fields, "name", where, map);
@@ -503,7 +503,7 @@ internal static class PackYamlReader
                 }
             }
 
-            Add(fields["typeKind"].Key, $"typeKind '{value}' in {where} must be one of {TypeKindNames}");
+            Add(fields["typeKind"].Key, $"typeKind '{PackText.Show(value)}' in {where} must be one of {TypeKindNames}");
             return null;
         }
 
@@ -558,9 +558,10 @@ internal static class PackYamlReader
                 else
                 {
                     var suggestion = KeySuggestion.Closest(key, allowed);
+                    var shown = PackText.Show(key);
                     Add(scalar, suggestion is null
-                        ? $"unknown key '{key}' in {where}"
-                        : $"unknown key '{key}' in {where}; did you mean '{suggestion}'?");
+                        ? $"unknown key '{shown}' in {where}"
+                        : $"unknown key '{shown}' in {where}; did you mean '{suggestion}'?");
                 }
             }
 
@@ -569,7 +570,7 @@ internal static class PackYamlReader
             {
                 foreach (ref readonly var duplicate in CollectionsMarshal.AsSpan(seen))
                 {
-                    _problems.Add(new PackProblem(duplicate.Line, duplicate.Column, $"duplicate key '{duplicate.Key}' in {where}"));
+                    _problems.Add(new PackProblem(duplicate.Line, duplicate.Column, $"duplicate key '{PackText.Show(duplicate.Key)}' in {where}"));
                 }
             }
 
@@ -588,7 +589,7 @@ internal static class PackYamlReader
             {
                 foreach (ref readonly var duplicate in CollectionsMarshal.AsSpan(seen))
                 {
-                    _problems.Add(new PackProblem(duplicate.Line, duplicate.Column, $"duplicate key '{duplicate.Key}' in the pack"));
+                    _problems.Add(new PackProblem(duplicate.Line, duplicate.Column, $"duplicate key '{PackText.Show(duplicate.Key)}' in the pack"));
                 }
             }
 
@@ -702,7 +703,10 @@ internal static class PackYamlReader
                 var glob = compile(values[i]);
                 if (!glob.IsSuccess)
                 {
-                    Add(sequence.Children[i], $"'{values[i]}' in {where} is not a valid pattern: {glob.Error}");
+                    // The glob's reason quotes the pattern too; it is shown the same way as the pattern itself.
+                    var shown = PackText.Show(values[i]);
+                    var reason = glob.Error.Replace($"'{values[i]}'", $"'{shown}'", StringComparison.Ordinal);
+                    Add(sequence.Children[i], $"'{shown}' in {where} is not a valid pattern: {PackText.Escape(reason)}");
                 }
             }
 

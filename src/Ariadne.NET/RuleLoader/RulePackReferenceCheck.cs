@@ -31,7 +31,7 @@ internal static class RulePackReferenceCheck
             {
                 if (!Contains(layerNames, dependencies[d]))
                 {
-                    failures.Add($"Layers[{i}].AllowedDependencies[{d}]: refers to unknown layer '{dependencies[d]}'.");
+                    failures.Add($"Layers[{i}].AllowedDependencies[{d}]: refers to unknown layer '{PackText.Show(dependencies[d])}'.");
                 }
             }
         }
@@ -44,13 +44,13 @@ internal static class RulePackReferenceCheck
             // generation only reads the role's Layer text. With no layer model there is nothing to refer to.
             if (layerNames.Count > 0 && !Contains(layerNames, role.Layer))
             {
-                failures.Add($"ComponentRoles[{i}].Layer: refers to unknown layer '{role.Layer}'.");
+                failures.Add($"ComponentRoles[{i}].Layer: refers to unknown layer '{PackText.Show(role.Layer)}'.");
             }
 
             // The engine reads InterfaceRole only when it is non-empty, so an empty value means "none".
             if (!string.IsNullOrEmpty(role.InterfaceRole) && !Contains(roleNames, role.InterfaceRole))
             {
-                failures.Add($"ComponentRoles[{i}].InterfaceRole: refers to unknown role '{role.InterfaceRole}'.");
+                failures.Add($"ComponentRoles[{i}].InterfaceRole: refers to unknown role '{PackText.Show(role.InterfaceRole)}'.");
             }
         }
 
@@ -83,7 +83,7 @@ internal static class RulePackReferenceCheck
         }
         else if (!seen.Add(id))
         {
-            failures.Add($"duplicate id '{id}'");
+            failures.Add($"duplicate id '{PackText.Show(id)}'");
         }
     }
 
@@ -102,7 +102,7 @@ internal static class RulePackReferenceCheck
         {
             if (!Contains(layerNames, name))
             {
-                failures.Add($"rule '{ruleId}' refers to unknown layer '{name}'");
+                failures.Add($"rule '{PackText.Show(ruleId)}' refers to unknown layer '{PackText.Show(name)}'");
             }
         }
     }
@@ -116,7 +116,7 @@ internal static class RulePackReferenceCheck
             // A missing name is a member-rule failure at load; skip it here rather than report it twice.
             if (!string.IsNullOrEmpty(name) && !seen.Add(name))
             {
-                failures.Add($"{path}[{index}].Name: duplicate {kind} name '{name}'.");
+                failures.Add($"{path}[{index}].Name: duplicate {kind} name '{PackText.Show(name)}'.");
             }
 
             index++;

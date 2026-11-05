@@ -149,6 +149,20 @@ public class RulePackReferenceCheckTests
     }
 
     [Fact]
+    public void PackTextInMessages_IsEscapedAndCut()
+    {
+        var pack = new RulePack
+        {
+            Name = "p",
+            Layers = [Layer("Domain")],
+            Rules = [Rule("R\u001b[2J", ["Domain"], [new string('g', 100)])],
+        };
+
+        Resolve(pack).Error.Detail.Should().Be(
+            $"rule 'R\\u001b[2J' refers to unknown layer '{new string('g', 80)}...'");
+    }
+
+    [Fact]
     public void RuleUnknownLayer_Fails()
     {
         var pack = new RulePack

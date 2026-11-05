@@ -63,7 +63,7 @@ public sealed class RulePackMerger : IRulePackMerger
         {
             if (layers.TryGet(layer.Name, out var existing) && existing.PackIndex != packIndex)
             {
-                problems.Add($"packs '{existing.PackName}' and '{pack.Name}' both define layer '{layer.Name}'");
+                problems.Add($"packs '{PackText.Show(existing.PackName)}' and '{PackText.Show(pack.Name)}' both define layer '{PackText.Show(layer.Name)}'");
                 continue;
             }
 
@@ -74,7 +74,7 @@ public sealed class RulePackMerger : IRulePackMerger
         {
             if (rules.TryGet(rule.Id, out var existing) && existing.PackIndex != packIndex)
             {
-                problems.Add($"packs '{existing.PackName}' and '{pack.Name}' both define rule '{rule.Id}'");
+                problems.Add($"packs '{PackText.Show(existing.PackName)}' and '{PackText.Show(pack.Name)}' both define rule '{PackText.Show(rule.Id)}'");
                 continue;
             }
 
@@ -88,7 +88,7 @@ public sealed class RulePackMerger : IRulePackMerger
         {
             if (!layers.TryGet(retarget.Name, out var target))
             {
-                problems.Add($"pack '{pack.Name}' retargets layer '{retarget.Name}', which no extended pack defines");
+                problems.Add($"pack '{PackText.Show(pack.Name)}' retargets layer '{PackText.Show(retarget.Name)}', which no extended pack defines");
                 continue;
             }
 
@@ -112,14 +112,14 @@ public sealed class RulePackMerger : IRulePackMerger
         {
             if (!rules.TryGet(amendment.Id, out var target))
             {
-                problems.Add($"pack '{pack.Name}' amends rule '{amendment.Id}', which no extended pack defines");
+                problems.Add($"pack '{PackText.Show(pack.Name)}' amends rule '{PackText.Show(amendment.Id)}', which no extended pack defines");
                 continue;
             }
 
             var inherited = target.Item;
             if (inherited.Locked)
             {
-                problems.Add($"rule '{inherited.Id}' from pack '{target.PackName}' is locked; pack '{pack.Name}' cannot add exceptions");
+                problems.Add($"rule '{PackText.Show(inherited.Id)}' from pack '{PackText.Show(target.PackName)}' is locked; pack '{PackText.Show(pack.Name)}' cannot add exceptions");
                 continue;
             }
 

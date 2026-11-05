@@ -820,6 +820,29 @@ public class PackYamlReaderTests
     }
 
     [Fact]
+    public void LongKey_IsCutInTheMessage()
+    {
+        var key = new string('k', 200);
+
+        Problems($"schema: 2\nname: shop\n{key}: x\n").Should().Equal(
+            new PackProblem(3, 1, $"unknown key '{new string('k', 80)}...' in the pack"));
+    }
+
+    [Fact]
+    public void ControlCharacterInKey_IsEscapedInTheMessage()
+    {
+        Problems("schema: 2\nname: shop\n\"a\\e[31m\\tb\": x\n").Should().Equal(
+            new PackProblem(3, 1, "unknown key 'a\\u001b[31m\\u0009b' in the pack"));
+    }
+
+    [Fact]
+    public void ControlCharacterInAName_IsEscapedWhereTheNameSaysWhere()
+    {
+        Problems("schema: 2\nname: shop\nlayers:\n  - name: \"Do\\emain\"\n    id: L\n    because: x\n").Should().Equal(
+            new PackProblem(4, 5, "layer 'Do\\u001bmain' needs at least one of 'namespaces', 'assemblies'"));
+    }
+
+    [Fact]
     public void LayersEntryNotAMapping_Fails()
     {
         Problems("schema: 2\nname: shop\nlayers: [1]\n").Should().Equal(
