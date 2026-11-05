@@ -20,7 +20,8 @@ internal sealed class Glob
 
     /// <summary>
     /// Compiles a dotted pattern. A segment that is exactly <c>**</c> matches zero or more segments and <c>*</c> inside
-    /// a segment matches any run of characters within that segment.
+    /// a segment matches any run of characters within that segment, possibly an empty one. Consecutive <c>**</c>
+    /// segments collapse into one. Malformed names (leading, trailing or doubled dots) are not rejected when matching.
     /// </summary>
     /// <param name="pattern">The pattern to compile.</param>
     /// <returns>The glob, or a message for the loader when the pattern is malformed.</returns>
@@ -32,8 +33,9 @@ internal sealed class Glob
             return Result<Glob, string>.Failure("pattern must not be empty");
         }
 
-        var segments = pattern.Split('.');
-        foreach (var segment in segments)
+        var split = pattern.Split('.');
+        var segments = new List<string>(split.Length);
+        foreach (var segment in split)
         {
             if (segment.Length == 0)
             {
@@ -44,9 +46,17 @@ internal sealed class Glob
             {
                 return Result<Glob, string>.Failure($"'**' must be a whole segment in '{pattern}'");
             }
+
+            var isAny = string.Equals(segment, AnySegments, StringComparison.Ordinal);
+            if (isAny && segments.Count > 0 && string.Equals(segments[^1], AnySegments, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            segments.Add(segment);
         }
 
-        return Result<Glob, string>.Success(new Glob(segments, dotted: true));
+        return Result<Glob, string>.Success(new Glob([.. segments], dotted: true));
     }
 
     /// <summary>Compiles a flat pattern, in which <c>*</c> matches any run of characters, dots included.</summary>
@@ -60,7 +70,10 @@ internal sealed class Glob
             : Result<Glob, string>.Success(new Glob([pattern], dotted: false));
     }
 
-    /// <summary>Whether the glob matches the name. The empty name is the global namespace and matches only <c>**</c>.</summary>
+    /// <summary>
+    /// Whether the glob matches the name. The empty name is the global namespace and matches only <c>**</c>.
+    /// Malformed names (leading, trailing or doubled dots) are not rejected; a <c>*</c> may match an empty segment.
+    /// </summary>
     /// <param name="name">The namespace, type name or assembly name.</param>
     /// <returns>True when the whole name matches.</returns>
     public bool IsMatch(ReadOnlySpan<char> name) =>

@@ -56,6 +56,28 @@ public class GlobTests
         glob.Error.Should().NotBeNullOrWhiteSpace();
     }
 
+    [Fact]
+    public void Dotted_DoubleStarInsideSegment_FailureMentionsDoubleStar()
+    {
+        Glob.Dotted("A.**B").Error.Should().Contain("**");
+    }
+
+    [Fact]
+    public void Flat_EmptyPattern_Fails()
+    {
+        Glob.Flat("").IsFailure.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Dotted_ConsecutiveDoubleStars_DoNotBlowUpOnNonMatch()
+    {
+        var glob = Glob.Dotted("**.**.**.**.**.**.X").Value;
+        var name = string.Join('.', Enumerable.Repeat("Seg", 200));
+
+        glob.IsMatch(name).Should().BeFalse();
+        glob.IsMatch(name + ".X").Should().BeTrue();
+    }
+
     // Interim: measures with GC.GetAllocatedBytesForCurrentThread, see ZeroAlloc-Net/ZeroAlloc.TestHelpers#106;
     // AllocationGate is not referenced in this repo yet.
     [Fact]
@@ -68,6 +90,21 @@ public class GlobTests
         for (var i = 0; i < 1_000; i++)
         {
             glob.IsMatch("Shop.Domain.Orders");
+        }
+
+        (GC.GetAllocatedBytesForCurrentThread() - before).Should().Be(0);
+    }
+
+    [Fact]
+    public void Flat_IsMatch_AllocatesNothing()
+    {
+        var glob = Glob.Flat("Rag.NET*").Value;
+        glob.IsMatch("Rag.NET.Abstractions").Should().BeTrue();
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < 1_000; i++)
+        {
+            glob.IsMatch("Rag.NET.Abstractions");
         }
 
         (GC.GetAllocatedBytesForCurrentThread() - before).Should().Be(0);
