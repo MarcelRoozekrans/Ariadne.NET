@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.2.0...v0.2.1) (2026-11-05)
+
+
+### Documentation
+
+* list all three 0.2.0 breaking changes in the changelog ([#29](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/29)) ([e6d41c0](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e6d41c07309fe4e32760252672e1442fa8d3ec4f))
+
 ## [0.2.0](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.1.1...v0.2.0) (2026-11-04)
 
 
