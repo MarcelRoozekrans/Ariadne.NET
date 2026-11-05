@@ -1,5 +1,7 @@
 using Ariadne.NET.Abstractions;
 using Ariadne.NET.Analysis;
+using Ariadne.NET.RuleEngine;
+using Ariadne.NET.RuleLoader;
 using FluentAssertions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -259,10 +261,8 @@ public class ArchitectureValidatorTests
     [Fact]
     public void RetargetIntoOverlap_ReportsLayerOverlap()
     {
-        var resolver = new Ariadne.NET.RuleLoader.RulePackResolver(
-            new Ariadne.NET.RuleLoader.BuiltinPackRegistry(new Ariadne.NET.RuleLoader.YamlRulePackLoader()),
-            new Ariadne.NET.RuleLoader.YamlRulePackLoader(),
-            new Ariadne.NET.RuleEngine.RulePackMerger());
+        var loader = new YamlRulePackLoader();
+        var resolver = new RulePackResolver(new BuiltinPackRegistry(loader), loader, new RulePackMerger());
         var child = new RulePack
         {
             Name = "child",
