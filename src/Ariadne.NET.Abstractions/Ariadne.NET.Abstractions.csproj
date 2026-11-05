@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsAotCompatible>true</IsAotCompatible>
+    <PackageId>Ariadne.NET.Abstractions</PackageId>
+    <Description>Rule-pack schema and contracts for Ariadne.NET architecture governance. Native AOT compatible; depends only on ZeroAlloc.Results and ZeroAlloc.Validation.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ZeroAlloc.Results" Version="1.4.5" />
+    <PackageReference Include="ZeroAlloc.Validation" Version="2.5.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

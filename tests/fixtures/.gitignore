@@ -1,0 +1,4 @@
+**/bin/
+**/obj/
+.restore.lock
+.restore-marker

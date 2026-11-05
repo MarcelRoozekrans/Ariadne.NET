@@ -31,8 +31,7 @@ GenerateRequest
 GenerateResult
   ├── Success: bool               (true if no errors)
   ├── GeneratedFiles: IReadOnlyList<CodeGenerationResult>
-  ├── Errors: IReadOnlyList<string>
-  └── DependencyViolations: IReadOnlyList<DependencyViolation>
+  └── Errors: IReadOnlyList<string>
 ```
 
 **Algorithm:**

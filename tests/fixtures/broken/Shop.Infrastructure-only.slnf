@@ -1,0 +1,8 @@
+{
+  "solution": {
+    "path": "Shop.slnx",
+    "projects": [
+      "Shop.Infrastructure\\Shop.Infrastructure.csproj"
+    ]
+  }
+}

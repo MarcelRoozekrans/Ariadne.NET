@@ -1,7 +1,56 @@
 <Project>
 
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>moderate</NuGetAuditLevel>
+    <!--
+      The version comes from release-please's manifest, which the release commit bumps, so it names the last release.
+      Only a semantic version under the manifest's "." key is taken; anything else leaves AriadneReleaseVersion empty, and
+      the AriadneCheckReleaseVersion target below fails the build naming the problem.
+
+      - A normal build, local or CI, is versioned <manifest version>-local, such as 0.4.0-local, and the SDK appends the
+        commit to the informational version, as in 0.4.0-local+<sha>. The prerelease suffix keeps a local pack from
+        taking the released package's id and version: NuGet caches packages by id and version, so a local 0.4.0 would
+        shadow the published 0.4.0, which is another commit. A -local version sorts below the release it builds on and
+        is never picked for a stable version range.
+      - A manifest version that is itself a prerelease, such as 1.0.0-beta.1, gets 1.0.0-0.local.beta.1 instead.
+        Appending to the prerelease would sort above it, since a longer prerelease with the same start is the higher
+        one; a leading numeric 0 identifier sorts below every alphanumeric one, so the local build sorts below every
+        1.0.0 prerelease, as a -local build sorts below its release.
+      - A release build passes -p:AriadneRelease=true, which drops the suffix and gives the manifest's version exactly. It
+        is a global property for the whole build, not a pack setting: the version is compiled into every assembly's
+        informational version, and so into the User-Agent and the telemetry version. So it must reach the build that
+        compiles the DLLs as well as the pack, or the pack must build them itself. A dotnet pack with no-build after a
+        build without it ships release-numbered packages whose DLLs still say -local.
+      - AssemblyVersion and FileVersion stay numeric, <major>.<minor>.<patch>.0, whichever build it is.
+    -->
+    <AriadneReleaseManifest>$(MSBuildThisFileDirectory).release-please-manifest.json</AriadneReleaseManifest>
+    <AriadneReleaseVersion Condition="Exists('$(AriadneReleaseManifest)')">$([System.Text.RegularExpressions.Regex]::Match($([System.IO.File]::ReadAllText('$(AriadneReleaseManifest)')), '(?&lt;="\."\s*:\s*")[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(?=")'))</AriadneReleaseVersion>
+    <AriadneReleaseVersionCore Condition="'$(AriadneReleaseVersion)' != ''">$([System.Text.RegularExpressions.Regex]::Match('$(AriadneReleaseVersion)', '^[0-9]+\.[0-9]+\.[0-9]+'))</AriadneReleaseVersionCore>
+    <AriadneLocalVersion Condition="'$(AriadneReleaseVersion)' != '' And $(AriadneReleaseVersion.Contains('-'))">$(AriadneReleaseVersionCore)-0.local.$(AriadneReleaseVersion.Substring($([MSBuild]::Add($(AriadneReleaseVersionCore.Length), 1))))</AriadneLocalVersion>
+    <AriadneLocalVersion Condition="'$(AriadneReleaseVersion)' != '' And !$(AriadneReleaseVersion.Contains('-'))">$(AriadneReleaseVersion)-local</AriadneLocalVersion>
+    <Version Condition="'$(AriadneReleaseVersion)' != '' And '$(AriadneRelease)' == 'true'">$(AriadneReleaseVersion)</Version>
+    <Version Condition="'$(AriadneReleaseVersion)' != '' And '$(AriadneRelease)' != 'true'">$(AriadneLocalVersion)</Version>
+    <AssemblyVersion Condition="'$(AriadneReleaseVersionCore)' != ''">$(AriadneReleaseVersionCore).0</AssemblyVersion>
+    <FileVersion Condition="'$(AriadneReleaseVersionCore)' != ''">$(AriadneReleaseVersionCore).0</FileVersion>
+  </PropertyGroup>
+
+  <!-- NuGet metadata shared by every package -->
+  <PropertyGroup>
+    <Authors>Marcel Roozekrans</Authors>
+    <Company>Marcel Roozekrans</Company>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://marcelroozekrans.github.io/Ariadne.NET/</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/MarcelRoozekrans/Ariadne.NET</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
   <ItemGroup>
-    <PackageReference Include="Meziantou.Analyzer" Version="3.0.318">
+    <PackageReference Include="Meziantou.Analyzer" Version="3.0.320">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
@@ -26,5 +75,13 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
   </ItemGroup>
+
+  <!-- Fails before any build or pack whose version could not be read from the release manifest, instead of building it as 1.0.0. -->
+  <Target Name="AriadneCheckReleaseVersion" BeforeTargets="BeforeBuild;GenerateNuspec">
+    <Error Condition="!Exists('$(AriadneReleaseManifest)')"
+           Text="The release manifest $(AriadneReleaseManifest) is missing. The build reads the version from it; restore the file from git." />
+    <Error Condition="Exists('$(AriadneReleaseManifest)') And '$(AriadneReleaseVersion)' == ''"
+           Text="The release manifest $(AriadneReleaseManifest) has no semantic version under its &quot;.&quot; key, such as { &quot;.&quot;: &quot;0.3.3&quot; }. Fix the file; the build reads the version from it." />
+  </Target>
 
 </Project>
