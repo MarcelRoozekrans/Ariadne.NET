@@ -718,6 +718,112 @@ public class PackYamlReaderTests
             new PackProblem(1, 1, "While scanning a mapping, found invalid tab as indentation."));
     }
 
+    [Fact]
+    public void DuplicateKey_UnderAnUnknownKey_IsStillReported()
+    {
+        var yaml = """
+            schema: 2
+            name: shop
+            owner:
+              team: a
+              team: b
+            """;
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(3, 1, "unknown key 'owner' in the pack"),
+            new PackProblem(5, 3, "duplicate key 'team' in the pack"));
+    }
+
+    [Fact]
+    public void DuplicateKey_InAMappingReachedByAlias_ReportedOnce()
+    {
+        var yaml = """
+            schema: 2
+            name: shop
+            layers:
+              - &core
+                name: Core
+                id: SH-CORE
+                because: x
+                namespaces: ["**.Core.**"]
+                because: y
+              - *core
+            """;
+
+        Problems(yaml).Should().Equal(new PackProblem(9, 5, "duplicate key 'because' in layer 'Core'"));
+    }
+
+    [Fact]
+    public void LayersEntryNotAMapping_Fails()
+    {
+        Problems("schema: 2\nname: shop\nlayers: [1]\n").Should().Equal(
+            new PackProblem(3, 10, "'layers[0]' in the pack must be a mapping"));
+    }
+
+    [Fact]
+    public void RulesEntryNotAMapping_Fails()
+    {
+        Problems("schema: 2\nname: shop\nrules:\n  - SH-001\n").Should().Equal(
+            new PackProblem(4, 5, "'rules[0]' in the pack must be a mapping"));
+    }
+
+    [Fact]
+    public void KeyWithEmptyValue_IsNotAString()
+    {
+        Problems("schema: 2\nname:\n").Should().Equal(new PackProblem(2, 1, "'name' in the pack must be a string"));
+    }
+
+    [Fact]
+    public void NonScalarKey_MustBeAString()
+    {
+        Problems("schema: 2\nname: shop\n? [a, b]\n: x\n").Should().Equal(
+            new PackProblem(3, 3, "a key in the pack must be a string"));
+    }
+
+    [Fact]
+    public void MergeKey_IsAnUnknownKey()
+    {
+        var yaml = """
+            schema: 2
+            name: shop
+            componentRoles:
+              - &entity
+                name: Entity
+                layer: Domain
+              - <<: *entity
+                name: Aggregate
+            """;
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(7, 5, "unknown key '<<' in role 'Aggregate'"),
+            new PackProblem(7, 5, "role 'Aggregate' has no 'layer'"));
+    }
+
+    [Fact]
+    public void TypeKind_IgnoresCase()
+    {
+        var result = PackYamlReader.Read("schema: 2\nname: shop\ncomponentRoles:\n  - name: Entity\n    layer: Domain\n    typeKind: class\n");
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        result.Value.ComponentRoles[0].TypeKind.Should().Be(CSharpTypeKind.Class);
+    }
+
+    [Fact]
+    public void UnknownKeys_UnderNamingConventions()
+    {
+        var yaml = """
+            schema: 2
+            name: shop
+            namingConventions:
+              namespce: "{Layer}"
+              owner: x
+            """;
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(4, 3, "unknown key 'namespce' in the namingConventions; did you mean 'namespace'?"),
+            new PackProblem(5, 3, "unknown key 'owner' in the namingConventions"));
+    }
+
     [Theory]
     [InlineData("allowedDependancies", "allowedDependencies")]
     [InlineData("nmae", "name")]

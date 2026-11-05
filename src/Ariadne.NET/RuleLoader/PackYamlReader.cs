@@ -70,14 +70,12 @@ internal static class PackYamlReader
         }
         catch (YamlException ex)
         {
-            var (line, column) = Position(ex.Start);
+            var (line, column) = DuplicateKeyFilter.Position(ex.Start);
             return Result<RulePack, IReadOnlyList<PackProblem>>.Failure([new PackProblem(line, column, ex.Message)]);
         }
 
         return new Walk(parser.Duplicates).Read(stream);
     }
-
-    private static (int Line, int Column) Position(Mark mark) => (checked((int)mark.Line), checked((int)mark.Column));
 
     private static bool IsNull(YamlScalarNode scalar) =>
         scalar.Style == ScalarStyle.Plain && scalar.Value is null or "" or "~" or "null" or "Null" or "NULL";
@@ -114,10 +112,8 @@ internal static class PackYamlReader
         public string Name => Key.Value ?? "";
     }
 
-    private readonly record struct DuplicateKey(string Key, int Line, int Column);
-
     /// <summary>One read of one file: the walk over the representation model and the problems it found.</summary>
-    private sealed class Walk(Dictionary<(int Line, int Column), List<DuplicateKey>> duplicates)
+    private sealed class Walk(Dictionary<(int Line, int Column), List<DuplicateKeyFilter.DuplicateKey>> duplicates)
     {
         private readonly List<PackProblem> _problems = [];
         private bool _hasExtends;
@@ -177,6 +173,7 @@ internal static class PackYamlReader
             var (rules, amendments) = ReadRules(fields, where);
             var roles = ReadRoles(fields, where);
             var naming = ReadNaming(fields, where);
+            ReportUnvisitedDuplicates();
             if (name is null)
             {
                 return null;
@@ -532,7 +529,7 @@ internal static class PackYamlReader
             {
                 if (keyNode is not YamlScalarNode { Value: { } key } scalar)
                 {
-                    Add(keyNode, $"unknown key '{keyNode}' in {where}");
+                    Add(keyNode, $"a key in {where} must be a string");
                     continue;
                 }
 
@@ -554,7 +551,7 @@ internal static class PackYamlReader
             }
 
             // Removed once reported, so a mapping reached again through an alias does not report them twice.
-            if (duplicates.Remove(Position(mapping.Start), out var seen))
+            if (duplicates.Remove(DuplicateKeyFilter.Position(mapping.Start), out var seen))
             {
                 foreach (ref readonly var duplicate in CollectionsMarshal.AsSpan(seen))
                 {
@@ -563,6 +560,20 @@ internal static class PackYamlReader
             }
 
             return fields;
+        }
+
+        // Repeats inside a mapping the walk never reached, such as one under an unknown key: never silently dropped.
+        private void ReportUnvisitedDuplicates()
+        {
+            foreach (var seen in duplicates.Values)
+            {
+                foreach (ref readonly var duplicate in CollectionsMarshal.AsSpan(seen))
+                {
+                    _problems.Add(new PackProblem(duplicate.Line, duplicate.Column, $"duplicate key '{duplicate.Key}' in the pack"));
+                }
+            }
+
+            duplicates.Clear();
         }
 
         private string? RequiredString(Dictionary<string, Field> fields, string key, string where, YamlMappingNode parent)
@@ -693,7 +704,7 @@ internal static class PackYamlReader
 
         private void Add(YamlNode node, string message)
         {
-            var (line, column) = Position(node.Start);
+            var (line, column) = DuplicateKeyFilter.Position(node.Start);
             _problems.Add(new PackProblem(line, column, message));
         }
 
@@ -718,121 +729,5 @@ internal static class PackYamlReader
 
         private static YamlNode Later(YamlNode a, YamlNode b) =>
             a.Start.Line > b.Start.Line || (a.Start.Line == b.Start.Line && a.Start.Column > b.Start.Column) ? a : b;
-    }
-
-    /// <summary>
-    /// Passes parser events through, but drops the second and later occurrence of a scalar key in a mapping together
-    /// with its value, recording it by the mapping's start. The representation model would otherwise stop at the first
-    /// duplicate with an exception and no other problem would be reported.
-    /// </summary>
-    private sealed class DuplicateKeyFilter(IParser inner) : IParser
-    {
-        private readonly Stack<Frame> _frames = new();
-
-        public Dictionary<(int Line, int Column), List<DuplicateKey>> Duplicates { get; } = [];
-
-        public ParsingEvent? Current => inner.Current;
-
-        public bool MoveNext()
-        {
-            while (inner.MoveNext())
-            {
-                var current = inner.Current;
-                if (current is Scalar key
-                    && _frames.TryPeek(out var frame)
-                    && frame.IsMapping
-                    && frame.ExpectKey
-                    && !frame.Keys.Add(key.Value))
-                {
-                    Record(frame.Start, key);
-                    SkipNode();
-                    continue;
-                }
-
-                Track(current);
-                return true;
-            }
-
-            return false;
-        }
-
-        private void Record(Mark mappingStart, Scalar key)
-        {
-            var at = Position(mappingStart);
-            if (!Duplicates.TryGetValue(at, out var list))
-            {
-                list = [];
-                Duplicates[at] = list;
-            }
-
-            var (line, column) = Position(key.Start);
-            list.Add(new DuplicateKey(key.Value, line, column));
-        }
-
-        // Consumes the next node, a scalar, an alias or a whole collection.
-        private void SkipNode()
-        {
-            var depth = 0;
-            while (inner.MoveNext())
-            {
-                switch (inner.Current)
-                {
-                    case MappingStart or SequenceStart:
-                        depth++;
-                        break;
-                    case MappingEnd or SequenceEnd:
-                        depth--;
-                        break;
-                }
-
-                if (depth == 0)
-                {
-                    return;
-                }
-            }
-        }
-
-        private void Track(ParsingEvent? current)
-        {
-            switch (current)
-            {
-                case DocumentStart:
-                    _frames.Clear();
-                    break;
-                case MappingStart mapping:
-                    _frames.Push(new Frame(isMapping: true, mapping.Start));
-                    break;
-                case SequenceStart sequence:
-                    _frames.Push(new Frame(isMapping: false, sequence.Start));
-                    break;
-                case MappingEnd or SequenceEnd:
-                    _frames.Pop();
-                    Completed();
-                    break;
-                case Scalar or AnchorAlias:
-                    Completed();
-                    break;
-            }
-        }
-
-        // A node finished: in a mapping, a key is followed by its value and a value by the next key.
-        private void Completed()
-        {
-            if (_frames.TryPeek(out var frame) && frame.IsMapping)
-            {
-                frame.ExpectKey = !frame.ExpectKey;
-            }
-        }
-
-        private sealed class Frame(bool isMapping, Mark start)
-        {
-            public bool IsMapping { get; } = isMapping;
-
-            public Mark Start { get; } = start;
-
-            public bool ExpectKey { get; set; } = true;
-
-            public HashSet<string> Keys { get; } = new(StringComparer.Ordinal);
-        }
     }
 }
