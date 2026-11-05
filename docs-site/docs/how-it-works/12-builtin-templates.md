@@ -4,7 +4,9 @@ sidebar_position: 12
 
 # Built-in Templates
 
-Ten templates ship as embedded YAML resources. They fall into two categories:
+Ten templates ship as embedded YAML resources, all in schema 2. They fall into two categories:
+
+Every layer of a standalone template has an `id` with a pack prefix (`CA-` for clean-architecture, `ONION-`, `HEX-`, `LAY-`, `MS-`, `ED-`, `VS-` and `MM-` for the others, as in `CA-LAYER-DOMAIN`), a `because` written for that architecture, and a namespace selector of the form `**.<Segment>.**`. `Domain` in clean-architecture is `**.Domain.**`, which matches `Shop.Domain` and `Shop.Orders.Domain.Entities`. A solution whose namespaces do not follow that naming retargets the layers; see [Rule Schema](03-rule-schema.md#extends). None of the built-in packs defines `rules` yet.
 
 ## Standalone Templates
 
@@ -21,8 +23,6 @@ Standalone templates define their own layers and can be used independently.
 | Infrastructure | Domain, Application | Repository (internal), ExternalService (internal) |
 | WebApi | Domain, Application, Infrastructure | Controller, Middleware |
 
-Code feature rules: `CODE-001` (interface-required roles must have interfaces), `CODE-002` (implementations should be internal).
-
 ```mermaid
 graph LR
     WebApi --> Infrastructure
@@ -35,7 +35,7 @@ graph LR
 
 ### onion-architecture
 
-5 layers, 15 roles. Onion Architecture (Jeffrey Palermo).
+5 layers, 14 roles. Onion Architecture (Jeffrey Palermo).
 
 | Layer | Dependencies | Key Roles |
 |-------|-------------|-----------|
@@ -181,9 +181,11 @@ graph TD
     Module.Core --> Module.Public
 ```
 
+The layers select `**.Public.**`, `**.Core.**`, `**.Infrastructure.**` and `**.Host.**`, so `Orders.Core` and `Billing.Core` are one layer, and `Orders.Core` may depend on `Billing.Core`. The pack does not isolate modules from each other. A rule type for module isolation is tracked in [issue #32](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/32).
+
 ## Composable Add-on Templates
 
-Add-on templates define only component roles (no layers). They are designed to be composed with standalone templates via the `extends` field.
+Add-on templates define only component roles (no layers). They are designed to be composed with standalone templates via the `extends` field. Only role-only add-ons compose with a layer pack: two templates that both define layers fail to compose.
 
 ### cqrs
 
@@ -221,10 +223,11 @@ Add-on templates define only component roles (no layers). They are designed to b
 
 ## Composing Templates
 
-Templates compose via the merge algorithm described in [Rule Engine](05-rule-engine.md):
+Templates compose via the merge described in [Rule Engine](05-rule-engine.md). A layer or rule can be defined by one pack only, so exactly one standalone template can be the base, and the add-ons come on top of it:
 
 ```yaml
 # .architecture/rules.yaml
+schema: 2
 name: my-project
 extends:
   - builtin://clean-architecture    # base: 4 layers, 19 roles
@@ -238,13 +241,14 @@ componentRoles:
     typeKind: Class
 ```
 
-The `cqrs` and `ddd-tactical` roles name the Application and Domain layers but declare no layers of their own. They resolve on their own, but combine them with a base pack that declares those layers; once the merged pack has any layer, a role naming an undeclared layer is an Invalid error.
+Naming two standalone templates fails the load. `clean-architecture+microservice` gives, for each layer both define, a message such as `packs 'clean-architecture' and 'microservice' both define layer 'Domain'`. Pick one base architecture and retarget its layers instead.
+
+The `cqrs` and `ddd-tactical` roles name the Application and Domain layers but declare no layers of their own. They resolve on their own, but combine them with a base pack that declares those layers; once the merged pack has any layer, a role naming an undeclared layer is an Invalid error. Composing `ddd-tactical` with a base pack that has no `Domain` layer, such as `hexagonal-architecture`, fails for that reason.
 
 The resolved pack will have:
 - **Name:** `"clean-architecture+cqrs+ddd-tactical+my-project"`
 - **Layers:** 4 (from clean-architecture, unmodified since add-ons define no layers)
 - **Roles:** ~30 (19 + 7 + 9, minus overlaps where later packs override)
-- **Rules:** 2 (from clean-architecture, locked — cannot be overridden)
+- **Rules:** none, because no built-in pack defines rules yet
 
 ---
-

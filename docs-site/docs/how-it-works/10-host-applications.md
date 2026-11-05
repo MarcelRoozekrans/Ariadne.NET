@@ -23,7 +23,7 @@ ariadne init --template clean-architecture+cqrs+ddd-tactical
 
 - Splits template string by `+`
 - Validates each pack name exists in the registry
-- Creates `.architecture/rules.yaml` with `extends` list
+- Creates `.architecture/rules.yaml` with `schema: 2`, a `name` taken from the current directory and the `extends` list
 
 ### `rules` — Print resolved layer rules
 
@@ -33,7 +33,7 @@ ariadne rules
 
 - Loads `.architecture/rules.yaml` from current directory
 - Resolves all extends references
-- Prints layers with their allowed dependencies
+- Prints each layer with its id, its selectors and the layers it depends on, then each rule with its id, targets, number of exceptions and `because`, then the number of component roles and the naming conventions
 
 ### `roles` — Print component roles table
 
@@ -81,16 +81,6 @@ Result: FAIL - 1 violation(s) found.
 ```
 
 File paths are shown relative to the directory of the solution or project.
-
-### `lint` — Lint source code
-
-```bash
-ariadne lint ./src
-```
-
-- Argument: `path` (default: `"./src"`)
-- Runs namespace-vs-directory consistency check
-- Prints files scanned and any violations
 
 ### `sync` — Sync rule packs from git
 
@@ -160,13 +150,12 @@ flowchart TD
 | Tool | Parameters | Returns | Description |
 |------|-----------|---------|-------------|
 | `list_templates` | — | `IReadOnlyList<string>` | List available templates |
-| `get_layers` | `template?` | `IList<LayerDefinition>` | Layer definitions with dependencies |
+| `get_layers` | `template?` | `IList<LayerDefinition>` | Layers with id, selectors, dependencies and because |
 | `get_component_roles` | `template?` | `IList<ComponentRoleDefinition>` | Available roles for code generation |
-| `get_rules` | `template?` | `IList<CodeFeatureRuleDefinition>` | Structural enforcement rules |
+| `get_rules` | `template?` | `IList<RuleDefinition>` | Forbid and allowOnly rules with id, targets, exceptions and because |
 | `generate_component` | `role`, `name`, `solution`, `feature`, `template?` | `GenerateResult` | Generate a C# component |
 | `generate_workspace` | `solution`, `features`, `template?` | `WorkspaceGenerateResult` | Scaffold project structure |
 | `validate_source` | `path`, `template?` | `ArchitectureReport` | Validate a solution or project against rules |
-| `lint_source` | `sourceDirectory`, `template?` | `LintResult` | Lint for mismatches |
 
 **MCP Resources:**
 

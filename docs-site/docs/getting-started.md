@@ -38,6 +38,7 @@ var validator = services.GetRequiredService<ISolutionValidator>();
 
 // A rule pack that builds on the built-in clean-architecture pack.
 var pack = loader.LoadFromString("""
+    schema: 2
     name: my-service
     extends:
       - builtin://clean-architecture
@@ -80,6 +81,6 @@ foreach (var violation in report.Violations)
 return report.IsValid ? 0 : 1;
 ```
 
-`dotnet run` prints the resolved pack name, its layer and component role counts, and each layer with the layers it may depend on. It then checks the solution or project you pass as the first argument, or the one in the current directory, and prints how many types it checked. Each violation follows as `[Kind] file:line: message`. The exit code is 1 when there are violations and 2 when the pack or the solution cannot be loaded.
+`dotnet run` prints the resolved pack name, its layer and component role counts, and each layer with the layers it may depend on. The built-in layers cover namespaces such as `**.Domain.**`, so the check finds layers in a solution whose namespaces contain those segments; see [Rule Schema](how-it-works/03-rule-schema.md) to point a layer at your own namespaces or assemblies. It then checks the solution or project you pass as the first argument, or the one in the current directory, and prints how many types it checked. Each violation follows as `[Kind] file:line: message`. The exit code is 1 when there are violations and 2 when the pack or the solution cannot be loaded.
 
-The path may be a `.sln`, `.slnx`, `.slnf` or `.csproj` file, or a directory that holds exactly one of them. Ariadne.NET.Workspaces needs a .NET SDK on the machine, and it never restores: run `dotnet restore` on the solution before you check it. See [Validation and Linting](how-it-works/08-validation.md) for what counts as a dependency and which projects are checked.
+The path may be a `.sln`, `.slnx`, `.slnf` or `.csproj` file, or a directory that holds exactly one of them. Ariadne.NET.Workspaces needs a .NET SDK on the machine, and it never restores: run `dotnet restore` on the solution before you check it. See [Validation](how-it-works/08-validation.md) for what counts as a dependency and which projects are checked.
