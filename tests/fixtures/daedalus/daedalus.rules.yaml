@@ -17,6 +17,9 @@ layers:
   - name: Agents
     id: DAE-LAYER-AGENTS
     because: Agent code is isolated in its own layer, which only the composition root wires up.
+    # Selects only the Runtime namespaces on purpose. A layer that covered the whole assembly would make
+    # DAE-APP-NOT-ON-AGENTS redundant with the inherited CA-LAYER-APPLICATION rule, because a child pack
+    # cannot add Agents to the allowedDependencies of Application.
     namespaces: ["Daedalus.Agents.Runtime.**"]
     description: "Agent implementations and retrieval"
     allowedDependencies: []
@@ -29,6 +32,8 @@ rules:
         layers: [Domain]
       to:
         namespaces: ["Microsoft.EntityFrameworkCore.**"]
+  # Targets the whole Daedalus.Agents assembly. The broken variant exercises it through the Contracts type,
+  # which sits outside the Agents layer, so only this rule fires.
   - id: DAE-APP-NOT-ON-AGENTS
     because: Use cases reach agents only through interfaces they own, so the application never depends on agent code.
     forbid:

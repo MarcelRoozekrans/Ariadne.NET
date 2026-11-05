@@ -10,6 +10,7 @@ namespace Ariadne.NET.Workspaces.Tests;
 /// <summary>Checks the Daedalus-shaped fixture solutions against the schema 2 pack that extends the clean-architecture built-in.</summary>
 public sealed class DaedalusFixtureTests
 {
+    // Copied from the pinned clean-architecture built-in, layer CA-LAYER-DOMAIN.
     private const string DomainBecause = "The domain is the core of the architecture and depends on no other layer.";
     private const string NoEfCoreBecause = "The domain stays free of persistence frameworks, so it can be tested and reused without a database.";
     private const string NotOnAgentsBecause = "Use cases reach agents only through interfaces they own, so the application never depends on agent code.";
