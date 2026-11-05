@@ -6,6 +6,8 @@
 ### ⚠ BREAKING CHANGES
 
 * validate no longer takes a source directory of .cs files.
+* MCP validate_source takes path, a solution or project, in place of sourceDirectory, and returns an ArchitectureReport.
+* ISourceValidator, SourceValidator, SourceValidationResult, SourceViolation, IDependencyValidator, DependencyValidator, DependencyViolation and GenerateResult.DependencyViolations are removed. Use IArchitectureValidator, or ISolutionValidator from Ariadne.NET.Workspaces.
 
 ### Features
 
