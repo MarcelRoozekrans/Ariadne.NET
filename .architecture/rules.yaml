@@ -34,3 +34,21 @@ layers:
       - Core
       - Workspaces
       - Host
+
+rules:
+  - id: ARIADNE-CORE-NO-HOSTS
+    because: Core is a library every host uses; it must not know them.
+    description: "Core never references a host or the workspace loader"
+    forbid:
+      from:
+        layers: [Core]
+      to:
+        assemblies: ["Ariadne.NET.Cli", "Ariadne.NET.Mcp", "Ariadne.NET.Mcp.Http", "Ariadne.NET.Workspaces"]
+  - id: ARIADNE-CORE-NO-HOST-FRAMEWORKS
+    because: Hosts orchestrate; Core holds the logic and runs inside any of them.
+    description: "Core never uses a host framework"
+    forbid:
+      from:
+        layers: [Core]
+      to:
+        namespaces: ["Microsoft.AspNetCore.**", "System.CommandLine.**", "ModelContextProtocol.**"]
