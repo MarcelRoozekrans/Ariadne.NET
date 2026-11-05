@@ -2,7 +2,7 @@ import {themes as prismThemes} from 'prism-react-renderer';
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: 'Architecture Governance Engine',
+  title: 'Ariadne.NET',
   tagline: 'AI generates behavior. The engine governs structure.',
   favicon: 'img/favicon.ico',
 
@@ -11,17 +11,19 @@ const config = {
   },
 
   url: 'https://MarcelRoozekrans.github.io',
-  baseUrl: '/architecture-governance-engine/',
+  baseUrl: '/Ariadne.NET/',
 
   organizationName: 'MarcelRoozekrans',
-  projectName: 'architecture-governance-engine',
+  projectName: 'Ariadne.NET',
 
   onBrokenLinks: 'warn',
-  onBrokenMarkdownLinks: 'warn',
 
   markdown: {
     mermaid: true,
     format: 'md',
+    hooks: {
+      onBrokenMarkdownLinks: 'warn',
+    },
   },
   themes: ['@docusaurus/theme-mermaid'],
 
@@ -39,7 +41,7 @@ const config = {
           sidebarPath: './sidebars.js',
           routeBasePath: '/',
           editUrl:
-            'https://github.com/MarcelRoozekrans/architecture-governance-engine/tree/main/docs-site/',
+            'https://github.com/MarcelRoozekrans/Ariadne.NET/tree/main/docs-site/',
         },
         blog: false,
         theme: {
@@ -56,7 +58,7 @@ const config = {
         respectPrefersColorScheme: true,
       },
       navbar: {
-        title: 'ArchGov',
+        title: 'Ariadne.NET',
         items: [
           {
             type: 'docSidebar',
@@ -65,7 +67,7 @@ const config = {
             label: 'Docs',
           },
           {
-            href: 'https://github.com/MarcelRoozekrans/architecture-governance-engine',
+            href: 'https://github.com/MarcelRoozekrans/Ariadne.NET',
             label: 'GitHub',
             position: 'right',
           },
@@ -87,7 +89,7 @@ const config = {
             items: [
               {
                 label: 'GitHub',
-                href: 'https://github.com/MarcelRoozekrans/architecture-governance-engine',
+                href: 'https://github.com/MarcelRoozekrans/Ariadne.NET',
               },
               {
                 label: 'NuGet (ZInject)',

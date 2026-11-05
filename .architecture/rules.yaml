@@ -1,6 +1,6 @@
-name: architecture-governance-engine
+name: ariadne
 version: "1.0.0"
-author: archgov-team
+author: ariadne
 extends:
   - builtin://clean-architecture
 
@@ -19,11 +19,11 @@ layers:
       - Host
 
 codeFeatureRules:
-  - id: ARCHGOV-001
+  - id: ARIADNE-001
     description: "Core must have zero host dependencies"
     appliesTo:
       layer: Core
-  - id: ARCHGOV-002
+  - id: ARIADNE-002
     description: "Hosts must only orchestrate, not contain business logic"
     appliesTo:
       layer: Host

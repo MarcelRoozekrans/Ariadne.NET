@@ -4,7 +4,7 @@ sidebar_position: 5
 
 # Rule Engine
 
-The rule engine provides three core services: pack merging, dependency validation, and layer inference.
+The rule engine provides two core services: pack merging and layer inference. Checking existing code against the layer rules is done by the semantic validator; see [Validation and Linting](08-validation.md).
 
 ## RulePackMerger
 
@@ -58,33 +58,6 @@ MergeResult
   ├── MergedPack: RulePack         (the combined result)
   └── Warnings: IReadOnlyList<MergeWarning>  (locked rule override attempts)
 ```
-
-## DependencyValidator
-
-**Interface:** `IDependencyValidator`
-**Implementation:** `DependencyValidator`
-
-Validates whether a source layer is allowed to depend on a set of target layers according to the resolved rule pack.
-
-```
-IDependencyValidator
-  └── Validate(RulePack resolvedPack, string sourceLayer, IReadOnlyList<string> dependsOnLayers)
-        → IReadOnlyList<DependencyViolation>
-```
-
-**Validation algorithm:**
-
-```mermaid
-flowchart TD
-    A["Input: sourceLayer=Domain<br/>dependsOnLayers=[Infrastructure, Application]"] --> B["Find LayerDefinition for 'Domain'<br/>→ allowedDependencies: []"]
-    B --> C["Build allowedSet = {} (empty)"]
-    C --> D{"Check: Infrastructure<br/>in allowedSet?"}
-    D -->|No| E["VIOLATION<br/>Domain → Infrastructure"]
-    C --> F{"Check: Application<br/>in allowedSet?"}
-    F -->|No| G["VIOLATION<br/>Domain → Application"]
-```
-
-**Edge case:** If `sourceLayer` doesn't match any known layer, a single violation is returned with an empty target and the message `"Unknown layer: {sourceLayer}"`.
 
 ## LayerInferenceEngine
 

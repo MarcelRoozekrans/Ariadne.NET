@@ -1,10 +1,10 @@
 ---
-sidebar_position: 2
+sidebar_position: 3
 ---
 
 # Features
 
-Complete feature reference for the Architecture Governance Engine.
+Complete feature reference for Ariadne.NET.
 
 ## Declarative Rule Packs
 
@@ -56,7 +56,7 @@ Ten templates ship out of the box, covering the most common architectural patter
 | `cqrs` | _(composable)_ | 7 | Add-on |
 | `ddd-tactical` | _(composable)_ | 9 | Add-on |
 
-**Standalone** templates define their own layers and can be used independently. **Add-on** templates define only component roles and are designed to be composed with a standalone template.
+**Standalone** templates define their own layers and can be used independently. **Add-on** templates define only component roles and are designed to be composed with a standalone template: a role-only pack resolves on its own, but combining it with a base pack that declares the layers its roles name (for example Application and Domain) is recommended. When the merged pack declares at least one layer, a role naming an undeclared layer is an Invalid error.
 
 ## Composability & Merge Semantics
 
@@ -77,6 +77,8 @@ Merge rules applied in order (first pack is the base, subsequent packs overlay):
 | Component Roles | Merged by name. Later pack overrides earlier. |
 | Code Feature Rules | Merged by ID. **Locked rules cannot be overridden** — attempts produce a warning. |
 | Naming Conventions | Last pack wins. |
+
+Validation rejects an empty `Namespace` or `FilePath` in the naming conventions.
 
 Use `MergeWithDiagnostics` programmatically to inspect merge warnings (e.g., locked rule override attempts).
 
@@ -109,20 +111,28 @@ The engine automatically resolves which layer a component belongs to based on it
 - **Alternative names**: roles can declare `alternativeNames` for flexible matching
 - **Ambiguity detection**: if a role name matches multiple definitions, the engine returns an `Ambiguous` status with all matching options
 
-## Dependency Validation
+## Semantic Validation
 
-Validates that layer dependencies in source code comply with architecture rules by analyzing Roslyn-parsed `using` directives.
+Checks a solution or project against the architecture rules with the compiler's semantic model. `Ariadne.NET.Workspaces` loads the projects with MSBuild, and the engine builds a type graph from each compilation. A dependency is a type reference somebody wrote: base types, interfaces, attributes, member signatures, generic arguments and types used in bodies. An unused `using` and `var` give nothing, and generated code is never a source.
 
 Detected violations:
-- **DependencyViolation** — a `using` directive references a layer not in `allowedDependencies`
-- **TypeKindMismatch** — a type declaration doesn't match the role's expected type kind
-- **AccessibilityMismatch** — a type's accessibility modifier doesn't match the role definition
+- **DependencyNotAllowed** — a type references a type in a layer that is not in its layer's `allowedDependencies`. One violation per source type and target type, located at the first reference, with a reference count.
+- **TypeKindMismatch** — a type doesn't match the role's expected type kind
+- **AccessibilityMismatch** — a type's accessibility doesn't match the role definition; a top-level type with no access modifier counts as internal (a nested one is private)
 - **MissingInterface** — a role requires an interface but none was found
+
+Each violation has a rule id, `layer/<Layer>` or `role/<Role>`. A project that targets several frameworks is checked once per framework, and a violation found in only some of them lists them. See [Validation and Linting](how-it-works/08-validation.md) for the details.
+
+Ariadne never restores, so run `dotnet restore` before you validate. The CLI exits 0 when clean, 1 on violations and 2 on an error.
+
+> Until the `ariadne` dotnet tool ships, run these commands as `dotnet run --project src/Ariadne.NET.Cli -- <command>`.
 
 ```bash
 # CLI
-arch validate ./src
+ariadne validate MyApp.slnx
 ```
+
+The path is a `.sln`, `.slnx`, `.slnf` or `.csproj` file, or a directory that holds exactly one; it defaults to `.`. The package that does the loading, `Ariadne.NET.Workspaces`, needs a .NET SDK on the machine.
 
 ## Linting
 
@@ -132,7 +142,7 @@ Flags files where the namespace implies one layer but the directory structure im
 
 ```bash
 # CLI
-arch lint ./src
+ariadne lint ./src
 ```
 
 ## Workspace Scaffolding
@@ -180,9 +190,9 @@ Versions are resolved against git tags using semver ranges:
 Packs are cached locally in `.architecture/.cache/git/` so validation works offline. Use `--no-cache` to force a fresh sync.
 
 ```bash
-arch sync                              # Sync all imports
-arch sync --name company-standards     # Sync a single import
-arch sync --no-cache                   # Force fresh fetch
+ariadne sync                              # Sync all imports
+ariadne sync --name company-standards     # Sync a single import
+ariadne sync --no-cache                   # Force fresh fetch
 ```
 
 ### Consuming synced packs
@@ -210,14 +220,14 @@ The engine exposes its full capability set as MCP tools and resources for AI age
 | `get_rules` | `template?` | Get code feature rules |
 | `generate_component` | `role`, `name`, `solution`, `feature`, `template?` | Generate a C# component file |
 | `generate_workspace` | `solution`, `features`, `template?` | Scaffold project structure |
-| `validate_source` | `sourceDirectory`, `template?` | Validate source against architecture rules |
+| `validate_source` | `path`, `template?` | Validate a solution or project against architecture rules; returns the report |
 | `lint_source` | `sourceDirectory`, `template?` | Lint for namespace-layer mismatches |
 
 ### Resources
 
 | URI | Description |
 |-----|-------------|
-| `archgov://packs/{name}` | Raw YAML content of a built-in rule pack |
+| `ariadne://packs/{name}` | Raw YAML content of a built-in rule pack |
 
 ### Transports
 
@@ -230,11 +240,11 @@ All tools auto-detect `.architecture/rules.yaml` in the working directory. Pass 
 
 | Host | Use Case | Protocol |
 |------|----------|----------|
-| **CLI** (`ArchGov.Host.Cli`) | Developer workflow, CI/CD pipelines | Terminal |
-| **MCP stdio** (`ArchGov.Host.Mcp`) | Local AI agent integration (Claude Code, Cursor) | MCP stdio |
-| **MCP HTTP** (`ArchGov.Host.Api`) | Remote/team AI agent access | MCP over HTTP |
+| **CLI** (`Ariadne.NET.Cli`) | Developer workflow, CI/CD pipelines | Terminal |
+| **MCP stdio** (`Ariadne.NET.Mcp`) | Local AI agent integration (Claude Code, Cursor) | MCP stdio |
+| **MCP HTTP** (`Ariadne.NET.Mcp.Http`) | Remote/team AI agent access | MCP over HTTP |
 
-All three hosts share the same core engine via `services.AddArchGovCore()`. The two MCP hosts expose identical tools and resources — stdio for local use, HTTP for remote.
+All three hosts share the same core engine via `services.AddAriadneNETServices()`, composed from registrations that ZeroAlloc.Inject generates at compile time. The two MCP hosts expose identical tools and resources — stdio for local use, HTTP for remote.
 
 ## Extensibility
 
