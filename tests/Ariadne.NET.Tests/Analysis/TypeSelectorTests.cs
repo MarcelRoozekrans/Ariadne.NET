@@ -69,6 +69,7 @@ public class TypeSelectorTests
         var loose = Find(compilation, "Loose");
 
         TypeSelector.From(["**"], [], []).Matches(loose).Should().BeTrue();
+        TypeSelector.From(["*"], [], []).Matches(loose).Should().BeFalse();
         TypeSelector.From(["Shop"], [], []).Matches(loose).Should().BeFalse();
         TypeSelector.From([], [], ["Loose"]).Matches(loose).Should().BeTrue();
     }
@@ -112,11 +113,53 @@ public class TypeSelectorTests
     [Fact]
     public void NullArguments_Throw()
     {
-        var compilation = TestCompilation.Create("public class A { }");
-
         ((Action)(() => TypeSelector.From(null!, [], []))).Should().Throw<ArgumentNullException>();
         ((Action)(() => TypeSelector.From([], [], []).Matches(null!))).Should().Throw<ArgumentNullException>();
-        Find(compilation, "A").Should().NotBeNull();
+    }
+
+    [Fact]
+    public void TwoAssemblies_AreOred()
+    {
+        var a = Find(TestCompilation.Create("namespace N { public class A { } }"), "N.A");
+
+        TypeSelector.From([], ["Other", "TestAssembly"], []).Matches(a).Should().BeTrue();
+    }
+
+    [Fact]
+    public void TwoTypes_AreOred()
+    {
+        var a = Find(TestCompilation.Create("namespace N { public class A { } }"), "N.A");
+
+        TypeSelector.From([], [], ["N.B", "N.A"]).Matches(a).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Matching_IsCaseSensitive()
+    {
+        var a = Find(TestCompilation.Create("namespace Shop.Domain { public class A { } }"), "Shop.Domain.A");
+
+        TypeSelector.From(["shop.domain"], [], []).Matches(a).Should().BeFalse();
+        TypeSelector.From([], ["testassembly"], []).Matches(a).Should().BeFalse();
+        TypeSelector.From([], [], ["shop.domain.a"]).Matches(a).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ConstructedGeneric_MatchesDefinitionName()
+    {
+        var compilation = TestCompilation.Create("namespace N { public class Foo<T> { } public class User { public Foo<int> F = null!; } }");
+        var constructed = (INamedTypeSymbol)((IFieldSymbol)Find(compilation, "N.User").GetMembers("F")[0]).Type;
+
+        constructed.IsDefinition.Should().BeFalse();
+        TypeSelector.From([], [], ["N.Foo"]).Matches(constructed).Should().BeTrue();
+    }
+
+    [Fact]
+    public void NestedGeneric_MatchesWithoutArity()
+    {
+        var compilation = TestCompilation.Create("namespace N { public class Outer<T> { public class Inner<U> { } } }");
+        var inner = Find(compilation, "N.Outer`1+Inner`1");
+
+        TypeSelector.From([], [], ["N.Outer.Inner"]).Matches(inner).Should().BeTrue();
     }
 
     [Fact]

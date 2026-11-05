@@ -60,7 +60,7 @@ internal sealed class LayerMap
             }
         }
 
-        IReadOnlyList<string> result = matches is null ? NoLayers : matches;
+        IReadOnlyList<string> result = matches is null ? NoLayers : matches.ToArray();
         _cache[type] = result;
         return result;
     }

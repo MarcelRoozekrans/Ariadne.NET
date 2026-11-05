@@ -47,7 +47,7 @@ internal sealed class TypeSelector
     {
         ArgumentNullException.ThrowIfNull(type);
 
-        if (_namespaces.Length > 0 && !AnyMatch(_namespaces, type.ContainingNamespace?.ToDisplayString() ?? string.Empty))
+        if (_namespaces.Length > 0 && !AnyMatch(_namespaces, type.ContainingNamespace is { IsGlobalNamespace: false } ns ? ns.ToDisplayString() : string.Empty))
         {
             return false;
         }
