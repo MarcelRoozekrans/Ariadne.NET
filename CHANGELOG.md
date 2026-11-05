@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.2.1...v0.2.2) (2026-11-05)
+
+
+### Documentation
+
+* phase 2.2 rule schema v2 design and plan ([#33](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/33)) ([8f066bb](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/8f066bb2a5908f344a97adbb2dd3f666bc72168d))
+
 ## [0.2.1](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.2.0...v0.2.1) (2026-11-05)
 
 
