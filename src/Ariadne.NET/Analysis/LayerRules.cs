@@ -143,7 +143,7 @@ internal static class LayerRules
     {
         ArgumentNullException.ThrowIfNull(violation);
 
-        if (violation.Kind != ViolationKind.DependencyNotAllowed)
+        if (violation.Kind is not (ViolationKind.DependencyNotAllowed or ViolationKind.ForbiddenDependency or ViolationKind.DependencyNotPermitted))
         {
             return violation with { ReferenceCount = count };
         }

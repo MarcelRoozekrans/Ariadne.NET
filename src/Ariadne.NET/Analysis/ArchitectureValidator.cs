@@ -5,7 +5,7 @@ using ZeroAlloc.Inject;
 
 namespace Ariadne.NET.Analysis;
 
-/// <summary>Builds the type graph of each project and target framework, runs the layer and role rules and merges the results per project.</summary>
+/// <summary>Builds the type graph of each project and target framework, runs the layer, forbid, allowOnly and role rules and merges the results per project.</summary>
 [Singleton]
 public sealed class ArchitectureValidator : IArchitectureValidator
 {
@@ -25,6 +25,11 @@ public sealed class ArchitectureValidator : IArchitectureValidator
 
         RejectMixedTargetFrameworks(projects);
 
+        // The matchers depend on the pack only, so one set serves every project.
+        var ruleLayers = new LayerMap(resolvedPack);
+        var forbid = ForbidRules.Compile(ruleLayers, resolvedPack);
+        var allowOnly = AllowOnlyRules.Compile(ruleLayers, resolvedPack);
+
         var entries = new List<Entry>(projects.Count);
         foreach (var project in projects)
         {
@@ -34,6 +39,8 @@ public sealed class ArchitectureValidator : IArchitectureValidator
             var graph = TypeGraphBuilder.Build(project.Compilation, project.GeneratedTrees, cancellationToken);
             var layers = new LayerMap(resolvedPack);
             var violations = new List<ArchitectureViolation>(LayerRules.Check(graph, layers, resolvedPack));
+            violations.AddRange(forbid.Check(graph));
+            violations.AddRange(allowOnly.Check(graph));
             var matches = RoleRules.Match(graph, layers, resolvedPack);
             violations.AddRange(RoleRules.CheckShape(matches));
             entries.Add(new Entry(project, graph, matches, violations));
