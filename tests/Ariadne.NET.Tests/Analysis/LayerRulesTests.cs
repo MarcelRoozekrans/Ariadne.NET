@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace Ariadne.NET.Tests.Analysis;
 
-public class V1LayerRulesTests
+public class LayerRulesTests
 {
     private static readonly RulePack Pack = new()
     {
@@ -38,7 +38,7 @@ public class V1LayerRulesTests
             """);
 
         var v = violations.Should().ContainSingle().Subject;
-        v.RuleId.Should().Be("layer/Domain");
+        v.RuleId.Should().Be("TEST-LAYER-DOMAIN");
         v.Kind.Should().Be(ViolationKind.DependencyNotAllowed);
         v.SourceType.Should().Be("Shop.Domain.Order");
         v.Target.Should().Be("Shop.Infrastructure.Store");
@@ -78,29 +78,102 @@ public class V1LayerRulesTests
 
         var v = violations.Should().ContainSingle().Subject;
         v.Target.Should().Be("Other.Infrastructure.Ext");
-        v.RuleId.Should().Be("layer/Domain");
+        v.RuleId.Should().Be("TEST-LAYER-DOMAIN");
     }
 
     [Fact]
-    public void LastMatchingSegmentWins()
+    public void TwoLayerSegments_IsLayerOverlap()
     {
         var violations = Check("""
             namespace Shop.Domain.Infrastructure { public class X { } }
             namespace Shop.Domain { public class Order { public Shop.Domain.Infrastructure.X? X; } }
             """);
 
-        violations.Should().ContainSingle().Which.Message.Should().StartWith("Layer 'Domain' is not allowed to depend on 'Infrastructure'");
+        var v = violations.Should().ContainSingle().Subject;
+        v.Kind.Should().Be(ViolationKind.LayerOverlap);
+        v.RuleId.Should().Be("TEST-LAYER-DOMAIN+TEST-LAYER-INFRASTRUCTURE");
+        v.SourceType.Should().Be("Shop.Domain.Infrastructure.X");
+        v.Message.Should().Be("Type 'Shop.Domain.Infrastructure.X' is covered by layers 'Domain', 'Infrastructure'");
     }
 
     [Fact]
-    public void CaseInsensitiveLayerMatch()
+    public void LowerCaseNamespace_NotInLayer() =>
+        Check("""
+            namespace Shop.infrastructure { public class Store { } }
+            namespace Shop.domain { public class Order { public Shop.infrastructure.Store? S; } }
+            """).Should().BeEmpty();
+
+    [Fact]
+    public void Violation_CarriesLayerIdAndBecause()
+    {
+        var v = Check("""
+            namespace Shop.Infrastructure { public class Store { } }
+            namespace Shop.Domain { public class Order { public Shop.Infrastructure.Store? S; } }
+            """).Should().ContainSingle().Subject;
+
+        v.RuleId.Should().Be("TEST-LAYER-DOMAIN");
+        v.Because.Should().Be("Test layer Domain.");
+    }
+
+    [Fact]
+    public void AssemblySelectedLayer_IsConstrained()
+    {
+        var pack = new RulePack
+        {
+            Name = "test",
+            Layers =
+            [
+                new LayerDefinition { Name = "Core", Id = "T-CORE", Because = "Core is the centre.", Assemblies = ["TestAssembly"] },
+                new LayerDefinition { Name = "Host", Id = "T-HOST", Because = "Host is the edge.", Assemblies = ["Shop.Lib"], AllowedDependencies = ["Core"] },
+            ],
+        };
+        var library = TestCompilation.Create("namespace Shop.Host { public class Web { } }").WithAssemblyName("Shop.Lib");
+        var compilation = TestCompilation.Create(
+            [library.ToMetadataReference()],
+            ("Test.cs", "namespace Shop.Core { public class Engine { public Shop.Host.Web? W; } }"));
+
+        var v = Check(compilation, pack).Should().ContainSingle().Subject;
+
+        v.RuleId.Should().Be("T-CORE");
+        v.Because.Should().Be("Core is the centre.");
+        v.Message.Should().Be("Layer 'Core' is not allowed to depend on 'Host': Shop.Core.Engine references Shop.Host.Web");
+    }
+
+    [Fact]
+    public void OverlappingSourceType_OneOverlap_NoDependencyViolation()
     {
         var violations = Check("""
-            namespace Shop.infrastructure { public class Store { } }
-            namespace Shop.DOMAIN { public class Order { public Shop.infrastructure.Store? S; } }
+            namespace Shop.Infrastructure { public class Store { } }
+            namespace Shop.Application { public class Other { } }
+            namespace Shop.Domain.Application
+            {
+                public class Mixed { public Shop.Infrastructure.Store? S; public Shop.Application.Other? O; public Shop.Infrastructure.Store? T; }
+            }
             """);
 
-        violations.Should().ContainSingle().Which.RuleId.Should().Be("layer/Domain");
+        var v = violations.Should().ContainSingle().Subject;
+        v.Kind.Should().Be(ViolationKind.LayerOverlap);
+        v.SourceType.Should().Be("Shop.Domain.Application.Mixed");
+        v.Target.Should().BeNull();
+        v.Because.Should().Be("A type must belong to at most one layer.");
+        v.Location.Should().Be(new SourceLocation("Test.cs", 5, 18));
+    }
+
+    [Fact]
+    public void OverlappingMetadataTarget_OneOverlapWithoutLocation()
+    {
+        var library = TestCompilation.Create("namespace Other.Domain.Infrastructure { public class Ext { } }");
+        var compilation = TestCompilation.Create(
+            [library.ToMetadataReference()],
+            ("Test.cs", "namespace Shop.Domain { public class Order { public Other.Domain.Infrastructure.Ext? A; public Other.Domain.Infrastructure.Ext? B; } }"));
+
+        var v = Check(compilation).Should().ContainSingle().Subject;
+
+        v.Kind.Should().Be(ViolationKind.LayerOverlap);
+        v.RuleId.Should().Be("TEST-LAYER-DOMAIN+TEST-LAYER-INFRASTRUCTURE");
+        v.SourceType.Should().Be("Other.Domain.Infrastructure.Ext");
+        v.Location.Should().BeNull();
+        v.Target.Should().BeNull();
     }
 
     [Fact]
@@ -137,7 +210,7 @@ public class V1LayerRulesTests
     {
         var compilation = TestCompilation.Create("namespace Shop.Domain { public class Order { } }");
         var type = compilation.GetTypeByMetadataName("Shop.Domain.Order")!;
-        var map = new V1LayerMap(Pack);
+        var map = new LayerMap(Pack);
 
         var beforeMiss = GC.GetAllocatedBytesForCurrentThread();
         var first = map.LayerOf(type);
@@ -161,7 +234,7 @@ public class V1LayerRulesTests
     {
         var compilation = TestCompilation.Create("namespace Shop.Misc { public class Thing { } }");
         var type = compilation.GetTypeByMetadataName("Shop.Misc.Thing")!;
-        var map = new V1LayerMap(Pack);
+        var map = new LayerMap(Pack);
 
         var beforeMiss = GC.GetAllocatedBytesForCurrentThread();
         var first = map.LayerOf(type);
@@ -182,9 +255,11 @@ public class V1LayerRulesTests
 
     private static IReadOnlyList<ArchitectureViolation> Check(string source) => Check(TestCompilation.Create(source));
 
-    private static IReadOnlyList<ArchitectureViolation> Check(CSharpCompilation compilation)
+    private static IReadOnlyList<ArchitectureViolation> Check(CSharpCompilation compilation) => Check(compilation, Pack);
+
+    private static IReadOnlyList<ArchitectureViolation> Check(CSharpCompilation compilation, RulePack pack)
     {
         var graph = TypeGraphBuilder.Build(compilation, new HashSet<SyntaxTree>(), CancellationToken.None);
-        return V1LayerRules.Check(graph, new V1LayerMap(Pack), Pack);
+        return LayerRules.Check(graph, new LayerMap(pack), pack);
     }
 }

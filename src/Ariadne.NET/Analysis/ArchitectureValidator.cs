@@ -5,7 +5,7 @@ using ZeroAlloc.Inject;
 
 namespace Ariadne.NET.Analysis;
 
-/// <summary>Builds the type graph of each project and target framework, runs the v1 rules and merges the results per project.</summary>
+/// <summary>Builds the type graph of each project and target framework, runs the layer and role rules and merges the results per project.</summary>
 [Singleton]
 public sealed class ArchitectureValidator : IArchitectureValidator
 {
@@ -32,10 +32,10 @@ public sealed class ArchitectureValidator : IArchitectureValidator
             cancellationToken.ThrowIfCancellationRequested();
 
             var graph = TypeGraphBuilder.Build(project.Compilation, project.GeneratedTrees, cancellationToken);
-            var layers = new V1LayerMap(resolvedPack);
-            var violations = new List<ArchitectureViolation>(V1LayerRules.Check(graph, layers, resolvedPack));
-            var matches = V1RoleRules.Match(graph, layers, resolvedPack);
-            violations.AddRange(V1RoleRules.CheckShape(matches));
+            var layers = new LayerMap(resolvedPack);
+            var violations = new List<ArchitectureViolation>(LayerRules.Check(graph, layers, resolvedPack));
+            var matches = RoleRules.Match(graph, layers, resolvedPack);
+            violations.AddRange(RoleRules.CheckShape(matches));
             entries.Add(new Entry(project, graph, matches, violations));
         }
 
@@ -134,7 +134,7 @@ public sealed class ArchitectureValidator : IArchitectureValidator
         foreach (ref readonly var entry in CollectionsMarshal.AsSpan(entries))
         {
             var scope = entry.Project.TargetFramework is { } framework ? byFramework[framework] : all;
-            entry.Violations.AddRange(V1RoleRules.CheckMissingInterface(entry.Matches, scope, pack));
+            entry.Violations.AddRange(RoleRules.CheckMissingInterface(entry.Matches, scope, pack));
         }
     }
 
@@ -281,7 +281,7 @@ public sealed class ArchitectureValidator : IArchitectureValidator
             var count = Math.Max(current.ReferenceCount, candidate.ReferenceCount);
             var candidateIsEarlier = candidate.Location is { } c
                 && (current.Location is not { } l || TypeGraphBuilder.Compare(c, l) < 0);
-            return V1LayerRules.WithReferenceCount(candidateIsEarlier ? candidate : current, count);
+            return LayerRules.WithReferenceCount(candidateIsEarlier ? candidate : current, count);
         }
     }
 }

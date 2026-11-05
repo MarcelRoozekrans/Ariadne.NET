@@ -4,11 +4,11 @@ using Microsoft.CodeAnalysis;
 
 namespace Ariadne.NET.Analysis;
 
-/// <summary>The v1 component-role checks, evaluated on the type graph's source types.</summary>
-internal static class V1RoleRules
+/// <summary>The component-role checks, evaluated on the type graph's source types.</summary>
+internal static class RoleRules
 {
     /// <summary>Returns the type kind, accessibility and missing-interface violations, ordered by location and then rule id. Violations without a location come last, ordered by source type.</summary>
-    public static IReadOnlyList<ArchitectureViolation> Check(TypeGraph graph, V1LayerMap layers, RulePack pack)
+    public static IReadOnlyList<ArchitectureViolation> Check(TypeGraph graph, LayerMap layers, RulePack pack)
     {
         var matches = Match(graph, layers, pack);
         var violations = new List<ArchitectureViolation>(CheckShape(matches));
@@ -18,7 +18,7 @@ internal static class V1RoleRules
     }
 
     /// <summary>Finds the source types of <paramref name="graph"/> that match a component role.</summary>
-    public static RoleMatches Match(TypeGraph graph, V1LayerMap layers, RulePack pack)
+    public static RoleMatches Match(TypeGraph graph, LayerMap layers, RulePack pack)
     {
         ArgumentNullException.ThrowIfNull(graph);
         ArgumentNullException.ThrowIfNull(layers);

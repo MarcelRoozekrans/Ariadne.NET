@@ -257,6 +257,33 @@ public class ArchitectureValidatorTests
     }
 
     [Fact]
+    public void RetargetIntoOverlap_ReportsLayerOverlap()
+    {
+        var resolver = new Ariadne.NET.RuleLoader.RulePackResolver(
+            new Ariadne.NET.RuleLoader.BuiltinPackRegistry(new Ariadne.NET.RuleLoader.YamlRulePackLoader()),
+            new Ariadne.NET.RuleLoader.YamlRulePackLoader(),
+            new Ariadne.NET.RuleEngine.RulePackMerger());
+        var child = new RulePack
+        {
+            Name = "child",
+            Extends = ["builtin://clean-architecture"],
+            LayerRetargets = [new LayerRetarget { Name = "Application", Namespaces = ["**.Domain.**"] }],
+        };
+        var resolved = resolver.Resolve(child);
+        resolved.IsSuccess.Should().BeTrue();
+
+        var report = _validator.Validate(
+            resolved.Value,
+            TestCompilation.Create("namespace Shop.Domain { public class Order { } }"));
+
+        var v = report.Violations.Should().ContainSingle().Subject;
+        v.Kind.Should().Be(ViolationKind.LayerOverlap);
+        v.RuleId.Should().Be("CA-LAYER-DOMAIN+CA-LAYER-APPLICATION");
+        v.SourceType.Should().Be("Shop.Domain.Order");
+        v.Message.Should().Be("Type 'Shop.Domain.Order' is covered by layers 'Domain', 'Application'");
+    }
+
+    [Fact]
     public void NullArguments_Throw()
     {
         var compilation = TestCompilation.Create("class C { }");

@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Ariadne.NET.Tests.Analysis;
 
-public class V1RoleRulesTests
+public class RoleRulesTests
 {
     private static readonly RulePack Pack = new()
     {
@@ -38,6 +38,10 @@ public class V1RoleRulesTests
         v.Location.Should().Be(new SourceLocation("Test.cs", 1, 50));
         v.Message.Should().Be("Type 'CreateOrderCommand' matches role 'Command' and should be a 'Record' but is declared as a 'Class'");
     }
+
+    [Fact]
+    public void TypeCoveredByTwoLayers_MatchesNoRole() =>
+        Check("namespace MyApp.Application.Domain; public class CreateOrderCommand { }").Should().BeEmpty();
 
     [Fact]
     public void CommandIsRecord_NoViolation() =>
@@ -194,6 +198,6 @@ public class V1RoleRulesTests
     {
         var compilation = TestCompilation.Create(files);
         var graph = TypeGraphBuilder.Build(compilation, new HashSet<SyntaxTree>(), CancellationToken.None);
-        return V1RoleRules.Check(graph, new V1LayerMap(Pack), Pack);
+        return RoleRules.Check(graph, new LayerMap(Pack), Pack);
     }
 }
