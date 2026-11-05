@@ -4,6 +4,13 @@ using Microsoft.CodeAnalysis;
 namespace Ariadne.NET.Analysis;
 
 /// <summary>Checks compiled projects against the architecture rules of a rule pack.</summary>
+/// <remarks>
+/// The pack must have been loaded and resolved: read by an <see cref="IRulePackLoader"/> and passed through
+/// <see cref="IRulePackResolver"/>, which validates every pattern and target and applies the layer retargets and rule
+/// amendments of the packs it merges. The validator trusts that. A pack built in code and passed straight in throws an
+/// <see cref="ArgumentException"/> for an invalid glob or for a target that mixes layers with namespaces, assemblies or
+/// types, and its <see cref="RulePack.LayerRetargets"/> and <see cref="RulePack.RuleAmendments"/> are ignored.
+/// </remarks>
 public interface IArchitectureValidator
 {
     /// <summary>

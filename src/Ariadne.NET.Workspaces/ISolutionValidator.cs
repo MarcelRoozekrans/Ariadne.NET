@@ -5,6 +5,11 @@ using ZeroAlloc.Results;
 namespace Ariadne.NET.Workspaces;
 
 /// <summary>Checks a solution or project on disk against the architecture rules of a rule pack.</summary>
+/// <remarks>
+/// The pack must have been loaded and resolved by <see cref="IRulePackResolver"/>, as for
+/// <see cref="IArchitectureValidator"/>: an unresolved pack built in code may throw an <see cref="ArgumentException"/> for
+/// an invalid glob or a mixed target, and its layer retargets and rule amendments are ignored.
+/// </remarks>
 public interface ISolutionValidator
 {
     /// <summary>Loads <paramref name="path"/>, checks its projects, lists the skipped ones in the report and releases the workspace.</summary>

@@ -1,6 +1,10 @@
+schema: 2
 name: simple-test
 version: "1.0.0"
 layers:
   - name: Domain
+    id: SIMPLE-LAYER-DOMAIN
+    because: The domain depends on nothing else.
+    namespaces: ["**.Domain.**"]
     description: "Domain layer"
     allowedDependencies: []

@@ -45,13 +45,18 @@ public static class InitCommand
 
             var extendsList = extends.Value;
 
+            // Schema 2 requires a name; the directory the pack belongs to is the natural one.
             var rulesContent = new Dictionary<string, object>(StringComparer.Ordinal)
             {
+                ["schema"] = 2,
+                ["name"] = PackName(Directory.GetCurrentDirectory()),
                 ["extends"] = extendsList,
             };
 
+            // The name comes from the directory, so it may read as another YAML type, such as null, ~, true or 2.
             var serializer = new SerializerBuilder()
                 .WithNamingConvention(CamelCaseNamingConvention.Instance)
+                .WithQuotingNecessaryStrings()
                 .Build();
 
             Directory.CreateDirectory(".architecture");
@@ -64,5 +69,11 @@ public static class InitCommand
         });
 
         return command;
+    }
+
+    private static string PackName(string directory)
+    {
+        var name = Path.GetFileName(Path.TrimEndingDirectorySeparator(directory));
+        return string.IsNullOrWhiteSpace(name) ? "architecture" : name;
     }
 }

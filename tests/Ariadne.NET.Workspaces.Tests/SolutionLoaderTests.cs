@@ -9,6 +9,7 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace Ariadne.NET.Workspaces.Tests;
 
+[Collection(FixtureSolutionCollection.Name)]
 public sealed class SolutionLoaderTests : IDisposable
 {
     private const string RestoreHint = "run 'dotnet restore' first";

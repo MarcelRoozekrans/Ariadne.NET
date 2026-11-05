@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Reflection;
 using FluentAssertions;
 using Ariadne.NET.RuleEngine;
 using Ariadne.NET.RuleLoader;
@@ -37,5 +39,36 @@ public class TemplateToolsTests
 
         result.Should().Contain(l => l.Name == "Domain");
         result.Should().Contain(l => l.Name == "Application");
+    }
+
+    [Fact]
+    public void GetLayers_ReturnsIdsAndSelectors()
+    {
+        var loader = new YamlRulePackLoader();
+        var helper = new RuleResolutionHelper(
+            _registry,
+            new RulePackResolver(_registry, loader, new RulePackMerger()),
+            loader);
+
+        var domain = TemplateTools.GetLayers(helper, "clean-architecture").First(l => string.Equals(l.Name, "Domain", StringComparison.Ordinal));
+
+        domain.Id.Should().Be("CA-LAYER-DOMAIN");
+        domain.Namespaces.Should().Equal("**.Domain.**");
+        domain.Because.Should().Be("The domain is the core of the architecture and depends on no other layer.");
+        domain.AllowedDependencies.Should().BeEmpty();
+
+        var infrastructure = TemplateTools.GetLayers(helper, "clean-architecture")
+            .First(l => string.Equals(l.Name, "Infrastructure", StringComparison.Ordinal));
+        infrastructure.AllowedDependencies.Should().Equal("Domain", "Application");
+    }
+
+    [Fact]
+    public void GetLayers_IsDescribedWithIdSelectorsDependenciesAndBecause()
+    {
+        var attribute = typeof(TemplateTools).GetMethod(nameof(TemplateTools.GetLayers))!
+            .GetCustomAttribute<DescriptionAttribute>()!;
+
+        attribute.Description.Should().Be(
+            "Get the layers of the resolved pack with their id, selectors, allowed dependencies and because.");
     }
 }

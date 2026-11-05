@@ -9,6 +9,7 @@ var validator = services.GetRequiredService<ISolutionValidator>();
 
 // A rule pack that builds on the built-in clean-architecture pack.
 var pack = loader.LoadFromString("""
+    schema: 2
     name: my-service
     extends:
       - builtin://clean-architecture

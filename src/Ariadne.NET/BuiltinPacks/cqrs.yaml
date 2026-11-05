@@ -1,3 +1,4 @@
+schema: 2
 name: cqrs
 version: "1.0.0"
 author: platform-team

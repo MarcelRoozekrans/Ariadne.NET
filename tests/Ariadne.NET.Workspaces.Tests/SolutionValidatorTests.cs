@@ -7,6 +7,7 @@ using ZeroAlloc.Results;
 
 namespace Ariadne.NET.Workspaces.Tests;
 
+[Collection(FixtureSolutionCollection.Name)]
 public sealed class SolutionValidatorTests
 {
     private readonly SolutionValidator _validator = new(new SolutionLoader(), new ArchitectureValidator());

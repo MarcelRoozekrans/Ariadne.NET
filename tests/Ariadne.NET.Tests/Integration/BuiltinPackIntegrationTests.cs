@@ -89,7 +89,7 @@ public class BuiltinPackIntegrationTests
         var merger = new RulePackMerger();
         var basePack = _registry.GetPack("clean-architecture").Value;
         var addOnPack = _registry.GetPack(packName).Value;
-        var merged = merger.Merge([basePack, addOnPack]);
+        var merged = merger.Merge([basePack, addOnPack]).Value;
 
         var request = new GenerateRequest
         {
@@ -121,7 +121,7 @@ public class BuiltinPackIntegrationTests
         var merger = new RulePackMerger();
         var basePack = _registry.GetPack("clean-architecture").Value;
         var cqrsPack = _registry.GetPack("cqrs").Value;
-        var merged = merger.Merge([basePack, cqrsPack]);
+        var merged = merger.Merge([basePack, cqrsPack]).Value;
 
         var request = new GenerateRequest
         {
@@ -138,6 +138,114 @@ public class BuiltinPackIntegrationTests
         result.Success.Should().BeTrue($"CQRS role '{roleName}' should generate successfully");
         result.GeneratedFiles.Should().HaveCount(1);
         result.GeneratedFiles[0].Code.Should().Contain(componentName);
+    }
+
+    public static TheoryData<string, string, int> BuiltinPackPrefixes() => new()
+    {
+        { "clean-architecture", "CA", 4 },
+        { "cqrs", "CQRS", 0 },
+        { "ddd-tactical", "DDD", 0 },
+        { "event-driven", "ED", 5 },
+        { "hexagonal-architecture", "HEX", 3 },
+        { "layered", "LAY", 3 },
+        { "microservice", "MS", 5 },
+        { "modular-monolith", "MM", 4 },
+        { "onion-architecture", "ONION", 5 },
+        { "vertical-slice", "VS", 3 },
+    };
+
+    [Theory]
+    [MemberData(nameof(BuiltinPackPrefixes))]
+    public void EveryBuiltinPack_LoadsAndResolves(string packName, string prefix, int layerCount)
+    {
+        _registry.GetAvailablePackNames().Should().HaveCount(10).And.Contain(packName);
+
+        var pack = _registry.GetPack(packName);
+        pack.IsSuccess.Should().BeTrue(pack.IsFailure ? $"{pack.Error.Message} {pack.Error.Detail}" : "");
+        pack.Value.Schema.Should().Be(2);
+        pack.Value.Layers.Should().HaveCount(layerCount);
+
+        foreach (var layer in pack.Value.Layers)
+        {
+            var segment = layer.Name[(layer.Name.LastIndexOf('.') + 1)..];
+            layer.Id.Should().Be($"{prefix}-LAYER-{segment.ToUpperInvariant()}");
+            layer.Because.Should().NotBeNullOrWhiteSpace().And.EndWith(".");
+            layer.Namespaces.Should().Equal($"**.{segment}.**");
+            layer.Assemblies.Should().BeEmpty();
+        }
+
+        var resolved = NewResolver().Resolve(new RulePack { Name = "user", Extends = [$"builtin://{packName}"] });
+        resolved.IsSuccess.Should().BeTrue(resolved.IsFailure ? $"{resolved.Error.Message} {resolved.Error.Detail}" : "");
+    }
+
+    [Fact]
+    public void CleanArchitecturePlusCqrs_Resolves()
+    {
+        var resolved = NewResolver().Resolve(new RulePack
+        {
+            Name = "user",
+            Extends = ["builtin://clean-architecture", "builtin://cqrs"],
+        });
+
+        resolved.IsSuccess.Should().BeTrue(resolved.IsFailure ? $"{resolved.Error.Message} {resolved.Error.Detail}" : "");
+        resolved.Value.Layers.Select(l => l.Id).Should().Equal(
+            "CA-LAYER-DOMAIN", "CA-LAYER-APPLICATION", "CA-LAYER-INFRASTRUCTURE", "CA-LAYER-WEBAPI");
+        resolved.Value.ComponentRoles.Select(r => r.Name).Should().Contain("Command").And.Contain("Entity");
+    }
+
+    [Fact]
+    public void CleanArchitecturePlusMicroservice_FailsBothDefineLayer()
+    {
+        var resolved = NewResolver().Resolve(new RulePack
+        {
+            Name = "user",
+            Extends = ["builtin://clean-architecture", "builtin://microservice"],
+        });
+
+        resolved.IsFailure.Should().BeTrue();
+        resolved.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        resolved.Error.Detail!.Split('\n').Should().Contain(
+            "packs 'clean-architecture' and 'microservice' both define layer 'Domain'",
+            "packs 'clean-architecture' and 'microservice' both define layer 'Application'",
+            "packs 'clean-architecture' and 'microservice' both define layer 'Infrastructure'");
+    }
+
+    [Fact]
+    public void RepoPack_Loads()
+    {
+        var dir = AppContext.BaseDirectory;
+        while (dir is not null && !File.Exists(Path.Combine(dir, "src", "Ariadne.NET.slnx")))
+        {
+            dir = Path.GetDirectoryName(dir);
+        }
+
+        dir.Should().NotBeNull("the repository root must be reachable from the test output directory");
+
+        var loaded = new YamlRulePackLoader().LoadFromFile(Path.Combine(dir!, ".architecture", "rules.yaml"));
+        loaded.IsSuccess.Should().BeTrue(loaded.IsFailure ? $"{loaded.Error.Message} {loaded.Error.Detail}" : "");
+        loaded.Value.Extends.Should().BeEmpty();
+        loaded.Value.Layers.Select(l => (l.Name, l.Id)).Should().Equal(
+            ("Core", "ARIADNE-LAYER-CORE"),
+            ("Workspaces", "ARIADNE-LAYER-WORKSPACES"),
+            ("Host", "ARIADNE-LAYER-HOST"),
+            ("Tests", "ARIADNE-LAYER-TESTS"));
+        loaded.Value.Layers.Should().OnlyContain(l => !string.IsNullOrWhiteSpace(l.Because));
+        loaded.Value.Layers.Should().OnlyContain(l => l.Namespaces.Count == 0);
+        loaded.Value.Layers.Select(l => (l.Name, string.Join(",", l.Assemblies), string.Join(",", l.AllowedDependencies)))
+            .Should().Equal(
+                ("Core", "Ariadne.NET.Abstractions,Ariadne.NET", ""),
+                ("Workspaces", "Ariadne.NET.Workspaces", "Core"),
+                ("Host", "Ariadne.NET.Cli,Ariadne.NET.Mcp,Ariadne.NET.Mcp.Http", "Core,Workspaces"),
+                ("Tests", "*.Tests,Ariadne.NET.AotSmoke", "Core,Workspaces,Host"));
+
+        var resolved = NewResolver().Resolve(loaded.Value);
+        resolved.IsSuccess.Should().BeTrue(resolved.IsFailure ? $"{resolved.Error.Message} {resolved.Error.Detail}" : "");
+    }
+
+    private static RulePackResolver NewResolver()
+    {
+        var loader = new YamlRulePackLoader();
+        return new RulePackResolver(new BuiltinPackRegistry(loader), loader, new RulePackMerger());
     }
 
     [Theory]

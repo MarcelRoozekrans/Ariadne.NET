@@ -1,15 +1,25 @@
+schema: 2
 name: vertical-slice
 version: "1.0.0"
 author: platform-team
 
 layers:
   - name: Feature
+    id: VS-LAYER-FEATURE
+    because: Each feature slice is self-contained and must not depend on another layer.
+    namespaces: ["**.Feature.**"]
     description: "Each feature is self-contained"
     allowedDependencies: []
   - name: SharedKernel
+    id: VS-LAYER-SHAREDKERNEL
+    because: The shared kernel holds the few types every slice needs and depends on nothing else.
+    namespaces: ["**.SharedKernel.**"]
     description: "Shared types across features"
     allowedDependencies: []
   - name: Infrastructure
+    id: VS-LAYER-INFRASTRUCTURE
+    because: Cross-cutting infrastructure serves the features and the shared kernel.
+    namespaces: ["**.Infrastructure.**"]
     description: "Cross-cutting infrastructure"
     allowedDependencies:
       - Feature
