@@ -140,29 +140,30 @@ public class BuiltinPackIntegrationTests
         result.GeneratedFiles[0].Code.Should().Contain(componentName);
     }
 
-    public static TheoryData<string, string> BuiltinPackPrefixes() => new()
+    public static TheoryData<string, string, int> BuiltinPackPrefixes() => new()
     {
-        { "clean-architecture", "CA" },
-        { "cqrs", "CQRS" },
-        { "ddd-tactical", "DDD" },
-        { "event-driven", "ED" },
-        { "hexagonal-architecture", "HEX" },
-        { "layered", "LAY" },
-        { "microservice", "MS" },
-        { "modular-monolith", "MM" },
-        { "onion-architecture", "ONION" },
-        { "vertical-slice", "VS" },
+        { "clean-architecture", "CA", 4 },
+        { "cqrs", "CQRS", 0 },
+        { "ddd-tactical", "DDD", 0 },
+        { "event-driven", "ED", 5 },
+        { "hexagonal-architecture", "HEX", 3 },
+        { "layered", "LAY", 3 },
+        { "microservice", "MS", 5 },
+        { "modular-monolith", "MM", 4 },
+        { "onion-architecture", "ONION", 5 },
+        { "vertical-slice", "VS", 3 },
     };
 
     [Theory]
     [MemberData(nameof(BuiltinPackPrefixes))]
-    public void EveryBuiltinPack_LoadsAndResolves(string packName, string prefix)
+    public void EveryBuiltinPack_LoadsAndResolves(string packName, string prefix, int layerCount)
     {
         _registry.GetAvailablePackNames().Should().HaveCount(10).And.Contain(packName);
 
         var pack = _registry.GetPack(packName);
         pack.IsSuccess.Should().BeTrue(pack.IsFailure ? $"{pack.Error.Message} {pack.Error.Detail}" : "");
         pack.Value.Schema.Should().Be(2);
+        pack.Value.Layers.Should().HaveCount(layerCount);
 
         foreach (var layer in pack.Value.Layers)
         {
@@ -229,6 +230,13 @@ public class BuiltinPackIntegrationTests
             ("Host", "ARIADNE-LAYER-HOST"),
             ("Tests", "ARIADNE-LAYER-TESTS"));
         loaded.Value.Layers.Should().OnlyContain(l => !string.IsNullOrWhiteSpace(l.Because));
+        loaded.Value.Layers.Should().OnlyContain(l => l.Namespaces.Count == 0);
+        loaded.Value.Layers.Select(l => (l.Name, string.Join(",", l.Assemblies), string.Join(",", l.AllowedDependencies)))
+            .Should().Equal(
+                ("Core", "Ariadne.NET.Abstractions,Ariadne.NET", ""),
+                ("Workspaces", "Ariadne.NET.Workspaces", "Core"),
+                ("Host", "Ariadne.NET.Cli,Ariadne.NET.Mcp,Ariadne.NET.Mcp.Http", "Core,Workspaces"),
+                ("Tests", "*.Tests,Ariadne.NET.AotSmoke", "Core,Workspaces,Host"));
 
         var resolved = NewResolver().Resolve(loaded.Value);
         resolved.IsSuccess.Should().BeTrue(resolved.IsFailure ? $"{resolved.Error.Message} {resolved.Error.Detail}" : "");

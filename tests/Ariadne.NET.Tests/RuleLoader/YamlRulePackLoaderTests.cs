@@ -167,16 +167,17 @@ public class YamlRulePackLoaderTests
     }
 
     [Theory]
-    [InlineData("")]
-    [InlineData("   \n  ")]
-    public void LoadFromString_Empty_ReturnsInvalid(string yaml)
+    [InlineData("", "rule pack YAML:1:1: the pack is empty")]
+    [InlineData("   \n  ", "rule pack YAML:1:1: the pack is empty")]
+    [InlineData("~", "rule pack YAML:1:1: the pack must be a mapping")]
+    public void LoadFromString_Empty_ReturnsInvalid(string yaml, string detail)
     {
         var result = new YamlRulePackLoader().LoadFromString(yaml);
 
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
         result.Error.Message.Should().Be("Rule pack YAML has 1 problem(s).");
-        result.Error.Detail.Should().Be("rule pack YAML:1:1: the pack is empty");
+        result.Error.Detail.Should().Be(detail);
     }
 
     [Fact]
