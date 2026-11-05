@@ -21,6 +21,9 @@ internal static class RulePackReferenceCheck
         var layerNames = CollectNames(mergedPack.Layers.Select(static l => l.Name), "Layers", "layer", failures);
         var roleNames = CollectNames(mergedPack.ComponentRoles.Select(static r => r.Name), "ComponentRoles", "role", failures);
 
+        CheckIds(mergedPack, failures);
+        CheckRuleLayers(mergedPack, layerNames, failures);
+
         for (var i = 0; i < mergedPack.Layers.Count; i++)
         {
             var dependencies = mergedPack.Layers[i].AllowedDependencies;
@@ -28,7 +31,7 @@ internal static class RulePackReferenceCheck
             {
                 if (!Contains(layerNames, dependencies[d]))
                 {
-                    failures.Add($"Layers[{i}].AllowedDependencies[{d}]: refers to unknown layer '{dependencies[d]}'.");
+                    failures.Add($"Layers[{i}].AllowedDependencies[{d}]: refers to unknown layer '{PackText.Show(dependencies[d])}'.");
                 }
             }
         }
@@ -41,19 +44,67 @@ internal static class RulePackReferenceCheck
             // generation only reads the role's Layer text. With no layer model there is nothing to refer to.
             if (layerNames.Count > 0 && !Contains(layerNames, role.Layer))
             {
-                failures.Add($"ComponentRoles[{i}].Layer: refers to unknown layer '{role.Layer}'.");
+                failures.Add($"ComponentRoles[{i}].Layer: refers to unknown layer '{PackText.Show(role.Layer)}'.");
             }
 
             // The engine reads InterfaceRole only when it is non-empty, so an empty value means "none".
             if (!string.IsNullOrEmpty(role.InterfaceRole) && !Contains(roleNames, role.InterfaceRole))
             {
-                failures.Add($"ComponentRoles[{i}].InterfaceRole: refers to unknown role '{role.InterfaceRole}'.");
+                failures.Add($"ComponentRoles[{i}].InterfaceRole: refers to unknown role '{PackText.Show(role.InterfaceRole)}'.");
             }
         }
 
         return failures.Count == 0
             ? Result<RulePack, AriadneError>.Success(mergedPack)
             : Result<RulePack, AriadneError>.Failure(RulePackError.Invalid(mergedPack.Name, failures));
+    }
+
+    // Layers and rules share one id space. A loaded pack always has ids, but a pack built in code reaches the resolver
+    // without the load-time member rules, so an empty id is reported here, once, rather than as a duplicate of another.
+    private static void CheckIds(RulePack pack, List<string> failures)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < pack.Layers.Count; i++)
+        {
+            CheckId(pack.Layers[i].Id, "Layers", i, seen, failures);
+        }
+
+        for (var i = 0; i < pack.Rules.Count; i++)
+        {
+            CheckId(pack.Rules[i].Id, "Rules", i, seen, failures);
+        }
+    }
+
+    private static void CheckId(string? id, string path, int index, HashSet<string> seen, List<string> failures)
+    {
+        if (string.IsNullOrEmpty(id))
+        {
+            failures.Add($"{path}[{index}].Id: Id must not be empty.");
+        }
+        else if (!seen.Add(id))
+        {
+            failures.Add($"duplicate id '{PackText.Show(id)}'");
+        }
+    }
+
+    private static void CheckRuleLayers(RulePack pack, HashSet<string> layerNames, List<string> failures)
+    {
+        foreach (var rule in pack.Rules)
+        {
+            CheckTargetLayers(rule.Id, rule.From, layerNames, failures);
+            CheckTargetLayers(rule.Id, rule.To, layerNames, failures);
+        }
+    }
+
+    private static void CheckTargetLayers(string ruleId, TargetSelector target, HashSet<string> layerNames, List<string> failures)
+    {
+        foreach (var name in target.Layers)
+        {
+            if (!Contains(layerNames, name))
+            {
+                failures.Add($"rule '{PackText.Show(ruleId)}' refers to unknown layer '{PackText.Show(name)}'");
+            }
+        }
     }
 
     private static HashSet<string> CollectNames(IEnumerable<string> names, string path, string kind, List<string> failures)
@@ -65,7 +116,7 @@ internal static class RulePackReferenceCheck
             // A missing name is a member-rule failure at load; skip it here rather than report it twice.
             if (!string.IsNullOrEmpty(name) && !seen.Add(name))
             {
-                failures.Add($"{path}[{index}].Name: duplicate {kind} name '{name}'.");
+                failures.Add($"{path}[{index}].Name: duplicate {kind} name '{PackText.Show(name)}'.");
             }
 
             index++;

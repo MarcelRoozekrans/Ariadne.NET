@@ -37,6 +37,7 @@ var validator = services.GetRequiredService<ISolutionValidator>();
 
 // A rule pack that builds on the built-in clean-architecture pack.
 var pack = loader.LoadFromString("""
+    schema: 2
     name: my-service
     extends:
       - builtin://clean-architecture
@@ -136,13 +137,12 @@ dotnet run --project src/Ariadne.NET.Mcp.Http
 | Tool | Description |
 |------|-------------|
 | `list_templates` | List available architecture templates |
-| `get_layers` | Get layer definitions with allowed dependencies |
+| `get_layers` | Get layers with their id, selectors, allowed dependencies and because |
 | `get_component_roles` | Get available component roles |
-| `get_rules` | Get code feature rules |
+| `get_rules` | Get the forbid and allowOnly rules |
 | `generate_component` | Generate a C# component |
 | `generate_workspace` | Scaffold the project structure for a solution |
 | `validate_source` | Validate a solution or project (`path`) against rules |
-| `lint_source` | Lint a source directory for namespace-layer mismatches |
 
 **MCP Resources:**
 
@@ -156,25 +156,41 @@ All tools auto-detect `.architecture/rules.yaml` in the working directory. Pass 
 
 ### 1. Declarative Rule Packs
 
-Architecture patterns are defined as YAML rule packs. No code changes needed to support a new pattern.
+Architecture patterns are defined as YAML rule packs in schema 2. No code changes needed to support a new pattern. The loader is strict: an unknown key, a missing key or a wrong type fails the load with `file:line:column`.
 
 ```yaml
+schema: 2
 name: clean-architecture
 version: "1.0.0"
 
 layers:
   - name: Domain
-    description: "Entities, value objects, domain services"
+    id: CA-LAYER-DOMAIN
+    because: The domain is the core of the architecture and depends on no other layer.
+    namespaces: ["**.Domain.**"]
     allowedDependencies: []
   - name: Application
-    description: "Use cases, commands, queries"
+    id: CA-LAYER-APPLICATION
+    because: Use cases orchestrate the domain and reach outward only through interfaces they own.
+    namespaces: ["**.Application.**"]
     allowedDependencies: [Domain]
   - name: Infrastructure
-    description: "Repositories, external services"
+    id: CA-LAYER-INFRASTRUCTURE
+    because: Infrastructure implements the interfaces the inner layers define, so it may depend on them.
+    namespaces: ["**.Infrastructure.**"]
     allowedDependencies: [Domain, Application]
   - name: WebApi
-    description: "Controllers, middleware"
+    id: CA-LAYER-WEBAPI
+    because: The web API is the outermost layer and composes everything beneath it.
+    namespaces: ["**.WebApi.**"]
     allowedDependencies: [Domain, Application, Infrastructure]
+
+rules:
+  - id: SHOP-NO-EFCORE-IN-DOMAIN
+    because: Persistence belongs to Infrastructure.
+    forbid:
+      from: { layers: [Domain] }
+      to: { namespaces: ["Microsoft.EntityFrameworkCore.**"] }
 
 componentRoles:
   - name: Entity
@@ -193,6 +209,8 @@ namingConventions:
   filePath: "src/{SolutionName}.{Feature}.{Layer}/{ComponentName}.cs"
 ```
 
+The `rules` entry above is an example of a `forbid` rule; the built-in clean-architecture pack defines none yet. `allowOnly` rules, selectors and `extends` are described in the [rule schema](https://marcelroozekrans.github.io/Ariadne.NET/how-it-works/rule-schema). A pack from release 0.3.0 or earlier needs the edits in [Migrating from v1](https://marcelroozekrans.github.io/Ariadne.NET/how-it-works/rule-schema#migrating-from-v1).
+
 ### 2. Built-in Templates
 
 Ten templates ship with the library:
@@ -200,7 +218,7 @@ Ten templates ship with the library:
 | Template | Layers | Roles | Description |
 |----------|--------|-------|-------------|
 | `clean-architecture` | Domain, Application, Infrastructure, WebApi | 19 | Classic Clean Architecture |
-| `onion-architecture` | DomainModel, DomainServices, ApplicationServices, Infrastructure, Presentation | 15 | Onion Architecture (Jeffrey Palermo) |
+| `onion-architecture` | DomainModel, DomainServices, ApplicationServices, Infrastructure, Presentation | 14 | Onion Architecture (Jeffrey Palermo) |
 | `hexagonal-architecture` | Core, Ports, Adapters | 7 | Ports & Adapters pattern |
 | `layered` | Presentation, Business, DataAccess | 11 | Traditional N-tier / layered |
 | `microservice` | Domain, Application, Infrastructure, Api, Contracts | 17 | Per-service microservice structure |
@@ -210,7 +228,7 @@ Ten templates ship with the library:
 | `vertical-slice` | Feature, SharedKernel, Infrastructure | 8 | Vertical slice / feature-based |
 | `modular-monolith` | Module.Public, Module.Core, Module.Infrastructure, Host | 8 | Modular monolith pattern |
 
-Templates are composable — `clean-architecture+cqrs` merges both packs.
+Role-only add-ons compose with one layer pack — `clean-architecture+cqrs` merges both packs. Two packs that both define layers, such as `clean-architecture+microservice`, fail to compose.
 
 ### 3. Sharing Rule Packs via Git Sync
 
@@ -271,12 +289,12 @@ componentRoles:
 ```
 
 Merge rules:
-- **Layers**: merged by name — duplicate names union their `allowedDependencies`
+- **Layers**: defined once — two packs that define the same layer fail the load. A child pack can retarget an inherited layer's `namespaces` and `assemblies`, and nothing else about it.
+- **Rules**: defined once, by id. A child pack can add rules, and add `exceptions` to an inherited rule unless it is `locked`.
 - **Component Roles**: merged by name — later pack wins
-- **Code Feature Rules**: merged by ID — **locked rules** in base packs cannot be overridden
 - **Naming Conventions**: last pack wins
 
-Use `MergeWithDiagnostics` to get warnings when locked rules are skipped during merging.
+A merge conflict or an amendment of a locked rule is a load error that lists every problem.
 
 ### 5. Code Generation
 
@@ -324,21 +342,11 @@ What counts as a dependency:
 - Generated code is never a source of dependencies, but it can be a target.
 
 Checks performed:
-- **Layer dependencies**: a type in one layer may reference a type in another layer only when the rule allows it (for example, Domain cannot reference Infrastructure). A type's layer is the last namespace segment that names a layer. The report holds one violation for each source type and target type, located at the first reference, with the number of references.
+- **Layer dependencies**: a type in one layer may reference a type in another layer only when the rule allows it (for example, Domain cannot reference Infrastructure). A type's layer comes from the namespace and assembly selectors of the layers; a type that two layers cover is reported as a `LayerOverlap`. The report holds one violation for each source type and target type, located at the first reference, with the number of references.
+- **Forbid and allow-only rules**: a `forbid` rule bars types in one selection from depending on another, and an `allowOnly` rule lets only the named types depend on a selection. Each rule has exceptions and a `because`.
 - **Component roles**: a type in a role's layer whose name ends with the role name must have the role's type kind and accessibility, and a role that requires an interface needs a matching interface role in the checked projects.
 
-Violations have the kinds `DependencyNotAllowed`, `TypeKindMismatch`, `AccessibilityMismatch` and `MissingInterface`, and the rule ids `layer/<Layer>` and `role/<Role>`. A project that targets several frameworks is checked once per framework, and a violation found in only some of them lists them in parentheses after its location, as in `Shop.Domain/Order.cs:7 (net10.0)`. The exit code is 0 when clean, 1 for violations and 2 for an error. Ariadne never restores, so run `dotnet restore` first.
-
-### 7. Lint
-
-A lighter check that detects namespace-vs-directory layer mismatches:
-
-```bash
-# CLI
-dotnet run --project src/Ariadne.NET.Cli -- lint ./src
-```
-
-Over MCP, use the `lint_source` tool.
+Violations have the kinds `DependencyNotAllowed`, `ForbiddenDependency`, `DependencyNotPermitted`, `LayerOverlap`, `TypeKindMismatch`, `AccessibilityMismatch` and `MissingInterface`. The rule id is the layer's or rule's `id`, or `role/<Role>`, and layer and rule violations carry the `because` of the layer or rule. A project that targets several frameworks is checked once per framework, and a violation found in only some of them lists them in parentheses after its location, as in `Shop.Domain/Order.cs:7 (net10.0)`. The exit code is 0 when clean, 1 for violations and 2 for an error. Ariadne never restores, so run `dotnet restore` first.
 
 ## Architecture
 
@@ -351,7 +359,6 @@ src/
     CodeGeneration/           # Roslyn-based code generator
     Orchestration/            # Wires inference + generation + workspace
     Analysis/                 # Type graph and architecture validator on Roslyn compilations
-    Validation/               # Linter (namespace vs directory)
     Sync/                     # Git-based sync: imports, semver, caching
     BuiltinPacks/             # Embedded YAML templates
 
@@ -404,7 +411,6 @@ The table below lists what is registered:
 | `IGenerateOrchestrator` | `GenerateOrchestrator` | Singleton |
 | `IWorkspaceOrchestrator` | `WorkspaceOrchestrator` | Singleton |
 | `IArchitectureValidator` | `ArchitectureValidator` | Singleton |
-| `ILinter` | `Linter` | Singleton |
 | `IImportsLoader` | `ImportsYamlLoader` | Singleton |
 | `IGitSyncProvider` | `GitCliSyncProvider` | Singleton |
 | `ISyncOrchestrator` | `SyncOrchestrator` | Singleton |
@@ -416,14 +422,13 @@ The table below lists what is registered:
 | Command | Description |
 |---------|-------------|
 | `ariadne init --template <name>` | Initialize `.architecture/rules.yaml` |
-| `ariadne rules` | Print resolved layer rules |
+| `ariadne rules` | Print resolved layers, rules and naming conventions |
 | `ariadne roles` | Print component roles table |
 | `ariadne generate --role <role> --name <name> --solution <sol> --feature <feat>` | Generate a component |
 | `ariadne validate [path]` | Validate a solution or project against architecture rules; `path` defaults to `.` |
-| `ariadne lint <path>` | Lint source files for namespace-layer mismatches |
 | `ariadne sync` | Sync rule packs from git repositories defined in imports.yaml |
 
-Exit codes: `0` success, `1` violations or lint issues found, `2` error (missing files or directories, a solution that does not load, failed generation or sync). CI pipelines can fail on any non-zero code, or treat `1` and `2` differently.
+Exit codes: `0` success, `1` violations found, `2` error (missing files or directories, a solution that does not load, failed generation or sync). CI pipelines can fail on any non-zero code, or treat `1` and `2` differently.
 
 ## Building
 

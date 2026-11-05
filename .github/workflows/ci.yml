@@ -62,6 +62,10 @@ jobs:
       - name: Test
         run: dotnet test src/Ariadne.NET.slnx --no-build -c Release --collect:"XPlat Code Coverage" --results-directory ./test-results
 
+      # Checks this repository against its own v2 rule pack in .architecture/rules.yaml.
+      - name: Validate architecture
+        run: dotnet run --project src/Ariadne.NET.Cli -c Release --no-build -- validate src/Ariadne.NET.slnx
+
       # Merges the Cobertura reports and fails below 80 percent line coverage, or when codecov.yml would let a drop in
       # coverage pass quietly.
       - name: Coverage gate

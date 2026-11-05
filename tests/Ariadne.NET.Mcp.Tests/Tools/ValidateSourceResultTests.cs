@@ -3,6 +3,7 @@ using FluentAssertions;
 namespace Ariadne.NET.Mcp.Tests.Tools;
 
 /// <summary>The report of <c>validate_source</c> as an MCP client receives it.</summary>
+[Collection(FixtureSolutionCollection.Name)]
 public sealed class ValidateSourceResultTests : IAsyncLifetime
 {
     private McpClientHarness _harness = null!;
