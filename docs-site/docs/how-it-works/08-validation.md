@@ -4,89 +4,139 @@ sidebar_position: 8
 
 # Validation and Linting
 
-The engine provides two levels of source code analysis: full validation (deep) and linting (shallow). Both use Roslyn to parse C# source files — no regex-based analysis.
+The engine checks existing code at two levels: validation (deep) and linting (shallow). Validation uses the compiler's semantic model on a loaded solution. The linter parses files with Roslyn and compares namespaces with directories.
 
-## SourceValidator — Deep Validation
+## Semantic Validation
 
-**Interface:** `ISourceValidator`
-**Implementation:** `SourceValidator`
+**Interfaces:** `ISolutionValidator` (`Ariadne.NET.Workspaces`) and `IArchitectureValidator` (`Ariadne.NET`)
+**Implementations:** `SolutionValidator` and `ArchitectureValidator`
 
-Performs comprehensive validation of existing source code against architecture rules.
+`ISolutionValidator` is the entry point for hosts. The CLI `validate` command and the MCP `validate_source` tool both call it.
 
 ```
-ISourceValidator
-  └── Validate(RulePack resolvedPack, string sourceDirectory) → SourceValidationResult
+ISolutionValidator
+  └── ValidateAsync(RulePack resolvedPack, string path, CancellationToken)
+        → Task<Result<ArchitectureReport, AriadneError>>
 ```
 
-**Two-pass algorithm:**
-
-```mermaid
-flowchart TD
-    subgraph Pass1["PASS 1: Per-file analysis and role matching"]
-        A["For each *.cs file (recursive)"] --> B["Parse with CSharpSyntaxTree"]
-        B --> C["Extract namespace<br/><i>(file-scoped or block)</i>"]
-        C --> D["Detect layer from namespace segments"]
-        D --> E["Validate using directives"]
-        E --> E1["For each 'using' statement:<br/>- Detect target layer<br/>- Skip self-references<br/>- Check allowedDependencies<br/>- If not → DependencyViolation"]
-        D --> F["Validate type declarations"]
-        F --> F1["For each type:<br/>- Match name to role (by suffix)<br/>- Check TypeKind matches<br/>- Check accessibility matches<br/>- Record matched roles"]
-    end
-
-    subgraph Pass2["PASS 2: Cross-file interface requirement check"]
-        G["For each role with<br/>RequiresInterface=true"] --> H{"Implementations<br/>found in Pass 1?"}
-        H -->|Yes| I{"Corresponding<br/>interface found?"}
-        H -->|No| J["Skip — no check needed"]
-        I -->|Yes| K["Valid"]
-        I -->|No| L["MissingInterface violation"]
-    end
-
-    Pass1 --> Pass2
-```
-
-**Layer detection algorithm (DetectLayer):**
+It loads `path` with `ISolutionLoader`, passes the compilations to `IArchitectureValidator`, and disposes the workspace. The engine itself has no MSBuild dependency. A host that builds its own `Compilation` objects calls `IArchitectureValidator.Validate(pack, projects)` or `Validate(pack, compilation)` directly.
 
 ```mermaid
 flowchart LR
-    A["Namespace:<br/>MyApp.Orders.Infrastructure"] --> B["Split by '.'<br/>[MyApp, Orders, Infrastructure]"]
-    B --> C["Scan right-to-left"]
-    C --> D{"Infrastructure<br/>in knownLayers?"}
-    D -->|Yes| E["Return: Infrastructure"]
+    A["path<br/>.sln .slnx .slnf .csproj"] --> B["ISolutionLoader<br/><i>one compilation per project<br/>and target framework</i>"]
+    B --> C["TypeGraphBuilder<br/><i>one edge per type reference</i>"]
+    C --> D["Layer rule<br/>Role rules"]
+    D --> E["ArchitectureReport"]
 ```
 
-**Type-to-role matching algorithm (MatchTypeToRole):**
+### The type graph
 
-```mermaid
-flowchart TD
-    A["typeName: OrderRepository<br/>detectedLayer: Infrastructure"] --> B["For each role in ComponentRoles"]
-    B --> C{"role.Layer ==<br/>Infrastructure?"}
-    C -->|No| B
-    C -->|Yes| D{"typeName ends with<br/>role.Name?"}
-    D -->|Yes| E["Match found:<br/>Role 'Repository'<br/>Layer 'Infrastructure'"]
-    D -->|No| F{"typeName ends with<br/>alternativeName?"}
-    F -->|Yes| E
-    F -->|No| B
-```
+For each compilation, the engine walks every syntax tree that is not generated code and binds each type name. Every type reference that somebody wrote becomes an edge from the innermost type around it to the type it names.
 
-**Violation types:**
+What counts as a dependency:
 
-| Type | Meaning | Example |
+- Base types, interfaces, attributes, member signatures, generic arguments and types used in method bodies, including `typeof`, casts, patterns and `catch` clauses.
+- `var` gives nothing, because nobody wrote the type.
+- An unused `using` gives nothing. A `using` directive is not a dependency; a use of what it imports is.
+- An alias use gives the edges its target would give if it were written out.
+- `using static` members count, and `Store.Count` counts once, as a reference to `Store`.
+
+An edge from a type to itself is dropped. So are type parameters, `dynamic` and types the compiler cannot resolve. A member, a constructed generic type, an array and a pointer all count as the type they belong to.
+
+### Generated code
+
+Generated code is any of these:
+
+- output of a source generator;
+- a file that starts with an `<auto-generated>` or `<autogenerated>` header;
+- a file name ending in `.g.cs`, `.g.i.cs`, `.designer.cs` or `.generated.cs`, or starting with `TemporaryGeneratedFile_`;
+- `generated_code = true` in the analyzer config;
+- a type marked `[GeneratedCode]`, and the types nested in it.
+
+Generated code is never a source: it produces no edges and its types are not checked against roles. It can be a target. This is why the SDK's `GlobalUsings.g.cs` no longer counts.
+
+### Layer of a type
+
+A type's layer is the last segment of its namespace that equals a layer name, ignoring case. This applies to source types and to types from referenced assemblies. A type with no such segment has no layer, and it is not constrained as a source or as a target.
+
+### Rules
+
+**Layer rule.** An edge between two layers is a violation when the target layer is not in the source layer's `allowedDependencies`. All edges from one source type to one target type make one violation, located at the first reference, with a count of the references.
+
+**Role rules.** A source type in a role's layer whose name ends with the role name or one of its `alternativeNames` matches the role. Nested types are included. Enums and delegates are never matched to a role. Each match is checked for:
+
+| Kind | Meaning | Example |
 |------|---------|---------|
-| `DependencyViolation` | `using` directive violates layer dependencies | Domain file using Infrastructure namespace |
-| `TypeKindMismatch` | Type declaration doesn't match role's expected kind | Role says `Interface` but file has `class` |
-| `AccessibilityMismatch` | Access modifier doesn't match role definition | Role says `internal` but type is `public` |
-| `MissingInterface` | Role requires interface but none found in codebase | `Repository` exists but `IRepository` doesn't |
+| `TypeKindMismatch` | The type is not of the kind the role requires | Role says `Interface` but the type is a `class` |
+| `AccessibilityMismatch` | The role asks for `internal` and the type is not | Role says `internal` but the type is `public` |
+| `MissingInterface` | The role requires an interface role and no type in the checked projects matches it | `Repository` exists but no type matches `RepositoryInterface` |
 
-**Result model:**
+The type kind is read from the symbol, so `record` and `record struct` are told apart. Accessibility is the declared accessibility, and a top-level type with no access modifier counts as internal. A nested one is private.
+
+Two verdicts differ from the old validator, which looked at `using` directives and keywords in the file text. A top-level type with no access modifier now passes an `internal` role, where it used to be reported as public. An unused `using` is no longer a dependency.
+
+### The report
 
 ```
-SourceValidationResult
-  ├── IsValid: bool                     (true if no violations)
-  ├── Violations: IReadOnlyList<SourceViolation>
-  │     ├── FilePath: string
-  │     ├── ViolationType: string
+ArchitectureReport
+  ├── IsValid: bool                          (true when there are no violations)
+  ├── Violations: IReadOnlyList<ArchitectureViolation>
+  │     ├── RuleId: string                   (layer/<Layer> or role/<Role>)
+  │     ├── Kind: ViolationKind              (DependencyNotAllowed, TypeKindMismatch,
+  │     │                                     AccessibilityMismatch, MissingInterface)
+  │     ├── SourceType: string               (fully qualified name)
+  │     ├── Target: string?                  (the type depended on, absent for role checks)
+  │     ├── Location: SourceLocation?        (file path, line, column; the first reference)
+  │     ├── ReferenceCount: int
+  │     ├── TargetFrameworks: IReadOnlyList<string>
+  │     ├── Because: string                  (reserved for schema v2; always empty for now)
   │     └── Message: string
-  └── FilesScanned: int
+  ├── Projects: IReadOnlyList<CheckedProject>   (name and target frameworks)
+  ├── SkippedProjects: IReadOnlyList<SkippedProject>  (name and reason)
+  └── TypesChecked: int
 ```
+
+A missing interface has no location, because no single reference caused it. `TargetFrameworks` is empty when the violation occurs in every target framework of the project, and otherwise lists the ones it occurs in.
+
+The CLI prints a report like this:
+
+```
+Checked 2 types in 2 projects
+Result: FAIL - 1 violation(s) found.
+
+  [DependencyNotAllowed] Shop.Domain/Order.cs:7
+    Layer 'Domain' is not allowed to depend on 'Infrastructure': Shop.Domain.Order references Shop.Infrastructure.SqlStore 3 times
+```
+
+Paths in the report are absolute. The CLI shows them relative to the directory of the solution or project it loaded, and puts a non-empty `TargetFrameworks` list in parentheses after the location, as in `Shop.Domain/Order.cs:7 (net10.0)`.
+
+### Which projects are checked
+
+The projects the path names are checked, test projects included: all projects of a `.sln` or `.slnx`, the listed projects of a `.slnf`, and the one project of a `.csproj`. A directory works when it holds exactly one of those files. A project that the load pulls in because a named project references it is compiled as a reference only.
+
+Projects that are not C#, or that have no language (`.dcproj`, `.shproj`, `.fsproj`, `.vbproj`), are skipped. They appear in `SkippedProjects` and the CLI prints a `Skipped` line for each.
+
+A project that targets several frameworks is checked once per target framework. Violations with the same rule, kind, source and target merge into one, which keeps the earliest location and the highest reference count.
+
+### Load failures
+
+A load is complete or it is an error. It fails on a workspace failure, on compile errors (the first 5 are listed), on a `System.Object` that does not resolve, and on a hand-written source file that a project lists and that is missing on disk. Warnings do not fail it.
+
+Ariadne never restores. A compilation that is complete passes even without a restore. When a project fails and no `project.assets.json` is found, the error adds `run 'dotnet restore' first`.
+
+### Requirements for package consumers
+
+`Ariadne.NET.Workspaces` loads projects with MSBuild from an installed .NET SDK, which it finds with MSBuildLocator. A project that references the package must also add its own reference, or the build fails with `MSBL001`:
+
+```xml
+<PackageReference Include="Microsoft.Build.Framework" Version="17.11.48" ExcludeAssets="runtime" />
+```
+
+The `BuildHost-*` folders that the workspace needs come with the package.
+
+### Performance
+
+The load and check times and the allocations of the check on this repository's own solution are recorded in `docs/perf/phase-2.1-baseline.md`.
 
 ## Linter — Shallow Validation
 

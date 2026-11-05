@@ -1,0 +1,15 @@
+using Ariadne.NET.Abstractions;
+using Ariadne.NET.Analysis;
+using ZeroAlloc.Results;
+
+namespace Ariadne.NET.Workspaces;
+
+/// <summary>Checks a solution or project on disk against the architecture rules of a rule pack.</summary>
+public interface ISolutionValidator
+{
+    /// <summary>Loads <paramref name="path"/>, checks its projects, lists the skipped ones in the report and releases the workspace.</summary>
+    /// <param name="resolvedPack">The resolved rule pack.</param>
+    /// <param name="path">A solution, solution filter or project file, or a directory that holds exactly one.</param>
+    /// <param name="cancellationToken">Cancels the load and the check.</param>
+    Task<Result<ArchitectureReport, AriadneError>> ValidateAsync(RulePack resolvedPack, string path, CancellationToken cancellationToken = default);
+}

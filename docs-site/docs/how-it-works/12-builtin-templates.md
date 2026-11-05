@@ -238,6 +238,8 @@ componentRoles:
     typeKind: Class
 ```
 
+The `cqrs` and `ddd-tactical` roles name the Application and Domain layers but declare no layers of their own. They resolve on their own, but combine them with a base pack that declares those layers; once the merged pack has any layer, a role naming an undeclared layer is an Invalid error.
+
 The resolved pack will have:
 - **Name:** `"clean-architecture+cqrs+ddd-tactical+my-project"`
 - **Layers:** 4 (from clean-architecture, unmodified since add-ons define no layers)

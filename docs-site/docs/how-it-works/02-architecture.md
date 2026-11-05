@@ -9,25 +9,28 @@ sidebar_position: 2
 ```mermaid
 graph TD
     subgraph src
-        subgraph ArchGov.Core["ArchGov.Core (Rule engine library)"]
-            RuleSchema["RuleSchema<br/><i>Domain models</i>"]
-            RuleLoader["RuleLoader<br/><i>YAML parsing, registry, resolver</i>"]
-            RuleEngine["RuleEngine<br/><i>Merger, validator, inference</i>"]
+        Abstractions["Ariadne.NET.Abstractions<br/><i>Rule-pack schema + contracts<br/>ZeroAlloc.Results + Validation only, Native AOT</i>"]
+        subgraph Ariadne.NET["Ariadne.NET (Rule engine library)"]
+            RuleLoader["RuleLoader<br/><i>YAML loading, registry, extends resolution</i>"]
+            RuleEngine["RuleEngine<br/><i>Merger, inference</i>"]
             CodeGeneration["CodeGeneration<br/><i>Roslyn C# generator</i>"]
             Orchestration["Orchestration<br/><i>Generate + workspace</i>"]
-            Validation["Validation<br/><i>Source validation & linting</i>"]
+            Analysis["Analysis<br/><i>Type graph, architecture validator</i>"]
+            Validation["Validation<br/><i>Namespace linting</i>"]
             Sync["Sync<br/><i>Git sync, semver, caching</i>"]
             BuiltinPacks["BuiltinPacks<br/><i>10 embedded YAML templates</i>"]
         end
-        HostApi["ArchGov.Host.Api<br/><i>REST API + MCP HTTP</i>"]
-        HostCli["ArchGov.Host.Cli<br/><i>CLI (System.CommandLine 3.0)</i>"]
-        HostMcp["ArchGov.Host.Mcp<br/><i>MCP stdio server</i>"]
+        Workspaces["Ariadne.NET.Workspaces<br/><i>Loads solutions with MSBuildWorkspace<br/>and validates them</i>"]
+        HostApi["Ariadne.NET.Mcp.Http<br/><i>MCP over HTTP</i>"]
+        HostCli["Ariadne.NET.Cli<br/><i>CLI (System.CommandLine 3.0)</i>"]
+        HostMcp["Ariadne.NET.Mcp<br/><i>MCP stdio server</i>"]
     end
 
     subgraph tests
-        CoreTests["ArchGov.Core.Tests<br/><i>Unit + integration tests</i>"]
-        ApiTests["ArchGov.Host.Api.Tests<br/><i>API integration tests</i>"]
-        McpTests["ArchGov.Host.Mcp.Tests<br/><i>MCP tool + resource tests</i>"]
+        CoreTests["Ariadne.NET.Tests<br/><i>Unit + integration tests</i>"]
+        CliTests["Ariadne.NET.Cli.Tests<br/><i>CLI exit-code tests</i>"]
+        McpTests["Ariadne.NET.Mcp.Tests<br/><i>MCP tool + resource tests</i>"]
+        AotSmoke["Ariadne.NET.AotSmoke<br/><i>Native AOT publish check</i>"]
     end
 ```
 
@@ -39,40 +42,49 @@ The engine processes a user request through a series of stages:
 flowchart TD
     A["User Request<br/><i>role, name, solution, feature</i>"] --> B
 
-    subgraph Core["ArchGov.Core Pipeline"]
+    subgraph Core["Ariadne.NET Pipeline"]
         B["1. RulePackResolver<br/><i>Parse extends references<br/>(builtin://, import://)<br/>Load referenced packs</i>"]
         B --> C["2. RulePackMerger<br/><i>Combine layers (union deps)<br/>Roles (last wins)<br/>Rules (locked protection)</i>"]
         C --> D["3. LayerInferenceEngine<br/><i>Map role name → layer<br/>Primary + alternative names<br/>Ambiguity detection</i>"]
-        D --> E["4. DependencyValidator<br/><i>Check layer dependency<br/>graph constraints</i>"]
-        E --> F["5. CodeGeneratorService<br/><i>Roslyn SyntaxFactory →<br/>formatted C# output</i>"]
+        D --> E["4. CodeGeneratorService<br/><i>Roslyn SyntaxFactory →<br/>formatted C# output</i>"]
     end
 
-    F --> G["Generated File<br/><i>path, namespace, type, code</i>"]
+    E --> G["Generated File<br/><i>path, namespace, type, code</i>"]
 ```
+
+Validation is a separate path. `ISolutionValidator` in `Ariadne.NET.Workspaces` loads a solution into compilations, and `IArchitectureValidator` in `Ariadne.NET` builds a type graph per compilation and checks it against the resolved pack. See [Validation and Linting](08-validation.md).
 
 ## Dependency Flow
 
-All three host applications depend only on `ArchGov.Core`. They never depend on each other.
+The CLI and the MCP hosts depend on `Ariadne.NET.Workspaces`, which depends on `Ariadne.NET`, which depends on `Ariadne.NET.Abstractions`. Abstractions holds the rule-pack schema and the loader, resolver and registry contracts, and depends on nothing, so other tools can reference it without pulling in Roslyn or YamlDotNet. The only host-to-host dependency is `Ariadne.NET.Mcp.Http` → `Ariadne.NET.Mcp`, so the HTTP transport serves the same MCP tools and resources as stdio.
 
 ```mermaid
 graph LR
-    Api["ArchGov.Host.Api"] --> Core["ArchGov.Core"]
-    Cli["ArchGov.Host.Cli"] --> Core
-    Mcp["ArchGov.Host.Mcp"] --> Core
+    Api["Ariadne.NET.Mcp.Http"] --> Core
+    Api --> Mcp
+    Cli["Ariadne.NET.Cli"] --> Ws["Ariadne.NET.Workspaces"]
+    Cli --> Core
+    Mcp["Ariadne.NET.Mcp"] --> Ws
+    Mcp --> Core
+    Ws --> Core["Ariadne.NET"]
+    Core --> Abs["Ariadne.NET.Abstractions"]
 ```
 
-Within `ArchGov.Core`, dependencies flow strictly top-down:
+Within `Ariadne.NET`, the namespaces depend on each other as follows. `Analysis` and `Validation` depend only on Abstractions, and `Telemetry` holds the instrumented pack and sync interfaces, so the pack and sync code and `Telemetry` reference each other.
 
 ```mermaid
 graph TD
     Orchestration --> CodeGeneration
-    Orchestration --> Validation
     Orchestration --> RuleEngine
-    CodeGeneration --> RuleEngine
-    Validation --> RuleEngine
-    RuleEngine --> RuleLoader
-    RuleLoader --> RuleSchema["RuleSchema<br/><i>(leaf — no dependencies)</i>"]
-    Sync["Sync<br/><i>(independent module)</i>"]
+    RuleLoader --> RuleEngine
+    RuleLoader --> Telemetry
+    Sync --> Telemetry
+    Telemetry --> RuleLoader
+    Telemetry --> Sync
+    Telemetry --> RuleEngine
+    RuleLoader --> Abstractions["Ariadne.NET.Abstractions<br/><i>(separate package — ZeroAlloc.Results + Validation only)</i>"]
+    Analysis --> Abstractions
+    Validation --> Abstractions
 ```
 
 ---
