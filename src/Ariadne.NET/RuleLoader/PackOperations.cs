@@ -18,11 +18,14 @@ internal sealed class PackOperations : IPackOperations
     private const string SchemaName = "rule pack";
 
     // The generated validator composes the nested validators, so they are built here instead of resolved from DI:
-    // ZeroAlloc.Validation.Inject would add a package and a constructor parameter for four stateless objects.
+    // ZeroAlloc.Validation.Inject would add a package and a constructor parameter for stateless objects.
     private static readonly RulePackValidator Validator = new(
         new LayerDefinitionValidator(),
         new ComponentRoleDefinitionValidator(),
         new CodeFeatureRuleDefinitionValidator(),
+        new RuleDefinitionValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleExceptionValidator()),
+        new LayerRetargetValidator(),
+        new RuleAmendmentValidator(new RuleExceptionValidator()),
         new NamingConventionsValidator());
 
     private PackOperations()

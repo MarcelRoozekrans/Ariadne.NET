@@ -41,4 +41,51 @@ public class RulePackTests
         pack.ComponentRoles.Should().HaveCount(1);
         pack.ComponentRoles[0].TypeKind.Should().Be(CSharpTypeKind.Class);
     }
+
+    [Fact]
+    public void NewPack_DefaultsToSchema2_AndEmptyV2Lists()
+    {
+        var pack = new RulePack { Name = "p" };
+
+        pack.Schema.Should().Be(2);
+        pack.Rules.Should().BeEmpty();
+        pack.LayerRetargets.Should().BeEmpty();
+        pack.RuleAmendments.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void RuleDefinition_WithoutBecause_FailsValidation()
+    {
+        var rule = new RuleDefinition { Id = "r1", Because = "", Kind = RuleKind.Forbid, From = new TargetSelector(), To = new TargetSelector() };
+
+        Validator().Validate(rule).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void RuleException_WithoutBecause_FailsValidation()
+    {
+        var exception = new RuleException { Because = "" };
+
+        new RuleExceptionValidator().Validate(exception).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Rules_WithNullEntry_FailsValidation()
+    {
+        var pack = new RulePack { Name = "p", Rules = [null!] };
+
+        PackValidator().Validate(pack).IsValid.Should().BeFalse();
+    }
+
+    private static RuleDefinitionValidator Validator() =>
+        new(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleExceptionValidator());
+
+    private static RulePackValidator PackValidator() => new(
+        new LayerDefinitionValidator(),
+        new ComponentRoleDefinitionValidator(),
+        new CodeFeatureRuleDefinitionValidator(),
+        new RuleDefinitionValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleExceptionValidator()),
+        new LayerRetargetValidator(),
+        new RuleAmendmentValidator(new RuleExceptionValidator()),
+        new NamingConventionsValidator());
 }
