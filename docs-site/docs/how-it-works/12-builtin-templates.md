@@ -4,9 +4,11 @@ sidebar_position: 12
 
 # Built-in Templates
 
-Ten templates ship as embedded YAML resources, all in schema 2. They fall into two categories:
+Ten templates ship as embedded YAML resources, all in schema 2.
 
 Every layer of a standalone template has an `id` with a pack prefix (`CA-` for clean-architecture, `ONION-`, `HEX-`, `LAY-`, `MS-`, `ED-`, `VS-` and `MM-` for the others, as in `CA-LAYER-DOMAIN`), a `because` written for that architecture, and a namespace selector of the form `**.<Segment>.**`. `Domain` in clean-architecture is `**.Domain.**`, which matches `Shop.Domain` and `Shop.Orders.Domain.Entities`. A solution whose namespaces do not follow that naming retargets the layers; see [Rule Schema](03-rule-schema.md#extends). None of the built-in packs defines `rules` yet.
+
+The templates fall into two categories:
 
 ## Standalone Templates
 

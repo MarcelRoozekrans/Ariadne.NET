@@ -65,7 +65,7 @@ Every mapping in a pack has a closed set of keys. An unknown key, a missing requ
 | `componentRoles` | no | List of component roles, used for code generation and role checks. |
 | `namingConventions` | no | Templates for namespaces and file paths. |
 
-The v1 section for code feature rules is not part of schema 2. A pack that still has it fails with "unknown key" and a note that typed code-feature rules arrive in a later release.
+The v1 section for code feature rules is not part of schema 2. A pack that still has it fails with `'codeFeatureRules' is not part of schema 2; typed code-feature rules arrive in a later release`.
 
 The C# model is `RulePack`:
 
@@ -198,6 +198,8 @@ An empty pattern, or one with an empty segment such as `Shop..Domain`, is a load
 
 `extends` lists parent packs: `builtin://name` for an embedded pack and `import://name` for a pack fetched by `ariadne sync`. Packs merge parent first, in `extends` order, then the child. See [Rule Loading](04-rule-loading.md) for how the references resolve and [Rule Engine](05-rule-engine.md) for the merge.
 
+`extends` is not recursive: only the packs a pack lists are loaded, and a parent's own `extends` is ignored. List every pack you need in the pack that you resolve.
+
 A child pack may do three things to what it inherits:
 
 - **Retarget a layer.** A layer entry with an inherited `name` that has only `name`, `namespaces` and `assemblies` replaces the inherited selectors. It cannot change `allowedDependencies` or `because`. A layer entry with any other key and an inherited name is a conflict and fails the load.
@@ -325,7 +327,7 @@ Schema 2 is a clean break. The loader reads only schema 2 packs; there is no v1 
        allowedDependencies: []
    ```
 
-   The built-in packs use selectors of the form `**.<Segment>.**`, which match the same namespaces as v1 did.
+   The built-in packs use selectors of the form `**.<Segment>.**`, which match the same namespaces as v1 did. One difference: v1 resolved nested matches by the innermost segment, so `Shop.Application.Domain` was in `Domain` in v1. Both `**.Application.**` and `**.Domain.**` cover it now, so it is a `LayerOverlap`.
 
    A pack that extends a built-in pack and defines its own layers with the same names as the parent's no longer works, because two definitions of one layer conflict. Keep the inherited layer and retarget it instead: list the name with only `namespaces` or `assemblies`.
 3. **Drop the `codeFeatureRules` section.** Schema 2 has no such key, and nothing evaluated the v1 entries beyond two checks that the engine already runs from the component roles. Typed code-feature rules arrive in a later release. Dependency restrictions that you wrote as prose can now be written as `forbid` and `allowOnly` rules.

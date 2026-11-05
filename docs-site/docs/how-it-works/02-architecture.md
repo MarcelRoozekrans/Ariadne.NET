@@ -43,7 +43,7 @@ flowchart TD
 
     subgraph Core["Ariadne.NET Pipeline"]
         B["1. RulePackResolver<br/><i>Parse extends references<br/>(builtin://, import://)<br/>Load referenced packs</i>"]
-        B --> C["2. RulePackMerger<br/><i>Combine layers (union deps)<br/>Roles (last wins)<br/>Rules (locked protection)</i>"]
+        B --> C["2. RulePackMerger<br/><i>Layers and rules defined once (conflicts fail)<br/>Retarget selectors, add exceptions<br/>Roles (last wins)</i>"]
         C --> D["3. LayerInferenceEngine<br/><i>Map role name → layer<br/>Primary + alternative names<br/>Ambiguity detection</i>"]
         D --> E["4. CodeGeneratorService<br/><i>Roslyn SyntaxFactory →<br/>formatted C# output</i>"]
     end

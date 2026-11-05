@@ -57,7 +57,7 @@ Generated code is never a source: it produces no edges and its types are not che
 
 ### Layer of a type
 
-A type's layer comes from the selectors of the pack's layers: a type belongs to a layer when its namespace matches one of the layer's `namespaces` globs or its assembly name matches one of its `assemblies` patterns, and to both lists when the layer has both. Matching is ordinal and case-sensitive. This applies to source types and to types from referenced assemblies. A type that no layer covers has no layer, and a type that two layers cover is reported as a `LayerOverlap` and is left out of the dependency check. See [Rule Schema](03-rule-schema.md#selectors) for the glob grammar.
+A type's layer comes from the selectors of the pack's layers: a type belongs to a layer when it matches each non-empty list the layer has. Within a list any value may match, so a layer with both `namespaces` and `assemblies` covers a type only when its namespace matches one of the globs and its assembly name matches one of the patterns. Matching is ordinal and case-sensitive. This applies to source types and to types from referenced assemblies. A type that no layer covers has no layer, and a type that two layers cover is reported as a `LayerOverlap` and is left out of the dependency check. See [Rule Schema](03-rule-schema.md#selectors) for the glob grammar.
 
 ### Rules
 
