@@ -262,6 +262,63 @@ public sealed class ExitCodeTests : IDisposable
     }
 
     [Fact]
+    public void Rules_PrintsSelectorsAndRules()
+    {
+        WriteRules("""
+            schema: 2
+            name: shop
+            extends:
+              - builtin://clean-architecture
+            rules:
+              - id: SH-001
+                because: The domain stays free of EF Core.
+                forbid:
+                  from:
+                    layers: [Domain]
+                  to:
+                    namespaces: ["Microsoft.EntityFrameworkCore.**"]
+                    types: ["**.DbContext"]
+                exceptions:
+                  - types: ["**.Bootstrap"]
+                    because: The composition root wires everything.
+              - id: SH-002
+                because: Agents only use the runner.
+                allowOnly:
+                  from:
+                    namespaces: ["**.Agents.**"]
+                  to:
+                    types: ["**.IRunner"]
+            """);
+
+        var (exitCode, stdout) = RunCapturingStdout("rules");
+
+        exitCode.Should().Be(ExitCodes.Success);
+        var lines = stdout.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        lines.Should().Contain("  Domain [CA-LAYER-DOMAIN]: namespaces **.Domain.**; depends on nothing");
+        lines.Should().Contain("  Application [CA-LAYER-APPLICATION]: namespaces **.Application.**; depends on Domain");
+        lines.Should().Contain("  WebApi [CA-LAYER-WEBAPI]: namespaces **.WebApi.**; depends on Domain, Application, Infrastructure");
+        var rules = lines.SkipWhile(l => !string.Equals(l, "Rules:", StringComparison.Ordinal)).Skip(1).TakeWhile(l => l.StartsWith("  ", StringComparison.Ordinal)).ToArray();
+        rules.Should().Contain(
+        [
+            "  SH-001 forbid layers Domain -> namespaces Microsoft.EntityFrameworkCore.**; types **.DbContext",
+            "    1 exception(s)",
+            "    The domain stays free of EF Core.",
+            "  SH-002 allowOnly namespaces **.Agents.** -> types **.IRunner",
+            "    Agents only use the runner.",
+        ]);
+    }
+
+    [Fact]
+    public void Rules_WithoutRules_PrintsNoneUnderRules()
+    {
+        var (exitCode, stdout) = RunCapturingStdout("rules");
+
+        exitCode.Should().Be(ExitCodes.Success);
+        var lines = stdout.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        lines.SkipWhile(l => !string.Equals(l, "Rules:", StringComparison.Ordinal)).Skip(1).First().Should().Be("  (none)");
+    }
+
+    [Fact]
     public void Rules_MissingRulesFile_TellsUserToRunAriadneInit()
     {
         File.Delete(Path.Combine(_tempDir, ".architecture", "rules.yaml"));

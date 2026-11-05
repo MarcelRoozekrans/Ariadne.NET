@@ -26,15 +26,32 @@ public static class RulesCommand
             Console.WriteLine();
 
             Console.WriteLine("Layers:");
-            Console.WriteLine($"  {"Name",-25} {"Allowed Dependencies"}");
-            Console.WriteLine($"  {new string('-', 25)} {new string('-', 30)}");
-
             foreach (var layer in pack.Layers)
             {
                 var deps = layer.AllowedDependencies.Count > 0
                     ? string.Join(", ", layer.AllowedDependencies)
-                    : "(none)";
-                Console.WriteLine($"  {layer.Name,-25} {deps}");
+                    : "nothing";
+                var selectors = Describe(layer.Namespaces, layer.Assemblies);
+                Console.WriteLine($"  {layer.Name} [{layer.Id}]: {selectors}; depends on {deps}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("Rules:");
+            if (pack.Rules.Count == 0)
+            {
+                Console.WriteLine("  (none)");
+            }
+
+            foreach (var rule in pack.Rules)
+            {
+                var kind = rule.Kind == RuleKind.Forbid ? "forbid" : "allowOnly";
+                Console.WriteLine($"  {rule.Id} {kind} {Describe(rule.From)} -> {Describe(rule.To)}");
+                if (rule.Exceptions.Count > 0)
+                {
+                    Console.WriteLine($"    {rule.Exceptions.Count} exception(s)");
+                }
+
+                Console.WriteLine($"    {rule.Because}");
             }
 
             Console.WriteLine();
@@ -45,6 +62,32 @@ public static class RulesCommand
         });
 
         return command;
+    }
+
+    private static string Describe(TargetSelector selector) =>
+        Describe(selector.Namespaces, selector.Assemblies, selector.Layers, selector.Types);
+
+    // Kinds in the order layers, namespaces, assemblies, types; kinds joined by "; ", values by ", ".
+    private static string Describe(
+        IList<string> namespaces,
+        IList<string> assemblies,
+        IList<string>? layers = null,
+        IList<string>? types = null)
+    {
+        var parts = new List<string>();
+        AddKind(parts, "layers", layers);
+        AddKind(parts, "namespaces", namespaces);
+        AddKind(parts, "assemblies", assemblies);
+        AddKind(parts, "types", types);
+        return parts.Count > 0 ? string.Join("; ", parts) : "no selectors";
+    }
+
+    private static void AddKind(List<string> parts, string label, IList<string>? values)
+    {
+        if (values is { Count: > 0 })
+        {
+            parts.Add($"{label} {string.Join(", ", values)}");
+        }
     }
 
     internal static Result<RulePack, AriadneError> ResolveRulesFromFile(IServiceProvider provider)
