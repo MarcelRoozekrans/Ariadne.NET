@@ -19,13 +19,13 @@ public static class RuleTools
     }
 
     [McpServerTool(Name = "get_rules")]
-    [Description("Get code feature rules that enforce structural constraints (e.g. interface requirements, accessibility rules).")]
-    public static IList<CodeFeatureRuleDefinition> GetRules(
+    [Description("Get the forbid and allowOnly rules of the resolved pack, each with its id, targets, exceptions and because.")]
+    public static IList<RuleDefinition> GetRules(
         IRuleResolutionHelper helper,
         [Description("Template name. Optional - auto-detects from .architecture/rules.yaml.")]
         string? template = null)
     {
         var resolved = ToolError.ValueOrToolError(helper.Resolve(template));
-        return resolved.CodeFeatureRules;
+        return resolved.Rules;
     }
 }

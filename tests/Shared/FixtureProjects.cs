@@ -18,6 +18,8 @@ internal static class FixtureProjects
         "multitarget/Multi.csproj",
         "compile-error/Broken.csproj",
         "generator/Gen.App/Gen.App.csproj",
+        "daedalus/clean/Daedalus.slnx",
+        "daedalus/broken/Daedalus.slnx",
     ];
 
     private static readonly TimeSpan LockTimeout = TimeSpan.FromMinutes(5);

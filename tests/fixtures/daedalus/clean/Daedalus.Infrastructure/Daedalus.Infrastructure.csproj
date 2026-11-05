@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- Infrastructure to Domain is an allowed edge, so the clean variant shows that it stays silent. The broken variant
+       leaves the Domain reference out: its Domain references Infrastructure, so it would be a project cycle. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Daedalus.Application\Daedalus.Application.csproj" />
+    <ProjectReference Include="..\Daedalus.Domain\Daedalus.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

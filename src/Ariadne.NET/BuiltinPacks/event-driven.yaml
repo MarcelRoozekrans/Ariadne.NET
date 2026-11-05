@@ -1,26 +1,42 @@
+schema: 2
 name: event-driven
 version: "1.0.0"
 author: platform-team
 
 layers:
   - name: Domain
+    id: ED-LAYER-DOMAIN
+    because: The domain model holds the business rules and knows nothing about messaging.
+    namespaces: ["**.Domain.**"]
     description: "Core domain model"
     allowedDependencies: []
   - name: Events
+    id: ED-LAYER-EVENTS
+    because: Events describe what happened in the domain, so they may refer only to the domain.
+    namespaces: ["**.Events.**"]
     description: "Event definitions"
     allowedDependencies:
       - Domain
   - name: Producers
+    id: ED-LAYER-PRODUCERS
+    because: Producers publish events about the domain and must not know who consumes them.
+    namespaces: ["**.Producers.**"]
     description: "Event publishers"
     allowedDependencies:
       - Domain
       - Events
   - name: Consumers
+    id: ED-LAYER-CONSUMERS
+    because: Consumers react to events and must not call producers directly, which keeps the flow one-way.
+    namespaces: ["**.Consumers.**"]
     description: "Event handlers/subscribers"
     allowedDependencies:
       - Domain
       - Events
   - name: Infrastructure
+    id: ED-LAYER-INFRASTRUCTURE
+    because: Messaging infrastructure wires producers and consumers to the broker, so it sees every layer.
+    namespaces: ["**.Infrastructure.**"]
     description: "Messaging infrastructure"
     allowedDependencies:
       - Domain

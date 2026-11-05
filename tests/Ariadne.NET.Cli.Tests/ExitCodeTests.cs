@@ -1,4 +1,5 @@
 using System.Runtime.Versioning;
+using Ariadne.NET.Abstractions;
 using Ariadne.NET.Analysis;
 using Ariadne.NET.Cli;
 using Ariadne.NET.Cli.Commands;
@@ -22,6 +23,8 @@ public sealed class ExitCodeTests : IDisposable
         File.WriteAllText(
             Path.Combine(_tempDir, ".architecture", "rules.yaml"),
             """
+            schema: 2
+            name: shop
             extends:
               - builtin://clean-architecture
             """);
@@ -183,6 +186,45 @@ public sealed class ExitCodeTests : IDisposable
     }
 
     [Fact]
+    public void Init_WritesASchema2PackThatValidates()
+    {
+        Run("init", "--template", "clean-architecture+cqrs").Should().Be(ExitCodes.Success);
+
+        var written = File.ReadAllText(Path.Combine(_tempDir, ".architecture", "rules.yaml"));
+        written.Should().StartWith("schema: 2");
+        written.Should().Contain("- builtin://clean-architecture").And.Contain("- builtin://cqrs");
+
+        Run("validate", FixtureProjects.Path("clean", "Shop.slnx")).Should().Be(ExitCodes.Success);
+    }
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("~")]
+    [InlineData("true")]
+    [InlineData("2")]
+    [InlineData("#tag")]
+    public void Init_InADirectoryWhoseNameIsNotAPlainYamlString_WritesALoadablePack(string directoryName) =>
+        AssertInitWritesALoadablePackIn(directoryName);
+
+    // A colon is not valid in a Windows directory name, so this row only runs on Unix.
+    [UnixFact]
+    public void Init_InADirectoryWhoseNameContainsAColon_WritesALoadablePack() =>
+        AssertInitWritesALoadablePackIn("a: b");
+
+    private void AssertInitWritesALoadablePackIn(string directoryName)
+    {
+        var directory = Path.Combine(_tempDir, directoryName);
+        Directory.CreateDirectory(directory);
+        Directory.SetCurrentDirectory(directory);
+
+        Run("init").Should().Be(ExitCodes.Success);
+
+        var loaded = new Ariadne.NET.RuleLoader.YamlRulePackLoader().LoadFromFile(Path.Combine(directory, ".architecture", "rules.yaml"));
+        loaded.IsSuccess.Should().BeTrue(loaded.IsFailure ? $"{loaded.Error.Message} {loaded.Error.Detail}" : "");
+        loaded.Value.Name.Should().Be(directoryName);
+    }
+
+    [Fact]
     public void Init_TemplateWithoutNames_ShouldReturnErrorAndWriteStderr()
     {
         var originalError = Console.Error;
@@ -220,20 +262,9 @@ public sealed class ExitCodeTests : IDisposable
     }
 
     [Fact]
-    public void Lint_NamespaceMismatch_ShouldReturnViolations()
+    public void Lint_CommandIsRemoved_ShouldNotBeRegistered()
     {
-        WriteSource("MyApp.Orders.Domain", "Order.cs", """
-            namespace MyApp.Orders.Application;
-            public class Order { }
-            """);
-
-        Run("lint", "src").Should().Be(ExitCodes.Violations);
-    }
-
-    [Fact]
-    public void Lint_MissingDirectory_ShouldReturnError()
-    {
-        Run("lint", "does-not-exist").Should().Be(ExitCodes.Error);
+        CliRootCommand.Create(_provider).Subcommands.Select(c => c.Name).Should().NotContain("lint");
     }
 
     [Fact]
@@ -256,6 +287,96 @@ public sealed class ExitCodeTests : IDisposable
         File.Delete(Path.Combine(_tempDir, ".architecture", "rules.yaml"));
 
         Run("rules").Should().Be(ExitCodes.Error);
+    }
+
+    [Fact]
+    public void Rules_PrintsSelectorsAndRules()
+    {
+        WriteRules("""
+            schema: 2
+            name: shop
+            extends:
+              - builtin://clean-architecture
+            rules:
+              - id: SH-001
+                because: The domain stays free of EF Core.
+                forbid:
+                  from:
+                    layers: [Domain]
+                  to:
+                    namespaces: ["Microsoft.EntityFrameworkCore.**"]
+                    types: ["**.DbContext"]
+                exceptions:
+                  - types: ["**.Bootstrap"]
+                    because: The composition root wires everything.
+              - id: SH-002
+                because: Agents only use the runner.
+                allowOnly:
+                  from:
+                    namespaces: ["**.Agents.**"]
+                  to:
+                    types: ["**.IRunner"]
+            """);
+
+        var (exitCode, stdout) = RunCapturingStdout("rules");
+
+        exitCode.Should().Be(ExitCodes.Success);
+        var lines = stdout.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        lines.Should().Contain("  Domain [CA-LAYER-DOMAIN]: namespaces **.Domain.**; depends on nothing");
+        lines.Should().Contain("  Application [CA-LAYER-APPLICATION]: namespaces **.Application.**; depends on Domain");
+        lines.Should().Contain("  WebApi [CA-LAYER-WEBAPI]: namespaces **.WebApi.**; depends on Domain, Application, Infrastructure");
+        var rules = lines.SkipWhile(l => !string.Equals(l, "Rules:", StringComparison.Ordinal)).Skip(1).TakeWhile(l => l.StartsWith("  ", StringComparison.Ordinal)).ToArray();
+        rules.Should().Equal(
+            "  SH-001 forbid layers Domain -> namespaces Microsoft.EntityFrameworkCore.**; types **.DbContext",
+            "    1 exception(s)",
+            "    The domain stays free of EF Core.",
+            "  SH-002 allowOnly namespaces **.Agents.** -> types **.IRunner",
+            "    Agents only use the runner.");
+    }
+
+    [Fact]
+    public void Rules_LayersSelectedByAssemblyOrNothing_PrintEachSelectorKind()
+    {
+        WriteRules("""
+            schema: 2
+            name: shop
+            layers:
+              - name: Data
+                id: SH-LAYER-DATA
+                because: Data access lives in one assembly.
+                assemblies: ["Shop.Data"]
+              - name: Mixed
+                id: SH-LAYER-MIXED
+                because: Mixed selection.
+                namespaces: ["**.Mixed.**"]
+                assemblies: ["Shop.Mixed"]
+                allowedDependencies: [Data]
+            """);
+
+        var (exitCode, stdout) = RunCapturingStdout("rules");
+
+        exitCode.Should().Be(ExitCodes.Success);
+        var lines = stdout.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        lines.SkipWhile(l => !string.Equals(l, "Layers:", StringComparison.Ordinal)).Skip(1).Take(2).Should().Equal(
+            "  Data [SH-LAYER-DATA]: assemblies Shop.Data; depends on nothing",
+            "  Mixed [SH-LAYER-MIXED]: namespaces **.Mixed.**; assemblies Shop.Mixed; depends on Data");
+    }
+
+    [Fact]
+    public void Describe_SelectorWithNothingSelected_SaysNoSelectors()
+    {
+        // The loader rejects a layer without selectors, so only the renderer can be pinned directly.
+        RulesCommand.Describe(new TargetSelector()).Should().Be("no selectors");
+    }
+
+    [Fact]
+    public void Rules_WithoutRules_PrintsNoneUnderRules()
+    {
+        var (exitCode, stdout) = RunCapturingStdout("rules");
+
+        exitCode.Should().Be(ExitCodes.Success);
+        var lines = stdout.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        lines.SkipWhile(l => !string.Equals(l, "Rules:", StringComparison.Ordinal)).Skip(1).First().Should().Be("  (none)");
     }
 
     [Fact]
@@ -309,6 +430,8 @@ public sealed class ExitCodeTests : IDisposable
     public void Validate_RulesExtendUnknownBuiltin_ShouldReturnErrorAndWriteStderr()
     {
         WriteRules("""
+            schema: 2
+            name: shop
             extends:
               - builtin://nope
             """);
@@ -333,7 +456,7 @@ public sealed class ExitCodeTests : IDisposable
     [Fact]
     public void Validate_MalformedRules_ShouldReturnErrorWithLine()
     {
-        WriteRules("name: x\nlayers: [unclosed");
+        WriteRules("schema: 2\nname: x\nlayers: [unclosed");
         var originalError = Console.Error;
         using var error = new StringWriter();
         Console.SetError(error);
@@ -347,8 +470,9 @@ public sealed class ExitCodeTests : IDisposable
             Console.SetError(originalError);
         }
 
-        error.ToString().Should().StartWith("Error: Rule pack file '.architecture/rules.yaml' could not be parsed: ")
-            .And.Contain("line");
+        var lines = error.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        lines[0].Should().Be("Error: Rule pack file '.architecture/rules.yaml' has 1 problem(s).");
+        lines[1].Should().StartWith(".architecture/rules.yaml:4:1: ");
         error.ToString().Should().NotContain(" at ", "an expected failure prints no stack trace");
     }
 

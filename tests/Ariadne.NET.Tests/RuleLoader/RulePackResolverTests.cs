@@ -39,11 +39,18 @@ public class RulePackResolverTests
         try
         {
             File.WriteAllText(Path.Combine(cacheDir, "my-pack.yaml"), """
+                schema: 2
                 name: my-pack
                 layers:
                   - name: Domain
+                    id: MY-LAYER-DOMAIN
+                    because: The domain depends on nothing else.
+                    namespaces: ["**.Domain.**"]
                     allowedDependencies: []
                   - name: Application
+                    id: MY-LAYER-APPLICATION
+                    because: Use cases build on the domain only.
+                    namespaces: ["**.Application.**"]
                     allowedDependencies:
                       - Domain
                 """);
@@ -187,7 +194,7 @@ public class RulePackResolverTests
         try
         {
             var packFile = Path.Combine(cacheDir, "bad-pack.yaml");
-            File.WriteAllText(packFile, "name: x\nlayers: [unclosed");
+            File.WriteAllText(packFile, "schema: 2\nname: x\nlayers: [unclosed");
 
             var result = CreateResolver().Resolve(
                 new RulePack { Name = "user-rules", Extends = ["import://bad-pack"] },
@@ -195,8 +202,8 @@ public class RulePackResolverTests
 
             result.IsFailure.Should().BeTrue();
             result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
-            result.Error.Message.Should().StartWith($"Rule pack file '{packFile}' could not be parsed: ");
-            result.Error.Detail.Should().Be("line 3, column 1");
+            result.Error.Message.Should().Be($"Rule pack file '{packFile}' has 1 problem(s).");
+            result.Error.Detail.Should().StartWith($"{packFile}:4:1: ");
         }
         finally
         {
@@ -225,7 +232,7 @@ public class RulePackResolverTests
         // A pack outside the cache that '../../x' would reach if the name were not checked.
         var outside = Path.Combine(tempDir, ".architecture", "x");
         Directory.CreateDirectory(outside);
-        File.WriteAllText(Path.Combine(outside, "x.yaml"), "name: outside\n");
+        File.WriteAllText(Path.Combine(outside, "x.yaml"), "schema: 2\nname: outside\n");
         Directory.CreateDirectory(Path.Combine(tempDir, ".architecture", ".cache", "git"));
 
         try
@@ -252,7 +259,7 @@ public class RulePackResolverTests
         var tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-resolver-{Guid.NewGuid():N}");
         var cacheDir = Path.Combine(tempDir, ".architecture", ".cache", "git", "locked");
         Directory.CreateDirectory(cacheDir);
-        File.WriteAllText(Path.Combine(cacheDir, "locked.yaml"), "name: locked\n");
+        File.WriteAllText(Path.Combine(cacheDir, "locked.yaml"), "schema: 2\nname: locked\n");
         File.SetUnixFileMode(cacheDir, UnixFileMode.None);
 
         try

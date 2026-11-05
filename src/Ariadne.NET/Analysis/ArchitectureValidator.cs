@@ -5,7 +5,7 @@ using ZeroAlloc.Inject;
 
 namespace Ariadne.NET.Analysis;
 
-/// <summary>Builds the type graph of each project and target framework, runs the v1 rules and merges the results per project.</summary>
+/// <summary>Builds the type graph of each project and target framework, runs the layer, forbid, allowOnly and role rules and merges the results per project.</summary>
 [Singleton]
 public sealed class ArchitectureValidator : IArchitectureValidator
 {
@@ -25,6 +25,12 @@ public sealed class ArchitectureValidator : IArchitectureValidator
 
         RejectMixedTargetFrameworks(projects);
 
+        // The layer map and the matchers depend on the pack only, so one set serves every project, and a type's layer,
+        // names and matches are worked out once per run.
+        var layers = new LayerMap(resolvedPack);
+        var forbid = ForbidRules.Compile(layers, resolvedPack);
+        var allowOnly = AllowOnlyRules.Compile(layers, resolvedPack);
+
         var entries = new List<Entry>(projects.Count);
         foreach (var project in projects)
         {
@@ -32,15 +38,40 @@ public sealed class ArchitectureValidator : IArchitectureValidator
             cancellationToken.ThrowIfCancellationRequested();
 
             var graph = TypeGraphBuilder.Build(project.Compilation, project.GeneratedTrees, cancellationToken);
-            var layers = new V1LayerMap(resolvedPack);
-            var violations = new List<ArchitectureViolation>(V1LayerRules.Check(graph, layers, resolvedPack));
-            var matches = V1RoleRules.Match(graph, layers, resolvedPack);
-            violations.AddRange(V1RoleRules.CheckShape(matches));
+            var violations = new List<ArchitectureViolation>(LayerRules.Check(graph, layers, resolvedPack));
+            violations.AddRange(forbid.Check(graph));
+            violations.AddRange(allowOnly.Check(graph));
+            var matches = RoleRules.Match(graph, layers, resolvedPack);
+            violations.AddRange(RoleRules.CheckShape(matches));
             entries.Add(new Entry(project, graph, matches, violations));
         }
 
         AddMissingInterfaceViolations(entries, resolvedPack);
 
+        var ordered = GroupByProject(entries);
+        var allViolations = new List<ArchitectureViolation>();
+        var checkedProjects = new List<CheckedProject>(ordered.Count);
+        var typesChecked = 0;
+        foreach (ref readonly var group in CollectionsMarshal.AsSpan(ordered))
+        {
+            group.AddMergedViolations(allViolations);
+            checkedProjects.Add(new CheckedProject(group.Name, group.TargetFrameworks()));
+            typesChecked += group.TypesChecked;
+        }
+
+        KeepOneOverlapPerType(allViolations);
+        allViolations.Sort(CompareViolations);
+        return new ArchitectureReport
+        {
+            Violations = allViolations,
+            Projects = checkedProjects,
+            TypesChecked = typesChecked,
+        };
+    }
+
+    // The entries of each project, in the order the projects first appear.
+    private static List<ProjectGroup> GroupByProject(List<Entry> entries)
+    {
         var groups = new Dictionary<string, ProjectGroup>(StringComparer.Ordinal);
         var ordered = new List<ProjectGroup>();
         foreach (ref readonly var entry in CollectionsMarshal.AsSpan(entries))
@@ -55,23 +86,38 @@ public sealed class ArchitectureValidator : IArchitectureValidator
             group.Add(entry);
         }
 
-        var allViolations = new List<ArchitectureViolation>();
-        var checkedProjects = new List<CheckedProject>(ordered.Count);
-        var typesChecked = 0;
-        foreach (ref readonly var group in CollectionsMarshal.AsSpan(ordered))
+        return ordered;
+    }
+
+    // A type that several layers cover is found where it is declared, with its location, and again as a target in every
+    // project that references it, without one. It is one problem: an unlocated overlap is dropped when the run holds a
+    // located one for the same type, and kept once otherwise.
+    private static void KeepOneOverlapPerType(List<ArchitectureViolation> violations)
+    {
+        var located = new HashSet<string>(StringComparer.Ordinal);
+        foreach (ref readonly var violation in CollectionsMarshal.AsSpan(violations))
         {
-            group.AddMergedViolations(allViolations);
-            checkedProjects.Add(new CheckedProject(group.Name, group.TargetFrameworks()));
-            typesChecked += group.TypesChecked;
+            if (violation is { Kind: ViolationKind.LayerOverlap, Location: not null })
+            {
+                located.Add(violation.SourceType);
+            }
         }
 
-        allViolations.Sort(CompareViolations);
-        return new ArchitectureReport
+        var unlocated = new HashSet<string>(StringComparer.Ordinal);
+        var kept = 0;
+        for (var i = 0; i < violations.Count; i++)
         {
-            Violations = allViolations,
-            Projects = checkedProjects,
-            TypesChecked = typesChecked,
-        };
+            var violation = violations[i];
+            if (violation is { Kind: ViolationKind.LayerOverlap, Location: null }
+                && (located.Contains(violation.SourceType) || !unlocated.Add(violation.SourceType)))
+            {
+                continue;
+            }
+
+            violations[kept++] = violation;
+        }
+
+        violations.RemoveRange(kept, violations.Count - kept);
     }
 
     // A violation found only in a null slot could not be told apart from one found everywhere, so a project is all null or all named.
@@ -134,7 +180,7 @@ public sealed class ArchitectureValidator : IArchitectureValidator
         foreach (ref readonly var entry in CollectionsMarshal.AsSpan(entries))
         {
             var scope = entry.Project.TargetFramework is { } framework ? byFramework[framework] : all;
-            entry.Violations.AddRange(V1RoleRules.CheckMissingInterface(entry.Matches, scope, pack));
+            entry.Violations.AddRange(RoleRules.CheckMissingInterface(entry.Matches, scope, pack));
         }
     }
 
@@ -281,7 +327,7 @@ public sealed class ArchitectureValidator : IArchitectureValidator
             var count = Math.Max(current.ReferenceCount, candidate.ReferenceCount);
             var candidateIsEarlier = candidate.Location is { } c
                 && (current.Location is not { } l || TypeGraphBuilder.Compare(c, l) < 0);
-            return V1LayerRules.WithReferenceCount(candidateIsEarlier ? candidate : current, count);
+            return LayerRules.WithReferenceCount(candidateIsEarlier ? candidate : current, count);
         }
     }
 }

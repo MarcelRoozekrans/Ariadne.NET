@@ -11,9 +11,9 @@ internal static class TestPacks
         Name = "test",
         Layers =
         [
-            new LayerDefinition { Name = "Domain" },
-            new LayerDefinition { Name = "Infrastructure", AllowedDependencies = ["Domain"] },
-            new LayerDefinition { Name = "WebApi", AllowedDependencies = ["Domain"] },
+            new LayerDefinition { Name = "Domain", Id = "TEST-LAYER-DOMAIN", Because = "Test layer Domain.", Namespaces = ["**.Domain.**"] },
+            new LayerDefinition { Name = "Infrastructure", Id = "TEST-LAYER-INFRASTRUCTURE", Because = "Test layer Infrastructure.", Namespaces = ["**.Infrastructure.**"], AllowedDependencies = ["Domain"] },
+            new LayerDefinition { Name = "WebApi", Id = "TEST-LAYER-WEBAPI", Because = "Test layer WebApi.", Namespaces = ["**.WebApi.**"], AllowedDependencies = ["Domain"] },
         ],
     };
 }

@@ -30,7 +30,6 @@ All services use **Singleton** lifetime. `AddAriadneNETServices()` registers:
 | `IGenerateOrchestrator` | `GenerateOrchestrator` | Multi-component generation workflow |
 | `IWorkspaceOrchestrator` | `WorkspaceOrchestrator` | Project structure scaffolding |
 | `IArchitectureValidator` | `ArchitectureValidator` | Type graph checks against layer and role rules |
-| `ILinter` | `Linter` | Shallow namespace/directory check |
 | `IImportsLoader` | `ImportsYamlLoader` | Imports manifest parsing |
 | `IGitSyncProvider` | `GitCliSyncProvider` | Git clone, tag resolution, caching |
 | `ISyncOrchestrator` | `SyncOrchestrator` | Multi-import sync coordination |

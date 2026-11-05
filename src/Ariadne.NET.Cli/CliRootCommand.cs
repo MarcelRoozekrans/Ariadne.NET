@@ -15,7 +15,6 @@ public static class CliRootCommand
         rootCommand.Subcommands.Add(RolesCommand.Create(provider));
         rootCommand.Subcommands.Add(GenerateCommand.Create(provider));
         rootCommand.Subcommands.Add(ValidateCommand.Create(provider));
-        rootCommand.Subcommands.Add(LintCommand.Create(provider));
         rootCommand.Subcommands.Add(SyncCommand.Create(provider));
 
         return rootCommand;

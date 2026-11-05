@@ -41,4 +41,84 @@ public class RulePackTests
         pack.ComponentRoles.Should().HaveCount(1);
         pack.ComponentRoles[0].TypeKind.Should().Be(CSharpTypeKind.Class);
     }
+
+    [Fact]
+    public void NewPack_DefaultsToSchema2_AndEmptyV2Lists()
+    {
+        var pack = new RulePack { Name = "p" };
+
+        pack.Schema.Should().Be(2);
+        pack.Rules.Should().BeEmpty();
+        pack.LayerRetargets.Should().BeEmpty();
+        pack.RuleAmendments.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void RuleDefinition_WithoutBecause_FailsValidation()
+    {
+        var rule = new RuleDefinition { Id = "r1", Because = "", Kind = RuleKind.Forbid, From = new TargetSelector(), To = new TargetSelector() };
+
+        RuleValidator().Validate(rule).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void RuleException_WithoutBecause_FailsValidation()
+    {
+        var exception = new RuleException { Because = "" };
+
+        new RuleExceptionValidator().Validate(exception).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Rules_WithNullEntry_FailsValidation()
+    {
+        var pack = new RulePack { Name = "p", Rules = [null!] };
+
+        PackValidator().Validate(pack).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void RuleDefinition_WithInvalidKind_FailsValidation()
+    {
+        var rule = new RuleDefinition { Id = "r1", Because = "why", Kind = (RuleKind)99, From = new TargetSelector(), To = new TargetSelector() };
+
+        RuleValidator().Validate(rule).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void RuleAmendment_WithoutId_FailsValidation()
+    {
+        var amendment = new RuleAmendment { Id = "" };
+
+        new RuleAmendmentValidator(new RuleExceptionValidator()).Validate(amendment).IsValid.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("", "Kept apart.")]
+    [InlineData("L-DOMAIN", "")]
+    public void Layer_WithoutIdOrBecause_FailsValidation(string id, string because)
+    {
+        var layer = new LayerDefinition { Name = "Domain", Id = id, Because = because, Namespaces = ["**.Domain.**"] };
+
+        new LayerDefinitionValidator().Validate(layer).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void LayerRetarget_WithoutName_FailsValidation()
+    {
+        var retarget = new LayerRetarget { Name = "" };
+
+        new LayerRetargetValidator().Validate(retarget).IsValid.Should().BeFalse();
+    }
+
+    private static RuleDefinitionValidator RuleValidator() =>
+        new(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleExceptionValidator());
+
+    private static RulePackValidator PackValidator() => new(
+        new LayerDefinitionValidator(),
+        new ComponentRoleDefinitionValidator(),
+        new RuleDefinitionValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleExceptionValidator()),
+        new LayerRetargetValidator(),
+        new RuleAmendmentValidator(new RuleExceptionValidator()),
+        new NamingConventionsValidator());
 }

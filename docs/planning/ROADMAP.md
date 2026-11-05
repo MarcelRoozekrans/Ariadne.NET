@@ -68,7 +68,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Plan:** `docs/superpowers/plans/2026-11-04-phase-2.1-semantic-dependency-analysis.md`
 **Completed:** 2026-11-05
 
-### Phase 2.2: Rule schema v2 [status: pending]
+### Phase 2.2: Rule schema v2 [status: active]
 **Note:** Consider ZeroAlloc.Specification for rule matching; extend the ZeroAlloc.Validation rules from 1.3.
 **Goal:** A versioned, strict schema with namespace and assembly selectors, `forbid` and `allowOnly` at layer, namespace and type level, per-rule exceptions and a required `because`, with the built-in packs, this repo's pack and every engine part that reads a pack migrated to it.
 **Surface:** Backend

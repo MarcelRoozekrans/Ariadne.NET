@@ -4,6 +4,7 @@ using FluentAssertions;
 
 namespace Ariadne.NET.Workspaces.Tests;
 
+[Collection(FixtureSolutionCollection.Name)]
 public sealed class SolutionPathTests : IDisposable
 {
     private readonly string _dir = Directory.CreateTempSubdirectory("ariadne-path-").FullName;

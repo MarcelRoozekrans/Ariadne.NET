@@ -10,34 +10,47 @@ Complete feature reference for Ariadne.NET.
 
 Define architecture patterns as YAML — no code changes needed to support new patterns.
 
-- **Layers** with explicit dependency rules (e.g., Domain depends on nothing, Application depends on Domain)
+- **Layers** that cover types by namespace globs and assembly names, with explicit dependency rules (e.g., Domain depends on nothing, Application depends on Domain)
+- **Rules** that `forbid` a dependency, or `allowOnly` named users of one, each with exceptions and a `because` that every violation repeats
 - **Component roles** with type kind (class, interface, record, struct, record struct), accessibility, and interface requirements
 - **Naming conventions** with template variables (`{SolutionName}`, `{Feature}`, `{Layer}`, `{ComponentName}`)
-- **Code feature rules** with `locked` flag to prevent downstream overrides
+- **A strict loader**: unknown keys, missing keys and wrong types fail the load with `file:line:column`
 
 ```yaml
+schema: 2
+name: my-service
+extends:
+  - builtin://clean-architecture
+
 layers:
   - name: Domain
-    allowedDependencies: []
+    assemblies: [MyService.Domain]
   - name: Application
-    allowedDependencies: [Domain]
+    assemblies: [MyService.Application]
+  - name: Infrastructure
+    assemblies: [MyService.Infrastructure]
+  - name: WebApi
+    assemblies: [MyService.Api]
+
+rules:
+  - id: MYSERVICE-NO-EFCORE-IN-DOMAIN
+    because: Persistence belongs to Infrastructure.
+    forbid:
+      from: { layers: [Domain] }
+      to: { namespaces: ["Microsoft.EntityFrameworkCore.**"] }
 
 componentRoles:
   - name: Entity
     layer: Domain
     typeKind: Class
     accessibility: public
-  - name: Repository
-    layer: Infrastructure
-    typeKind: Class
-    requiresInterface: true
-    interfaceRole: RepositoryInterface
-    accessibility: internal
 
 namingConventions:
   namespace: "{SolutionName}.{Feature}.{Layer}"
   filePath: "src/{SolutionName}.{Feature}.{Layer}/{ComponentName}.cs"
 ```
+
+The four layer entries have only a name and selectors, so they retarget the layers of `clean-architecture` to this solution's assemblies. See [Rule Schema](how-it-works/03-rule-schema.md) for the full format.
 
 ## Built-in Templates
 
@@ -46,7 +59,7 @@ Ten templates ship out of the box, covering the most common architectural patter
 | Template | Layers | Roles | Type |
 |----------|--------|-------|------|
 | `clean-architecture` | Domain, Application, Infrastructure, WebApi | 19 | Standalone |
-| `onion-architecture` | DomainModel, DomainServices, ApplicationServices, Infrastructure, Presentation | 15 | Standalone |
+| `onion-architecture` | DomainModel, DomainServices, ApplicationServices, Infrastructure, Presentation | 14 | Standalone |
 | `hexagonal-architecture` | Core, Ports, Adapters | 7 | Standalone |
 | `layered` | Presentation, Business, DataAccess | 11 | Standalone |
 | `microservice` | Domain, Application, Infrastructure, Api, Contracts | 17 | Standalone |
@@ -56,7 +69,7 @@ Ten templates ship out of the box, covering the most common architectural patter
 | `cqrs` | _(composable)_ | 7 | Add-on |
 | `ddd-tactical` | _(composable)_ | 9 | Add-on |
 
-**Standalone** templates define their own layers and can be used independently. **Add-on** templates define only component roles and are designed to be composed with a standalone template: a role-only pack resolves on its own, but combining it with a base pack that declares the layers its roles name (for example Application and Domain) is recommended. When the merged pack declares at least one layer, a role naming an undeclared layer is an Invalid error.
+**Standalone** templates define their own layers and can be used independently. **Add-on** templates define only component roles and are designed to be composed with a standalone template: a role-only pack resolves on its own, but combining it with a base pack that declares the layers its roles name (for example Application and Domain) is recommended. When the merged pack declares at least one layer, a role naming an undeclared layer is an Invalid error. Two standalone templates do not compose, because both define layers; see [Composability](#composability--merge-semantics).
 
 ## Composability & Merge Semantics
 
@@ -69,18 +82,18 @@ extends:
   - builtin://ddd-tactical
 ```
 
-Merge rules applied in order (first pack is the base, subsequent packs overlay):
+Packs merge parent first, in `extends` order, then the child:
 
 | Element | Merge Strategy |
 |---------|---------------|
-| Layers | Merged by name (case-insensitive). `allowedDependencies` are unioned. |
+| Layers | Defined once. Two packs that define the same layer name fail the load. A child can retarget an inherited layer's selectors (`namespaces`, `assemblies`) and nothing else about it. |
+| Rules | Defined once. Two packs that define the same rule id fail the load. A child can add rules and add `exceptions` to an inherited rule that is not `locked`. |
 | Component Roles | Merged by name. Later pack overrides earlier. |
-| Code Feature Rules | Merged by ID. **Locked rules cannot be overridden** — attempts produce a warning. |
 | Naming Conventions | Last pack wins. |
 
 Validation rejects an empty `Namespace` or `FilePath` in the naming conventions.
 
-Use `MergeWithDiagnostics` programmatically to inspect merge warnings (e.g., locked rule override attempts).
+A solution picks one base architecture and retargets it. `clean-architecture+cqrs` composes because `cqrs` defines roles only; `clean-architecture+microservice` fails because both define `Domain`, `Application` and `Infrastructure`.
 
 ## Roslyn Code Generation
 
@@ -116,12 +129,15 @@ The engine automatically resolves which layer a component belongs to based on it
 Checks a solution or project against the architecture rules with the compiler's semantic model. `Ariadne.NET.Workspaces` loads the projects with MSBuild, and the engine builds a type graph from each compilation. A dependency is a type reference somebody wrote: base types, interfaces, attributes, member signatures, generic arguments and types used in bodies. An unused `using` and `var` give nothing, and generated code is never a source.
 
 Detected violations:
-- **DependencyNotAllowed** — a type references a type in a layer that is not in its layer's `allowedDependencies`. One violation per source type and target type, located at the first reference, with a reference count.
+- **DependencyNotAllowed** — a type references a type in a layer that is not in its layer's `allowedDependencies`. One violation per source type and target type, located at the first reference, with a reference count. Carries the layer's id and `because`.
+- **ForbiddenDependency** — a type in a `forbid` rule's `from` references a type in its `to`, and no exception matches the source type.
+- **DependencyNotPermitted** — a type references a type in an `allowOnly` rule's `to`, and is neither in `from`, nor in `to` itself, nor matched by an exception.
+- **LayerOverlap** — a type is covered by more than one layer. It is reported once and left out of the dependency check.
 - **TypeKindMismatch** — a type doesn't match the role's expected type kind
 - **AccessibilityMismatch** — a type's accessibility doesn't match the role definition; a top-level type with no access modifier counts as internal (a nested one is private)
 - **MissingInterface** — a role requires an interface but none was found
 
-Each violation has a rule id, `layer/<Layer>` or `role/<Role>`. A project that targets several frameworks is checked once per framework, and a violation found in only some of them lists them. See [Validation and Linting](how-it-works/08-validation.md) for the details.
+Each violation has a rule id: a layer id, a rule id or `role/<Role>`. Layer and rule violations also carry the `because` of the layer or rule. A project that targets several frameworks is checked once per framework, and a violation found in only some of them lists them. See [Validation](how-it-works/08-validation.md) for the details.
 
 Ariadne never restores, so run `dotnet restore` before you validate. The CLI exits 0 when clean, 1 on violations and 2 on an error.
 
@@ -133,17 +149,6 @@ ariadne validate MyApp.slnx
 ```
 
 The path is a `.sln`, `.slnx`, `.slnf` or `.csproj` file, or a directory that holds exactly one; it defaults to `.`. The package that does the loading, `Ariadne.NET.Workspaces`, needs a .NET SDK on the machine.
-
-## Linting
-
-A lighter check that detects namespace-vs-directory layer mismatches without full dependency analysis.
-
-Flags files where the namespace implies one layer but the directory structure implies another — a common issue when files are moved or copied without updating namespaces.
-
-```bash
-# CLI
-ariadne lint ./src
-```
 
 ## Workspace Scaffolding
 
@@ -215,13 +220,12 @@ The engine exposes its full capability set as MCP tools and resources for AI age
 | Tool | Parameters | Description |
 |------|-----------|-------------|
 | `list_templates` | — | List available architecture templates |
-| `get_layers` | `template?` | Get layer definitions with dependency rules |
+| `get_layers` | `template?` | Get layers with id, selectors, dependency rules and because |
 | `get_component_roles` | `template?` | Get available component roles |
-| `get_rules` | `template?` | Get code feature rules |
+| `get_rules` | `template?` | Get the forbid and allowOnly rules |
 | `generate_component` | `role`, `name`, `solution`, `feature`, `template?` | Generate a C# component file |
 | `generate_workspace` | `solution`, `features`, `template?` | Scaffold project structure |
 | `validate_source` | `path`, `template?` | Validate a solution or project against architecture rules; returns the report |
-| `lint_source` | `sourceDirectory`, `template?` | Lint for namespace-layer mismatches |
 
 ### Resources
 
@@ -250,27 +254,29 @@ All three hosts share the same core engine via `services.AddAriadneNETServices()
 
 ### Custom rule packs
 
-Create your own YAML rule packs with custom layers, roles, and rules. Extend built-in templates or start from scratch:
+Create your own YAML rule packs with custom layers, roles, and rules. Extend a built-in template or start from scratch:
 
 ```yaml
+schema: 2
 name: my-custom-rules
 extends:
   - builtin://clean-architecture
+
+rules:
+  - id: MYORG-NO-DBCONTEXT-IN-DOMAIN
+    because: The domain must not use DbContext directly.
+    locked: true
+    forbid:
+      from: { layers: [Domain] }
+      to: { types: ["**.DbContext"] }
 
 componentRoles:
   - name: OutboxMessage
     layer: Infrastructure
     typeKind: Class
     accessibility: public
-
-codeFeatureRules:
-  - id: no-direct-db-access
-    description: "Domain layer must not use DbContext directly"
-    appliesTo:
-      layer: Domain
-    locked: true
 ```
 
 ### Locked rules
 
-Mark rules as `locked: true` to enforce organizational standards that cannot be overridden by downstream teams. When a downstream pack attempts to override a locked rule, the merge produces a warning and the original rule is preserved.
+Mark a rule `locked: true` to keep downstream teams from loosening it. A pack that extends yours can add rules, but it cannot add exceptions to a locked rule: the load fails and names the rule and both packs. Rules that are not locked accept exceptions from a child pack, each with its own `because`.
