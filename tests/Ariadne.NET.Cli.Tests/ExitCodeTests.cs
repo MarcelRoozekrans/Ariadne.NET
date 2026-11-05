@@ -1,4 +1,5 @@
 using System.Runtime.Versioning;
+using Ariadne.NET.Abstractions;
 using Ariadne.NET.Analysis;
 using Ariadne.NET.Cli;
 using Ariadne.NET.Cli.Commands;
@@ -298,14 +299,47 @@ public sealed class ExitCodeTests : IDisposable
         lines.Should().Contain("  Application [CA-LAYER-APPLICATION]: namespaces **.Application.**; depends on Domain");
         lines.Should().Contain("  WebApi [CA-LAYER-WEBAPI]: namespaces **.WebApi.**; depends on Domain, Application, Infrastructure");
         var rules = lines.SkipWhile(l => !string.Equals(l, "Rules:", StringComparison.Ordinal)).Skip(1).TakeWhile(l => l.StartsWith("  ", StringComparison.Ordinal)).ToArray();
-        rules.Should().Contain(
-        [
+        rules.Should().Equal(
             "  SH-001 forbid layers Domain -> namespaces Microsoft.EntityFrameworkCore.**; types **.DbContext",
             "    1 exception(s)",
             "    The domain stays free of EF Core.",
             "  SH-002 allowOnly namespaces **.Agents.** -> types **.IRunner",
-            "    Agents only use the runner.",
-        ]);
+            "    Agents only use the runner.");
+    }
+
+    [Fact]
+    public void Rules_LayersSelectedByAssemblyOrNothing_PrintEachSelectorKind()
+    {
+        WriteRules("""
+            schema: 2
+            name: shop
+            layers:
+              - name: Data
+                id: SH-LAYER-DATA
+                because: Data access lives in one assembly.
+                assemblies: ["Shop.Data"]
+              - name: Mixed
+                id: SH-LAYER-MIXED
+                because: Mixed selection.
+                namespaces: ["**.Mixed.**"]
+                assemblies: ["Shop.Mixed"]
+                allowedDependencies: [Data]
+            """);
+
+        var (exitCode, stdout) = RunCapturingStdout("rules");
+
+        exitCode.Should().Be(ExitCodes.Success);
+        var lines = stdout.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        lines.SkipWhile(l => !string.Equals(l, "Layers:", StringComparison.Ordinal)).Skip(1).Take(2).Should().Equal(
+            "  Data [SH-LAYER-DATA]: assemblies Shop.Data; depends on nothing",
+            "  Mixed [SH-LAYER-MIXED]: namespaces **.Mixed.**; assemblies Shop.Mixed; depends on Data");
+    }
+
+    [Fact]
+    public void Describe_SelectorWithNothingSelected_SaysNoSelectors()
+    {
+        // The loader rejects a layer without selectors, so only the renderer can be pinned directly.
+        RulesCommand.Describe(new TargetSelector()).Should().Be("no selectors");
     }
 
     [Fact]

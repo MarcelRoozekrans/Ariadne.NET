@@ -64,7 +64,7 @@ public static class RulesCommand
         return command;
     }
 
-    private static string Describe(TargetSelector selector) =>
+    internal static string Describe(TargetSelector selector) =>
         Describe(selector.Namespaces, selector.Assemblies, selector.Layers, selector.Types);
 
     // Kinds in the order layers, namespaces, assemblies, types; kinds joined by "; ", values by ", ".

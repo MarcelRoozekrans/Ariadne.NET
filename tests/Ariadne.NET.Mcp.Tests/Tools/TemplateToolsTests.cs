@@ -54,7 +54,12 @@ public class TemplateToolsTests
 
         domain.Id.Should().Be("CA-LAYER-DOMAIN");
         domain.Namespaces.Should().Equal("**.Domain.**");
-        domain.Because.Should().NotBeEmpty();
+        domain.Because.Should().Be("The domain is the core of the architecture and depends on no other layer.");
+        domain.AllowedDependencies.Should().BeEmpty();
+
+        var infrastructure = TemplateTools.GetLayers(helper, "clean-architecture")
+            .First(l => string.Equals(l.Name, "Infrastructure", StringComparison.Ordinal));
+        infrastructure.AllowedDependencies.Should().Equal("Domain", "Application");
     }
 
     [Fact]
