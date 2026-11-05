@@ -58,7 +58,7 @@ public class RulePackTests
     {
         var rule = new RuleDefinition { Id = "r1", Because = "", Kind = RuleKind.Forbid, From = new TargetSelector(), To = new TargetSelector() };
 
-        Validator().Validate(rule).IsValid.Should().BeFalse();
+        RuleValidator().Validate(rule).IsValid.Should().BeFalse();
     }
 
     [Fact]
@@ -77,7 +77,31 @@ public class RulePackTests
         PackValidator().Validate(pack).IsValid.Should().BeFalse();
     }
 
-    private static RuleDefinitionValidator Validator() =>
+    [Fact]
+    public void RuleDefinition_WithInvalidKind_FailsValidation()
+    {
+        var rule = new RuleDefinition { Id = "r1", Because = "why", Kind = (RuleKind)99, From = new TargetSelector(), To = new TargetSelector() };
+
+        RuleValidator().Validate(rule).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void RuleAmendment_WithoutId_FailsValidation()
+    {
+        var amendment = new RuleAmendment { Id = "" };
+
+        new RuleAmendmentValidator(new RuleExceptionValidator()).Validate(amendment).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void LayerRetarget_WithoutName_FailsValidation()
+    {
+        var retarget = new LayerRetarget { Name = "" };
+
+        new LayerRetargetValidator().Validate(retarget).IsValid.Should().BeFalse();
+    }
+
+    private static RuleDefinitionValidator RuleValidator() =>
         new(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleExceptionValidator());
 
     private static RulePackValidator PackValidator() => new(
