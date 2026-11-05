@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.3.0](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.2.2...v0.3.0) (2026-11-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* **rule-engine:** IRulePackMerger.Merge returns a Result, MergeWithDiagnostics, MergeResult and MergeWarning are removed, and a locked-rule override now fails instead of warning
+* **rule-loader:** packs need schema 2, unknown keys, a missing because and v1 packs fail to load, codeFeatureRules and CodeFeatureRuleDefinition are removed, and MCP get_rules returns the v2 rules list
+* **cli:** CLI lint and MCP lint_source are removed, validate checks layers on the semantic type graph
+* **cli:** the rules output and MCP get_layers payload follow schema v2
+
+### Features
+
+* **cli:** CLI lint and MCP lint_source are removed, validate checks layers on the semantic type graph ([f1d8a14](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/f1d8a14fd2eb80b37718af2a58e5bfe81375c0b5))
+* **cli:** the rules output and MCP get_layers payload follow schema v2 ([f1d8a14](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/f1d8a14fd2eb80b37718af2a58e5bfe81375c0b5))
+* rule schema v2 with selectors, forbid and allowOnly rules ([#35](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/35)) ([f1d8a14](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/f1d8a14fd2eb80b37718af2a58e5bfe81375c0b5))
+* **rule-engine:** IRulePackMerger.Merge returns a Result, MergeWithDiagnostics, MergeResult and MergeWarning are removed, and a locked-rule override now fails instead of warning ([f1d8a14](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/f1d8a14fd2eb80b37718af2a58e5bfe81375c0b5))
+* **rule-loader:** packs need schema 2, unknown keys, a missing because and v1 packs fail to load, codeFeatureRules and CodeFeatureRuleDefinition are removed, and MCP get_rules returns the v2 rules list ([f1d8a14](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/f1d8a14fd2eb80b37718af2a58e5bfe81375c0b5))
+
 ## [0.2.2](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.2.1...v0.2.2) (2026-11-05)
 
 
