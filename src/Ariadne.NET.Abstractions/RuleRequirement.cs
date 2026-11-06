@@ -15,6 +15,6 @@ public sealed class RuleRequirement
     /// <summary>The accessibility the type must have.</summary>
     public string? Accessibility { get; init; }
 
-    /// <summary>A selector the type must implement or inherit from.</summary>
+    /// <summary>A selector for an interface the type must implement, including interfaces it gets through a base class.</summary>
     public TargetSelector? Implements { get; init; }
 }

@@ -11,7 +11,7 @@ Complete feature reference for Ariadne.NET.
 Define architecture patterns as YAML — no code changes needed to support new patterns.
 
 - **Layers** that cover types by namespace globs and assembly names, with explicit dependency rules (e.g., Domain depends on nothing, Application depends on Domain)
-- **Rules** that `forbid` a dependency, or `allowOnly` named users of one, each with exceptions and a `because` that every violation repeats
+- **Rules** that `forbid` a dependency, `allowOnly` named users of one, or `require` selected types to live in a layer and have a shape, each with exceptions and a `because` that every violation repeats
 - **Component roles** with type kind (class, interface, record, struct, record struct), accessibility, and interface requirements
 - **Naming conventions** with template variables (`{SolutionName}`, `{Feature}`, `{Layer}`, `{ComponentName}`)
 - **A strict loader**: unknown keys, missing keys and wrong types fail the load with `file:line:column`
@@ -133,9 +133,10 @@ Detected violations:
 - **ForbiddenDependency** — a type in a `forbid` rule's `from` references a type in its `to`, and no exception matches the source type.
 - **DependencyNotPermitted** — a type references a type in an `allowOnly` rule's `to`, and is neither in `from`, nor in `to` itself, nor matched by an exception.
 - **LayerOverlap** — a type is covered by more than one layer. It is reported once and left out of the dependency check.
-- **TypeKindMismatch** — a type doesn't match the role's expected type kind
-- **AccessibilityMismatch** — a type's accessibility doesn't match the role definition; a top-level type with no access modifier counts as internal (a nested one is private)
-- **MissingInterface** — a role requires an interface but none was found
+- **WrongLayer** — a type selected by a `require` rule is not in the layer the rule requires
+- **TypeKindMismatch** — a type doesn't match the role's or a `require` rule's expected type kind
+- **AccessibilityMismatch** — a type's accessibility doesn't match the role definition or `require` rule; a top-level type with no access modifier counts as internal (a nested one is private)
+- **MissingInterface** — a role requires an interface but none was found, or a type selected by a `require` rule implements no interface its `implements` selector matches
 
 Each violation has a rule id: a layer id, a rule id, or `ROLE-<Name>`, `CODE-001` or `CODE-002` for component roles. Every violation also carries the `because` of its layer or rule. A project that targets several frameworks is checked once per framework, and a violation found in only some of them lists them. See [Validation](how-it-works/08-validation.md) for the details.
 

@@ -78,7 +78,7 @@ Both kinds carry the rule's `id` and `because`. A selector that matches no type 
 | `WrongLayer` | The type is not in the layer the rule requires | Repositories must be in `Infrastructure` but one is in `Domain` |
 | `TypeKindMismatch` | The type is not of the required kind | The rule says `class` but the type is a `record` |
 | `AccessibilityMismatch` | The rule asks for `internal` and the type is not | The rule says `internal` but the type is `public` |
-| `MissingInterface` | The type implements or inherits nothing that the `implements` selector matches | A repository that implements no `I*Repository` |
+| `MissingInterface` | The type implements no interface that the `implements` selector matches, including interfaces it gets through a base class | A repository that implements no `I*Repository` |
 
 The violation carries the rule's `id` and `because`. A selector that matches no type is not an error.
 
@@ -105,7 +105,7 @@ ArchitectureReport
   │     │                                     DependencyNotPermitted, LayerOverlap, TypeKindMismatch,
   │     │                                     AccessibilityMismatch, MissingInterface, WrongLayer)
   │     ├── SourceType: string               (fully qualified name)
-  │     ├── Target: string?                  (the type depended on, absent for role and overlap checks)
+  │     ├── Target: string?                  (the type depended on, absent for role, require and overlap checks)
   │     ├── Location: SourceLocation?        (file path, line, column; the first reference)
   │     ├── ReferenceCount: int
   │     ├── TargetFrameworks: IReadOnlyList<string>

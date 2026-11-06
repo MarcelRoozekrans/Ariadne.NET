@@ -179,7 +179,7 @@ rules:
         because: DI registration wires the interface to its implementation.
 ```
 
-The C# model is `RuleDefinition`, with `Id`, `Because`, `Description`, `Kind` (`RuleKind.Forbid` or `RuleKind.AllowOnly`), `From` and `To` (`TargetSelector`), `Exceptions` (`IList<RuleException>`) and `Locked`.
+The C# model is `RuleDefinition`, with `Id`, `Because`, `Description`, `Kind` (`RuleKind.Forbid`, `RuleKind.AllowOnly` or `RuleKind.Require`), `From` and `To` (`TargetSelector`), `Require` (`RuleRequirement?`, with `Layer`, `Kind`, `Accessibility` and `Implements`), `Exceptions` (`IList<RuleException>`) and `Locked`. For a `require` rule `From` holds the `for` selector.
 
 ### Require rules
 
@@ -190,7 +190,7 @@ A `forbid` or `allowOnly` rule constrains dependencies. A `require` rule constra
 | `layer` | The name of the layer the type must belong to. | `WrongLayer` |
 | `kind` | `class`, `interface`, `record`, `struct` or `recordStruct`. | `TypeKindMismatch` |
 | `accessibility` | `public` or `internal`. Only `internal` is checked, because public is the default. | `AccessibilityMismatch` |
-| `implements` | A selector with `namespaces`, `assemblies` and `types` only. The type must implement or inherit from a type it matches. | `MissingInterface` |
+| `implements` | A selector with `namespaces`, `assemblies` and `types` only. The type must implement an interface it matches, including interfaces it gets through a base class. | `MissingInterface` |
 
 Placement example: every implementation of a repository interface lives in Infrastructure, as an internal class.
 
@@ -204,9 +204,13 @@ rules:
       kind: class
       accessibility: internal
     exceptions:
+      - namespaces: ["**.Domain.**"]
+        because: The repository interfaces themselves live in the domain.
       - types: ["Shop.Testing.InMemoryOrderRepository"]
         because: Test doubles live next to the tests.
 ```
+
+`interfaces` selects a type that implements a matching interface, and that includes an interface that extends one. `interface IOrderRepository : IRepository<Order>` is therefore selected by `**.I*Repository` too, and without the Domain exception it would be reported as `WrongLayer`, `TypeKindMismatch` and `AccessibilityMismatch`.
 
 A `require` rule yields one violation per selected type and failed requirement, with the rule's `id` and `because`. Exceptions exempt a type, and a rule with no match checks nothing.
 
@@ -224,7 +228,7 @@ Matching is ordinal and case-sensitive, like C# names.
 - **`interfaces`** match any interface a type implements or inherits, directly or through a base class, with the `types` grammar. `**.I*Repository` selects every implementation of a repository interface.
 - **`attributes`** match the full name of an attribute on the type, with the `types` grammar. Write the name as the compiler knows it, so `**.ObsoleteAttribute` and not `**.Obsolete`.
 
-The three keys work in the `for` of a `require` rule and in the targets of `forbid` and `allowOnly`. Like `layers`, they cannot be mixed with `layers` in one target.
+The three keys work in the `for` of a `require` rule and in the targets of `forbid` and `allowOnly`. Like `namespaces`, `assemblies` and `types`, they cannot be mixed with `layers` in one target.
 
 An empty pattern, or one with an empty segment such as `Shop..Domain`, is a load error.
 
