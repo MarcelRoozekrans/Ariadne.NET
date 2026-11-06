@@ -248,7 +248,7 @@ jobs:
   # next version from these messages, and silently drops a commit it cannot parse, so a bad message is caught here,
   # before the merge. Pull-request events only: a push to main is a merge of commits this job already linted.
   commitlint:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
