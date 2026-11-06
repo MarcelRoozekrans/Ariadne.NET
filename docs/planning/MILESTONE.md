@@ -25,7 +25,7 @@ A v2 pack can state every rule in the roadmap design's Daedalus appendix, and th
 
 1. Phase 2.1 — Semantic dependency analysis [complete]
 2. Phase 2.2 — Rule schema v2 [complete]
-3. Phase 2.3 — Enforce placement and code-feature rules [active]
+3. Phase 2.3 — Enforce placement and code-feature rules [complete]
 4. Phase 2.4 — Banned packages, forbidden APIs and name collisions [pending]
 5. Phase 2.5 — Vacuity detection [pending]
 6. Phase 2.6 — Pack reference and JSON Schema [pending]
