@@ -277,14 +277,14 @@ public class PackYamlReaderTests
             """;
 
         Problems(yaml).Should().Equal(
-            new PackProblem(9, 5, "rule 'SH-001' must have exactly one of 'forbid' or 'allowOnly'"));
+            new PackProblem(9, 5, "rule 'SH-001' must have exactly one of 'forbid', 'allowOnly' or 'require'"));
     }
 
     [Fact]
     public void RuleWithNeitherForbidNorAllowOnly()
     {
         Problems("schema: 2\nname: shop\nrules:\n  - id: SH-001\n    because: x\n    locked: false\n").Should().Equal(
-            new PackProblem(4, 5, "rule 'SH-001' must have exactly one of 'forbid' or 'allowOnly'"));
+            new PackProblem(4, 5, "rule 'SH-001' must have exactly one of 'forbid', 'allowOnly' or 'require'"));
     }
 
     [Fact]
@@ -320,7 +320,7 @@ public class PackYamlReaderTests
             """;
 
         Problems(yaml).Should().Equal(
-            new PackProblem(8, 9, "a target in rule 'SH-001' cannot mix 'layers' with 'namespaces', 'assemblies' or 'types'"));
+            new PackProblem(8, 9, "a target in rule 'SH-001' cannot mix 'layers' with 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces' or 'attributes'"));
     }
 
     [Fact]
@@ -364,7 +364,7 @@ public class PackYamlReaderTests
             """;
 
         Problems(yaml).Should().Equal(
-            new PackProblem(8, 11, "the to of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types'"));
+            new PackProblem(8, 11, "the to of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes'"));
     }
 
     [Fact]
@@ -946,6 +946,123 @@ public class PackYamlReaderTests
     public void KeySuggestion_PrefersTheLowerDistance()
     {
         KeySuggestion.Closest("types", ["typez1", "types1"]).Should().Be("types1");
+    }
+
+    private const string RequireHead = "schema: 2\nname: shop\nrules:\n  - id: SH-001\n    because: x\n";
+
+    [Fact]
+    public void Require_ReadsForLayerKindAccessibilityAndImplements()
+    {
+        var yaml = RequireHead + """
+                require:
+                  for: { interfaces: ["**.I*Repository"], baseTypes: ["**.Base"], attributes: ["**.Marker"] }
+                  layer: Infrastructure
+                  kind: class
+                  accessibility: internal
+                  implements: { types: ["**.I*Repository"], namespaces: ["Shop.**"], assemblies: ["Shop.*"] }
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var rule = result.Value.Rules.Should().ContainSingle().Subject;
+        rule.Kind.Should().Be(RuleKind.Require);
+        rule.From.Interfaces.Should().Equal("**.I*Repository");
+        rule.From.BaseTypes.Should().Equal("**.Base");
+        rule.From.Attributes.Should().Equal("**.Marker");
+        rule.Require.Should().NotBeNull();
+        rule.Require!.Layer.Should().Be("Infrastructure");
+        rule.Require.Kind.Should().Be(CSharpTypeKind.Class);
+        rule.Require.Accessibility.Should().Be("internal");
+        rule.Require.Implements!.Types.Should().Equal("**.I*Repository");
+        rule.Require.Implements.Namespaces.Should().Equal("Shop.**");
+        rule.Require.Implements.Assemblies.Should().Equal("Shop.*");
+    }
+
+    [Fact]
+    public void Require_WithoutFor_ReportsLine()
+    {
+        var yaml = RequireHead + "    require:\n      layer: Domain\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(7, 7, "the require of rule 'SH-001' has no 'for'"));
+    }
+
+    [Fact]
+    public void Require_WithNoRequirement_Fails()
+    {
+        var yaml = RequireHead + "    require:\n      for: { types: [\"**.X\"] }\n";
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(7, 7, "the require of rule 'SH-001' needs at least one of 'layer', 'kind', 'accessibility', 'implements'"));
+    }
+
+    [Fact]
+    public void Require_WithForbidAlsoPresent_Fails()
+    {
+        var yaml = RequireHead + """
+                forbid:
+                  from: { layers: [Domain] }
+                  to: { namespaces: ["System.**"] }
+                require:
+                  for: { types: ["**.X"] }
+                  layer: Domain
+            """;
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(9, 5, "rule 'SH-001' must have exactly one of 'forbid', 'allowOnly' or 'require'"));
+    }
+
+    [Theory]
+    [InlineData("kind: Widget", 8, "kind 'Widget' in the require of rule 'SH-001' must be one of")]
+    [InlineData("accessibility: private", 8, "accessibility 'private' in the require of rule 'SH-001' must be public or internal")]
+    public void Require_KindAndAccessibilityOutsideTheirValues_Fail(string line, int at, string expected)
+    {
+        var yaml = RequireHead + $"    require:\n      for: {{ types: [\"**.X\"] }}\n      {line}\n";
+
+        var problem = Problems(yaml).Should().ContainSingle().Subject;
+        problem.Line.Should().Be(at);
+        problem.Message.Should().StartWith(expected);
+    }
+
+    [Fact]
+    public void Implements_WithBaseTypes_Fails()
+    {
+        var yaml = RequireHead + "    require:\n      for: { types: [\"**.X\"] }\n      implements: { baseTypes: [\"**.B\"] }\n";
+
+        Problems(yaml).Should().Contain(new PackProblem(8, 21, "unknown key 'baseTypes' in the implements of rule 'SH-001'"));
+    }
+
+    [Fact]
+    public void ForbidTarget_AcceptsBaseTypesInterfacesAttributes()
+    {
+        var yaml = """
+            schema: 2
+            name: shop
+            rules:
+              - id: SH-001
+                because: x
+                forbid:
+                  from: { baseTypes: ["**.Base"] }
+                  to: { interfaces: ["**.IDisposable"], attributes: ["**.Obsolete*"] }
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var rule = result.Value.Rules.First();
+        rule.From.BaseTypes.Should().Equal("**.Base");
+        rule.To.Interfaces.Should().Equal("**.IDisposable");
+        rule.To.Attributes.Should().Equal("**.Obsolete*");
+    }
+
+    [Fact]
+    public void ForTarget_MixingLayersWithInterfaces_Fails()
+    {
+        var yaml = RequireHead + "    require:\n      for: { layers: [Domain], interfaces: [\"**.IX\"] }\n      layer: Domain\n";
+
+        var problem = Problems(yaml).Should().ContainSingle().Subject;
+        problem.Line.Should().Be(7);
+        problem.Message.Should().Contain("cannot mix 'layers'");
     }
 
     private static IReadOnlyList<PackProblem> Problems(string yaml)

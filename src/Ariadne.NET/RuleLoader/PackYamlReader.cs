@@ -34,13 +34,21 @@ internal static class PackYamlReader
     private static readonly string[] RetargetKeys = ["name", "namespaces", "assemblies"];
 
     private static readonly string[] RuleKeys =
-        ["id", "because", "description", "forbid", "allowOnly", "exceptions", "locked"];
+        ["id", "because", "description", "forbid", "allowOnly", "require", "exceptions", "locked"];
 
     private static readonly string[] AmendmentKeys = ["id", "exceptions"];
 
     private static readonly string[] KindKeys = ["from", "to"];
 
-    private static readonly string[] TargetKeys = ["layers", "namespaces", "assemblies", "types"];
+    private static readonly string[] TargetKeys =
+        ["layers", "namespaces", "assemblies", "types", "baseTypes", "interfaces", "attributes"];
+
+    private static readonly string[] RequireKeys = ["for", "layer", "kind", "accessibility", "implements"];
+
+    // What a type must implement is matched by name only: its namespace, assembly or full name.
+    private static readonly string[] ImplementsKeys = ["namespaces", "assemblies", "types"];
+
+    private static readonly string[] OtherSelectorKeys = ["namespaces", "assemblies", "types", "baseTypes", "interfaces", "attributes"];
 
     private static readonly string[] ExceptionKeys = ["namespaces", "assemblies", "types", "because"];
 
@@ -331,33 +339,134 @@ internal static class PackYamlReader
             var description = OptionalString(fields, "description", where);
             var locked = OptionalBool(fields, "locked", where);
 
-            var hasForbid = fields.TryGetValue("forbid", out var forbid);
-            var hasAllowOnly = fields.TryGetValue("allowOnly", out var allowOnly);
-            (TargetSelector From, TargetSelector To)? targets = null;
-            if (hasForbid == hasAllowOnly)
-            {
-                YamlNode at = !hasForbid ? map : Later(forbid.Key, allowOnly.Key);
-                Add(at, $"{where} must have exactly one of 'forbid' or 'allowOnly'");
-            }
-            else
-            {
-                targets = hasForbid ? ReadKind(in forbid, where) : ReadKind(in allowOnly, where);
-            }
-
-            if (_problems.Count == before && id is not null && because is not null && targets is { } pair)
+            var body = ReadRuleBody(fields, map, where);
+            if (_problems.Count == before && id is not null && because is not null && body is { } read)
             {
                 rules.Add(new RuleDefinition
                 {
                     Id = id,
                     Because = because,
                     Description = description ?? "",
-                    Kind = hasForbid ? RuleKind.Forbid : RuleKind.AllowOnly,
-                    From = pair.From,
-                    To = pair.To,
+                    Kind = read.Kind,
+                    From = read.From,
+                    To = read.To,
+                    Require = read.Require,
                     Exceptions = exceptions,
                     Locked = locked ?? false,
                 });
             }
+        }
+
+        // Exactly one of forbid, allowOnly or require.
+        private (RuleKind Kind, TargetSelector From, TargetSelector To, RuleRequirement? Require)? ReadRuleBody(
+            Dictionary<string, Field> fields, YamlMappingNode map, string where)
+        {
+            var hasForbid = fields.TryGetValue("forbid", out var forbid);
+            var hasAllowOnly = fields.TryGetValue("allowOnly", out var allowOnly);
+            var hasRequire = fields.TryGetValue("require", out var require);
+            var count = (hasForbid ? 1 : 0) + (hasAllowOnly ? 1 : 0) + (hasRequire ? 1 : 0);
+            if (count != 1)
+            {
+                YamlNode at = count == 0 ? map : Latest(hasForbid ? forbid.Key : null, hasAllowOnly ? allowOnly.Key : null, hasRequire ? require.Key : null);
+                Add(at, $"{where} must have exactly one of 'forbid', 'allowOnly' or 'require'");
+                return null;
+            }
+
+            if (hasRequire)
+            {
+                return ReadRequire(in require, where) is { } required
+                    ? (RuleKind.Require, required.For, new TargetSelector(), required.Require)
+                    : null;
+            }
+
+            return (hasForbid ? ReadKind(in forbid, where) : ReadKind(in allowOnly, where)) is { } pair
+                ? (hasForbid ? RuleKind.Forbid : RuleKind.AllowOnly, pair.From, pair.To, null)
+                : null;
+        }
+
+        private (TargetSelector For, RuleRequirement Require)? ReadRequire(in Field field, string ruleWhere)
+        {
+            if (field.Value is not YamlMappingNode map)
+            {
+                Add(field.Key, $"'require' in {ruleWhere} must be a mapping");
+                return null;
+            }
+
+            var where = $"the require of {ruleWhere}";
+            var before = _problems.Count;
+            var fields = Fields(map, RequireKeys, where);
+
+            TargetSelector? subject = null;
+            if (!fields.TryGetValue("for", out var forField))
+            {
+                Add(map, $"{where} has no 'for'");
+            }
+            else if (forField.Value is not YamlMappingNode forMap)
+            {
+                Add(forField.Key, $"'for' in {where} must be a mapping");
+            }
+            else
+            {
+                subject = ReadSelector(forMap, $"the for of {ruleWhere}", ruleWhere, TargetKeys);
+            }
+
+            var layer = fields.ContainsKey("layer") ? RequiredString(fields, "layer", where, map) : null;
+            var kind = ReadTypeKind(fields, where, "kind");
+            var accessibility = ReadAccessibility(fields, where);
+
+            TargetSelector? implements = null;
+            if (fields.TryGetValue("implements", out var implementsField))
+            {
+                if (implementsField.Value is YamlMappingNode implementsMap)
+                {
+                    implements = ReadSelector(implementsMap, $"the implements of {ruleWhere}", ruleWhere, ImplementsKeys);
+                }
+                else
+                {
+                    Add(implementsField.Key, $"'implements' in {where} must be a mapping");
+                }
+            }
+
+            if (!fields.ContainsKey("layer") && !fields.ContainsKey("kind") && !fields.ContainsKey("accessibility") && !fields.ContainsKey("implements"))
+            {
+                Add(map, $"{where} needs at least one of 'layer', 'kind', 'accessibility', 'implements'");
+            }
+
+            return _problems.Count == before && subject is not null
+                ? (subject, new RuleRequirement { Layer = layer, Kind = kind, Accessibility = accessibility, Implements = implements })
+                : null;
+        }
+
+        private string? ReadAccessibility(Dictionary<string, Field> fields, string where)
+        {
+            var value = OptionalString(fields, "accessibility", where);
+            if (value is null)
+            {
+                return null;
+            }
+
+            var normalized = value.Trim().ToLowerInvariant();
+            if (normalized is "public" or "internal")
+            {
+                return normalized;
+            }
+
+            Add(fields["accessibility"].Key, $"accessibility '{PackText.Show(value)}' in {where} must be public or internal");
+            return null;
+        }
+
+        private static YamlNode Latest(params YamlScalarNode?[] keys)
+        {
+            YamlScalarNode? latest = null;
+            foreach (var key in keys)
+            {
+                if (key is not null && (latest is null || key.Start.Index > latest.Start.Index))
+                {
+                    latest = key;
+                }
+            }
+
+            return latest!;
         }
 
         private (TargetSelector From, TargetSelector To)? ReadKind(in Field field, string ruleWhere)
@@ -389,27 +498,54 @@ internal static class PackYamlReader
                 return null;
             }
 
-            var where = $"the {key} of {ruleWhere}";
-            var before = _problems.Count;
-            var fields = Fields(map, TargetKeys, where);
-            var layers = StringList(fields, "layers", where);
-            var namespaces = PatternList(fields, "namespaces", where, Glob.Dotted);
-            var assemblies = PatternList(fields, "assemblies", where, Glob.Flat);
-            var types = PatternList(fields, "types", where, Glob.Dotted);
+            return ReadSelector(map, $"the {key} of {ruleWhere}", ruleWhere, TargetKeys);
+        }
 
-            if (fields.TryGetValue("layers", out var layersField)
-                && (fields.ContainsKey("namespaces") || fields.ContainsKey("assemblies") || fields.ContainsKey("types")))
+        // One selector mapping. Only the given keys may appear; 'layers' stands alone, as it cannot mix with code patterns.
+        private TargetSelector? ReadSelector(YamlMappingNode map, string where, string ruleWhere, string[] keys)
+        {
+            var before = _problems.Count;
+            var fields = Fields(map, keys, where);
+            var lists = new List<string>?[keys.Length];
+            var selectors = new (string Key, List<string>? Items)[keys.Length];
+            for (var i = 0; i < keys.Length; i++)
             {
-                Add(layersField.Key, $"a target in {ruleWhere} cannot mix 'layers' with 'namespaces', 'assemblies' or 'types'");
+                lists[i] = keys[i] switch
+                {
+                    "layers" => StringList(fields, "layers", where),
+                    "assemblies" => PatternList(fields, "assemblies", where, Glob.Flat),
+                    _ => PatternList(fields, keys[i], where, Glob.Dotted),
+                };
+                selectors[i] = (keys[i], lists[i]);
             }
-            else if (NoneSelected(fields, [("layers", layers), ("namespaces", namespaces), ("assemblies", assemblies), ("types", types)]))
+
+            if (fields.TryGetValue("layers", out var layersField) && OtherSelectorKeys.Any(fields.ContainsKey))
             {
-                Add(map, $"{where} needs at least one of 'layers', 'namespaces', 'assemblies', 'types'");
+                Add(layersField.Key, $"a target in {ruleWhere} cannot mix 'layers' with 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces' or 'attributes'");
+            }
+            else if (NoneSelected(fields, selectors))
+            {
+                Add(map, $"{where} needs at least one of {string.Join(", ", keys.Select(static k => $"'{k}'"))}");
             }
 
             return _problems.Count == before
-                ? new TargetSelector { Layers = layers ?? [], Namespaces = namespaces ?? [], Assemblies = assemblies ?? [], Types = types ?? [] }
+                ? new TargetSelector
+                {
+                    Layers = ListFor(lists, keys, "layers"),
+                    Namespaces = ListFor(lists, keys, "namespaces"),
+                    Assemblies = ListFor(lists, keys, "assemblies"),
+                    Types = ListFor(lists, keys, "types"),
+                    BaseTypes = ListFor(lists, keys, "baseTypes"),
+                    Interfaces = ListFor(lists, keys, "interfaces"),
+                    Attributes = ListFor(lists, keys, "attributes"),
+                }
                 : null;
+        }
+
+        private static List<string> ListFor(List<string>?[] lists, string[] keys, string key)
+        {
+            var at = Array.IndexOf(keys, key);
+            return at < 0 ? [] : lists[at] ?? [];
         }
 
         private List<RuleException> ReadExceptions(Dictionary<string, Field> ruleFields, string ruleWhere)
@@ -488,9 +624,9 @@ internal static class PackYamlReader
             }
         }
 
-        private CSharpTypeKind? ReadTypeKind(Dictionary<string, Field> fields, string where)
+        private CSharpTypeKind? ReadTypeKind(Dictionary<string, Field> fields, string where, string key = "typeKind")
         {
-            var value = OptionalString(fields, "typeKind", where);
+            var value = OptionalString(fields, key, where);
             if (value is null)
             {
                 return null;
@@ -504,7 +640,7 @@ internal static class PackYamlReader
                 }
             }
 
-            Add(fields["typeKind"].Key, $"typeKind '{PackText.Show(value)}' in {where} must be one of {TypeKindNames}");
+            Add(fields[key].Key, $"{key} '{PackText.Show(value)}' in {where} must be one of {TypeKindNames}");
             return null;
         }
 

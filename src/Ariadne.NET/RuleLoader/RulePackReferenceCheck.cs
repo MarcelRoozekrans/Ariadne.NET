@@ -81,11 +81,21 @@ internal static class RulePackReferenceCheck
         {
             failures.Add($"{path}[{index}].Id: Id must not be empty.");
         }
+        else if (IsReserved(id))
+        {
+            failures.Add($"id '{PackText.Show(id)}' is reserved for generated rules");
+        }
         else if (!seen.Add(id))
         {
             failures.Add($"duplicate id '{PackText.Show(id)}'");
         }
     }
+
+    // CODE-001, CODE-002 and ROLE-<Name> are the ids of the rules generated from component roles.
+    private static bool IsReserved(string id) =>
+        id.Equals("CODE-001", StringComparison.OrdinalIgnoreCase)
+        || id.Equals("CODE-002", StringComparison.OrdinalIgnoreCase)
+        || id.StartsWith("ROLE-", StringComparison.OrdinalIgnoreCase);
 
     private static void CheckRuleLayers(RulePack pack, HashSet<string> layerNames, List<string> failures)
     {
@@ -93,6 +103,11 @@ internal static class RulePackReferenceCheck
         {
             CheckTargetLayers(rule.Id, rule.From, layerNames, failures);
             CheckTargetLayers(rule.Id, rule.To, layerNames, failures);
+
+            if (rule.Require?.Layer is { } required && !Contains(layerNames, required))
+            {
+                failures.Add($"rule '{PackText.Show(rule.Id)}' requires unknown layer '{PackText.Show(required)}'");
+            }
         }
     }
 

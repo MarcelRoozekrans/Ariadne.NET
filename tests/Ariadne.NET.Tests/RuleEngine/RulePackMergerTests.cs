@@ -135,6 +135,31 @@ public class RulePackMergerTests
     }
 
     [Fact]
+    public void AmendingARequireRule_KeepsItsRequirement()
+    {
+        var require = new RuleDefinition
+        {
+            Id = "R1",
+            Because = "because",
+            Kind = RuleKind.Require,
+            From = new TargetSelector { Interfaces = ["**.IX"] },
+            Require = new RuleRequirement { Layer = "Domain", Accessibility = "internal" },
+        };
+
+        var result = _merger.Merge(
+        [
+            new RulePack { Name = "parent", Rules = [require] },
+            new RulePack { Name = "child", RuleAmendments = [new RuleAmendment { Id = "R1", Exceptions = [Exception("two")] }] },
+        ]);
+
+        var merged = result.Value.Rules.Should().ContainSingle().Subject;
+        merged.Kind.Should().Be(RuleKind.Require);
+        merged.Require.Should().BeSameAs(require.Require);
+        merged.From.Interfaces.Should().Equal("**.IX");
+        merged.Exceptions.Should().ContainSingle();
+    }
+
+    [Fact]
     public void AmendmentOfLockedRule_Fails()
     {
         var result = _merger.Merge(

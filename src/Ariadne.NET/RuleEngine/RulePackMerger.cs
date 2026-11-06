@@ -131,6 +131,7 @@ public sealed class RulePackMerger : IRulePackMerger
                 Kind = inherited.Kind,
                 From = inherited.From,
                 To = inherited.To,
+                Require = inherited.Require,
                 Exceptions = [.. inherited.Exceptions, .. amendment.Exceptions],
                 Locked = inherited.Locked,
             });
