@@ -186,14 +186,14 @@ internal static class RoleRules
         });
     }
 
-    private static CSharpTypeKind ActualKind(INamedTypeSymbol type) => type.TypeKind switch
+    internal static CSharpTypeKind ActualKind(INamedTypeSymbol type) => type.TypeKind switch
     {
         TypeKind.Interface => CSharpTypeKind.Interface,
         TypeKind.Struct => type.IsRecord ? CSharpTypeKind.RecordStruct : CSharpTypeKind.Struct,
         _ => type.IsRecord ? CSharpTypeKind.Record : CSharpTypeKind.Class,
     };
 
-    private static string Keyword(Accessibility accessibility) => accessibility switch
+    internal static string Keyword(Accessibility accessibility) => accessibility switch
     {
         Accessibility.Public => "public",
         Accessibility.Internal => "internal",

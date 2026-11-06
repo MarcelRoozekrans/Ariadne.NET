@@ -5,7 +5,7 @@ using ZeroAlloc.Inject;
 
 namespace Ariadne.NET.Analysis;
 
-/// <summary>Builds the type graph of each project and target framework, runs the layer, forbid, allowOnly and role rules and merges the results per project.</summary>
+/// <summary>Builds the type graph of each project and target framework, runs the layer, forbid, allowOnly, require and role rules and merges the results per project.</summary>
 [Singleton]
 public sealed class ArchitectureValidator : IArchitectureValidator
 {
@@ -41,6 +41,7 @@ public sealed class ArchitectureValidator : IArchitectureValidator
             var violations = new List<ArchitectureViolation>(LayerRules.Check(graph, layers, resolvedPack));
             violations.AddRange(forbid.Check(graph));
             violations.AddRange(allowOnly.Check(graph));
+            violations.AddRange(RequireRules.Check(graph, layers, resolvedPack));
             var matches = RoleRules.Match(graph, layers, resolvedPack);
             violations.AddRange(RoleRules.CheckShape(matches));
             entries.Add(new Entry(project, graph, matches, violations));

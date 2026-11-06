@@ -284,6 +284,42 @@ public class ArchitectureValidatorTests
     }
 
     [Fact]
+    public void Validate_RunsRequireRules_AndLayerOverlapOnceForAnOverlappedType()
+    {
+        var pack = new RulePack
+        {
+            Name = "test",
+            Layers =
+            [
+                new LayerDefinition { Name = "Domain", Id = "L1", Because = "b", Namespaces = ["**.Domain.**"] },
+                new LayerDefinition { Name = "Application", Id = "L2", Because = "b", Namespaces = ["**.Application.**"] },
+            ],
+            Rules =
+            [
+                new RuleDefinition
+                {
+                    Id = "TEST-REQUIRE",
+                    Because = "Orders live in Application.",
+                    Kind = RuleKind.Require,
+                    From = new TargetSelector { Types = ["**.*Order"] },
+                    Require = new RuleRequirement { Layer = "Application" },
+                },
+            ],
+        };
+
+        var report = _validator.Validate(
+            pack,
+            TestCompilation.Create("""
+                namespace Shop.Domain { public class Order { } }
+                namespace Shop.Domain.Application { public class BigOrder { } }
+                """));
+
+        report.Violations.Should().HaveCount(2);
+        report.Violations.Should().Contain(v => v.Kind == ViolationKind.WrongLayer && v.SourceType == "Shop.Domain.Order" && v.RuleId == "TEST-REQUIRE");
+        report.Violations.Should().Contain(v => v.Kind == ViolationKind.LayerOverlap && v.SourceType == "Shop.Domain.Application.BigOrder");
+    }
+
+    [Fact]
     public void OverlappedType_ReferencedByTwoOtherProjects_ReportedOnceWithLocation()
     {
         var references = TestCompilation.Create("class C { }").References.ToList();
