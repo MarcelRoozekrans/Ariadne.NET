@@ -77,7 +77,21 @@ public static class RulesCommand
     }
 
     internal static string Describe(TargetSelector selector) =>
-        Describe(selector.Namespaces, selector.Assemblies, selector.Layers, selector.Types, selector.BaseTypes, selector.Interfaces, selector.Attributes);
+        Describe(
+            selector.Namespaces,
+            selector.Assemblies,
+            selector.Layers,
+            selector.Types,
+            selector.BaseTypes,
+            selector.Interfaces,
+            selector.Attributes);
+
+    // The enum name with a lower-case first letter is the spelling a pack uses: class, recordStruct.
+    private static string YamlSpelling(CSharpTypeKind kind)
+    {
+        var name = kind.ToString();
+        return string.Concat(char.ToLowerInvariant(name[0]).ToString(), name.AsSpan(1));
+    }
 
     // Members in the order layer, kind, accessibility, implements, joined by ", ".
     internal static string Describe(RuleRequirement? requirement)
@@ -95,7 +109,7 @@ public static class RulesCommand
 
         if (requirement.Kind is { } kind)
         {
-            parts.Add($"kind {kind}");
+            parts.Add($"kind {YamlSpelling(kind)}");
         }
 
         if (requirement.Accessibility is not null)

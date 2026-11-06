@@ -234,6 +234,68 @@ public class RulePackReferenceCheckTests
         Resolve(pack).IsSuccess.Should().BeTrue();
     }
 
+    private static RulePack PackWithRequire(RuleRequirement? requirement) => new()
+    {
+        Name = "p",
+        Layers = [Layer("Domain")],
+        Rules =
+        [
+            new RuleDefinition
+            {
+                Id = "R-1",
+                Because = "because",
+                Kind = RuleKind.Require,
+                From = new TargetSelector { Types = ["**.X"] },
+                Require = requirement,
+            },
+        ],
+    };
+
+    [Fact]
+    public void RequireRule_WithoutARequirement_Fails()
+    {
+        Resolve(PackWithRequire(null)).Error.Detail.Should().Contain("rule 'R-1' is a require rule and has no requirement");
+    }
+
+    [Fact]
+    public void RequireRule_WithAnEmptyRequirement_Fails()
+    {
+        Resolve(PackWithRequire(new RuleRequirement())).Error.Detail.Should()
+            .Contain("the requirement of rule 'R-1' needs at least one of layer, kind, accessibility, implements");
+    }
+
+    [Fact]
+    public void RequireRule_WithUnknownAccessibility_Fails()
+    {
+        Resolve(PackWithRequire(new RuleRequirement { Accessibility = "private" })).Error.Detail.Should()
+            .Contain("the requirement of rule 'R-1' has accessibility 'private', which must be public or internal");
+    }
+
+    [Theory]
+    [InlineData("public")]
+    [InlineData("INTERNAL")]
+    public void RequireRule_WithKnownAccessibility_Passes(string accessibility)
+    {
+        Resolve(PackWithRequire(new RuleRequirement { Accessibility = accessibility })).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void RequireRule_ImplementsWithOnlyCodeFeatureKeys_Fails()
+    {
+        var requirement = new RuleRequirement { Implements = new TargetSelector { Interfaces = ["**.IX"] } };
+
+        Resolve(PackWithRequire(requirement)).Error.Detail.Should()
+            .Contain("the implements of rule 'R-1' needs at least one of namespaces, assemblies, types");
+    }
+
+    [Fact]
+    public void RequireRule_ImplementsWithTypes_Passes()
+    {
+        var requirement = new RuleRequirement { Implements = new TargetSelector { Types = ["**.IX"] } };
+
+        Resolve(PackWithRequire(requirement)).IsSuccess.Should().BeTrue();
+    }
+
     [Theory]
     [InlineData("CODE-001")]
     [InlineData("code-002")]

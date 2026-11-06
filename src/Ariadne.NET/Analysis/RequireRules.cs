@@ -14,9 +14,12 @@ internal static class RequireRules
     /// layers cover is skipped for <c>layer</c>, because it is already a layer overlap. Enums and delegates are subjects of
     /// <c>layer</c> only. An accessibility other than <c>internal</c> requires nothing.
     /// </summary>
-    public static IReadOnlyList<ArchitectureViolation> Check(TypeGraph graph, LayerMap layers, RulePack pack)
+    public static IReadOnlyList<ArchitectureViolation> Check(TypeGraph graph, LayerMap layers, RulePack pack) =>
+        Compile(layers, pack).Check(graph);
+
+    /// <summary>Compiles the rules once, for a run that checks several graphs.</summary>
+    public static Checker Compile(LayerMap layers, RulePack pack)
     {
-        ArgumentNullException.ThrowIfNull(graph);
         ArgumentNullException.ThrowIfNull(layers);
         ArgumentNullException.ThrowIfNull(pack);
 
@@ -29,25 +32,36 @@ internal static class RequireRules
             }
         }
 
-        if (rules.Count == 0)
-        {
-            return [];
-        }
+        return new Checker(rules, layers);
+    }
 
-        var violations = new List<ArchitectureViolation>();
-        foreach (var type in graph.SourceTypes)
+    /// <summary>The compiled <c>require</c> rules of a pack.</summary>
+    internal sealed class Checker(List<Compiled> rules, LayerMap layers)
+    {
+        public IReadOnlyList<ArchitectureViolation> Check(TypeGraph graph)
         {
-            var location = graph.SourceTypeLocations[type];
-            foreach (ref readonly var rule in CollectionsMarshal.AsSpan(rules))
+            ArgumentNullException.ThrowIfNull(graph);
+
+            if (rules.Count == 0)
             {
-                if (rule.From.Matches(type) && !rule.IsExcepted(type, layers.Names))
+                return [];
+            }
+
+            var violations = new List<ArchitectureViolation>();
+            foreach (var type in graph.SourceTypes)
+            {
+                var location = graph.SourceTypeLocations[type];
+                foreach (ref readonly var rule in CollectionsMarshal.AsSpan(rules))
                 {
-                    rule.Check(type, in location, layers, violations);
+                    if (rule.From.Matches(type) && !rule.IsExcepted(type, layers.Names))
+                    {
+                        rule.Check(type, in location, layers, violations);
+                    }
                 }
             }
-        }
 
-        return violations;
+            return violations;
+        }
     }
 
     private static Compiled Compile(RuleDefinition rule, RuleRequirement requirement, LayerMap layers)
@@ -69,7 +83,7 @@ internal static class RequireRules
         return new Compiled(rule, requirement, TargetMatcher.From(rule.From, layers), exceptions, implements);
     }
 
-    private sealed class Compiled(RuleDefinition rule, RuleRequirement requirement, TargetMatcher from, TypeSelector[] exceptions, TypeSelector? implements)
+    internal sealed class Compiled(RuleDefinition rule, RuleRequirement requirement, TargetMatcher from, TypeSelector[] exceptions, TypeSelector? implements)
     {
         public TargetMatcher From { get; } = from;
 

@@ -108,6 +108,41 @@ internal static class RulePackReferenceCheck
             {
                 failures.Add($"rule '{PackText.Show(rule.Id)}' requires unknown layer '{PackText.Show(required)}'");
             }
+
+            if (rule.Kind == RuleKind.Require)
+            {
+                CheckRequirement(rule, failures);
+            }
+        }
+    }
+
+    // The loader enforces these for a YAML pack. A pack built in code skips the loader, and RequireRules would silently
+    // check nothing for them, so they are reported here.
+    private static void CheckRequirement(RuleDefinition rule, List<string> failures)
+    {
+        var id = PackText.Show(rule.Id);
+        if (rule.Require is not { } requirement)
+        {
+            failures.Add($"rule '{id}' is a require rule and has no requirement");
+            return;
+        }
+
+        if (requirement.Layer is null && requirement.Kind is null && requirement.Accessibility is null && requirement.Implements is null)
+        {
+            failures.Add($"the requirement of rule '{id}' needs at least one of layer, kind, accessibility, implements");
+        }
+
+        if (requirement.Accessibility is { } accessibility
+            && !accessibility.Equals("public", StringComparison.OrdinalIgnoreCase)
+            && !accessibility.Equals("internal", StringComparison.OrdinalIgnoreCase))
+        {
+            failures.Add($"the requirement of rule '{id}' has accessibility '{PackText.Show(accessibility)}', which must be public or internal");
+        }
+
+        if (requirement.Implements is { } implements
+            && implements.Namespaces.Count == 0 && implements.Assemblies.Count == 0 && implements.Types.Count == 0)
+        {
+            failures.Add($"the implements of rule '{id}' needs at least one of namespaces, assemblies, types");
         }
     }
 

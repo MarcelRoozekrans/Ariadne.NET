@@ -350,7 +350,7 @@ public sealed class ExitCodeTests : IDisposable
                   layer: Infrastructure
                   kind: class
                   accessibility: internal
-                  implements: { types: ["**.RepositoryBase"] }
+                  implements: { types: ["**.IRepositoryContract"] }
                 exceptions:
                   - types: ["**.Legacy"]
                     because: Old code.
@@ -362,7 +362,7 @@ public sealed class ExitCodeTests : IDisposable
         var lines = stdout.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
         var rules = lines.SkipWhile(l => !string.Equals(l, "Rules:", StringComparison.Ordinal)).Skip(1).TakeWhile(l => l.StartsWith("  ", StringComparison.Ordinal)).ToArray();
         rules.Should().Equal(
-            "  SH-010 require interfaces **.I*Repository; attributes **.Stored -> layer Infrastructure, kind Class, internal, implements types **.RepositoryBase",
+            "  SH-010 require interfaces **.I*Repository; attributes **.Stored -> layer Infrastructure, kind class, internal, implements types **.IRepositoryContract",
             "    1 exception(s)",
             "    Repositories live in Infrastructure.");
     }
@@ -393,6 +393,12 @@ public sealed class ExitCodeTests : IDisposable
         lines.SkipWhile(l => !string.Equals(l, "Layers:", StringComparison.Ordinal)).Skip(1).Take(2).Should().Equal(
             "  Data [SH-LAYER-DATA]: assemblies Shop.Data; depends on nothing",
             "  Mixed [SH-LAYER-MIXED]: namespaces **.Mixed.**; assemblies Shop.Mixed; depends on Data");
+    }
+
+    [Fact]
+    public void Describe_RequirementKind_UsesTheYamlSpelling()
+    {
+        RulesCommand.Describe(new RuleRequirement { Kind = CSharpTypeKind.RecordStruct }).Should().Be("kind recordStruct");
     }
 
     [Fact]

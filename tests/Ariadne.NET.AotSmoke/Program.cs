@@ -24,7 +24,7 @@ var pack = new RulePack
             Because = "Handlers belong in the domain layer.",
             Kind = RuleKind.Require,
             From = new TargetSelector { Interfaces = ["IHandler"] },
-            Require = new RuleRequirement { Layer = "Domain", Kind = CSharpTypeKind.Class, Accessibility = "public", Implements = new TargetSelector { BaseTypes = ["Handler"] } },
+            Require = new RuleRequirement { Layer = "Domain", Kind = CSharpTypeKind.Class, Accessibility = "public", Implements = new TargetSelector { Types = ["IHandler"] } },
         },
     ],
 };
