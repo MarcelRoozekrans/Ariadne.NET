@@ -11,7 +11,7 @@
   - Design: `docs/superpowers/specs/2026-11-05-phase-2.2-rule-schema-v2-design.md`
   - Plan: `docs/superpowers/plans/2026-11-05-phase-2.2-rule-schema-v2.md`, all boxes ticked.
   - Perf: the check on the repo pack is about 21% slower and allocates about 32% more than the 2.1 baseline; see `docs/perf/phase-2.1-baseline.md`.
-- **Phase 2.3 — Enforce placement and code-feature rules:** [status: pending], no design yet. `codeFeatureRules` comes back typed here; selectors gain base type, interface and attribute.
+- **Phase 2.3 — Enforce placement and code-feature rules:** [status: active]. Design approved 2026-11-06 (`docs/superpowers/specs/2026-11-06-phase-2.3-placement-and-code-feature-rules-design.md`), plan written (`docs/superpowers/plans/2026-11-06-phase-2.3-placement-and-code-feature-rules.md`, 7 tasks, none started). Owner decisions: one `require` rule with roles kept as engine-internal shorthand; `CODE-001` keeps its solution-wide meaning; no placement rules in the built-in packs, only in this repo's own pack.
 - Issues filed from 2.2: #36 (child packs: amending `allowedDependencies`, locked rules sidestepped by retargeting, empty retargets) and #37 (child-layer error wording, duplicate roles, pack file size limit). #32 stays the module-isolation item.
 
 Phase 2.2 decisions by the owner, 2026-11-05:
@@ -47,6 +47,6 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 
 ## Recommended Next Step
 
-Branch `chore/complete-phase-2.2` (from `ariadne/main`, one commit, PR #39). Run `start-next-phase`, which routes Phase 2.3 to `superpowers:brainstorming` because no design spec exists. Open a PR for the branch when asked; `main` requires one.
+Merge the docs PR for branch `docs/phase-2.3-design` (design, plan, roadmap and state). Then ask the owner for the execution method (subagent-driven or native) and start Task 1 of the plan on `feat/phase-2.3-placement-and-code-feature-rules`, branched from `ariadne/main`. Task 5 is breaking: put a `BEGIN_COMMIT_OVERRIDE` block in the PR body before merging.
 
 Commit rules: conventional commits; no `Co-Authored-By` trailer or session link; no nested parentheses in commit bodies; keep every footer line under 100 characters, because commitlint rejects longer ones; breaking commits carry `!` and a `BREAKING CHANGE` footer. Shared VM: one build or test at a time, no local AOT publish.
