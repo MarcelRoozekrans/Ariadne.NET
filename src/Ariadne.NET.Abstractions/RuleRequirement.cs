@@ -1,0 +1,20 @@
+using ZeroAlloc.Validation;
+
+namespace Ariadne.NET.Abstractions;
+
+/// <summary>What code selected by a <c>require</c> rule must satisfy. Unset members are not checked.</summary>
+[Validate]
+public sealed class RuleRequirement
+{
+    /// <summary>The layer the type must belong to.</summary>
+    public string? Layer { get; init; }
+
+    /// <summary>The kind the type must have.</summary>
+    public CSharpTypeKind? Kind { get; init; }
+
+    /// <summary>The accessibility the type must have.</summary>
+    public string? Accessibility { get; init; }
+
+    /// <summary>A selector the type must implement or inherit from.</summary>
+    public TargetSelector? Implements { get; init; }
+}
