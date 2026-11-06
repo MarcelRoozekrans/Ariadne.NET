@@ -50,6 +50,14 @@ public class TargetMatcherTests
         act.Should().Throw<ArgumentException>();
     }
 
+    [Fact]
+    public void LayersMixedWithInterfaces_Throws()
+    {
+        var act = () => TargetMatcher.From(new TargetSelector { Layers = ["Domain"], Interfaces = ["**.IRepository"] }, new LayerMap(Pack));
+
+        act.Should().Throw<ArgumentException>();
+    }
+
     // Interim: measures with GC.GetAllocatedBytesForCurrentThread, see ZeroAlloc-Net/ZeroAlloc.TestHelpers#106;
     // AllocationGate is not referenced in this repo yet.
     [Fact]
