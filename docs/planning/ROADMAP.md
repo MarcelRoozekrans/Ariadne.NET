@@ -213,7 +213,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **HelpWanted:** no
 **Design:** `docs/superpowers/specs/2026-11-06-agent-guidance-hooks-design.md` (approved 2026-11-06, stage A)
 **Note:** Starts after phase 2.3, which changes the loader the pack attachments extend. Runs next to AI.Sentinel's hook, which keeps tool-call enforcement.
-**Plan:** _to be written_
+**Plan:** `docs/superpowers/plans/2026-11-06-phase-5.6-agent-hooks.md` (written 2026-11-06, awaiting owner review; not started)
 
 ### Phase 5.7: Guidance delivery [status: pending]
 **Goal:** Packs carry standards, skills and opaque files, and `ariadne sync` delivers them to projects, so a new project connects once instead of copying rules.
