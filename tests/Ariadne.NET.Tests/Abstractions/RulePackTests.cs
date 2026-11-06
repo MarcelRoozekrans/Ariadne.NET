@@ -121,12 +121,28 @@ public class RulePackTests
         selector.Attributes.Should().BeEmpty();
     }
 
-    [Fact]
-    public void TargetSelector_WithNullEntryInInterfaces_FailsValidation()
+    [Theory]
+    [InlineData("BaseTypes")]
+    [InlineData("Interfaces")]
+    [InlineData("Attributes")]
+    public void TargetSelector_WithNullEntryInNewList_FailsValidation(string list)
     {
-        var selector = new TargetSelector { Interfaces = ["IFoo", null!] };
+        var selector = list switch
+        {
+            "BaseTypes" => new TargetSelector { BaseTypes = ["Base", null!] },
+            "Interfaces" => new TargetSelector { Interfaces = ["IFoo", null!] },
+            _ => new TargetSelector { Attributes = ["Foo", null!] },
+        };
 
         new TargetSelectorValidator().Validate(selector).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void RuleRequirement_WithNullEntryInImplements_FailsValidation()
+    {
+        var requirement = new RuleRequirement { Implements = new TargetSelector { Interfaces = ["IFoo", null!] } };
+
+        new RuleRequirementValidator(new TargetSelectorValidator()).Validate(requirement).IsValid.Should().BeFalse();
     }
 
     [Fact]
