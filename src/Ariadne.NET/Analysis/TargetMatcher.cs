@@ -32,15 +32,16 @@ internal sealed class TargetMatcher
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(layers);
 
-        if (target.Layers.Count > 0 && (target.Namespaces.Count > 0 || target.Assemblies.Count > 0 || target.Types.Count > 0))
+        if (target.Layers.Count > 0 && (target.Namespaces.Count > 0 || target.Assemblies.Count > 0 || target.Types.Count > 0
+                || target.BaseTypes.Count > 0 || target.Interfaces.Count > 0 || target.Attributes.Count > 0))
         {
-            throw new ArgumentException("A target selects either layers or namespaces, assemblies and types, not both.", nameof(target));
+            throw new ArgumentException("A target selects either layers or namespaces, assemblies, types, base types, interfaces and attributes, not both.", nameof(target));
         }
 
         return new TargetMatcher(
             layers,
             new HashSet<string>(target.Layers, StringComparer.OrdinalIgnoreCase),
-            TypeSelector.From(target.Namespaces, target.Assemblies, target.Types));
+            TypeSelector.From(target.Namespaces, target.Assemblies, target.Types, target.BaseTypes, target.Interfaces, target.Attributes));
     }
 
     /// <summary>Whether the type is selected. A type covered by more than one layer is in none of them.</summary>

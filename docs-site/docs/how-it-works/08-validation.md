@@ -71,6 +71,17 @@ A type's layer comes from the selectors of the pack's layers: a type belongs to 
 
 Both kinds carry the rule's `id` and `because`. A selector that matches no type in the solution is not an error; the rule has nothing to check.
 
+**Require rules.** A `require` rule selects types with its `for` selector and checks each selected type against the requirement. A source type, nested types included, is checked once per failed requirement, unless an exception matches it. The kinds are:
+
+| Kind | Meaning | Example |
+|------|---------|---------|
+| `WrongLayer` | The type is not in the layer the rule requires | Repositories must be in `Infrastructure` but one is in `Domain` |
+| `TypeKindMismatch` | The type is not of the required kind | The rule says `class` but the type is a `record` |
+| `AccessibilityMismatch` | The rule asks for `internal` and the type is not | The rule says `internal` but the type is `public` |
+| `MissingInterface` | The type implements no interface that the `implements` selector matches, including interfaces it gets through a base class | A repository that implements no `I*Repository` |
+
+The violation carries the rule's `id` and `because`. A selector that matches no type is not an error.
+
 **Role rules.** A source type in a role's layer whose name ends with the role name or one of its `alternativeNames` matches the role. Nested types are included. Enums and delegates are never matched to a role. Each match is checked for:
 
 | Kind | Meaning | Example |
@@ -81,7 +92,7 @@ Both kinds carry the rule's `id` and `because`. A selector that matches no type 
 
 The type kind is read from the symbol, so `record` and `record struct` are told apart. Accessibility is the declared accessibility, and a top-level type with no access modifier counts as internal. A nested one is private.
 
-Role violations have the rule id `role/<Role>` and no `because`.
+Role violations carry generated rule ids and a `because`. `ROLE-<Name>` is the type kind check of the role `<Name>`, and its `because` is the role's description, or `Role '<Name>' defines this shape.` when there is none. `CODE-002` is the accessibility check and `CODE-001` the missing-interface check. Their `because` text is fixed by the engine. The ids `CODE-001`, `CODE-002` and anything starting with `ROLE-` are reserved, and a pack that declares one fails to load.
 
 ### The report
 
@@ -89,16 +100,16 @@ Role violations have the rule id `role/<Role>` and no `because`.
 ArchitectureReport
   ├── IsValid: bool                          (true when there are no violations)
   ├── Violations: IReadOnlyList<ArchitectureViolation>
-  │     ├── RuleId: string                   (a layer id, a rule id or role/<Role>)
+  │     ├── RuleId: string                   (a layer id, a rule id, ROLE-<Name>, CODE-001 or CODE-002)
   │     ├── Kind: ViolationKind              (DependencyNotAllowed, ForbiddenDependency,
   │     │                                     DependencyNotPermitted, LayerOverlap, TypeKindMismatch,
-  │     │                                     AccessibilityMismatch, MissingInterface)
+  │     │                                     AccessibilityMismatch, MissingInterface, WrongLayer)
   │     ├── SourceType: string               (fully qualified name)
-  │     ├── Target: string?                  (the type depended on, absent for role and overlap checks)
+  │     ├── Target: string?                  (the type depended on, absent for role, require and overlap checks)
   │     ├── Location: SourceLocation?        (file path, line, column; the first reference)
   │     ├── ReferenceCount: int
   │     ├── TargetFrameworks: IReadOnlyList<string>
-  │     ├── Because: string                  (the layer's or rule's because; empty for role checks)
+  │     ├── Because: string                  (the because of the layer, rule or role; LayerOverlap has a fixed text)
   │     └── Message: string
   ├── Projects: IReadOnlyList<CheckedProject>   (name and target frameworks)
   ├── SkippedProjects: IReadOnlyList<SkippedProject>  (name and reason)

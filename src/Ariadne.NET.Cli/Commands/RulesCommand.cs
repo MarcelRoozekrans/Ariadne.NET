@@ -44,14 +44,7 @@ public static class RulesCommand
 
             foreach (var rule in pack.Rules)
             {
-                var kind = rule.Kind == RuleKind.Forbid ? "forbid" : "allowOnly";
-                Console.WriteLine($"  {rule.Id} {kind} {Describe(rule.From)} -> {Describe(rule.To)}");
-                if (rule.Exceptions.Count > 0)
-                {
-                    Console.WriteLine($"    {rule.Exceptions.Count} exception(s)");
-                }
-
-                Console.WriteLine($"    {rule.Because}");
+                PrintRule(rule);
             }
 
             Console.WriteLine();
@@ -64,21 +57,92 @@ public static class RulesCommand
         return command;
     }
 
-    internal static string Describe(TargetSelector selector) =>
-        Describe(selector.Namespaces, selector.Assemblies, selector.Layers, selector.Types);
+    private static void PrintRule(RuleDefinition rule)
+    {
+        var kind = rule.Kind switch
+        {
+            RuleKind.Forbid => "forbid",
+            RuleKind.AllowOnly => "allowOnly",
+            RuleKind.Require => "require",
+            _ => rule.Kind.ToString(),
+        };
+        var target = rule.Kind == RuleKind.Require ? Describe(rule.Require) : Describe(rule.To);
+        Console.WriteLine($"  {rule.Id} {kind} {Describe(rule.From)} -> {target}");
+        if (rule.Exceptions.Count > 0)
+        {
+            Console.WriteLine($"    {rule.Exceptions.Count} exception(s)");
+        }
 
-    // Kinds in the order layers, namespaces, assemblies, types; kinds joined by "; ", values by ", ".
+        Console.WriteLine($"    {rule.Because}");
+    }
+
+    internal static string Describe(TargetSelector selector) =>
+        Describe(
+            selector.Namespaces,
+            selector.Assemblies,
+            selector.Layers,
+            selector.Types,
+            selector.BaseTypes,
+            selector.Interfaces,
+            selector.Attributes);
+
+    // The enum name with a lower-case first letter is the spelling a pack uses: class, recordStruct.
+    private static string YamlSpelling(CSharpTypeKind kind)
+    {
+        var name = kind.ToString();
+        return string.Concat(char.ToLowerInvariant(name[0]).ToString(), name.AsSpan(1));
+    }
+
+    // Members in the order layer, kind, accessibility, implements, joined by ", ".
+    internal static string Describe(RuleRequirement? requirement)
+    {
+        if (requirement is null)
+        {
+            return "no requirement";
+        }
+
+        var parts = new List<string>();
+        if (requirement.Layer is not null)
+        {
+            parts.Add($"layer {requirement.Layer}");
+        }
+
+        if (requirement.Kind is { } kind)
+        {
+            parts.Add($"kind {YamlSpelling(kind)}");
+        }
+
+        if (requirement.Accessibility is not null)
+        {
+            parts.Add(requirement.Accessibility);
+        }
+
+        if (requirement.Implements is not null)
+        {
+            parts.Add($"implements {Describe(requirement.Implements)}");
+        }
+
+        return parts.Count > 0 ? string.Join(", ", parts) : "no requirement";
+    }
+
+    // Kinds in the order layers, namespaces, assemblies, types, baseTypes, interfaces, attributes; kinds joined by "; ", values by ", ".
     private static string Describe(
         IList<string> namespaces,
         IList<string> assemblies,
         IList<string>? layers = null,
-        IList<string>? types = null)
+        IList<string>? types = null,
+        IList<string>? baseTypes = null,
+        IList<string>? interfaces = null,
+        IList<string>? attributes = null)
     {
         var parts = new List<string>();
         AddKind(parts, "layers", layers);
         AddKind(parts, "namespaces", namespaces);
         AddKind(parts, "assemblies", assemblies);
         AddKind(parts, "types", types);
+        AddKind(parts, "baseTypes", baseTypes);
+        AddKind(parts, "interfaces", interfaces);
+        AddKind(parts, "attributes", attributes);
         return parts.Count > 0 ? string.Join("; ", parts) : "no selectors";
     }
 

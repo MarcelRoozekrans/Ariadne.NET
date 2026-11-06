@@ -177,4 +177,79 @@ public class TypeSelectorTests
         TypeSelector.From(["Lib.**"], ["TestAssembly"], ["Lib.Core.Widget"]).Matches(widget, new TypeNames()).Should().BeTrue();
         TypeSelector.From([], ["Consumer"], []).Matches(widget, new TypeNames()).Should().BeFalse();
     }
+
+    [Fact]
+    public void BaseTypes_MatchesAnyClassInTheBaseChain_NotObject()
+    {
+        var compilation = TestCompilation.Create("namespace N { public class A { } public class B : A { } public class C : B { } }");
+        var c = Find(compilation, "N.C");
+
+        TypeSelector.From([], [], [], ["N.A"], [], []).Matches(c, new TypeNames()).Should().BeTrue();
+        TypeSelector.From([], [], [], ["N.B"], [], []).Matches(c, new TypeNames()).Should().BeTrue();
+        TypeSelector.From([], [], [], ["N.C"], [], []).Matches(c, new TypeNames()).Should().BeFalse();
+        TypeSelector.From([], [], [], ["System.Object"], [], []).Matches(c, new TypeNames()).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Interfaces_MatchesInheritedAndGenericInterfaces_ByNameWithoutArity()
+    {
+        var compilation = TestCompilation.Create(
+            "namespace N { public interface IRepository<T> { } public abstract class RepositoryBase<T> : IRepository<T> { } public class Order { } public class OrderRepository : RepositoryBase<Order> { } }");
+        var repository = Find(compilation, "N.OrderRepository");
+
+        TypeSelector.From([], [], [], [], ["**.IRepository"], []).Matches(repository, new TypeNames()).Should().BeTrue();
+        TypeSelector.From([], [], [], [], ["**.IRepository`1"], []).Matches(repository, new TypeNames()).Should().BeFalse();
+        TypeSelector.From([], [], [], [], ["**.IOther"], []).Matches(repository, new TypeNames()).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Interfaces_AnInterfaceDoesNotMatchItself()
+    {
+        var compilation = TestCompilation.Create("namespace N { public interface IRepository<T> { } public interface IOrders : IRepository<int> { } }");
+
+        TypeSelector.From([], [], [], [], ["**.IRepository"], []).Matches(Find(compilation, "N.IRepository`1"), new TypeNames()).Should().BeFalse();
+        TypeSelector.From([], [], [], [], ["**.IRepository"], []).Matches(Find(compilation, "N.IOrders"), new TypeNames()).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Attributes_MatchesTheAttributeClassFullName()
+    {
+        var compilation = TestCompilation.Create("namespace N { [System.Obsolete] public class Old { } public class Fresh { } }");
+        var old = Find(compilation, "N.Old");
+
+        TypeSelector.From([], [], [], [], [], ["System.ObsoleteAttribute"]).Matches(old, new TypeNames()).Should().BeTrue();
+        TypeSelector.From([], [], [], [], [], ["**.ObsoleteAttribute"]).Matches(old, new TypeNames()).Should().BeTrue();
+        TypeSelector.From([], [], [], [], [], ["**.Obsolete"]).Matches(old, new TypeNames()).Should().BeFalse();
+        TypeSelector.From([], [], [], [], [], ["**.ObsoleteAttribute"]).Matches(Find(compilation, "N.Fresh"), new TypeNames()).Should().BeFalse();
+    }
+
+    [Fact]
+    public void SixListsAnd_NamespaceAndInterfaceTogether()
+    {
+        var compilation = TestCompilation.Create("namespace Shop.Data { public interface IRepository { } public class A : IRepository { } } namespace Other { public class B : Shop.Data.IRepository { } }");
+
+        var selector = TypeSelector.From(["Shop.**"], [], [], [], ["**.IRepository"], []);
+
+        selector.Matches(Find(compilation, "Shop.Data.A"), new TypeNames()).Should().BeTrue();
+        selector.Matches(Find(compilation, "Other.B"), new TypeNames()).Should().BeFalse();
+        selector.IsEmpty.Should().BeFalse();
+        TypeSelector.From([], [], [], [], [], []).IsEmpty.Should().BeTrue();
+    }
+
+    [Fact]
+    public void NullEntries_AreRejected_ForNewLists()
+    {
+        ((Action)(() => TypeSelector.From([], [], [], null!, [], []))).Should().Throw<ArgumentNullException>();
+        ((Action)(() => TypeSelector.From([], [], [], [], null!, []))).Should().Throw<ArgumentNullException>();
+        ((Action)(() => TypeSelector.From([], [], [], [], [], null!))).Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void BaseTypes_MatchesAGenericBaseClass_ByNameWithoutArity()
+    {
+        var compilation = TestCompilation.Create("namespace N { public class A<T> { } public class B : A<int> { } }");
+
+        TypeSelector.From([], [], [], ["N.A"], [], []).Matches(Find(compilation, "N.B"), new TypeNames()).Should().BeTrue();
+        TypeSelector.From([], [], [], ["N.A`1"], [], []).Matches(Find(compilation, "N.B"), new TypeNames()).Should().BeFalse();
+    }
 }

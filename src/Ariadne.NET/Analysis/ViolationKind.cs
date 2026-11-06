@@ -23,4 +23,7 @@ public enum ViolationKind
 
     /// <summary>A type is covered by more than one layer.</summary>
     LayerOverlap = 7,
+
+    /// <summary>A type a require rule selects is not in the layer the rule requires.</summary>
+    WrongLayer = 8,
 }

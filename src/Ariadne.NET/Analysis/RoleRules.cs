@@ -97,7 +97,8 @@ internal static class RoleRules
                 {
                     violations.Add(new ArchitectureViolation
                     {
-                        RuleId = "role/" + role.Name,
+                        RuleId = "CODE-001",
+                        Because = "A role that requires an interface needs a type of its interface role in the solution.",
                         Kind = ViolationKind.MissingInterface,
                         SourceType = match.Type.ToDisplayString(),
                         Message = string.Create(
@@ -151,7 +152,10 @@ internal static class RoleRules
 
         violations.Add(new ArchitectureViolation
         {
-            RuleId = "role/" + role.Name,
+            RuleId = "ROLE-" + role.Name,
+            Because = string.IsNullOrEmpty(role.Description)
+                ? string.Create(CultureInfo.InvariantCulture, $"Role '{role.Name}' defines this shape.")
+                : role.Description,
             Kind = ViolationKind.TypeKindMismatch,
             SourceType = type.ToDisplayString(),
             Location = location,
@@ -176,7 +180,8 @@ internal static class RoleRules
 
         violations.Add(new ArchitectureViolation
         {
-            RuleId = "role/" + role.Name,
+            RuleId = "CODE-002",
+            Because = "A role that asks for internal accessibility keeps its implementation out of the public API.",
             Kind = ViolationKind.AccessibilityMismatch,
             SourceType = type.ToDisplayString(),
             Location = location,
@@ -186,14 +191,14 @@ internal static class RoleRules
         });
     }
 
-    private static CSharpTypeKind ActualKind(INamedTypeSymbol type) => type.TypeKind switch
+    internal static CSharpTypeKind ActualKind(INamedTypeSymbol type) => type.TypeKind switch
     {
         TypeKind.Interface => CSharpTypeKind.Interface,
         TypeKind.Struct => type.IsRecord ? CSharpTypeKind.RecordStruct : CSharpTypeKind.Struct,
         _ => type.IsRecord ? CSharpTypeKind.Record : CSharpTypeKind.Class,
     };
 
-    private static string Keyword(Accessibility accessibility) => accessibility switch
+    internal static string Keyword(Accessibility accessibility) => accessibility switch
     {
         Accessibility.Public => "public",
         Accessibility.Internal => "internal",

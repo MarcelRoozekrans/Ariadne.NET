@@ -43,6 +43,8 @@ Layer and rule keys compare case-insensitively. Retargeting a layer that no earl
 
 A child cannot loosen an inherited architecture: it cannot change an inherited layer's `allowedDependencies` or `because`, and it cannot change an inherited rule other than by adding exceptions to it.
 
+**Reserved ids.** The checks that come from component roles report generated rule ids: `ROLE-<Name>` for the type kind of the role `<Name>`, `CODE-001` for a role that requires an interface when no type matches its `interfaceRole`, and `CODE-002` for a role that asks for `internal` accessibility. The ids `CODE-001`, `CODE-002` and any id starting with `ROLE-` are reserved. A pack that declares a rule or layer with one of them fails the load with the message `id '...' is reserved for generated rules`.
+
 Composing templates follows the same rules. `clean-architecture+cqrs` works because `cqrs` defines roles only. `clean-architecture+microservice` fails because both define `Domain`, `Application` and `Infrastructure`.
 
 ## LayerInferenceEngine

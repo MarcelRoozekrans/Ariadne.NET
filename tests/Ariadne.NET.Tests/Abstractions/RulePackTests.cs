@@ -111,13 +111,74 @@ public class RulePackTests
         new LayerRetargetValidator().Validate(retarget).IsValid.Should().BeFalse();
     }
 
+    [Fact]
+    public void TargetSelector_DefaultsNewListsToEmpty()
+    {
+        var selector = new TargetSelector();
+
+        selector.BaseTypes.Should().BeEmpty();
+        selector.Interfaces.Should().BeEmpty();
+        selector.Attributes.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("BaseTypes")]
+    [InlineData("Interfaces")]
+    [InlineData("Attributes")]
+    public void TargetSelector_WithNullEntryInNewList_FailsValidation(string list)
+    {
+        var selector = list switch
+        {
+            "BaseTypes" => new TargetSelector { BaseTypes = ["Base", null!] },
+            "Interfaces" => new TargetSelector { Interfaces = ["IFoo", null!] },
+            _ => new TargetSelector { Attributes = ["Foo", null!] },
+        };
+
+        new TargetSelectorValidator().Validate(selector).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void RuleRequirement_WithNullEntryInImplements_FailsValidation()
+    {
+        var requirement = new RuleRequirement { Implements = new TargetSelector { Interfaces = ["IFoo", null!] } };
+
+        new RuleRequirementValidator(new TargetSelectorValidator()).Validate(requirement).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void RuleDefinition_Require_DoesNotNeedATo()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "r1",
+            Because = "why",
+            Kind = RuleKind.Require,
+            From = new TargetSelector { Interfaces = ["IHandler"] },
+            Require = new RuleRequirement { Layer = "Application" },
+        };
+
+        rule.To.Should().NotBeNull();
+        RuleValidator().Validate(rule).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void RuleRequirement_DefaultsToNoRequirements()
+    {
+        var requirement = new RuleRequirement();
+
+        requirement.Layer.Should().BeNull();
+        requirement.Kind.Should().BeNull();
+        requirement.Accessibility.Should().BeNull();
+        requirement.Implements.Should().BeNull();
+    }
+
     private static RuleDefinitionValidator RuleValidator() =>
-        new(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleExceptionValidator());
+        new(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleRequirementValidator(new TargetSelectorValidator()), new RuleExceptionValidator());
 
     private static RulePackValidator PackValidator() => new(
         new LayerDefinitionValidator(),
         new ComponentRoleDefinitionValidator(),
-        new RuleDefinitionValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleExceptionValidator()),
+        new RuleDefinitionValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleRequirementValidator(new TargetSelectorValidator()), new RuleExceptionValidator()),
         new LayerRetargetValidator(),
         new RuleAmendmentValidator(new RuleExceptionValidator()),
         new NamingConventionsValidator());

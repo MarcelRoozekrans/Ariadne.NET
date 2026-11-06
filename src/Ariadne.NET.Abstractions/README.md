@@ -8,9 +8,9 @@ Reference this package when your tool needs to talk about rule packs without pul
 
 All types live in the `Ariadne.NET.Abstractions` namespace.
 
-- **Schema:** `RulePack`, `LayerDefinition`, `ComponentRoleDefinition`, `RuleDefinition`, `RuleKind`, `TargetSelector`, `RuleException`, `NamingConventions`, `CSharpTypeKind`, and `LayerRetarget` and `RuleAmendment`, which hold the entries of a child pack that change what it inherits
+- **Schema:** `RulePack`, `LayerDefinition`, `ComponentRoleDefinition`, `RuleDefinition`, `RuleKind`, `RuleRequirement`, `TargetSelector`, `RuleException`, `NamingConventions`, `CSharpTypeKind`, and `LayerRetarget` and `RuleAmendment`, which hold the entries of a child pack that change what it inherits
 - **Contracts:** `IRulePackLoader`, `IRulePackResolver`, `IBuiltinPackRegistry`, with `AriadneError` as the error type of their `Result<T, AriadneError>` returns
 
-The model is schema 2: layers with selectors, an `id` and a `because`, and `forbid` and `allowOnly` rules. See the [rule schema](https://marcelroozekrans.github.io/Ariadne.NET/how-it-works/rule-schema) page, and [Migrating from v1](https://marcelroozekrans.github.io/Ariadne.NET/how-it-works/rule-schema#migrating-from-v1) for packs from release 0.3.0 or earlier.
+The model is schema 2: layers with selectors, an `id` and a `because`, and `forbid`, `allowOnly` and `require` rules. See the [rule schema](https://marcelroozekrans.github.io/Ariadne.NET/how-it-works/rule-schema) page, and [Migrating from v1](https://marcelroozekrans.github.io/Ariadne.NET/how-it-works/rule-schema#migrating-from-v1) for packs from release 0.3.0 or earlier.
 
 Loading YAML, resolving `extends`, merging packs, the built-in packs and validation live in the [`Ariadne.NET`](https://www.nuget.org/packages/Ariadne.NET) engine package, which implements these contracts.

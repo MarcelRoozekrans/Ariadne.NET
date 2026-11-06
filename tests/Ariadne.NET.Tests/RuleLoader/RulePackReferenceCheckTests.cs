@@ -197,4 +197,130 @@ public class RulePackReferenceCheckTests
         From = new TargetSelector { Layers = fromLayers },
         To = new TargetSelector { Layers = toLayers },
     };
+
+    private static RuleDefinition RequireRule(string id, string? layer = "Domain", params string[] forLayers) => new()
+    {
+        Id = id,
+        Because = "because",
+        Kind = RuleKind.Require,
+        From = new TargetSelector { Layers = forLayers, Types = forLayers.Length == 0 ? ["**.X"] : [] },
+        Require = new RuleRequirement { Layer = layer },
+    };
+
+    [Fact]
+    public void RequireLayer_NamingAnUnknownLayer_Fails()
+    {
+        var pack = new RulePack { Name = "p", Layers = [Layer("Domain")], Rules = [RequireRule("R-1", "Ghost")] };
+
+        var result = Resolve(pack);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Detail.Should().Contain("rule 'R-1' requires unknown layer 'Ghost'");
+    }
+
+    [Fact]
+    public void RequireFor_NamingAnUnknownLayer_Fails()
+    {
+        var pack = new RulePack { Name = "p", Layers = [Layer("Domain")], Rules = [RequireRule("R-1", "Domain", "Ghost")] };
+
+        Resolve(pack).Error.Detail.Should().Contain("rule 'R-1' refers to unknown layer 'Ghost'");
+    }
+
+    [Fact]
+    public void RequireRule_NamingKnownLayer_Passes()
+    {
+        var pack = new RulePack { Name = "p", Layers = [Layer("Domain")], Rules = [RequireRule("R-1", "domain")] };
+
+        Resolve(pack).IsSuccess.Should().BeTrue();
+    }
+
+    private static RulePack PackWithRequire(RuleRequirement? requirement) => new()
+    {
+        Name = "p",
+        Layers = [Layer("Domain")],
+        Rules =
+        [
+            new RuleDefinition
+            {
+                Id = "R-1",
+                Because = "because",
+                Kind = RuleKind.Require,
+                From = new TargetSelector { Types = ["**.X"] },
+                Require = requirement,
+            },
+        ],
+    };
+
+    [Fact]
+    public void RequireRule_WithoutARequirement_Fails()
+    {
+        Resolve(PackWithRequire(null)).Error.Detail.Should().Contain("rule 'R-1' is a require rule and has no requirement");
+    }
+
+    [Fact]
+    public void RequireRule_WithAnEmptyRequirement_Fails()
+    {
+        Resolve(PackWithRequire(new RuleRequirement())).Error.Detail.Should()
+            .Contain("the requirement of rule 'R-1' needs at least one of layer, kind, accessibility, implements");
+    }
+
+    [Fact]
+    public void RequireRule_WithUnknownAccessibility_Fails()
+    {
+        Resolve(PackWithRequire(new RuleRequirement { Accessibility = "private" })).Error.Detail.Should()
+            .Contain("the requirement of rule 'R-1' has accessibility 'private', which must be public or internal");
+    }
+
+    [Theory]
+    [InlineData("public")]
+    [InlineData("INTERNAL")]
+    public void RequireRule_WithKnownAccessibility_Passes(string accessibility)
+    {
+        Resolve(PackWithRequire(new RuleRequirement { Accessibility = accessibility })).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void RequireRule_ImplementsWithOnlyCodeFeatureKeys_Fails()
+    {
+        var requirement = new RuleRequirement { Implements = new TargetSelector { Interfaces = ["**.IX"] } };
+
+        Resolve(PackWithRequire(requirement)).Error.Detail.Should()
+            .Contain("the implements of rule 'R-1' needs at least one of namespaces, assemblies, types");
+    }
+
+    [Fact]
+    public void RequireRule_ImplementsWithTypes_Passes()
+    {
+        var requirement = new RuleRequirement { Implements = new TargetSelector { Types = ["**.IX"] } };
+
+        Resolve(PackWithRequire(requirement)).IsSuccess.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("CODE-001")]
+    [InlineData("code-002")]
+    public void RuleId_CODE001_IsReserved(string id)
+    {
+        var pack = new RulePack { Name = "p", Layers = [Layer("Domain")], Rules = [RequireRule(id)] };
+
+        Resolve(pack).Error.Detail.Should().Contain($"'{id}' is reserved");
+    }
+
+    [Theory]
+    [InlineData("ROLE-Entity")]
+    [InlineData("role-entity")]
+    public void RuleId_StartingROLEDash_IsReserved_CaseInsensitive(string id)
+    {
+        var pack = new RulePack { Name = "p", Layers = [Layer("Domain")], Rules = [RequireRule(id)] };
+
+        Resolve(pack).Error.Detail.Should().Contain($"'{id}' is reserved");
+    }
+
+    [Fact]
+    public void LayerId_CODE002_IsReserved()
+    {
+        var layer = new LayerDefinition { Name = "Domain", Id = "CODE-002", Because = "x" };
+
+        Resolve(Pack([layer])).Error.Detail.Should().Contain("'CODE-002' is reserved");
+    }
 }

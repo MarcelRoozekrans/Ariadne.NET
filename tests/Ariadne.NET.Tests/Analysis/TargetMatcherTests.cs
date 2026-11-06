@@ -50,6 +50,24 @@ public class TargetMatcherTests
         act.Should().Throw<ArgumentException>();
     }
 
+    [Theory]
+    [InlineData("BaseTypes")]
+    [InlineData("Interfaces")]
+    [InlineData("Attributes")]
+    public void LayersMixedWithCodeFeatureSelectors_Throws(string key)
+    {
+        var target = key switch
+        {
+            "BaseTypes" => new TargetSelector { Layers = ["Domain"], BaseTypes = ["**.Base"] },
+            "Interfaces" => new TargetSelector { Layers = ["Domain"], Interfaces = ["**.IRepository"] },
+            _ => new TargetSelector { Layers = ["Domain"], Attributes = ["**.ObsoleteAttribute"] },
+        };
+
+        var act = () => TargetMatcher.From(target, new LayerMap(Pack));
+
+        act.Should().Throw<ArgumentException>();
+    }
+
     // Interim: measures with GC.GetAllocatedBytesForCurrentThread, see ZeroAlloc-Net/ZeroAlloc.TestHelpers#106;
     // AllocationGate is not referenced in this repo yet.
     [Fact]

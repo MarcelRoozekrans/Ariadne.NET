@@ -146,7 +146,7 @@ The C# model is `LayerDefinition`:
 
 ## Rules
 
-A rule is an entry in `rules:`. It has exactly one of `forbid` or `allowOnly`.
+A rule is an entry in `rules:`. It has exactly one of `forbid`, `allowOnly` or `require`.
 
 | Key | Required | Meaning |
 |-----|----------|---------|
@@ -155,10 +155,11 @@ A rule is an entry in `rules:`. It has exactly one of `forbid` or `allowOnly`.
 | `description` | no | Free text. |
 | `forbid` | one of | `{ from: <target>, to: <target> }`: no type in `from` may depend on a type in `to`. Reported as `ForbiddenDependency`. |
 | `allowOnly` | one of | `{ from: <target>, to: <target> }`: a type in `to` may be depended on only by types in `from`, or by types in `to` itself. Any other source is reported as `DependencyNotPermitted`. |
+| `require` | one of | `{ for: <selector>, layer, kind, accessibility, implements }`: every type that `for` selects must satisfy the requirement. At least one of `layer`, `kind`, `accessibility` and `implements` is needed. See [Require rules](#require-rules). |
 | `exceptions` | no | List of selectors, each with a required `because`. A source type that an exception matches is exempt from the rule. |
 | `locked` | no, default `false` | A child pack cannot add exceptions to this rule. |
 
-A **target** is either `layers: [...]` or a [selector](#selectors) made of `namespaces`, `assemblies` and `types`. Mixing `layers` with selector kinds in one target is a load error, and a target must select something.
+A **target** is either `layers: [...]` or a [selector](#selectors) made of `namespaces`, `assemblies`, `types`, `baseTypes`, `interfaces` and `attributes`. Mixing `layers` with selector kinds in one target is a load error, and a target must select something.
 
 An exception takes `namespaces`, `assemblies` and `types` (at least one) and a required `because`. Exceptions exempt the source type, the same way for `forbid` and `allowOnly`.
 
@@ -178,11 +179,44 @@ rules:
         because: DI registration wires the interface to its implementation.
 ```
 
-The C# model is `RuleDefinition`, with `Id`, `Because`, `Description`, `Kind` (`RuleKind.Forbid` or `RuleKind.AllowOnly`), `From` and `To` (`TargetSelector`), `Exceptions` (`IList<RuleException>`) and `Locked`.
+The C# model is `RuleDefinition`, with `Id`, `Because`, `Description`, `Kind` (`RuleKind.Forbid`, `RuleKind.AllowOnly` or `RuleKind.Require`), `From` and `To` (`TargetSelector`), `Require` (`RuleRequirement?`, with `Layer`, `Kind`, `Accessibility` and `Implements`), `Exceptions` (`IList<RuleException>`) and `Locked`. For a `require` rule `From` holds the `for` selector.
+
+### Require rules
+
+A `forbid` or `allowOnly` rule constrains dependencies. A `require` rule constrains where a type lives and what shape it has. `for` is a [selector](#selectors) and the other keys describe what each selected type must be:
+
+| Key | Meaning | Reported as |
+|-----|---------|-------------|
+| `layer` | The name of the layer the type must belong to. | `WrongLayer` |
+| `kind` | `class`, `interface`, `record`, `struct` or `recordStruct`. | `TypeKindMismatch` |
+| `accessibility` | `public` or `internal`. Only `internal` is checked, because public is the default. | `AccessibilityMismatch` |
+| `implements` | A selector with `namespaces`, `assemblies` and `types` only. The type must implement an interface it matches, including interfaces it gets through a base class. | `MissingInterface` |
+
+Placement example: every implementation of a repository interface lives in Infrastructure, as an internal class.
+
+```yaml
+rules:
+  - id: SHOP-REPOSITORIES-IN-INFRASTRUCTURE
+    because: Persistence is an infrastructure concern, and callers use the interface.
+    require:
+      for: { interfaces: ["**.I*Repository"] }
+      layer: Infrastructure
+      kind: class
+      accessibility: internal
+    exceptions:
+      - namespaces: ["**.Domain.**"]
+        because: The repository interfaces themselves live in the domain.
+      - types: ["Shop.Testing.InMemoryOrderRepository"]
+        because: Test doubles live next to the tests.
+```
+
+`interfaces` selects a type that implements a matching interface, and that includes an interface that extends one. `interface IOrderRepository : IRepository<Order>` is therefore selected by `**.I*Repository` too, and without the Domain exception it would be reported as `WrongLayer`, `TypeKindMismatch` and `AccessibilityMismatch`.
+
+A `require` rule yields one violation per selected type and failed requirement, with the rule's `id` and `because`. Exceptions exempt a type, and a rule with no match checks nothing.
 
 ## Selectors
 
-A selector has up to three lists. Values within one list are alternatives: any may match. When a selector has more than one list, a type must match each list it has. So `{ assemblies: [Daedalus.Agents], namespaces: ["**.Api.**"] }` means the Api namespaces inside the Agents assembly. A selector with no values is a load error.
+A selector has up to seven lists: `layers`, `namespaces`, `assemblies`, `types`, and the three code-feature keys below. Values within one list are alternatives: any may match. When a selector has more than one list, a type must match each list it has. So `{ assemblies: [Daedalus.Agents], namespaces: ["**.Api.**"] }` means the Api namespaces inside the Agents assembly. A selector with no values is a load error.
 
 Matching is ordinal and case-sensitive, like C# names.
 
@@ -190,9 +224,15 @@ Matching is ordinal and case-sensitive, like C# names.
 - **`assemblies`** match the containing assembly name as one string, where `*` matches any characters, dots included. `Rag.NET*` matches `Rag.NET` and `Rag.NET.Abstractions`.
 - **`types`** match the type's full name: namespace and containing types joined with `.`, without generic arity or type arguments. They use the namespace rules with the type name as the last segment. `Daedalus.Application.Agents.ISubagentRunner` names one type; `**.I*Repository` names every repository interface. A generic type `Foo<T>` is matched as `Foo`.
 
+- **`baseTypes`** match any type in the base class chain of a type, with the `types` grammar. `**.RepositoryBase` selects every class that derives from a `RepositoryBase`, directly or not. A generic base is matched without its type arguments.
+- **`interfaces`** match any interface a type implements or inherits, directly or through a base class, with the `types` grammar. `**.I*Repository` selects every implementation of a repository interface.
+- **`attributes`** match the full name of an attribute on the type, with the `types` grammar. Write the name as the compiler knows it, so `**.ObsoleteAttribute` and not `**.Obsolete`.
+
+The three keys work in the `for` of a `require` rule and in the targets of `forbid` and `allowOnly`. Like `namespaces`, `assemblies` and `types`, they cannot be mixed with `layers` in one target.
+
 An empty pattern, or one with an empty segment such as `Shop..Domain`, is a load error.
 
-`TargetSelector` has `Layers`, `Namespaces`, `Assemblies` and `Types`. `RuleException` has `Namespaces`, `Assemblies`, `Types` and a required `Because`.
+`TargetSelector` has `Layers`, `Namespaces`, `Assemblies`, `Types`, `BaseTypes`, `Interfaces` and `Attributes`. `RuleException` has `Namespaces`, `Assemblies`, `Types` and a required `Because`.
 
 ## `extends`
 

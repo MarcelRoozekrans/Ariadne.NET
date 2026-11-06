@@ -18,13 +18,21 @@ var pack = new RulePack
             To = new TargetSelector { Namespaces = ["Infrastructure.*"] },
             Exceptions = [new RuleException { Types = ["Aot.Legacy"], Because = "Smoke exception." }],
         },
+        new RuleDefinition
+        {
+            Id = "handlers-in-domain",
+            Because = "Handlers belong in the domain layer.",
+            Kind = RuleKind.Require,
+            From = new TargetSelector { Interfaces = ["IHandler"] },
+            Require = new RuleRequirement { Layer = "Domain", Kind = CSharpTypeKind.Class, Accessibility = "public", Implements = new TargetSelector { Types = ["IHandler"] } },
+        },
     ],
 };
 
 var validator = new RulePackValidator(
     new LayerDefinitionValidator(),
     new ComponentRoleDefinitionValidator(),
-    new RuleDefinitionValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleExceptionValidator()),
+    new RuleDefinitionValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleRequirementValidator(new TargetSelectorValidator()), new RuleExceptionValidator()),
     new LayerRetargetValidator(),
     new RuleAmendmentValidator(new RuleExceptionValidator()),
     new NamingConventionsValidator());
