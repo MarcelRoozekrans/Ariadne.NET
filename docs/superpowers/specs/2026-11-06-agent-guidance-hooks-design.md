@@ -16,7 +16,7 @@ The pain: such rules are normally baked into each project's `CLAUDE.md` and
 The goal is that a new project connects to Ariadne once and receives the rules
 from then on, without them living in its own md and json files.
 
-Ariadne already has the distribution half: `arch sync` resolves a git repo of
+Ariadne already has the distribution half: `ariadne sync` resolves a git repo of
 packs by semver tag, caches it offline in `.architecture/.cache/`, and
 `extends` plus `locked` give an org-to-project override model. What is missing
 is a delivery channel into the agent and, for the general guidance, content
@@ -51,40 +51,60 @@ Division of labour:
 - Ariadne takes no package dependency on AI.Sentinel. It writes its own small
   hook wire types.
 
-## Shape: one tool, two milestones
+## Shape: one tool, two stages
 
-One product, one install, one `archgov hook` entry in a project's settings.
+One product, one install, one `ariadne hook` entry in a project's settings.
 Inside the repo there is a hard boundary:
 
-- `ArchGov.Core` stays structural: layers, roles, naming, validator. It gains
-  only a generic **pack attachment** concept (named files it carries and merges
-  but does not interpret).
-- `ArchGov.Guidance` (new package, same repo, same release) interprets the
+- `Ariadne.NET` (engine) and `Ariadne.NET.Abstractions` (schema) stay
+  structural: layers, roles, rules, validator. They gain only a generic
+  **pack attachment** concept (named files they carry and merge but do not
+  interpret). Abstractions stays AOT-compatible with no new dependencies.
+- `Ariadne.NET.Guidance` (new package, same repo, same release) interprets the
   attachments: standards, skills and opaque file delivery. It registers itself
-  with the hook host. Core never references it; a layer rule in
+  with the hook host. The engine never references it; a layer rule in
   `.architecture/rules.yaml` enforces that direction.
 - A later split of Guidance into its own repo must be possible without
-  touching Core.
+  touching the engine.
 
-**Milestone 1, structural hooks (Core and the hook host):**
-`archgov hook` with `session-start`, `post-tool-use` and a small structural
-`pre-tool-use`; `archgov init --agent claude`.
+**Stage A, structural hooks (engine and the hook host):**
+`ariadne hook` with `session-start`, `stop` and a small structural
+`pre-tool-use`; `ariadne init --agent claude`.
 
-**Milestone 2, general guidance (`ArchGov.Guidance`):**
+**Stage B, general guidance (`Ariadne.NET.Guidance`):**
 standards injection, skill materialisation, opaque file delivery, starter
 content.
+
+## Roadmap fit
+
+Checked against `docs/planning/ROADMAP.md` and `STATE.md` (Milestone 2, phase
+2.3 active):
+
+- Stage A belongs in **Milestone 5, Agent surfaces**, as a new phase beside
+  5.1 to 5.5. It is not in the roadmap yet; adding it is an owner decision.
+- Stage B (Guidance) has no home in the roadmap. It widens Ariadne from
+  structure to general agent guidance; the owner decides whether it is a new
+  milestone or stays out of scope.
+- Phase 5.5 (Claude Code plugin that teaches agents when to call Ariadne)
+  overlaps with skill delivery. The plugin ships skills about *using Ariadne*
+  through a marketplace; Guidance delivers *organisation-specific* skills and
+  standards from a pack. Keep them separate and avoid shipping the same
+  skill both ways.
+- Phase 2.3 is changing the rule schema and loader that attachments extend, so
+  none of this starts before 2.3 lands.
 
 ## Goals
 
 - The agent meets the resolved structural rules at session start, and gets
-  validator feedback right after it edits a `.cs` file.
+  validator feedback, with each rule's reason, when it finishes a turn that
+  edited `.cs` files.
 - A new `.cs` file whose path maps to no known layer is questioned before it
   is written.
-- Delivery uses the existing `arch sync` path: central repo, semver pin,
+- Delivery uses the existing `ariadne sync` path: central repo, semver pin,
   private repos, offline cache.
-- A project runs `archgov init --agent claude` once; afterwards rule changes
-  arrive through `arch sync` and the project's settings never change.
-- Milestone 2: packs carry **standards** (markdown), **skills** (Agent Skills
+- A project runs `ariadne init --agent claude` once; afterwards rule changes
+  arrive through `ariadne sync` and the project's settings never change.
+- Stage B: packs carry **standards** (markdown), **skills** (Agent Skills
   folders) and **opaque files** (such as a Sentinel approval config) with a
   target path, delivered the same way. `locked` works for all of them as it
   does for structural rules.
@@ -105,7 +125,7 @@ content.
 - A hook failure that blocks the agent from working.
 - Rules silently applied from an unsynced or stale cache without saying so.
 - Per-project copies of org rules (the drift this exists to remove).
-- Core growing knowledge of git, docker, testing philosophy or any other
+- The engine growing knowledge of git, docker, testing philosophy or any other
   non-structural concern.
 - Duplicating AI.Sentinel's hook host, audit or authorization features.
 
@@ -135,7 +155,7 @@ content.
    offline but is the copy-and-drift problem. Rejected.
 
 Packaging, chosen by the author after weighing three options: one tool with a
-separate `ArchGov.Guidance` package. Rejected: everything in Core (blurs the
+separate `Ariadne.NET.Guidance` package. Rejected: everything in the engine (blurs the
 structural engine) and a second standalone tool (second install, repo,
 release and hook entry).
 
@@ -147,10 +167,10 @@ because of Native AOT) and keeping a full guardrail engine in Ariadne
 
 ## Design
 
-### Pack attachments (Core)
+### Pack attachments (Abstractions and engine)
 
 A pack folder may carry attachment files next to its YAML, and `RulePack`
-gains generic lists that Core merges by name but does not interpret:
+gains generic lists that the engine merges by name but does not interpret:
 
 ```yaml
 standards: [git-and-pr, testing]          # files in standards/
@@ -162,31 +182,40 @@ files:                                    # opaque files with a target path
     locked: true
 ```
 
-In milestone 1 Core only loads and merges these. `ArchGov.Guidance` interprets
-them in milestone 2.
+In stage A The engine only loads and merges these. `Ariadne.NET.Guidance` interprets
+them in stage B.
 
 ### Merge semantics
 
 Same model as today: `extends` order, later packs override earlier ones.
 Standards, skills and files are keyed by name. A downstream pack may replace
-an inherited item unless it is marked `locked`; an attempt becomes a
-`MergeWarning`, shown in `arch sync` output and on stderr by the hook.
+an inherited item unless it is marked `locked`; an attempt is a merge error,
+as amending a locked rule is today (merge reports errors only, collecting every
+problem).
 
 ### Hook command
 
-`archgov hook <event>` reads the event JSON from stdin, resolves the project's
+`ariadne hook <event>` reads the event JSON from stdin, resolves the project's
 rules from `.architecture` (imports from the sync cache) and writes the result
 to stdout.
 
 - `session-start`: returns the resolved structural rules (layers, roles,
   naming) as `additionalContext`, plus pack versions in use, and warns if the
-  cache is missing or stale ("run `arch sync`"). Milestone 2 adds standards
+  cache is missing or stale ("run `ariadne sync`"). Stage B adds standards
   and, when it has written skills, `reloadSkills`.
 - `pre-tool-use`: for a write of a new `.cs` file, uses the existing layer
   inference to check the path maps to a known layer; if not, returns `ask`
   with the reason. Everything else is allowed silently.
-- `post-tool-use`: for an edit or write of a `.cs` file, runs the source
-  validator and returns violations as feedback; silent when clean.
+- `stop`: when the agent finishes a turn that edited `.cs` files, runs
+  `ISolutionValidator` on the solution and returns the violations, each with
+  its rule id and `because`, as feedback; silent when clean. It must not loop:
+  it feeds back once per turn.
+
+The validator is solution-wide: it loads the projects through
+`MSBuildWorkspace` and checks one `TypeGraph` per compilation, with no
+per-file mode. Running that after every single edit would cost seconds each
+time, so the once-per-turn `stop` hook is the default trigger. A per-edit
+`post-tool-use` is added only if measurement shows it is fast enough.
 
 Failure policy: any internal error (unreadable cache, bad YAML, exception)
 fails open with a one-line warning on stderr. The agent is never blocked by a
@@ -195,14 +224,14 @@ deliberately from Sentinel, which is a security boundary and fails closed.
 
 ### Init and sync
 
-- `archgov init --agent claude` writes the hook entries into
+- `ariadne init --agent claude` writes the hook entries into
   `.claude/settings.json` (merging with existing settings) and, with
   `--from <url>`, an `imports.yaml` entry for the org repo.
-- Milestone 2: `arch sync` materialises synced skills into `.claude/skills/`
+- Stage B: `ariadne sync` materialises synced skills into `.claude/skills/`
   and opaque files to their `to:` paths, each with a generated-file marker
   where the format allows one, and gitignores them.
 
-### Starter content (milestone 2)
+### Starter content (stage B)
 
 One example pack, separate from the built-ins: stack-neutral `git-and-pr`,
 `testing`, `security-basics` and `code-quality` standards, and `tdd-workflow`
@@ -219,28 +248,34 @@ co-author lines. Written from scratch for this repo.
 
 ## My calls (please check)
 
-- Milestone 1 is structural hooks; Guidance is milestone 2.
+- Stage A is structural hooks; Guidance is stage B.
 - Fail-open on internal errors.
 - The structural `pre-tool-use` only returns `ask`, never `deny`, and only
   for a new `.cs` file outside every known layer.
-- Standards (milestone 2) are injected at `SessionStart` within the 10,000
+- Standards (stage B) are injected at `SessionStart` within the 10,000
   character cap: an index plus the most important text, with full text left on
   disk for the agent to read on demand.
 - Skills materialised under `.claude/skills/`, gitignored, regenerated by
-  `arch sync`. Sync only deletes folders carrying the generated marker and
+  `ariadne sync`. Sync only deletes folders carrying the generated marker and
   never overwrites a user-authored skill of the same name (skips and warns).
 - "Stale cache" is decided offline: the cached resolved tag no longer
   satisfies the pin's semver range, or the cache is absent. The hook never
-  touches the network; `arch sync` does.
+  touches the network; `ariadne sync` does.
 - `init --agent claude` is idempotent. It recognises its own entries by the
-  `archgov hook` command prefix, updates them in place and leaves the user's
-  other hooks alone. The command is `archgov hook <event>`, with `archgov`
+  `ariadne hook` command prefix, updates them in place and leaves the user's
+  other hooks alone. The command is `ariadne hook <event>`, with `ariadne`
   installed on PATH as a dotnet tool.
 - "The user's global rules win" is a rule for the starter content only. The
   engine does not enforce it.
 - Native AOT for the hook entry point is a follow-up, only if measured startup
-  is too slow. The post-edit validator may need a per-file mode if the
-  whole-project run is too slow.
+  is too slow. Note the hook host references `Ariadne.NET.Workspaces`, which
+  uses MSBuild and is not AOT-friendly, so `stop` may need to run the
+  validator out of process or in the CLI rather than the hook binary itself.
+- Validation feedback runs on `stop`, once per turn, not after every edit
+  (see Hook command).
+- Attachments are an additive schema change. Merge conflicts on a locked
+  attachment are merge errors, like an amended locked rule today, not
+  warnings.
 - No package dependency on AI.Sentinel; hook wire types are written locally.
 - Starter content is original, not copied from another project.
 
@@ -251,7 +286,12 @@ co-author lines. Written from scratch for this repo.
 - Project layout for the hook host (new project vs. a mode of the CLI) and how
   Guidance registers with it.
 - Truncation strategy for injected standards within the cap.
-- Pack file discovery details and the `MergeWarning` wording.
+- Pack file discovery details and the merge error wording.
+- How `PackYamlReader`'s closed key set learns the attachment keys, and
+  whether that stays schema 2. Phase 2.3 is changing the same loader, so
+  this work starts after 2.3 lands.
+- Where the hook host lives (a new `Ariadne.NET.Hooks` project vs. a mode of
+  `Ariadne.NET.Cli`), given the Workspaces/MSBuild constraint above.
 - Whether the layer-inference check is precise enough for `ask` without noise;
-  if not, drop `pre-tool-use` from milestone 1.
+  if not, drop `pre-tool-use` from stage A.
 - Test strategy, following the existing test layout.
