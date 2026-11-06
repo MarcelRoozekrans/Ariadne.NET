@@ -109,7 +109,7 @@ ArchitectureReport
   │     ├── Location: SourceLocation?        (file path, line, column; the first reference)
   │     ├── ReferenceCount: int
   │     ├── TargetFrameworks: IReadOnlyList<string>
-  │     ├── Because: string                  (the layer's or rule's because; empty for role checks)
+  │     ├── Because: string                  (the because of the layer, rule or role; LayerOverlap has a fixed text)
   │     └── Message: string
   ├── Projects: IReadOnlyList<CheckedProject>   (name and target frameworks)
   ├── SkippedProjects: IReadOnlyList<SkippedProject>  (name and reason)
