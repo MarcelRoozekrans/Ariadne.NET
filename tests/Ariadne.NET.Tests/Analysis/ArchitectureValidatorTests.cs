@@ -45,7 +45,7 @@ public class ArchitectureValidatorTests
         broken.IsValid.Should().BeFalse();
         var violation = broken.Violations.Should().ContainSingle().Subject;
         violation.Kind.Should().Be(ViolationKind.TypeKindMismatch);
-        violation.RuleId.Should().Be("role/Command");
+        violation.RuleId.Should().Be("ROLE-Command");
         violation.TargetFrameworks.Should().BeEmpty();
     }
 
