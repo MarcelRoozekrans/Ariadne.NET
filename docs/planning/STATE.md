@@ -11,7 +11,7 @@
   - Design: `docs/superpowers/specs/2026-11-05-phase-2.2-rule-schema-v2-design.md`
   - Plan: `docs/superpowers/plans/2026-11-05-phase-2.2-rule-schema-v2.md`, all boxes ticked.
   - Perf: the check on the repo pack is about 21% slower and allocates about 32% more than the 2.1 baseline; see `docs/perf/phase-2.1-baseline.md`.
-- **Phase 2.3 — Enforce placement and code-feature rules:** [status: active]. Design approved 2026-11-06 (`docs/superpowers/specs/2026-11-06-phase-2.3-placement-and-code-feature-rules-design.md`), plan written (`docs/superpowers/plans/2026-11-06-phase-2.3-placement-and-code-feature-rules.md`, 7 tasks, none started). Owner decisions: one `require` rule with roles kept as engine-internal shorthand; `CODE-001` keeps its solution-wide meaning; no placement rules in the built-in packs, only in this repo's own pack.
+- **Phase 2.3 — Enforce placement and code-feature rules:** [status: active]. Design approved 2026-11-06 (`docs/superpowers/specs/2026-11-06-phase-2.3-placement-and-code-feature-rules-design.md`), plan written (`docs/superpowers/plans/2026-11-06-phase-2.3-placement-and-code-feature-rules.md`, 7 tasks, all done and ticked on `feat/phase-2.3-placement-and-code-feature-rules`, pushed to `ariadne`, no PR yet). Owner decisions: one `require` rule with roles kept as engine-internal shorthand; `CODE-001` keeps its solution-wide meaning; no placement rules in the built-in packs, only in this repo's own pack.
 - Issues filed from 2.2: #36 (child packs: amending `allowedDependencies`, locked rules sidestepped by retargeting, empty retargets) and #37 (child-layer error wording, duplicate roles, pack file size limit). #32 stays the module-isolation item.
 
 Phase 2.2 decisions by the owner, 2026-11-05:
@@ -47,6 +47,6 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 
 ## Recommended Next Step
 
-Merge the docs PR for branch `docs/phase-2.3-design` (design, plan, roadmap and state). Execution method chosen by the owner: subagent-driven. Start Task 1 of the plan on `feat/phase-2.3-placement-and-code-feature-rules`, branched from `ariadne/main`. Task 5 is breaking: put a `BEGIN_COMMIT_OVERRIDE` block in the PR body before merging.
+Phase 2.3 is implemented and reviewed. Open the PR from `feat/phase-2.3-placement-and-code-feature-rules` only when the owner asks, then run `complete-phase` for 2.3 after the merge. Before merging, put a `BEGIN_COMMIT_OVERRIDE` block in the PR body with one line per commit and the breaking text in the subject. It needs two breaking lines: the role violation ids changing to `ROLE-name`, `CODE-001` and `CODE-002` (Task 5), and the public `RuleDefinitionValidator` constructor gaining a `RuleRequirementValidator` parameter, which breaks hand-composed validators. State in the PR body that roles are not expanded into `require` rules (plan refinement), so roles stay listed as roles in `rules` and `get_rules`. Check the release-please PR afterwards for both breaking changes.
 
 Commit rules: conventional commits; no `Co-Authored-By` trailer or session link; no nested parentheses in commit bodies; keep every footer line under 100 characters, because commitlint rejects longer ones; breaking commits carry `!` and a `BREAKING CHANGE` footer. Shared VM: one build or test at a time, no local AOT publish.
