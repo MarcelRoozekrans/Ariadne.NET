@@ -174,6 +174,8 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 - [ ] The MCP server runs on rule engine v2 and installs as a dotnet tool or npx package
 - [ ] An agent can ask where a component belongs and get violations with the rule's reason
 - [ ] A Thalos agent can call Ariadne in-process
+- [ ] A Claude Code agent gets the structural rules and violation feedback through `ariadne hook`
+- [ ] A new project receives an organisation's standards and skills from a synced pack
 
 ### Phase 5.1: MCP server on engine v2 [status: pending]
 **Goal:** Publish the MCP server as a dotnet tool and npx package, like roslyn-codelens.
@@ -203,6 +205,22 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Goal:** A superpowers-extensions plugin that teaches agents when to call Ariadne.
 **Surface:** Docs
 **HelpWanted:** no
+**Plan:** _to be written_
+
+### Phase 5.6: Agent hooks [status: pending]
+**Goal:** `ariadne hook` gives a Claude Code agent the resolved structural rules at session start and the validator's violations, with each rule's reason, at the end of a turn.
+**Surface:** Backend
+**HelpWanted:** no
+**Design:** `docs/superpowers/specs/2026-11-06-agent-guidance-hooks-design.md` (approved 2026-11-06, stage A)
+**Note:** Starts after phase 2.3, which changes the loader the pack attachments extend. Runs next to AI.Sentinel's hook, which keeps tool-call enforcement.
+**Plan:** _to be written_
+
+### Phase 5.7: Guidance delivery [status: pending]
+**Goal:** Packs carry standards, skills and opaque files, and `ariadne sync` delivers them to projects, so a new project connects once instead of copying rules.
+**Surface:** Backend
+**HelpWanted:** no
+**Design:** `docs/superpowers/specs/2026-11-06-agent-guidance-hooks-design.md` (approved 2026-11-06, stage B)
+**Note:** Lives in a separate `Ariadne.NET.Guidance` package that the engine never references. Keep it distinct from phase 5.5, which ships skills about using Ariadne.
 **Plan:** _to be written_
 
 ## Milestone 6: Ecosystem [status: pending]
