@@ -137,7 +137,7 @@ Detected violations:
 - **AccessibilityMismatch** — a type's accessibility doesn't match the role definition; a top-level type with no access modifier counts as internal (a nested one is private)
 - **MissingInterface** — a role requires an interface but none was found
 
-Each violation has a rule id: a layer id, a rule id or `role/<Role>`. Layer and rule violations also carry the `because` of the layer or rule. A project that targets several frameworks is checked once per framework, and a violation found in only some of them lists them. See [Validation](how-it-works/08-validation.md) for the details.
+Each violation has a rule id: a layer id, a rule id, or `ROLE-<Name>`, `CODE-001` or `CODE-002` for component roles. Every violation also carries the `because` of its layer or rule. A project that targets several frameworks is checked once per framework, and a violation found in only some of them lists them. See [Validation](how-it-works/08-validation.md) for the details.
 
 Ariadne never restores, so run `dotnet restore` before you validate. The CLI exits 0 when clean, 1 on violations and 2 on an error.
 

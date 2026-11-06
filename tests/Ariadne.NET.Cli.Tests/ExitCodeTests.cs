@@ -335,6 +335,39 @@ public sealed class ExitCodeTests : IDisposable
     }
 
     [Fact]
+    public void Rules_PrintsARequireRuleWithItsRequirements()
+    {
+        WriteRules("""
+            schema: 2
+            name: shop
+            extends:
+              - builtin://clean-architecture
+            rules:
+              - id: SH-010
+                because: Repositories live in Infrastructure.
+                require:
+                  for: { interfaces: ["**.I*Repository"], attributes: ["**.Stored"] }
+                  layer: Infrastructure
+                  kind: class
+                  accessibility: internal
+                  implements: { types: ["**.RepositoryBase"] }
+                exceptions:
+                  - types: ["**.Legacy"]
+                    because: Old code.
+            """);
+
+        var (exitCode, stdout) = RunCapturingStdout("rules");
+
+        exitCode.Should().Be(ExitCodes.Success);
+        var lines = stdout.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        var rules = lines.SkipWhile(l => !string.Equals(l, "Rules:", StringComparison.Ordinal)).Skip(1).TakeWhile(l => l.StartsWith("  ", StringComparison.Ordinal)).ToArray();
+        rules.Should().Equal(
+            "  SH-010 require interfaces **.I*Repository; attributes **.Stored -> layer Infrastructure, kind Class, internal, implements types **.RepositoryBase",
+            "    1 exception(s)",
+            "    Repositories live in Infrastructure.");
+    }
+
+    [Fact]
     public void Rules_LayersSelectedByAssemblyOrNothing_PrintEachSelectorKind()
     {
         WriteRules("""

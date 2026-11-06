@@ -52,3 +52,18 @@ rules:
         layers: [Core]
       to:
         namespaces: ["Microsoft.AspNetCore.**", "System.CommandLine.**", "ModelContextProtocol.**"]
+  - id: ARIADNE-RULE-ENGINES-INTERNAL
+    because: The rule evaluators are an implementation detail of the validator and must not become public API.
+    description: "Static rule evaluators in Analysis stay internal classes"
+    require:
+      for:
+        types: ["Ariadne.NET.Analysis.*Rules"]
+      kind: class
+      accessibility: internal
+  - id: ARIADNE-PACK-LOADERS-IN-CORE
+    because: Loading rule packs is part of the library itself; hosts and the workspace loader only consume it.
+    description: "Every IRulePackLoader implementation lives in Core"
+    require:
+      for:
+        interfaces: ["Ariadne.NET.Abstractions.IRulePackLoader"]
+      layer: Core
