@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.4.0](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.3.0...v0.4.0) (2026-11-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* **analysis:** report role violations as ROLE-name, CODE-001 and CODE-002 instead of role/name
+* **abstractions:** add the require rule and selector keys, RuleDefinitionValidator takes a RuleRequirementValidator
+
+### Features
+
+* **abstractions:** add the require rule and selector keys, RuleDefinitionValidator takes a RuleRequirementValidator ([918551c](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/918551ca3d6b900048797edc71c12c5e38ca5f3d))
+* **analysis:** enforce require rules on the type graph ([918551c](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/918551ca3d6b900048797edc71c12c5e38ca5f3d))
+* **analysis:** report role violations as ROLE-name, CODE-001 and CODE-002 instead of role/name ([918551c](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/918551ca3d6b900048797edc71c12c5e38ca5f3d))
+* **analysis:** select types by base type, interface and attribute ([918551c](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/918551ca3d6b900048797edc71c12c5e38ca5f3d))
+* **cli:** show require rules, dogfood placement rules and document them ([918551c](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/918551ca3d6b900048797edc71c12c5e38ca5f3d))
+* **rule-loader:** read and check the require rule ([918551c](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/918551ca3d6b900048797edc71c12c5e38ca5f3d))
+
+
+### Bug Fixes
+
+* **analysis:** check require rules of code-built packs and compile them once ([918551c](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/918551ca3d6b900048797edc71c12c5e38ca5f3d))
+
+
+### Documentation
+
+* correct the because description for role violations ([918551c](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/918551ca3d6b900048797edc71c12c5e38ca5f3d))
+* describe implements as interface matching and fix the placement example ([918551c](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/918551ca3d6b900048797edc71c12c5e38ca5f3d))
+* phase 2.3 placement and code-feature rules design and plan ([#40](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/40)) ([15f6eaa](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/15f6eaa87c0740b83ab8dac36df1c6b988f65d0b))
+
+
+### Tests
+
+* **abstractions:** cover null entries in every new selector list ([918551c](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/918551ca3d6b900048797edc71c12c5e38ca5f3d))
+* **analysis:** cover generic base chains and all mixed selector keys ([918551c](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/918551ca3d6b900048797edc71c12c5e38ca5f3d))
+* **rule-loader:** pin require kind casing and empty layer ([918551c](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/918551ca3d6b900048797edc71c12c5e38ca5f3d))
+
 ## [0.3.0](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.2.2...v0.3.0) (2026-11-05)
 
 
