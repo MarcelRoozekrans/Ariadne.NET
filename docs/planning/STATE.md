@@ -47,6 +47,6 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 
 ## Recommended Next Step
 
-Merge the docs PR for branch `docs/phase-2.3-design` (design, plan, roadmap and state). Then ask the owner for the execution method (subagent-driven or native) and start Task 1 of the plan on `feat/phase-2.3-placement-and-code-feature-rules`, branched from `ariadne/main`. Task 5 is breaking: put a `BEGIN_COMMIT_OVERRIDE` block in the PR body before merging.
+Merge the docs PR for branch `docs/phase-2.3-design` (design, plan, roadmap and state). Execution method chosen by the owner: subagent-driven. Start Task 1 of the plan on `feat/phase-2.3-placement-and-code-feature-rules`, branched from `ariadne/main`. Task 5 is breaking: put a `BEGIN_COMMIT_OVERRIDE` block in the PR body before merging.
 
 Commit rules: conventional commits; no `Co-Authored-By` trailer or session link; no nested parentheses in commit bodies; keep every footer line under 100 characters, because commitlint rejects longer ones; breaking commits carry `!` and a `BREAKING CHANGE` footer. Shared VM: one build or test at a time, no local AOT publish.
