@@ -50,10 +50,20 @@ public class TargetMatcherTests
         act.Should().Throw<ArgumentException>();
     }
 
-    [Fact]
-    public void LayersMixedWithInterfaces_Throws()
+    [Theory]
+    [InlineData("BaseTypes")]
+    [InlineData("Interfaces")]
+    [InlineData("Attributes")]
+    public void LayersMixedWithCodeFeatureSelectors_Throws(string key)
     {
-        var act = () => TargetMatcher.From(new TargetSelector { Layers = ["Domain"], Interfaces = ["**.IRepository"] }, new LayerMap(Pack));
+        var target = key switch
+        {
+            "BaseTypes" => new TargetSelector { Layers = ["Domain"], BaseTypes = ["**.Base"] },
+            "Interfaces" => new TargetSelector { Layers = ["Domain"], Interfaces = ["**.IRepository"] },
+            _ => new TargetSelector { Layers = ["Domain"], Attributes = ["**.ObsoleteAttribute"] },
+        };
+
+        var act = () => TargetMatcher.From(target, new LayerMap(Pack));
 
         act.Should().Throw<ArgumentException>();
     }

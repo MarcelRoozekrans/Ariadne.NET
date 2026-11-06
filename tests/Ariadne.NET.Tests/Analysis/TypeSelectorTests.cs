@@ -243,4 +243,13 @@ public class TypeSelectorTests
         ((Action)(() => TypeSelector.From([], [], [], [], null!, []))).Should().Throw<ArgumentNullException>();
         ((Action)(() => TypeSelector.From([], [], [], [], [], null!))).Should().Throw<ArgumentNullException>();
     }
+
+    [Fact]
+    public void BaseTypes_MatchesAGenericBaseClass_ByNameWithoutArity()
+    {
+        var compilation = TestCompilation.Create("namespace N { public class A<T> { } public class B : A<int> { } }");
+
+        TypeSelector.From([], [], [], ["N.A"], [], []).Matches(Find(compilation, "N.B"), new TypeNames()).Should().BeTrue();
+        TypeSelector.From([], [], [], ["N.A`1"], [], []).Matches(Find(compilation, "N.B"), new TypeNames()).Should().BeFalse();
+    }
 }
