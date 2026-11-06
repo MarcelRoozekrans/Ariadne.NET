@@ -44,6 +44,7 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 - ZeroAlloc-Net/ZeroAlloc.TestHelpers#106: once fixed, switch the allocation tests from `GC.GetAllocatedBytesForCurrentThread` back to `AllocationGate`.
 - The old `docs/how-it-works/*` copy still describes removed features; Phase 2.6 deletes it.
 - Deferred minors from the reviews: the Daedalus fixture never exercises the Agents layer's `allowedDependencies`; `Owned<T>` and the reader have no further known gaps.
+- **Parked, approved 2026-11-06:** phases 5.6 Agent hooks and 5.7 Guidance delivery, designed in `docs/superpowers/specs/2026-11-06-agent-guidance-hooks-design.md` on branch `docs/agent-hooks-design`. Owner decisions: hooks are the delivery channel; Claude Code first; one tool with a separate `Ariadne.NET.Guidance` package; Ariadne owns structure and delivery while AI.Sentinel owns tool-call enforcement. Next step is the implementation plan for 5.6, written with `superpowers:writing-plans` after phase 2.3 has merged, because 2.3 changes the loader the attachments extend. Re-read the loader and validator before planning.
 
 ## Recommended Next Step
 
