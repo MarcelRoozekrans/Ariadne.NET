@@ -1024,6 +1024,27 @@ public class PackYamlReaderTests
         problem.Message.Should().StartWith(expected);
     }
 
+    [Theory]
+    [InlineData("class")]
+    [InlineData("Class")]
+    public void Require_Kind_IsMatchedCaseInsensitively(string kind)
+    {
+        var yaml = RequireHead + $"    require:\n      for: {{ types: [\"**.X\"] }}\n      kind: {kind}\n";
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        result.Value.Rules.First().Require!.Kind.Should().Be(CSharpTypeKind.Class);
+    }
+
+    [Fact]
+    public void Require_WithEmptyLayer_FailsAtTheKey()
+    {
+        var yaml = RequireHead + "    require:\n      for: { types: [\"**.X\"] }\n      layer:\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(8, 7, "'layer' in the require of rule 'SH-001' must be a string"));
+    }
+
     [Fact]
     public void Implements_WithBaseTypes_Fails()
     {
