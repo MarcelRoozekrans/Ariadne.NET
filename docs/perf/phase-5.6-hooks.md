@@ -36,7 +36,7 @@ echo '{"session_id":"perf2","cwd":"<repo root>","tool_name":"Edit","tool_input":
 echo '{"session_id":"perf2","cwd":"<repo root>"}' | dotnet <dll> hook stop
 ```
 
-Each edit record is a small file in `ariadne-hooks-<user>/<session>/` under the temp folder (`/tmp` here).
+Each edit record is a small file in `ariadne-hooks-<user>/<session>/` under `XDG_RUNTIME_DIR`, else the local application data folder, else the temp folder.
 
 ## Results
 

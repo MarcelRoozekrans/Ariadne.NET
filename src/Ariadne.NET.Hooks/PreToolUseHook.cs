@@ -25,7 +25,7 @@ public sealed class PreToolUseHook(IProjectRules rules, Func<string, string?>? g
         ArgumentNullException.ThrowIfNull(warn);
 
         // A relative path is relative to the agent's working directory, which is not always the project root.
-        var filePath = input.Cwd is null ? input.FilePath : Path.GetFullPath(input.FilePath, input.Cwd);
+        var filePath = input.Cwd is null ? Path.GetFullPath(input.FilePath) : Path.GetFullPath(input.FilePath, input.Cwd);
 
         try
         {

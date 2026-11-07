@@ -12,6 +12,8 @@ public static class EditedFiles
     private const string RecordExtension = ".rec";
     private const string TempExtension = ".tmp";
 
+    private const UnixFileMode PrivateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+
     private static readonly TimeSpan MaxAge = TimeSpan.FromDays(7);
 
     /// <summary>Adds <paramref name="path"/> to the session's list. Duplicates are dropped on Read. Paths compare case-sensitively.</summary>
@@ -69,19 +71,25 @@ public static class EditedFiles
         ArgumentNullException.ThrowIfNull(seen);
         foreach (var record in seen)
         {
-            DeleteRecord(record.File);
+            foreach (var file in record.Files)
+            {
+                DeleteRecord(file);
+            }
         }
     }
 
-    /// <summary>The records of the session with their files, paths de-duplicated, in the order they were first recorded.</summary>
+    /// <summary>
+    /// The edited paths of the session in the order they were first recorded. A path recorded more than once shows once,
+    /// with all of its record files, so removing it leaves nothing of it behind.
+    /// </summary>
     internal static IReadOnlyList<EditedRecord> ReadRecords(string sessionId)
     {
         var folder = SessionFolder(sessionId);
         var files = RecordFiles(folder);
         Array.Sort(files, StringComparer.Ordinal);
 
-        var records = new List<EditedRecord>(files.Length);
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var order = new List<string>(files.Length);
+        var byPath = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         foreach (var file in files)
         {
             string path;
@@ -96,10 +104,25 @@ public static class EditedFiles
                 continue; // Cleared by another process since the listing.
             }
 
-            if (path.Length > 0 && seen.Add(path))
+            if (path.Length == 0)
             {
-                records.Add(new EditedRecord(file, path));
+                continue;
             }
+
+            if (!byPath.TryGetValue(path, out var list))
+            {
+                list = [];
+                byPath[path] = list;
+                order.Add(path);
+            }
+
+            list.Add(file);
+        }
+
+        var records = new List<EditedRecord>(order.Count);
+        for (var i = 0; i < order.Count; i++)
+        {
+            records.Add(new EditedRecord(order[i], byPath[order[i]]));
         }
 
         return records;
@@ -107,7 +130,8 @@ public static class EditedFiles
 
     /// <summary>
     /// Removes session folders nobody touched for <paramref name="maxAge"/>. Best effort: a hook must not fail over a
-    /// stale folder, so anything that goes wrong is ignored.
+    /// stale folder, so anything that goes wrong is ignored. The age check and the recursive delete are not atomic. That is
+    /// acceptable: only a session idle for more than the age limit is exposed, and a failure is swallowed and retried by the next record.
     /// </summary>
     internal static void Prune(TimeSpan maxAge)
     {
@@ -128,8 +152,29 @@ public static class EditedFiles
         }
     }
 
-    /// <summary>The folder of this user, <c>ariadne-hooks-&lt;user&gt;</c> in the temp folder, so users on a shared machine never meet.</summary>
-    internal static string Folder => Path.Combine(Path.GetTempPath(), "ariadne-hooks-" + SafeName(Environment.UserName));
+    /// <summary>
+    /// The folder of this user, <c>ariadne-hooks-&lt;user&gt;</c>. It lives in a base that is already private to the user,
+    /// <c>XDG_RUNTIME_DIR</c> when set and existing, else the local application data folder, and only when neither exists
+    /// in the shared temp folder, where <see cref="VerifyPrivate"/> guards against a folder somebody else created.
+    /// </summary>
+    internal static string Folder => Path.Combine(Base(), "ariadne-hooks-" + SafeName(Environment.UserName));
+
+    private static string Base()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return Path.GetTempPath();
+        }
+
+        var runtime = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
+        if (!string.IsNullOrEmpty(runtime) && Directory.Exists(runtime))
+        {
+            return runtime;
+        }
+
+        var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.DoNotVerify);
+        return !string.IsNullOrEmpty(local) && Directory.Exists(local) ? local : Path.GetTempPath();
+    }
 
     internal static string SessionFolder(string sessionId) => Path.Combine(Folder, SafeName(sessionId));
 
@@ -152,6 +197,24 @@ public static class EditedFiles
         return name.ToString();
     }
 
+    /// <summary>
+    /// Throws <see cref="IOException"/> unless the folder's Unix mode is exactly 700. The BCL cannot read the owner, but a
+    /// folder of another user with mode 700 cannot be written to, and one with a wider mode is refused here.
+    /// </summary>
+    internal static void VerifyPrivate(string folder)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var mode = File.GetUnixFileMode(folder);
+        if (mode != PrivateMode)
+        {
+            throw new IOException($"The edit list folder '{folder}' is not private to the user, its mode is {Convert.ToString((int)mode, 8)}.");
+        }
+    }
+
     private static string[] RecordFiles(string folder) =>
         Directory.Exists(folder) ? Directory.GetFiles(folder, "*" + RecordExtension) : [];
 
@@ -164,9 +227,11 @@ public static class EditedFiles
             return;
         }
 
-        const UnixFileMode Private = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
-        Directory.CreateDirectory(Folder, Private);
-        Directory.CreateDirectory(folder, Private);
+        // CreateDirectory neither changes nor checks a folder that exists, so verify both levels.
+        Directory.CreateDirectory(Folder, PrivateMode);
+        VerifyPrivate(Folder);
+        Directory.CreateDirectory(folder, PrivateMode);
+        VerifyPrivate(folder);
     }
 
     // A record another process or a reader holds open is gone on the next Clear; on Windows the readers share Delete.

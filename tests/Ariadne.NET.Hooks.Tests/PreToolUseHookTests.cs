@@ -63,6 +63,17 @@ public class PreToolUseHookTests
     }
 
     [Fact]
+    public async Task A_relative_path_without_a_cwd_is_recorded_relative_to_the_process_directory()
+    {
+        using var session = new TestSession();
+        var input = new HookInput { SessionId = session.Id, Cwd = null, ToolName = "Edit", FilePath = "Ariadne-M4.cs" };
+
+        await Create().RunAsync(input, TextWriter.Null, CancellationToken.None).ConfigureAwait(true);
+
+        EditedFiles.Read(session.Id).Should().Equal(Path.GetFullPath("Ariadne-M4.cs"));
+    }
+
+    [Fact]
     public void Serves_the_pre_tool_use_event() => Create().Event.Should().Be("pre-tool-use");
 
     [Fact]

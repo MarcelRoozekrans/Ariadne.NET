@@ -121,6 +121,24 @@ public class StopHookTests
     }
 
     [Fact]
+    public async Task Editing_a_file_twice_is_validated_once()
+    {
+        using var project = ProjectWithSolution();
+        using var session = new TestSession();
+        EditedFiles.Record(session.Id, "/x/A.cs");
+        EditedFiles.Record(session.Id, "/x/A.cs");
+        var validator = new FakeValidator(Report(Violation()));
+        var hook = Create(validator);
+
+        var first = await RunAsync(hook, project.Root, session.Id).ConfigureAwait(true);
+        var second = await RunAsync(hook, project.Root, session.Id).ConfigureAwait(true);
+
+        first.Should().NotBeNull();
+        second.Should().BeNull();
+        validator.Calls.Should().Be(1);
+    }
+
+    [Fact]
     public async Task Edits_and_a_clean_report_return_null_and_clear_the_list()
     {
         using var project = ProjectWithSolution();

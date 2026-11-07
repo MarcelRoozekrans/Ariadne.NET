@@ -61,25 +61,26 @@ public class EditedFilesTests
         const int writers = 16;
         using var session = new TestSession();
         using var barrier = new Barrier(writers);
-        var threads = new Thread[writers];
+        var tasks = new Task[writers];
         var expected = new string[writers];
         for (var i = 0; i < writers; i++)
         {
             var path = $"/a/File{i}.cs";
             expected[i] = path;
-            threads[i] = new Thread(() =>
-            {
-                barrier.SignalAndWait();
-                EditedFiles.Record(session.Id, path);
-            });
-            threads[i].Start();
+            // Dedicated threads, so all writers wait at the barrier together; a failure surfaces at WaitAll, not in the host.
+            tasks[i] = Task.Factory.StartNew(
+                () =>
+                {
+                    barrier.SignalAndWait();
+                    EditedFiles.Record(session.Id, path);
+                },
+                CancellationToken.None,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default);
         }
 
-        foreach (var thread in threads)
-        {
-            thread.Join();
-        }
-
+        var wait = () => Task.WaitAll(tasks);
+        wait.Should().NotThrow($"round {round}");
         EditedFiles.Read(session.Id).Should().BeEquivalentTo(expected, $"round {round}");
     }
 
@@ -94,6 +95,57 @@ public class EditedFilesTests
         EditedFiles.Remove(snapshot);
 
         EditedFiles.Read(session.Id).Should().Equal("/a/Two.cs");
+    }
+
+    [Fact]
+    public void Removing_what_was_read_removes_every_record_of_a_path_recorded_more_than_once()
+    {
+        using var session = new TestSession();
+        EditedFiles.Record(session.Id, "/a/One.cs");
+        EditedFiles.Record(session.Id, "/a/One.cs");
+        EditedFiles.Record(session.Id, "/a/One.cs");
+        var snapshot = EditedFiles.ReadRecords(session.Id);
+
+        snapshot.Should().ContainSingle();
+        EditedFiles.Remove(snapshot);
+
+        EditedFiles.Read(session.Id).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Only_a_record_written_after_the_read_survives_removing_the_duplicates()
+    {
+        using var session = new TestSession();
+        EditedFiles.Record(session.Id, "/a/One.cs");
+        EditedFiles.Record(session.Id, "/a/One.cs");
+        var snapshot = EditedFiles.ReadRecords(session.Id);
+
+        EditedFiles.Record(session.Id, "/a/One.cs");
+        EditedFiles.Remove(snapshot);
+
+        EditedFiles.Read(session.Id).Should().Equal("/a/One.cs");
+        Directory.GetFiles(EditedFiles.SessionFolder(session.Id), "*.rec").Should().HaveCount(1);
+    }
+
+    [UnixFact]
+    [UnsupportedOSPlatform("windows")]
+    public void A_folder_that_others_can_access_is_refused()
+    {
+        var folder = Directory.CreateTempSubdirectory("ariadne-mode-").FullName;
+        try
+        {
+            File.SetUnixFileMode(folder, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            var ok = () => EditedFiles.VerifyPrivate(folder);
+            ok.Should().NotThrow();
+
+            File.SetUnixFileMode(folder, (UnixFileMode)Convert.ToInt32("777", 8));
+            var refused = () => EditedFiles.VerifyPrivate(folder);
+            refused.Should().Throw<IOException>();
+        }
+        finally
+        {
+            Directory.Delete(folder);
+        }
     }
 
     [Fact]
