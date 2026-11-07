@@ -1,5 +1,7 @@
 using Ariadne.NET.Abstractions;
+using Ariadne.NET.Analysis;
 using Ariadne.NET.Workspaces;
+using ZeroAlloc.Results;
 
 namespace Ariadne.NET.Hooks;
 
@@ -60,15 +62,39 @@ public sealed class StopHook(IProjectRules rules, ISolutionValidator validator) 
             return null;
         }
 
-        var report = await validator.ValidateAsync(loaded.Value, solution, cancellationToken).ConfigureAwait(false);
-        if (report.IsFailure)
+        var report = await ValidateAsync(loaded.Value, solution, warn, cancellationToken).ConfigureAwait(false);
+        if (report is null)
         {
-            warn.WriteLine($"ariadne: could not validate the solution: {TextLimit.Shorten(report.Error.Message)}");
             return null;
         }
 
         Forget(input.SessionId, warn);
-        return report.Value.IsValid ? null : HookOutput.StopFeedback(ViolationFeedback.Build(report.Value, root));
+        return report.IsValid ? null : HookOutput.StopFeedback(ViolationFeedback.Build(report, root));
+    }
+
+    /// <summary>Validates, or warns once and returns null when the validation failed or threw. Cancellation propagates.</summary>
+    private async Task<ArchitectureReport?> ValidateAsync(RulePack pack, string solution, TextWriter warn, CancellationToken cancellationToken)
+    {
+        string failure;
+        try
+        {
+            var result = await validator.ValidateAsync(pack, solution, cancellationToken).ConfigureAwait(false);
+            if (result.IsSuccess)
+            {
+                return result.Value;
+            }
+
+            failure = result.Error.Message;
+        }
+#pragma warning disable CA1031 // The loader throws more than it declares; the turn must end as usual and the next one retries.
+        catch (Exception e) when (e is not OperationCanceledException)
+#pragma warning restore CA1031
+        {
+            failure = e.Message;
+        }
+
+        warn.WriteLine($"ariadne: could not validate the solution: {TextLimit.Shorten(failure.ReplaceLineEndings(" "))}");
+        return null;
     }
 
     private static void Forget(string sessionId, TextWriter warn)

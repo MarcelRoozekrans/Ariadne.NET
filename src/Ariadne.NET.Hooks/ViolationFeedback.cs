@@ -47,17 +47,19 @@ public static class ViolationFeedback
         return text.ToString();
     }
 
+    private static string One(string text) => TextLimit.Shorten(text.ReplaceLineEndings(" "), MaxField);
+
     private static string Entry(ArchitectureViolation violation, string root)
     {
         var where = violation.Location is { } location
             ? $"{Path.GetRelativePath(root, location.FilePath).Replace('\\', '/')}:{location.Line}"
             : violation.SourceType;
         var entry = new StringBuilder()
-            .Append("\n[").Append(violation.Kind).Append("] ").Append(TextLimit.Shorten(where, MaxField))
-            .Append("\n  ").Append(TextLimit.Shorten(violation.Message, MaxField));
+            .Append("\n[").Append(violation.Kind).Append("] ").Append(One(where))
+            .Append("\n  ").Append(One(violation.Message));
         if (violation.Because.Length > 0)
         {
-            entry.Append("\n  Rule ").Append(TextLimit.Shorten(violation.RuleId, MaxField)).Append(": ").Append(TextLimit.Shorten(violation.Because, MaxField));
+            entry.Append("\n  Rule ").Append(One(violation.RuleId)).Append(": ").Append(One(violation.Because));
         }
 
         return entry.ToString();

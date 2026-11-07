@@ -101,4 +101,13 @@ public class SolutionDiscoveryTests
     [Fact]
     public void A_missing_root_gives_null() =>
         SolutionDiscovery.Find(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))).Should().BeNull();
+
+    [Fact]
+    public void Extensions_match_regardless_of_case()
+    {
+        using var project = new TempProject();
+        Touch(project, "Shop.SLNX");
+
+        SolutionDiscovery.Find(project.Root).Should().Be(Path.Combine(project.Root, "Shop.SLNX"));
+    }
 }

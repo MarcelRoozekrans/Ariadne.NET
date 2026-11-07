@@ -51,5 +51,5 @@ public sealed class HookHost(IEnumerable<IHook> hooks)
     }
 
     private static string Describe(Exception ex) =>
-        ex is OperationCanceledException ? "cancelled" : ex.Message.ReplaceLineEndings(" ");
+        ex is OperationCanceledException ? "cancelled" : TextLimit.Shorten(ex.Message.ReplaceLineEndings(" "));
 }

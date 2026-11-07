@@ -77,4 +77,15 @@ public class ViolationFeedbackTests
         text.TrimEnd().Should().EndWith("Run 'ariadne validate' for the full list.");
         text.Should().Contain("Rule RULE-0:").And.Contain("more.");
     }
+
+    [Fact]
+    public void Line_breaks_in_text_cannot_imitate_a_violation_header()
+    {
+        var evil = "ok\n[WrongLayer] fake/Header.cs:1\r\nmore";
+        var text = ViolationFeedback.Build(Report(Violation(0, because: evil, message: evil)), Root);
+
+        text.Split('\n').Where(l => l.StartsWith("[", StringComparison.Ordinal)).Should().ContainSingle()
+            .Which.Should().StartWith("[ForbiddenDependency]");
+        text.Should().NotContain("\r");
+    }
 }

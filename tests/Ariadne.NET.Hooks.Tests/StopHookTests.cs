@@ -31,16 +31,21 @@ public class StopHookTests
         public Result<RulePack, AriadneError> Load(string root) => result;
     }
 
-    private sealed class FakeValidator(Result<ArchitectureReport, AriadneError> result) : ISolutionValidator
+    private sealed class FakeValidator(Result<ArchitectureReport, AriadneError> result, Exception? throws = null) : ISolutionValidator
     {
         public int Calls { get; private set; }
 
-        public string? Path { get; private set; }
+        public string? ValidatedPath { get; private set; }
 
         public Task<Result<ArchitectureReport, AriadneError>> ValidateAsync(RulePack resolvedPack, string path, CancellationToken cancellationToken = default)
         {
             Calls++;
-            Path = path;
+            ValidatedPath = path;
+            if (throws is not null)
+            {
+                throw throws;
+            }
+
             return Task.FromResult(result);
         }
     }
@@ -94,7 +99,7 @@ public class StopHookTests
         output.GetProperty("hookEventName").GetString().Should().Be("Stop");
         output.GetProperty("additionalContext").GetString().Should().Contain("SHOP-RULE").And.Contain("Keep the layers apart.");
         validator.Calls.Should().Be(1);
-        validator.Path.Should().Be(Path.Combine(project.Root, "Shop.slnx"));
+        validator.ValidatedPath.Should().Be(Path.Combine(project.Root, "Shop.slnx"));
         EditedFiles.Read(session.Id).Should().BeEmpty();
     }
 
@@ -212,34 +217,81 @@ public class StopHookTests
         warn.ToString().Should().BeEmpty();
     }
 
-    [UnixFact]
-    public async Task An_unreadable_edit_list_warns_once_and_stays_fail_open()
+    [Fact]
+    public async Task An_edit_list_that_cannot_be_read_warns_once_and_stays_fail_open()
     {
-        if (OperatingSystem.IsWindows() || Environment.IsPrivilegedProcess)
-        {
-            return; // Root reads any file, so the failure cannot be provoked.
-        }
-
         using var project = ProjectWithSolution();
         using var session = new TestSession();
         EditedFiles.Record(session.Id, "/x/A.cs");
-        var file = EditedFiles.PathOf(session.Id);
-        File.SetUnixFileMode(file, UnixFileMode.None);
         var validator = new FakeValidator(Report(Violation()));
         using var warn = new StringWriter();
 
-        try
-        {
-            var json = await RunAsync(Create(validator), project.Root, session.Id, warn: warn).ConfigureAwait(true);
+        // An exclusive lock makes the read fail with an IOException on every platform and for every user, root included.
+        using var locked = new FileStream(EditedFiles.PathOf(session.Id), FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        var json = await RunAsync(Create(validator), project.Root, session.Id, warn: warn).ConfigureAwait(true);
 
-            json.Should().BeNull();
-            validator.Calls.Should().Be(0);
-            warn.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries).Should().ContainSingle().Which.Should().StartWith("ariadne:");
-        }
-        finally
-        {
-            File.SetUnixFileMode(file, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-        }
+        json.Should().BeNull();
+        validator.Calls.Should().Be(0);
+        warn.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries).Should().ContainSingle().Which.Should().StartWith("ariadne:");
+    }
+
+    [Fact]
+    public async Task A_throwing_validator_warns_once_bounded_and_keeps_the_list()
+    {
+        using var project = ProjectWithSolution();
+        using var session = new TestSession();
+        EditedFiles.Record(session.Id, "/x/A.cs");
+        var validator = new FakeValidator(Report(), new InvalidOperationException(new string('x', 30_000)));
+        using var warn = new StringWriter();
+
+        var json = await RunAsync(Create(validator), project.Root, session.Id, warn: warn).ConfigureAwait(true);
+
+        json.Should().BeNull();
+        var lines = warn.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        lines.Should().ContainSingle();
+        lines[0].Length.Should().BeLessThan(700);
+        EditedFiles.Read(session.Id).Should().Equal("/x/A.cs");
+    }
+
+    [Fact]
+    public async Task A_cancelled_validation_propagates_and_keeps_the_list_and_the_host_exits_zero()
+    {
+        using var project = ProjectWithSolution();
+        using var session = new TestSession();
+        EditedFiles.Record(session.Id, "/x/A.cs");
+        var validator = new FakeValidator(Report(), new OperationCanceledException());
+        var hook = Create(validator);
+
+        var act = () => RunAsync(hook, project.Root, session.Id);
+        await act.Should().ThrowAsync<OperationCanceledException>().ConfigureAwait(true);
+        EditedFiles.Read(session.Id).Should().Equal("/x/A.cs");
+
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var input = JsonSerializer.Serialize(new { session_id = session.Id, cwd = project.Root });
+        var exit = await new HookHost([hook]).RunAsync("stop", new StringReader(input), stdout, stderr, CancellationToken.None).ConfigureAwait(true);
+
+        exit.Should().Be(0);
+        stdout.ToString().Should().BeEmpty();
+        stderr.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries).Should().ContainSingle().Which.Should().Contain("cancelled");
+    }
+
+    [Fact]
+    public async Task Two_solutions_warn_once_and_keep_the_list()
+    {
+        using var project = ProjectWithSolution();
+        File.WriteAllText(Path.Combine(project.Root, "Other.slnx"), "");
+        using var session = new TestSession();
+        EditedFiles.Record(session.Id, "/x/A.cs");
+        var validator = new FakeValidator(Report(Violation()));
+        using var warn = new StringWriter();
+
+        var json = await RunAsync(Create(validator), project.Root, session.Id, warn: warn).ConfigureAwait(true);
+
+        json.Should().BeNull();
+        validator.Calls.Should().Be(0);
+        warn.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries).Should().ContainSingle();
+        EditedFiles.Read(session.Id).Should().Equal("/x/A.cs");
     }
 
     [Fact]
@@ -260,6 +312,10 @@ public class StopHookTests
         json.Should().NotBeNull();
         using var doc = JsonDocument.Parse(json!);
         var text = doc.RootElement.GetProperty("hookSpecificOutput").GetProperty("additionalContext").GetString()!;
-        text.Should().StartWith("Ariadne found").And.MatchRegex("Rule (CA|DAE)-[A-Z-]+:");
+        text.Should().StartWith("Ariadne found 5 architecture violation(s)");
+        foreach (var id in new[] { "CA-LAYER-DOMAIN", "DAE-NO-EFCORE-IN-DOMAIN", "DAE-APP-NOT-ON-AGENTS", "DAE-RAGNET-ONLY-IN-AGENTS", "DAE-SUBAGENT-RUNNER" })
+        {
+            text.Should().Contain($"Rule {id}:");
+        }
     }
 }

@@ -140,4 +140,18 @@ public class HookHostTests
         err.TrimEnd().Split('\n').Should().HaveCount(1);
         err.Should().Contain("first").And.Contain("second").And.Contain("third");
     }
+
+    [Fact]
+    public async Task A_huge_exception_message_gives_one_bounded_stderr_line()
+    {
+        var hook = new FakeHook("stop", _ => throw new InvalidOperationException(new string('x', 30_000) + "\nsecond"));
+
+        var (exit, output, err) = await RunAsync([hook], "stop", ValidInput);
+
+        exit.Should().Be(0);
+        output.Should().BeEmpty();
+        var lines = err.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        lines.Should().ContainSingle();
+        lines[0].Length.Should().BeLessThan(700);
+    }
 }
