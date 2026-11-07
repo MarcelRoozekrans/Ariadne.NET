@@ -7,11 +7,11 @@
 
 - **Milestone:** 2 — Rule engine v2 [active since 2026-11-04]
 - **Phase 2.1 — Semantic dependency analysis:** complete, released as 0.2.0.
-- **Phase 2.2 — Rule schema v2:** [status: complete 2026-11-05]. PR #35 merged as f1d8a14; release-please PR #38 (0.3.0) is open and lists all four breaking changes. Completion is committed on branch `chore/complete-phase-2.2`, pushed to `ariadne` and not yet in a PR.
+- **Phase 2.2 — Rule schema v2:** [status: complete 2026-11-05]. PR #35 merged as f1d8a14; 0.3.0 released via release-please PR #38, which lists all four breaking changes. Completion merged as #39.
   - Design: `docs/superpowers/specs/2026-11-05-phase-2.2-rule-schema-v2-design.md`
   - Plan: `docs/superpowers/plans/2026-11-05-phase-2.2-rule-schema-v2.md`, all boxes ticked.
   - Perf: the check on the repo pack is about 21% slower and allocates about 32% more than the 2.1 baseline; see `docs/perf/phase-2.1-baseline.md`.
-- **Phase 2.3 — Enforce placement and code-feature rules:** [status: complete]. Merged as #44 on 2026-11-06. Design `docs/superpowers/specs/2026-11-06-phase-2.3-placement-and-code-feature-rules-design.md`, plan `docs/superpowers/plans/2026-11-06-phase-2.3-placement-and-code-feature-rules.md`, all boxes ticked. Owner decisions: one `require` rule with roles kept as engine-internal shorthand; `CODE-001` keeps its solution-wide meaning; no placement rules in the built-in packs, only in this repo's own pack.
+- **Phase 2.3 — Enforce placement and code-feature rules:** [status: complete]. Merged as #44 on 2026-11-06; completion merged as #45 and 0.4.0 released via #41. Design `docs/superpowers/specs/2026-11-06-phase-2.3-placement-and-code-feature-rules-design.md`, plan `docs/superpowers/plans/2026-11-06-phase-2.3-placement-and-code-feature-rules.md`, all boxes ticked. Owner decisions: one `require` rule with roles kept as engine-internal shorthand; `CODE-001` keeps its solution-wide meaning; no placement rules in the built-in packs, only in this repo's own pack.
 - **Phase 5.6 — Agent hooks:** [status: complete 2026-11-07]. Implemented on branch `feat/phase-5.6-agent-hooks`, pushed to remote `ariadne`, no PR yet. Plan `docs/superpowers/plans/2026-11-06-phase-5.6-agent-hooks.md`, all boxes ticked; design `docs/superpowers/specs/2026-11-06-agent-guidance-hooks-design.md`. Timings in `docs/perf/phase-5.6-hooks.md`: `session-start` and `pre-tool-use` about 0.1 s, `stop` with one edit about 13 s on this solution. Owner decisions, approved 2026-11-07, beyond the design: pack attachments move to 5.7; `pre-tool-use` records edits for `stop`; the new-file check reads the namespace from the written content. Follow-ups:
   - Pack attachments move to phase 5.7, together with `init --from <url>`.
   - Per-edit validation through `PostToolUse`: the measurement says no; it would need a resident process.
@@ -47,7 +47,7 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 
 ## Follow-ups
 
-- Open Renovate and Dependabot PRs, among them majors for YamlDotNet 18, xunit runner 4, MSBuild 18 and ModelContextProtocol 2. Phase 2.2 pins YamlDotNet at 16.3.0; review #20 only after 2.2 lands.
+- Open Renovate and Dependabot PRs, among them majors for YamlDotNet 18 (#20), MSBuild 18 (#28) and ModelContextProtocol 2 (#14). Phase 2.2 pins YamlDotNet at 16.3.0; phase 2.2 has landed, so #20 can be reviewed.
 - ZeroAlloc-Net/ZeroAlloc.TestHelpers#106: once fixed, switch the allocation tests from `GC.GetAllocatedBytesForCurrentThread` back to `AllocationGate`.
 - The old `docs/how-it-works/*` copy still describes removed features; Phase 2.6 deletes it.
 - Deferred minors from the reviews: the Daedalus fixture never exercises the Agents layer's `allowedDependencies`; `Owned<T>` and the reader have no further known gaps.
