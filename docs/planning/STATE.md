@@ -18,7 +18,10 @@
   - Make `Ariadne.NET.Hooks` packable in 5.7.
   - Native AOT for the `ariadne hook` entry point only if a later measurement shows it slow; process start is about 0.1 s today.
   - The `ariadne` command must be on `PATH`, which needs the dotnet tool of phase 3.3. The Milestone 5 hooks item stays unticked until then.
-  - One flaky Hooks test was seen once in a full run and not reproduced; its name was not captured. Watch the next full runs.
+  - The flaky Hooks test was `EditedFilesTests.Concurrent_records_all_land`: an append race in `EditedFiles`, because .NET seeks to the end once at open, so parallel hook processes wrote at the same offset and lost or split records. Fixed in the final review wave: one small file per edit in a per-user, per-session folder, and `stop` removes only the records it read.
+  - Owner decision pending: `stop_hook_active` currently clears the edit list. Not clearing it would check the edits made while fixing in the next turn.
+  - A custom hook `timeout` on an existing Ariadne entry in `.claude/settings.json` is reset by every `init` run.
+  - SIGTERM during `stop` can exit 143, which breaks the fail-open rule.
 - Issues filed from 2.2: #36 (child packs: amending `allowedDependencies`, locked rules sidestepped by retargeting, empty retargets) and #37 (child-layer error wording, duplicate roles, pack file size limit). #32 stays the module-isolation item.
 
 Phase 2.2 decisions by the owner, 2026-11-05:

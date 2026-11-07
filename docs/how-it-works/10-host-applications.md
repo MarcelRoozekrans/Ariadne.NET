@@ -21,7 +21,7 @@ ariadne init --template clean-architecture+cqrs+ddd-tactical
 - Validates each pack name exists in the registry
 - Creates `.architecture/rules.yaml` with `extends` list
 
-`ariadne init --agent claude` also installs the hooks. It merges the three entries shown under "Install the hooks without `init`" into `.claude/settings.json` and keeps every other setting, replaces the entries it wrote on an earlier run instead of duplicating them, and keeps an existing `.architecture/rules.yaml`. It fails without writing anything when the settings file is not valid JSON or has an unexpected shape. The first run may reformat an existing settings file, because it is written back as indented JSON. The only accepted agent is `claude`.
+`ariadne init --agent claude` also installs the hooks. It merges the three entries shown under "Install the hooks without `init`" into `.claude/settings.json` and keeps every other setting, replaces the entries it wrote on an earlier run instead of duplicating them, and keeps an existing `.architecture/rules.yaml`. It fails without writing anything when the settings file is not valid JSON or has an unexpected shape. The first run may reformat an existing settings file, because it is written back as indented JSON. It prints `Added the Ariadne hooks to .claude/settings.json`, or `The Ariadne hooks are already in .claude/settings.json` when the file needed no change. The only accepted agent is `claude`.
 
 ### `rules` — Print resolved layer rules
 
@@ -104,7 +104,7 @@ ariadne hook pre-tool-use
 ariadne hook stop
 ```
 
-`ariadne hook <event>` is the entry point Claude Code runs for its hooks. It reads the hook input as JSON on stdin and prints a JSON answer on stdout, both UTF-8 without a byte order mark. The root it works in is the `cwd` of the input, so it reads `.architecture/rules.yaml` from the session's working directory.
+`ariadne hook <event>` is the entry point Claude Code runs for its hooks. It reads the hook input as JSON on stdin and prints a JSON answer on stdout, both UTF-8 without a byte order mark. The root it works in is the nearest folder from the `cwd` of the input upwards that has `.architecture/rules.yaml`, so it keeps working after the agent has run `cd` into a subfolder. When no folder has one, it uses the folder the `CLAUDE_PROJECT_DIR` environment variable names, if that is set and exists, and otherwise the `cwd` itself.
 
 | Event | What it does |
 |-------|--------------|
