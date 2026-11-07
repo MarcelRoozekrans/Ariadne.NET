@@ -1,3 +1,4 @@
+using System.Runtime.Versioning;
 using System.Text;
 using Ariadne.NET.Cli;
 using FluentAssertions;
@@ -297,14 +298,10 @@ public sealed class InitAgentTests : IDisposable
         output.Should().Contain("Added the Ariadne hooks to .claude/settings.json");
     }
 
-    [Fact]
+    [UnixFact]
+    [UnsupportedOSPlatform("windows")]
     public void Init_agent_claude_writes_through_a_symlinked_settings_file_and_keeps_its_mode()
     {
-        if (OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
         Directory.CreateDirectory(".claude");
         Directory.CreateDirectory("shared");
         var real = Path.GetFullPath(Path.Combine("shared", "real.json"));
@@ -331,5 +328,48 @@ public sealed class InitAgentTests : IDisposable
         run.Exit.Should().Be(2);
         run.Err.Length.Should().BeLessThan(200);
         run.Err.Should().Contain("...");
+    }
+
+    [Theory]
+    [InlineData(true, "rules.yaml was written, but the hooks were not added.")]
+    [InlineData(false, "Nothing was written.")]
+    public void Commit_failure_says_what_was_and_was_not_written(bool rulesWritten, string expected)
+    {
+        Directory.CreateDirectory(".claude");
+        var plan = new ClaudeSettingsFile.Plan(Path.GetFullPath(Settings), Path.GetFullPath(Path.Combine(".claude", "missing.tmp")));
+
+        var result = ClaudeSettingsFile.Commit(plan, rulesWritten);
+        var failed = result.IsFailure;
+        var message = failed ? result.Error.Message : "";
+        var temps = TempFiles();
+        var settingsExists = File.Exists(Settings);
+
+        failed.Should().BeTrue();
+        message.Should().Contain(expected).And.EndWith(".");
+        temps.Should().BeEmpty();
+        settingsExists.Should().BeFalse();
+    }
+
+    [UnixNonRootFact]
+    [UnsupportedOSPlatform("windows")]
+    public void Commit_failure_keeps_the_original_error_when_the_temp_file_cannot_be_deleted()
+    {
+        Directory.CreateDirectory(".claude");
+        var temp = Path.GetFullPath(Path.Combine(".claude", "stuck.tmp"));
+        File.WriteAllText(temp, "{}");
+        File.SetUnixFileMode(".claude", UnixFileMode.UserRead | UnixFileMode.UserExecute);
+        try
+        {
+            var result = ClaudeSettingsFile.Commit(new ClaudeSettingsFile.Plan(Path.GetFullPath(Settings), temp), rulesWritten: true);
+            var failed = result.IsFailure;
+            var message = failed ? result.Error.Message : "";
+
+            failed.Should().BeTrue();
+            message.Should().Contain("rules.yaml was written, but the hooks were not added.");
+        }
+        finally
+        {
+            File.SetUnixFileMode(".claude", UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
     }
 }

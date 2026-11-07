@@ -83,12 +83,24 @@ internal static class ClaudeSettingsFile
         }
     }
 
-    /// <summary>Removes the temp file when the caller gives up after <see cref="Prepare"/>.</summary>
-    internal static void Discard(Plan plan)
+    /// <summary>
+    /// Removes the temp file when the caller gives up after <see cref="Prepare"/>. Best effort: a failure here must
+    /// never replace the error that made the caller give up.
+    /// </summary>
+    internal static void Discard(Plan plan) => DeleteQuietly(plan.TempPath);
+
+    private static void DeleteQuietly(string? path)
     {
-        if (plan.TempPath is not null && File.Exists(plan.TempPath))
+        try
         {
-            File.Delete(plan.TempPath);
+            if (path is not null && File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // A stray temp file is the lesser problem; the caller reports the original failure.
         }
     }
 
@@ -108,11 +120,7 @@ internal static class ClaudeSettingsFile
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            if (File.Exists(temp))
-            {
-                File.Delete(temp);
-            }
-
+            DeleteQuietly(temp);
             return Fail(AriadneErrorCode.Unavailable, $"Cannot write {DisplayPath}. Nothing was written.", ex.Message);
         }
     }
