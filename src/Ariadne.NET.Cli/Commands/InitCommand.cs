@@ -2,7 +2,6 @@ using System.CommandLine;
 using Ariadne.NET.Abstractions;
 using Ariadne.NET.RuleLoader;
 using Microsoft.Extensions.DependencyInjection;
-using ZeroAlloc.Results;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -10,6 +9,10 @@ namespace Ariadne.NET.Cli.Commands;
 
 public static class InitCommand
 {
+    private const int MaxEchoedLength = 40;
+
+    private static readonly string RulesPath = Path.Combine(".architecture", "rules.yaml");
+
     public static Command Create(IServiceProvider provider)
     {
         var templateOption = new Option<string>("--template", "-t")
@@ -43,7 +46,7 @@ public static class InitCommand
         {
             return ErrorOutput.Report(new AriadneError(
                 AriadneErrorCode.Invalid,
-                $"Unknown agent '{agent}'. The only accepted value is: claude."));
+                $"Unknown agent '{Truncate(agent)}'. The only accepted value is: claude."));
         }
 
         var extends = TemplateReference.ToExtends(template);
@@ -62,54 +65,46 @@ public static class InitCommand
             }
         }
 
-        var installHooks = agent is not null;
-        var rulesPath = Path.Combine(".architecture", "rules.yaml");
-        var keepRules = installHooks && File.Exists(rulesPath);
+        return agent is null
+            ? WriteRules(template, extends.Value)
+            : InitWithHooks(template, extends.Value);
+    }
 
-        // Compute the merged settings before writing anything, so an unusable settings file aborts untouched.
-        var settingsPath = Path.Combine(".claude", "settings.json");
-        string? settingsText = null;
-        if (installHooks)
+    // Everything that can fail on the settings file runs before rules.yaml is written; only the final move comes after.
+    private static int InitWithHooks(string template, IList<string> extends)
+    {
+        var plan = ClaudeSettingsFile.Prepare(Path.Combine(".claude", "settings.json"));
+        if (plan.IsFailure)
         {
-            var settings = MergeSettings(settingsPath);
-            if (settings.IsFailure)
-            {
-                return ErrorOutput.Report(settings.Error);
-            }
-
-            settingsText = settings.Value;
+            return ErrorOutput.Report(plan.Error);
         }
 
+        var keepRules = File.Exists(RulesPath);
         if (keepRules)
         {
             Console.WriteLine("Kept the existing .architecture/rules.yaml");
         }
         else
         {
-            WriteRules(rulesPath, template, extends.Value);
+            var written = WriteRules(template, extends);
+            if (written != ExitCodes.Success)
+            {
+                ClaudeSettingsFile.Discard(plan.Value);
+                return written;
+            }
         }
 
-        if (settingsText is not null)
+        var committed = ClaudeSettingsFile.Commit(plan.Value, rulesWritten: !keepRules);
+        if (committed.IsFailure)
         {
-            WriteAtomically(settingsPath, settingsText);
-            Console.WriteLine($"Added the Ariadne hooks to {ClaudeSettingsDisplay}");
+            return ErrorOutput.Report(committed.Error);
         }
 
+        Console.WriteLine($"Added the Ariadne hooks to {ClaudeSettingsFile.DisplayPath}");
         return ExitCodes.Success;
     }
 
-    private static Result<string, AriadneError> MergeSettings(string settingsPath)
-    {
-        var merged = AgentSettings.Merge(File.Exists(settingsPath) ? File.ReadAllText(settingsPath) : null);
-        return merged.IsSuccess
-            ? merged
-            : Result<string, AriadneError>.Failure(new AriadneError(
-                merged.Error.Code,
-                $"Cannot update {ClaudeSettingsDisplay}. {merged.Error.Message}",
-                "Fix or remove the file and run the command again; nothing was written."));
-    }
-
-    private static void WriteRules(string rulesPath, string template, IList<string> extends)
+    private static int WriteRules(string template, IList<string> extends)
     {
         // Schema 2 requires a name; the directory the pack belongs to is the natural one.
         var rulesContent = new Dictionary<string, object>(StringComparer.Ordinal)
@@ -125,31 +120,22 @@ public static class InitCommand
             .WithQuotingNecessaryStrings()
             .Build();
 
-        Directory.CreateDirectory(".architecture");
-        File.WriteAllText(rulesPath, serializer.Serialize(rulesContent));
-        Console.WriteLine($"Initialized .architecture/rules.yaml with template: {template}");
-    }
-
-    private const string ClaudeSettingsDisplay = ".claude/settings.json";
-
-    // Write beside the target and move over it, so a crash cannot leave a half-written file.
-    private static void WriteAtomically(string path, string content)
-    {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var temp = $"{path}.{Guid.NewGuid():N}.tmp";
         try
         {
-            File.WriteAllText(temp, content, new System.Text.UTF8Encoding(false));
-            File.Move(temp, path, overwrite: true);
+            Directory.CreateDirectory(".architecture");
+            File.WriteAllText(RulesPath, serializer.Serialize(rulesContent));
         }
-        finally
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            if (File.Exists(temp))
-            {
-                File.Delete(temp);
-            }
+            return ErrorOutput.Report(new AriadneError(
+                AriadneErrorCode.Unavailable, "Cannot write .architecture/rules.yaml.", ex.Message));
         }
+
+        Console.WriteLine($"Initialized .architecture/rules.yaml with template: {template}");
+        return ExitCodes.Success;
     }
+
+    private static string Truncate(string value) => value.Length <= MaxEchoedLength ? value : value[..MaxEchoedLength] + "...";
 
     private static string PackName(string directory)
     {

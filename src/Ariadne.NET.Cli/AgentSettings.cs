@@ -24,6 +24,9 @@ internal static class AgentSettings
         new("Stop", null, "stop", 300),
     ];
 
+    // Duplicate property names would silently lose one of the values on write, so they are a parse failure.
+    private static readonly JsonDocumentOptions ParseOptions = new() { AllowDuplicateProperties = false };
+
     private static readonly JsonSerializerOptions WriteOptions = new()
     {
         WriteIndented = true,
@@ -34,7 +37,7 @@ internal static class AgentSettings
     /// <summary>Returns the new settings text, or <c>Invalid</c> when the existing text cannot be merged without losing data.</summary>
     internal static Result<string, AriadneError> Merge(string? existingJson)
     {
-        var text = existingJson?.TrimStart('﻿');
+        var text = existingJson?.TrimStart('\uFEFF');
         JsonObject root;
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -45,10 +48,11 @@ internal static class AgentSettings
             JsonNode? parsed;
             try
             {
-                parsed = JsonNode.Parse(text);
+                parsed = JsonNode.Parse(text, nodeOptions: null, ParseOptions);
             }
-            catch (JsonException ex)
+            catch (Exception ex) when (ex is JsonException or ArgumentException)
             {
+                // Duplicate property names surface as ArgumentException from JsonNode.Parse, not JsonException.
                 return Invalid($"The settings file is not valid JSON: {ex.Message.TrimEnd('.')}.");
             }
 
@@ -147,7 +151,7 @@ internal static class AgentSettings
             var removedAny = false;
             for (var e = 0; e < entries.Count; e++)
             {
-                if (entries[e] is not JsonObject existing || !IsOurs(existing))
+                if (entries[e] is not JsonObject existing || !IsOurs(existing, spec))
                 {
                     continue;
                 }
@@ -205,15 +209,33 @@ internal static class AgentSettings
         return string.IsNullOrEmpty(matcher) ? null : matcher;
     }
 
-    private static bool IsOurs(JsonObject entry)
+    // An entry is ours for an event when its command runs "ariadne hook <that event's subcommand>", with or without a
+    // path in front of ariadne and with or without trailing arguments. An "ariadne hook stop" entry sitting under
+    // PreToolUse is a misplaced entry the user arranged themselves, so it is left alone, like any foreign entry.
+    // "ariadne hooks-other" and "ariadne hook" without a subcommand never match.
+    private static bool IsOurs(JsonObject entry, HookSpec spec)
     {
         if (entry["command"] is not JsonValue v || !v.TryGetValue<string>(out var command))
         {
             return false;
         }
 
-        return command.StartsWith(HookCommandPrefix, StringComparison.Ordinal)
-            && (command.Length == HookCommandPrefix.Length || char.IsWhiteSpace(command[HookCommandPrefix.Length]));
+        var words = command.Split((char[]?)null, 3, StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length < 3 || !string.Equals(words[1], "hook", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        // The subcommand is the third word; the split limit keeps any trailing arguments in it.
+        var subcommand = words[2].Split((char[]?)null, 2, StringSplitOptions.RemoveEmptyEntries)[0];
+        return string.Equals(subcommand, spec.Argument, StringComparison.Ordinal) && IsAriadneExecutable(words[0]);
+    }
+
+    private static bool IsAriadneExecutable(string word)
+    {
+        var name = word[(word.LastIndexOfAny(['/', '\\']) + 1)..];
+        return string.Equals(name, "ariadne", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "ariadne.exe", StringComparison.OrdinalIgnoreCase);
     }
 
     private static Result<string, AriadneError> Invalid(string message) =>

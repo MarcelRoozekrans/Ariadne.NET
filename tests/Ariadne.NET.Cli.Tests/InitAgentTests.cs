@@ -181,4 +181,155 @@ public sealed class InitAgentTests : IDisposable
         rules.Should().Contain("schema: 2");
         claudeExists.Should().BeFalse();
     }
+
+    private (int Exit, string Out, string Err) RunCapture(params string[] args)
+    {
+        var exit = Run(args);
+        return (exit, _out.ToString(), _err.ToString());
+    }
+
+    private static string[] TempFiles() =>
+        Directory.Exists(".claude") ? Directory.GetFiles(".claude", "*.tmp") : [];
+
+    [Fact]
+    public void Init_agent_claude_when_dot_claude_is_a_file_fails_cleanly()
+    {
+        File.WriteAllText(".claude", "x");
+
+        var run = RunCapture("init", "--agent", "claude");
+        var rulesExists = File.Exists(Rules);
+
+        run.Exit.Should().Be(2);
+        run.Err.Should().Contain("Cannot write .claude/settings.json").And.Contain("Nothing was written.");
+        run.Out.Should().NotContain("Added");
+        rulesExists.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Init_agent_claude_when_settings_is_a_directory_fails_cleanly()
+    {
+        Directory.CreateDirectory(Settings);
+
+        var run = RunCapture("init", "--agent", "claude");
+        var rulesExists = File.Exists(Rules);
+        var temps = TempFiles();
+
+        run.Exit.Should().Be(2);
+        run.Err.Should().Contain("is a directory");
+        run.Out.Should().NotContain("Added");
+        rulesExists.Should().BeFalse();
+        temps.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Init_agent_claude_when_settings_is_locked_fails_cleanly()
+    {
+        Directory.CreateDirectory(".claude");
+        File.WriteAllText(Settings, "{}");
+        string err;
+        string output;
+        int exit;
+        bool rulesExists;
+        string[] temps;
+        using (new FileStream(Settings, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            (exit, output, err) = RunCapture("init", "--agent", "claude");
+            rulesExists = File.Exists(Rules);
+            temps = TempFiles();
+        }
+
+        exit.Should().Be(2);
+        err.Should().Contain("Cannot read .claude/settings.json");
+        output.Should().NotContain("Added");
+        rulesExists.Should().BeFalse();
+        temps.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Init_agent_claude_with_non_UTF8_settings_fails_and_leaves_the_file()
+    {
+        Directory.CreateDirectory(".claude");
+        byte[] original = [0x7B, 0x22, 0x61, 0x22, 0x3A, 0x22, 0xFF, 0xFE, 0x22, 0x7D];
+        File.WriteAllBytes(Settings, original);
+
+        var run = RunCapture("init", "--agent", "claude");
+        var after = File.ReadAllBytes(Settings);
+        var rulesExists = File.Exists(Rules);
+
+        run.Exit.Should().Be(2);
+        run.Err.Should().Contain("not valid UTF-8");
+        run.Out.Should().NotContain("Added");
+        after.Should().Equal(original);
+        rulesExists.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Init_agent_claude_with_a_BOM_prefixed_settings_file_merges_and_drops_the_BOM()
+    {
+        Directory.CreateDirectory(".claude");
+        File.WriteAllBytes(Settings, [0xEF, 0xBB, 0xBF, .. "{\"a\":1}"u8.ToArray()]);
+
+        var exit = Run("init", "--agent", "claude");
+        var bytes = File.ReadAllBytes(Settings);
+
+        exit.Should().Be(0);
+        bytes[0].Should().Be((byte)'{');
+        Encoding.UTF8.GetString(bytes).Should().Contain("\"a\": 1").And.Contain("ariadne hook stop");
+    }
+
+    [Fact]
+    public void Init_agent_claude_leaves_no_temp_files_and_a_rerun_keeps_the_modification_time()
+    {
+        Run("init", "--agent", "claude");
+        var old = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(Settings, old);
+        var temps = TempFiles();
+
+        var exit = Run("init", "--agent", "claude");
+        var output = _out.ToString();
+        var stamp = File.GetLastWriteTimeUtc(Settings);
+        var tempsAfter = TempFiles();
+
+        exit.Should().Be(0);
+        temps.Should().BeEmpty();
+        tempsAfter.Should().BeEmpty();
+        stamp.Should().Be(old);
+        output.Should().Contain("Added the Ariadne hooks to .claude/settings.json");
+    }
+
+    [Fact]
+    public void Init_agent_claude_writes_through_a_symlinked_settings_file_and_keeps_its_mode()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        Directory.CreateDirectory(".claude");
+        Directory.CreateDirectory("shared");
+        var real = Path.GetFullPath(Path.Combine("shared", "real.json"));
+        File.WriteAllText(real, """{"keep":true}""");
+        File.SetUnixFileMode(real, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        File.CreateSymbolicLink(Settings, real);
+
+        var exit = Run("init", "--agent", "claude");
+        var linkTarget = new FileInfo(Settings).LinkTarget;
+        var content = File.ReadAllText(real);
+        var mode = File.GetUnixFileMode(real);
+
+        exit.Should().Be(0);
+        linkTarget.Should().Be(real);
+        content.Should().Contain("\"keep\": true").And.Contain("ariadne hook stop");
+        mode.Should().Be(UnixFileMode.UserRead | UnixFileMode.UserWrite);
+    }
+
+    [Fact]
+    public void Init_with_a_long_unknown_agent_truncates_the_echoed_value()
+    {
+        var run = RunCapture("init", "--agent", new string('x', 500));
+
+        run.Exit.Should().Be(2);
+        run.Err.Length.Should().BeLessThan(200);
+        run.Err.Should().Contain("...");
+    }
 }

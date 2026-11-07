@@ -122,6 +122,8 @@ public sealed class AgentSettingsTests
     [InlineData("42")]
     [InlineData("{ // comment\n \"a\": 1 }")]
     [InlineData("{\"a\": 1,}")]
+    [InlineData("""{"a":1,"a":2}""")]
+    [InlineData("""{"hooks":{"Stop":[],"Stop":[]}}""")]
     [InlineData("""{"hooks":null}""")]
     [InlineData("""{"hooks":[]}""")]
     [InlineData("""{"hooks":{"Stop":"x"}}""")]
@@ -187,7 +189,7 @@ public sealed class AgentSettingsTests
     [Fact]
     public void Merge_tolerates_a_byte_order_mark()
     {
-        var root = Parse(MergeOk("﻿{\"a\":1}"));
+        var root = Parse(MergeOk("\uFEFF{\"a\":1}"));
 
         ((int)root["a"]!).Should().Be(1);
     }
@@ -205,5 +207,40 @@ public sealed class AgentSettingsTests
             """{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"ariadne hooks-other"}]}]}}"""));
 
         Commands(Groups(root, "Stop")).Should().Equal("ariadne hooks-other", $"{Prefix} stop");
+    }
+
+    [Theory]
+    [InlineData("/usr/bin/ariadne hook stop")]
+    [InlineData("  ariadne hook stop --old")]
+    [InlineData("C:\\tools\\ariadne.exe hook stop")]
+    public void Merge_recognises_a_path_qualified_or_padded_command_as_ours(string command)
+    {
+        var json = new JsonObject { ["hooks"] = new JsonObject { ["Stop"] = new JsonArray(new JsonObject
+        {
+            ["hooks"] = new JsonArray(new JsonObject { ["type"] = "command", ["command"] = command }),
+        }) } }.ToJsonString();
+
+        var root = Parse(MergeOk(json));
+
+        Commands(Groups(root, "Stop")).Should().Equal($"{Prefix} stop");
+    }
+
+    [Fact]
+    public void Merge_leaves_a_hook_entry_for_another_event_alone_under_this_event()
+    {
+        // "ariadne hook stop" under PreToolUse is a misplaced entry, not ours for that event: it is kept as is.
+        var root = Parse(MergeOk(
+            """{"hooks":{"PreToolUse":[{"matcher":"Write|Edit|MultiEdit","hooks":[{"type":"command","command":"ariadne hook stop"}]}]}}"""));
+
+        Commands(Groups(root, "PreToolUse")).Should().Equal("ariadne hook stop", $"{Prefix} pre-tool-use");
+    }
+
+    [Fact]
+    public void Merge_does_not_treat_ariadne_without_a_subcommand_as_ours()
+    {
+        var root = Parse(MergeOk(
+            """{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"ariadne hook"},{"type":"command","command":"other ariadne hook stop"}]}]}}"""));
+
+        Commands(Groups(root, "Stop")).Should().Equal("ariadne hook", "other ariadne hook stop", $"{Prefix} stop");
     }
 }
