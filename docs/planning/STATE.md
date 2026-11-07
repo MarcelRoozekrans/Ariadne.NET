@@ -11,8 +11,14 @@
   - Design: `docs/superpowers/specs/2026-11-05-phase-2.2-rule-schema-v2-design.md`
   - Plan: `docs/superpowers/plans/2026-11-05-phase-2.2-rule-schema-v2.md`, all boxes ticked.
   - Perf: the check on the repo pack is about 21% slower and allocates about 32% more than the 2.1 baseline; see `docs/perf/phase-2.1-baseline.md`.
-- **Phase 2.3 — Enforce placement and code-feature rules:** [status: complete 2026-11-06]. PR #44 merged as 918551c; release-please PR #41 (0.4.0) lists both breaking changes. Completion is committed on branch `chore/complete-phase-2.3`, pushed to `ariadne`, not yet in a PR. Roles are not expanded into `require` rules (plan refinement); `rules` and `get_rules` list roles as roles. Deferred, out of scope: `ArchitectureValidator` does not call `RulePackReferenceCheck` itself, so a code-built pack passed straight to it skips those checks.
-- **Phase 2.4 — Banned packages, forbidden APIs and name collisions:** [status: pending], no design yet.
+- **Phase 2.3 — Enforce placement and code-feature rules:** [status: complete]. Merged as #44 on 2026-11-06. Design `docs/superpowers/specs/2026-11-06-phase-2.3-placement-and-code-feature-rules-design.md`, plan `docs/superpowers/plans/2026-11-06-phase-2.3-placement-and-code-feature-rules.md`, all boxes ticked. Owner decisions: one `require` rule with roles kept as engine-internal shorthand; `CODE-001` keeps its solution-wide meaning; no placement rules in the built-in packs, only in this repo's own pack.
+- **Phase 5.6 — Agent hooks:** [status: complete 2026-11-07]. Implemented on branch `feat/phase-5.6-agent-hooks`, pushed to remote `ariadne`, no PR yet. Plan `docs/superpowers/plans/2026-11-06-phase-5.6-agent-hooks.md`, all boxes ticked; design `docs/superpowers/specs/2026-11-06-agent-guidance-hooks-design.md`. Timings in `docs/perf/phase-5.6-hooks.md`: `session-start` and `pre-tool-use` about 0.1 s, `stop` with one edit about 13 s on this solution. Owner decisions, approved 2026-11-07, beyond the design: pack attachments move to 5.7; `pre-tool-use` records edits for `stop`; the new-file check reads the namespace from the written content. Follow-ups:
+  - Pack attachments move to phase 5.7, together with `init --from <url>`.
+  - Per-edit validation through `PostToolUse`: the measurement says no; it would need a resident process.
+  - Make `Ariadne.NET.Hooks` packable in 5.7.
+  - Native AOT for the `ariadne hook` entry point only if a later measurement shows it slow; process start is about 0.1 s today.
+  - The `ariadne` command must be on `PATH`, which needs the dotnet tool of phase 3.3. The Milestone 5 hooks item stays unticked until then.
+  - One flaky Hooks test was seen once in a full run and not reproduced; its name was not captured. Watch the next full runs.
 - Issues filed from 2.2: #36 (child packs: amending `allowedDependencies`, locked rules sidestepped by retargeting, empty retargets) and #37 (child-layer error wording, duplicate roles, pack file size limit). #32 stays the module-isolation item.
 
 Phase 2.2 decisions by the owner, 2026-11-05:
@@ -45,17 +51,10 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 - ZeroAlloc-Net/ZeroAlloc.TestHelpers#106: once fixed, switch the allocation tests from `GC.GetAllocatedBytesForCurrentThread` back to `AllocationGate`.
 - The old `docs/how-it-works/*` copy still describes removed features; Phase 2.6 deletes it.
 - Deferred minors from the reviews: the Daedalus fixture never exercises the Agents layer's `allowedDependencies`; `Owned<T>` and the reader have no further known gaps.
-- **Parked, approved 2026-11-06:** phases 5.6 Agent hooks and 5.7 Guidance delivery, designed in `docs/superpowers/specs/2026-11-06-agent-guidance-hooks-design.md` on branch `docs/agent-hooks-design`. Owner decisions: hooks are the delivery channel; Claude Code first; one tool with a separate `Ariadne.NET.Guidance` package; Ariadne owns structure and delivery while AI.Sentinel owns tool-call enforcement. Phase 2.3 merged as #44 (2026-11-06), so the plan can start. The 5.6 plan (stage A, 8 tasks) is written at `docs/superpowers/plans/2026-11-06-phase-5.6-agent-hooks.md` and passed a fresh builder check (four blockers fixed). The owner approved it as written on 2026-11-07, including all ten decisions beyond the design. The ten decisions beyond the design, the main ones being that pack attachments move to 5.7, that `pre-tool-use` records edits for `stop`, and that the new-file check reads the namespace from the written content. `ariadne` is not a dotnet tool until phase 3.3.
-- **Phase 5.6 — Agent hooks:** [status: complete 2026-11-07]. Implemented on branch `feat/phase-5.6-agent-hooks`, pushed to remote `ariadne`, no PR yet. Plan `docs/superpowers/plans/2026-11-06-phase-5.6-agent-hooks.md`, all boxes ticked. Timings in `docs/perf/phase-5.6-hooks.md`: `session-start` and `pre-tool-use` about 0.1 s, `stop` with one edit about 13 s on this solution. Follow-ups:
-  - Pack attachments move to phase 5.7, together with `init --from <url>`.
-  - Per-edit validation through `PostToolUse`: the measurement says no; it would need a resident process.
-  - Make `Ariadne.NET.Hooks` packable in 5.7.
-  - Native AOT for the `ariadne hook` entry point only if a later measurement shows it slow; process start is about 0.1 s today.
-  - The `ariadne` command must be on `PATH`, which needs the dotnet tool of phase 3.3. The Milestone 5 hooks item stays unticked until then.
-  - One flaky Hooks test was seen once in a full run and not reproduced; its name was not captured. Watch the next full runs.
+- **Parked, approved 2026-11-06:** phase 5.7 Guidance delivery, designed in `docs/superpowers/specs/2026-11-06-agent-guidance-hooks-design.md` (stage B). Owner decisions: one tool with a separate `Ariadne.NET.Guidance` package; Ariadne owns structure and delivery while AI.Sentinel owns tool-call enforcement. It takes over the pack attachments that 5.6 left out.
 
 ## Recommended Next Step
 
-Merge the PR for `chore/complete-phase-2.3`, then merge release-please PR #41 when ready. Next phase is 2.4: run `start-next-phase`, which routes to brainstorming because there is no design spec. Check that the 0.4.0 notes keep both breaking changes after any further merge.
+Phase 5.6 is implemented and reviewed. Open the PR from `feat/phase-5.6-agent-hooks` only when the owner asks, then run `complete-phase` for 5.6 after the merge. The PR is squash merged, so put a `BEGIN_COMMIT_OVERRIDE` block in the PR body with one line per commit; no breaking changes are expected. Check the release-please PR afterwards that the commits were counted.
 
 Commit rules: conventional commits; no `Co-Authored-By` trailer or session link; no nested parentheses in commit bodies; keep every footer line under 100 characters, because commitlint rejects longer ones; breaking commits carry `!` and a `BREAKING CHANGE` footer. Shared VM: one build or test at a time, no local AOT publish.

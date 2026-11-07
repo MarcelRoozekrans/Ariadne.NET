@@ -2,7 +2,7 @@ namespace Ariadne.NET.Hooks;
 
 /// <summary>
 /// Runs the hook for an event and fails open: whatever goes wrong becomes one line on stderr, empty stdout and exit code 0,
-/// because a non-zero exit would block the agent's tool call.
+/// because Claude Code treats a non-zero exit other than 2 as a non-blocking error and exit 2 blocks the tool call, and a hook must not do either.
 /// </summary>
 public sealed class HookHost(IEnumerable<IHook> hooks)
 {

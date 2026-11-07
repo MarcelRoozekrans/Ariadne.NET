@@ -7,7 +7,7 @@ namespace Ariadne.NET.Cli.Commands;
 
 /// <summary>
 /// <c>ariadne hook &lt;event&gt;</c>: the entry point Claude Code runs for its hooks. It fails open, so every outcome
-/// exits 0; a non-zero exit would block the agent's tool call. Only a missing event argument is a usage error.
+/// exits 0; exit 2 would block the agent's tool call and any other non-zero code is reported as an error. Only a missing event argument is a usage error.
 /// </summary>
 public static class HookCommand
 {

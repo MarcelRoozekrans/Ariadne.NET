@@ -25,7 +25,7 @@ ariadne init --template clean-architecture+cqrs+ddd-tactical
 - Validates each pack name exists in the registry
 - Creates `.architecture/rules.yaml` with `schema: 2`, a `name` taken from the current directory and the `extends` list
 
-`ariadne init --agent claude` also installs the hooks. It merges the three entries above into `.claude/settings.json` and keeps every other setting, replaces the entries it wrote on an earlier run instead of duplicating them, and keeps an existing `.architecture/rules.yaml`. It fails without writing anything when the settings file is not valid JSON or has an unexpected shape. The first run may reformat an existing settings file, because it is written back as indented JSON. The only accepted agent is `claude`.
+`ariadne init --agent claude` also installs the hooks. It merges the three entries shown under "Install the hooks without `init`" into `.claude/settings.json` and keeps every other setting, replaces the entries it wrote on an earlier run instead of duplicating them, and keeps an existing `.architecture/rules.yaml`. It fails without writing anything when the settings file is not valid JSON or has an unexpected shape. The first run may reformat an existing settings file, because it is written back as indented JSON. The only accepted agent is `claude`.
 
 ### `rules` — Print resolved layer rules
 
@@ -113,13 +113,13 @@ ariadne hook stop
 
 | Event | What it does |
 |-------|--------------|
-| `session-start` | Adds the resolved layers, the rules with their `because`, the component roles, the naming conventions and the versions of the cached rule packs to the session. It warns when an import is missing from the cache or no longer satisfies its version range. The text is capped at 10,000 characters; when it does not fit, whole roles, rules and layers are dropped from the end and a final `Truncated` line says how many lines went. Without a rules file it tells the agent to run `ariadne init`. |
+| `session-start` | Adds the resolved layers, the rules with their `because`, the component roles, the naming conventions and the versions of the cached rule packs to the session. It warns when an import is missing from the cache or no longer satisfies its version range. The text is capped at 10,000 characters; when it does not fit, whole roles, rules and layers are dropped from the end, then the naming line, then the warnings, and a final `Truncated` line says how many lines went. Without a rules file it tells the agent to run `ariadne init`. |
 | `pre-tool-use` | Answers only `ask`, and only for a new `.cs` file whose assembly and namespace no layer selects. The namespace is read from the content that is written, with the folder as the fallback. It also records every `.cs` file that `Write`, `Edit` and `MultiEdit` touch, for `stop`. |
-| `stop` | Once per turn, when the agent edited `.cs` files, validates the solution found from the working directory and feeds at most 20 violations back through `additionalContext`, each with its rule id and `because`. It prints nothing when the solution is clean, when `stop_hook_active` is set, and when no `.cs` file was edited. |
+| `stop` | Once per turn, when the agent edited `.cs` files, validates the solution found from the working directory and feeds at most 20 violations back through `additionalContext`, each with its message and, when it has one, its rule id and `because`. The text is capped at 10,000 characters too, and a final line says how many violations were left out. It prints nothing when the solution is clean, when `stop_hook_active` is set, and when no `.cs` file was edited. |
 
 The stale-cache check is offline. It compares the version ranges in `.architecture/imports.yaml` with `resolvedTag` in `.architecture/.cache/git/<name>/.git-info.json` and never touches the network. Run `ariadne sync` to refresh the cache.
 
-The hooks fail open. Every error becomes one line on stderr, stdout stays empty and the exit code is 0, because a non-zero exit would block the agent's tool call. The only exception is a missing event argument, which is a usage error with exit code 1.
+The hooks fail open. Every error becomes one line on stderr, stdout stays empty and the exit code is 0, because in Claude Code exit code 2 blocks a tool call and any other non-zero code is reported as an error. The only exception is a missing event argument, which is a usage error with exit code 1.
 
 Limits to know about:
 
