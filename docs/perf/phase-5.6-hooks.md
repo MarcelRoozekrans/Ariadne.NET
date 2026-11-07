@@ -32,11 +32,11 @@ This is the shared VM of the earlier perf runs. The load average was about 2 bef
 dotnet build -c Release src/Ariadne.NET.Cli
 echo '{"session_id":"perf1","cwd":"<repo root>"}' | dotnet src/Ariadne.NET.Cli/bin/Release/net10.0/Ariadne.NET.Cli.dll hook session-start
 echo '{"session_id":"perf1","cwd":"<repo root>","tool_name":"Edit","tool_input":{"file_path":"<repo root>/src/Ariadne.NET.Hooks/TextLimit.cs"}}' | dotnet <dll> hook pre-tool-use
-echo '<repo root>/src/Ariadne.NET.Hooks/TextLimit.cs' > "$TMPDIR/ariadne-hooks/perf2.txt"   # the recorded edit
+echo '{"session_id":"perf2","cwd":"<repo root>","tool_name":"Edit","tool_input":{"file_path":"<repo root>/src/Ariadne.NET.Hooks/TextLimit.cs"}}' | dotnet <dll> hook pre-tool-use   # records the edit
 echo '{"session_id":"perf2","cwd":"<repo root>"}' | dotnet <dll> hook stop
 ```
 
-The edit record lives in `ariadne-hooks/<session>.txt` under the temp folder (`/tmp` here).
+Each edit record is a small file in `ariadne-hooks-<user>/<session>/` under the temp folder (`/tmp` here).
 
 ## Results
 

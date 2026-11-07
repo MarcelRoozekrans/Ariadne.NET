@@ -4,7 +4,7 @@ namespace Ariadne.NET.Hooks;
 /// Records the C# files the agent edits and asks the user before a new file lands outside every layer. It only ever asks,
 /// it never denies.
 /// </summary>
-public sealed class PreToolUseHook(IProjectRules rules) : IHook
+public sealed class PreToolUseHook(IProjectRules rules, Func<string, string?>? getEnvironmentVariable = null) : IHook
 {
     /// <inheritdoc />
     public string Event => "pre-tool-use";
@@ -24,9 +24,12 @@ public sealed class PreToolUseHook(IProjectRules rules) : IHook
 
         ArgumentNullException.ThrowIfNull(warn);
 
+        // A relative path is relative to the agent's working directory, which is not always the project root.
+        var filePath = input.Cwd is null ? input.FilePath : Path.GetFullPath(input.FilePath, input.Cwd);
+
         try
         {
-            EditedFiles.Record(input.SessionId, input.FilePath);
+            EditedFiles.Record(input.SessionId, filePath);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
         {
@@ -34,7 +37,7 @@ public sealed class PreToolUseHook(IProjectRules rules) : IHook
             warn.WriteLine($"ariadne: could not record the edited file: {TextLimit.Shorten(e.Message)}");
         }
 
-        var root = input.Cwd ?? Directory.GetCurrentDirectory();
+        var root = ProjectRoot.Resolve(input.Cwd, getEnvironmentVariable);
         if (!File.Exists(Path.Combine(root, ".architecture", "rules.yaml")))
         {
             return Task.FromResult<string?>(null);
@@ -48,7 +51,7 @@ public sealed class PreToolUseHook(IProjectRules rules) : IHook
         }
 
         var content = string.Equals(input.ToolName, "Write", StringComparison.Ordinal) ? input.Content : null;
-        var question = NewFilePlacement.Check(loaded.Value, root, input.FilePath, content);
+        var question = NewFilePlacement.Check(loaded.Value, root, filePath, content);
         return Task.FromResult(question is null ? null : HookOutput.PreToolUseAsk(question));
     }
 

@@ -14,7 +14,7 @@ public class PreToolUseHookTests
     {
         var loader = new YamlRulePackLoader();
         var registry = new BuiltinPackRegistry(loader);
-        return new PreToolUseHook(new ProjectRules(loader, new RulePackResolver(registry, loader, new RulePackMerger())));
+        return new PreToolUseHook(new ProjectRules(loader, new RulePackResolver(registry, loader, new RulePackMerger())), _ => null);
     }
 
     private static TempProject ProjectWith(string projectName, string rules = Rules)
@@ -35,6 +35,32 @@ public class PreToolUseHookTests
 
     private static string[] Lines(StringWriter writer) =>
         writer.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    [Fact]
+    public async Task After_a_cd_into_the_project_the_hook_still_asks_for_a_new_file()
+    {
+        using var project = ProjectWith("Shop.Web");
+        using var session = new TestSession();
+        var below = Path.Combine(project.Root, "Shop.Web");
+        var file = Path.Combine(below, "Home.cs");
+
+        var json = await RunAsync(below, session.Id, "Write", file).ConfigureAwait(true);
+
+        json.Should().NotBeNull().And.Contain("\"ask\"");
+    }
+
+    [Fact]
+    public async Task A_relative_path_is_taken_relative_to_the_cwd_and_recorded_absolute()
+    {
+        using var project = ProjectWith("Shop.Web");
+        using var session = new TestSession();
+        var below = Path.Combine(project.Root, "Shop.Web");
+
+        var json = await RunAsync(below, session.Id, "Write", "Home.cs").ConfigureAwait(true);
+
+        json.Should().NotBeNull().And.Contain("\"ask\"");
+        EditedFiles.Read(session.Id).Should().Equal(Path.Combine(below, "Home.cs"));
+    }
 
     [Fact]
     public void Serves_the_pre_tool_use_event() => Create().Event.Should().Be("pre-tool-use");

@@ -9,7 +9,7 @@ namespace Ariadne.NET.Hooks;
 /// Checks the solution when a turn ends, if the agent edited C# files, and feeds the violations back so the agent can fix
 /// them. It never blocks: any failure is a warning on stderr and the turn ends as usual.
 /// </summary>
-public sealed class StopHook(IProjectRules rules, ISolutionValidator validator) : IHook
+public sealed class StopHook(IProjectRules rules, ISolutionValidator validator, Func<string, string?>? getEnvironmentVariable = null) : IHook
 {
     /// <inheritdoc />
     public string Event => "stop";
@@ -23,14 +23,14 @@ public sealed class StopHook(IProjectRules rules, ISolutionValidator validator) 
         if (input.StopHookActive)
         {
             // The agent already got feedback this turn; do not loop.
-            Forget(input.SessionId, warn);
+            ForgetAll(input.SessionId, warn);
             return null;
         }
 
-        IReadOnlyList<string> edited;
+        IReadOnlyList<EditedRecord> edited;
         try
         {
-            edited = EditedFiles.Read(input.SessionId);
+            edited = EditedFiles.ReadRecords(input.SessionId);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
         {
@@ -38,12 +38,12 @@ public sealed class StopHook(IProjectRules rules, ISolutionValidator validator) 
             return null;
         }
 
-        if (!edited.Any(p => p.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)))
+        if (!edited.Any(r => r.Path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)))
         {
             return null;
         }
 
-        var root = input.Cwd ?? Directory.GetCurrentDirectory();
+        var root = ProjectRoot.Resolve(input.Cwd, getEnvironmentVariable);
         var loaded = rules.Load(root);
         if (loaded.IsFailure)
         {
@@ -62,42 +62,47 @@ public sealed class StopHook(IProjectRules rules, ISolutionValidator validator) 
             return null;
         }
 
-        var report = await ValidateAsync(loaded.Value, solution, warn, cancellationToken).ConfigureAwait(false);
+        var report = await ValidateAsync(validator, loaded.Value, solution, warn, cancellationToken).ConfigureAwait(false);
         if (report is null)
         {
             return null;
         }
 
-        Forget(input.SessionId, warn);
+        Forget(edited, warn);
         return report.IsValid ? null : HookOutput.StopFeedback(ViolationFeedback.Build(report, root));
     }
 
-    /// <summary>Validates, or warns once and returns null when the validation failed or threw. Cancellation propagates.</summary>
-    private async Task<ArchitectureReport?> ValidateAsync(RulePack pack, string solution, TextWriter warn, CancellationToken cancellationToken)
+    /// <summary>
+    /// Validates, or warns once and returns null when the validation failed. A validator that throws propagates to
+    /// <see cref="HookHost"/>, which reports it as one stderr line; the edit list is kept because nothing forgets it then.
+    /// </summary>
+    private static async Task<ArchitectureReport?> ValidateAsync(
+        ISolutionValidator validator, RulePack pack, string solution, TextWriter warn, CancellationToken cancellationToken)
     {
-        string failure;
-        try
+        var result = await validator.ValidateAsync(pack, solution, cancellationToken).ConfigureAwait(false);
+        if (result.IsSuccess)
         {
-            var result = await validator.ValidateAsync(pack, solution, cancellationToken).ConfigureAwait(false);
-            if (result.IsSuccess)
-            {
-                return result.Value;
-            }
-
-            failure = result.Error.Message;
-        }
-#pragma warning disable CA1031 // The loader throws more than it declares; the turn must end as usual and the next one retries.
-        catch (Exception e) when (e is not OperationCanceledException)
-#pragma warning restore CA1031
-        {
-            failure = e.Message;
+            return result.Value;
         }
 
-        warn.WriteLine($"ariadne: could not validate the solution: {TextLimit.Shorten(failure.ReplaceLineEndings(" "))}");
+        warn.WriteLine($"ariadne: could not validate the solution: {TextLimit.Shorten(result.Error.Message.ReplaceLineEndings(" "))}");
         return null;
     }
 
-    private static void Forget(string sessionId, TextWriter warn)
+    // Only what this run read: an edit recorded while the check ran stays for the next one.
+    private static void Forget(IReadOnlyList<EditedRecord> seen, TextWriter warn)
+    {
+        try
+        {
+            EditedFiles.Remove(seen);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            warn.WriteLine($"ariadne: could not clear the edited files: {TextLimit.Shorten(e.Message)}");
+        }
+    }
+
+    private static void ForgetAll(string sessionId, TextWriter warn)
     {
         try
         {

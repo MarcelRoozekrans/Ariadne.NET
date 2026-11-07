@@ -3,7 +3,7 @@ using Ariadne.NET.Sync;
 namespace Ariadne.NET.Hooks;
 
 /// <summary>Gives the agent the resolved rules when a session starts. Every start source behaves the same.</summary>
-public sealed class SessionStartHook(IProjectRules rules, IImportsLoader importsLoader) : IHook
+public sealed class SessionStartHook(IProjectRules rules, IImportsLoader importsLoader, Func<string, string?>? getEnvironmentVariable = null) : IHook
 {
     private const string NoRulesText =
         "Ariadne has no rules for this project yet. Run 'ariadne init' to create .architecture/rules.yaml.";
@@ -16,7 +16,7 @@ public sealed class SessionStartHook(IProjectRules rules, IImportsLoader imports
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        var root = input.Cwd ?? Directory.GetCurrentDirectory();
+        var root = ProjectRoot.Resolve(input.Cwd, getEnvironmentVariable);
         string context;
         if (!File.Exists(Path.Combine(root, ".architecture", "rules.yaml")))
         {

@@ -55,7 +55,7 @@ public class StopHookTests
     private static StopHook Create(FakeValidator validator) => Create(validator, Loaded());
 
     private static StopHook Create(FakeValidator validator, Result<RulePack, AriadneError> rules) =>
-        new(new FakeRules(rules), validator);
+        new(new FakeRules(rules), validator, _ => null);
 
     private static Task<string?> RunAsync(StopHook hook, string root, string session, bool active = false, TextWriter? warn = null) =>
         hook.RunAsync(new HookInput { SessionId = session, Cwd = root, StopHookActive = active }, warn ?? TextWriter.Null, CancellationToken.None);
@@ -101,6 +101,23 @@ public class StopHookTests
         validator.Calls.Should().Be(1);
         validator.ValidatedPath.Should().Be(Path.Combine(project.Root, "Shop.slnx"));
         EditedFiles.Read(session.Id).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task After_a_cd_into_a_subfolder_the_stop_hook_still_gives_feedback_for_the_project_solution()
+    {
+        using var project = ProjectWithSolution();
+        project.WriteRules();
+        var below = Path.Combine(project.Root, "src", "Shop.Core");
+        Directory.CreateDirectory(below);
+        using var session = new TestSession();
+        EditedFiles.Record(session.Id, "/x/A.cs");
+        var validator = new FakeValidator(Report(Violation()));
+
+        var json = await RunAsync(Create(validator), below, session.Id).ConfigureAwait(true);
+
+        json.Should().NotBeNull().And.Contain("SHOP-RULE");
+        validator.ValidatedPath.Should().Be(Path.Combine(project.Root, "Shop.slnx"));
     }
 
     [Fact]
@@ -227,7 +244,7 @@ public class StopHookTests
         using var warn = new StringWriter();
 
         // An exclusive lock makes the read fail with an IOException on every platform and for every user, root included.
-        using var locked = new FileStream(EditedFiles.PathOf(session.Id), FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        using var locked = new FileStream(Directory.GetFiles(EditedFiles.SessionFolder(session.Id)).First(), FileMode.Open, FileAccess.ReadWrite, FileShare.None);
         var json = await RunAsync(Create(validator), project.Root, session.Id, warn: warn).ConfigureAwait(true);
 
         json.Should().BeNull();
@@ -236,18 +253,21 @@ public class StopHookTests
     }
 
     [Fact]
-    public async Task A_throwing_validator_warns_once_bounded_and_keeps_the_list()
+    public async Task A_throwing_validator_is_reported_once_bounded_by_the_host_and_keeps_the_list()
     {
         using var project = ProjectWithSolution();
         using var session = new TestSession();
         EditedFiles.Record(session.Id, "/x/A.cs");
         var validator = new FakeValidator(Report(), new InvalidOperationException(new string('x', 30_000)));
-        using var warn = new StringWriter();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
 
-        var json = await RunAsync(Create(validator), project.Root, session.Id, warn: warn).ConfigureAwait(true);
+        var input = JsonSerializer.Serialize(new { session_id = session.Id, cwd = project.Root });
+        var exit = await new HookHost([Create(validator)]).RunAsync("stop", new StringReader(input), stdout, stderr, CancellationToken.None).ConfigureAwait(true);
 
-        json.Should().BeNull();
-        var lines = warn.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        exit.Should().Be(0);
+        stdout.ToString().Should().BeEmpty();
+        var lines = stderr.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries);
         lines.Should().ContainSingle();
         lines[0].Length.Should().BeLessThan(700);
         EditedFiles.Read(session.Id).Should().Equal("/x/A.cs");
@@ -303,11 +323,20 @@ public class StopHookTests
         var rulesFile = FixtureProjects.Path("daedalus", "daedalus.rules.yaml");
         var pack = resolver.Resolve(loader.LoadFromFile(rulesFile).Value, Path.GetDirectoryName(rulesFile)!);
         pack.IsSuccess.Should().BeTrue(pack.IsFailure ? pack.Error.Message : null);
-        var hook = new StopHook(new FakeRules(pack), new SolutionValidator(new SolutionLoader(), new ArchitectureValidator()));
+        var hook = new StopHook(new FakeRules(pack), new SolutionValidator(new SolutionLoader(), new ArchitectureValidator()), _ => null);
         using var session = new TestSession();
         EditedFiles.Record(session.Id, "/x/A.cs");
 
-        var json = await RunAsync(hook, FixtureProjects.Path("daedalus", "broken"), session.Id).ConfigureAwait(true);
+        // The hook walks up to the nearest .architecture/rules.yaml, which for the fixture folder is the repository's own.
+        // So the project root is a temp folder with a rules file and a solution that points at the fixture projects.
+        using var project = new TempProject();
+        project.WriteRules();
+        var broken = FixtureProjects.Path("daedalus", "broken");
+        var entries = Directory.GetFiles(broken, "*.csproj", SearchOption.AllDirectories)
+            .Select(f => $"  <Project Path=\"{Path.GetRelativePath(project.Root, f).Replace('\\', '/')}\" />");
+        File.WriteAllText(Path.Combine(project.Root, "Daedalus.slnx"), $"<Solution>\n{string.Join('\n', entries)}\n</Solution>\n");
+
+        var json = await RunAsync(hook, project.Root, session.Id).ConfigureAwait(true);
 
         json.Should().NotBeNull();
         using var doc = JsonDocument.Parse(json!);

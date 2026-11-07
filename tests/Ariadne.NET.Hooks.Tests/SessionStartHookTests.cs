@@ -13,7 +13,7 @@ public class SessionStartHookTests
         var loader = new YamlRulePackLoader();
         var registry = new BuiltinPackRegistry(loader);
         var rules = new ProjectRules(loader, new RulePackResolver(registry, loader, new RulePackMerger()));
-        return new SessionStartHook(rules, new ImportsYamlLoader());
+        return new SessionStartHook(rules, new ImportsYamlLoader(), _ => null);
     }
 
     private static async Task<string> ContextAsync(string root, string? source = null)
@@ -39,6 +39,34 @@ public class SessionStartHookTests
         var context = await ContextAsync(project.Root).ConfigureAwait(true);
 
         context.Should().Contain("Ariadne rules (clean-architecture+shop").And.Contain("Layers:");
+    }
+
+    [Fact]
+    public async Task A_cwd_below_the_project_still_returns_its_layers()
+    {
+        using var project = new TempProject();
+        project.WriteRules();
+        var below = Path.Combine(project.Root, "src", "Shop.Core");
+        Directory.CreateDirectory(below);
+
+        var context = await ContextAsync(below).ConfigureAwait(true);
+
+        context.Should().Contain("Ariadne rules (clean-architecture+shop").And.Contain("Layers:");
+    }
+
+    [Fact]
+    public async Task A_cwd_outside_every_project_uses_the_project_dir_of_the_environment()
+    {
+        using var project = new TempProject();
+        project.WriteRules();
+        using var outside = new TempProject();
+        var loader = new YamlRulePackLoader();
+        var rules = new ProjectRules(loader, new RulePackResolver(new BuiltinPackRegistry(loader), loader, new RulePackMerger()));
+        var hook = new SessionStartHook(rules, new ImportsYamlLoader(), name => string.Equals(name, "CLAUDE_PROJECT_DIR", StringComparison.Ordinal) ? project.Root : null);
+
+        var json = await hook.RunAsync(new HookInput { SessionId = "s1", Cwd = outside.Root }, TextWriter.Null, CancellationToken.None).ConfigureAwait(true);
+
+        json.Should().Contain("Ariadne rules (clean-architecture+shop");
     }
 
     [Theory]
