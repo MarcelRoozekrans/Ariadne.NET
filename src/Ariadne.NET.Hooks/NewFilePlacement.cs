@@ -5,7 +5,13 @@ using Ariadne.NET.Analysis;
 
 namespace Ariadne.NET.Hooks;
 
-/// <summary>Decides whether a C# file that is about to be written lands in a namespace and assembly no layer selects.</summary>
+/// <summary>
+/// Decides whether a C# file that is about to be written lands in a namespace and assembly no layer selects. The root is
+/// the hook's working directory. Projects that no layer selects, such as tests, samples and tools, ask on every new file.
+/// A non-literal <c>AssemblyName</c>, such as <c>$(Prefix).Core</c>, falls back to the project file name and can give a
+/// false question. The namespace is found with a regular expression, so a <c>namespace X;</c> line inside a block comment
+/// or a raw string can fool it. That is a known limit.
+/// </summary>
 public static partial class NewFilePlacement
 {
     /// <summary>
@@ -37,6 +43,11 @@ public static partial class NewFilePlacement
         }
 
         var segments = relative.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Any(s => string.Equals(s, "..", StringComparison.Ordinal)))
+        {
+            return null;
+        }
+
         if (segments.Any(s => string.Equals(s, "obj", StringComparison.Ordinal) || string.Equals(s, "bin", StringComparison.Ordinal))
             || (!treatAsNew && File.Exists(Path.Combine(normalizedRoot, relative))))
         {
@@ -50,7 +61,7 @@ public static partial class NewFilePlacement
         }
 
         var (assembly, rootNamespace) = ReadProject(project.Value.Csproj);
-        var folderNamespace = string.Join('.', [rootNamespace, .. segments[project.Value.FolderDepth..^1]]);
+        var folderNamespace = string.Join('.', [rootNamespace, .. segments[project.Value.FolderDepth..^1].Select(Identifier)]);
         var ns = content is null ? null : DeclaredNamespace(content);
         ns ??= folderNamespace;
         if (LayerProbe.LayersOf(pack, assembly, ns).Count > 0)
@@ -60,6 +71,14 @@ public static partial class NewFilePlacement
 
         return $"New file '{relative}' would be namespace '{ns}' in assembly '{assembly}', which no layer of the rules selects. "
             + $"Layers: {string.Join(", ", layers)}. Ask the user where it belongs or add a layer.";
+    }
+
+    // MSBuild turns a folder name into a namespace segment: invalid identifier characters become '_' and a leading digit gets '_'.
+    private static string Identifier(string folder)
+    {
+        var chars = folder.Select(c => char.IsLetterOrDigit(c) || c == '_' ? c : '_').ToArray();
+        var text = new string(chars);
+        return text.Length > 0 && char.IsDigit(text[0]) ? "_" + text : text;
     }
 
     private static string Normalize(string path) => path.Replace('\\', '/');
@@ -108,7 +127,7 @@ public static partial class NewFilePlacement
             assembly = Literal(doc, "AssemblyName");
             rootNamespace = Literal(doc, "RootNamespace");
         }
-        catch (System.Xml.XmlException)
+        catch (Exception e) when (e is System.Xml.XmlException or IOException or UnauthorizedAccessException)
         {
             // An unreadable project falls back to its file name.
         }
@@ -118,14 +137,25 @@ public static partial class NewFilePlacement
     }
 
     private static string? Literal(XDocument doc, string element) =>
-        doc.Descendants().Where(e => string.Equals(e.Name.LocalName, element, StringComparison.Ordinal))
+        doc.Descendants().Where(e => string.Equals(e.Name.LocalName, element, StringComparison.Ordinal) && !IsConditional(e))
             .Select(e => e.Value.Trim())
             .FirstOrDefault(v => v.Length > 0 && !v.Contains("$(", StringComparison.Ordinal));
 
+    private static bool IsConditional(XElement element) =>
+        element.Attribute("Condition") is not null || element.Parent?.Attribute("Condition") is not null;
+
+    // The first declaration wins.
     private static string? DeclaredNamespace(string content)
     {
-        var match = NamespaceDeclaration().Match(content);
-        return match.Success ? match.Groups["name"].Value : null;
+        try
+        {
+            var match = NamespaceDeclaration().Match(content);
+            return match.Success ? match.Groups["name"].Value : null;
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            return null;
+        }
     }
 
     [GeneratedRegex(@"^\s*namespace\s+(?<name>[\w.]+)\s*[;{]", RegexOptions.Multiline | RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]

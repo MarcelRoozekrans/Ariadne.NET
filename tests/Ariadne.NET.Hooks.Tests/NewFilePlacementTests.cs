@@ -72,7 +72,7 @@ public class NewFilePlacementTests(ITestOutputHelper output)
 
         var question = NewFilePlacement.Check(Pack, project.Root, Path.Combine(project.Root, "Shop Web", "My Pages", "Home.cs"), null);
 
-        question.Should().Contain("namespace 'Shop.Web.My Pages'").And.Contain("assembly 'Shop.Web'");
+        question.Should().Contain("namespace 'Shop.Web.My_Pages'").And.Contain("assembly 'Shop.Web'");
     }
 
     [Fact]
@@ -140,9 +140,13 @@ public class NewFilePlacementTests(ITestOutputHelper output)
     [Fact]
     public void No_noise_on_the_clean_fixture()
     {
-        var pack = Resolve(Path.Combine(RepoRoot, "tests", "fixtures", "clean"), "schema: 2\nname: shop\nextends:\n  - builtin://clean-architecture\n");
+        var root = Path.Combine(RepoRoot, "tests", "fixtures", "clean");
+        var pack = Resolve(root, "schema: 2\nname: shop\nextends:\n  - builtin://clean-architecture\n");
 
-        Unplaced(pack, Path.Combine(RepoRoot, "tests", "fixtures", "clean")).Should().BeEmpty();
+        var (unplaced, evaluated) = Evaluate(pack, root);
+
+        unplaced.Should().BeEmpty();
+        evaluated.Should().Contain("Shop.Domain/Order.cs").And.HaveCountGreaterThanOrEqualTo(2);
     }
 
     [Fact]
@@ -150,7 +154,11 @@ public class NewFilePlacementTests(ITestOutputHelper output)
     {
         var pack = Resolve(RepoRoot, File.ReadAllText(Path.Combine(RepoRoot, ".architecture", "rules.yaml")));
 
-        Unplaced(pack, RepoRoot, "src").Should().BeEmpty();
+        var (unplaced, evaluated) = Evaluate(pack, RepoRoot, "src");
+
+        unplaced.Should().BeEmpty();
+        evaluated.Should().Contain("src/Ariadne.NET/Analysis/LayerProbe.cs").And.Contain("src/Ariadne.NET.Hooks/PreToolUseHook.cs");
+        evaluated.Count.Should().BeGreaterThan(100);
     }
 
     [Fact]
@@ -159,7 +167,7 @@ public class NewFilePlacementTests(ITestOutputHelper output)
         var root = Path.Combine(RepoRoot, "tests", "fixtures", "daedalus", "clean");
         var pack = Resolve(root, File.ReadAllText(Path.Combine(RepoRoot, "tests", "fixtures", "daedalus", "daedalus.rules.yaml")));
 
-        var unplaced = Unplaced(pack, root);
+        var (unplaced, evaluated) = Evaluate(pack, root);
 
         // Rag.NET and Stub.EntityFrameworkCore are in assemblies no layer selects. Daedalus.Agents/AgentDescriptor.cs is in
         // Daedalus.Agents.Contracts, which the Agents layer leaves out on purpose by selecting only Daedalus.Agents.Runtime.**.
@@ -168,6 +176,109 @@ public class NewFilePlacementTests(ITestOutputHelper output)
             "Daedalus.Agents/AgentDescriptor.cs",
             "Rag.NET/Retriever.cs",
             "Stub.EntityFrameworkCore/DbContext.cs");
+        evaluated.Should().Contain("Daedalus.Agents/RagAgent.cs").And.HaveCountGreaterThanOrEqualTo(14);
+    }
+
+    [Fact]
+    public void A_path_that_leaves_the_root_is_allowed()
+    {
+        using var project = new TempProject();
+        Csproj(project, "Shop.Web", "Shop.Web");
+
+        NewFilePlacement.Check(Pack, project.Root, Path.Combine(project.Root, "Shop.Web", "..", "..", "Shop.Web", "A.cs"), null).Should().BeNull();
+        NewFilePlacement.Check(Pack, project.Root, "..\\Shop.Web\\A.cs", null).Should().BeNull();
+    }
+
+    [Fact]
+    public void Folder_names_become_identifiers()
+    {
+        using var project = new TempProject();
+        Csproj(project, "Shop.Web", "Shop.Web");
+
+        NewFilePlacement.Check(Pack, project.Root, Path.Combine(project.Root, "Shop.Web", "2024", "my-pages", "A.cs"), null)
+            .Should().Contain("namespace 'Shop.Web._2024.my_pages'");
+    }
+
+    [Fact]
+    public void A_malformed_project_file_falls_back_to_its_file_name()
+    {
+        using var project = new TempProject();
+        Directory.CreateDirectory(Path.Combine(project.Root, "Shop.Web"));
+        File.WriteAllText(Path.Combine(project.Root, "Shop.Web", "Shop.Web.csproj"), "<Project><PropertyGroup><AssemblyName>Shop.Domain");
+
+        NewFilePlacement.Check(Pack, project.Root, Path.Combine(project.Root, "Shop.Web", "A.cs"), null)
+            .Should().Contain("assembly 'Shop.Web'");
+    }
+
+    [Fact]
+    public void A_non_literal_AssemblyName_falls_back_to_the_file_name()
+    {
+        using var project = new TempProject();
+        Csproj(project, "Shop.Web", "Shop.Web", "<AssemblyName>$(Prefix).Core</AssemblyName><RootNamespace>$(Prefix)</RootNamespace>");
+
+        NewFilePlacement.Check(Pack, project.Root, Path.Combine(project.Root, "Shop.Web", "A.cs"), null)
+            .Should().Contain("assembly 'Shop.Web'").And.Contain("namespace 'Shop.Web'");
+    }
+
+    [Fact]
+    public void Conditional_properties_are_ignored()
+    {
+        using var project = new TempProject();
+        var dir = Path.Combine(project.Root, "Shop.Web");
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(
+            Path.Combine(dir, "Shop.Web.csproj"),
+            "<Project><PropertyGroup Condition=\"'$(X)'=='1'\"><AssemblyName>Shop.Domain</AssemblyName></PropertyGroup>"
+            + "<PropertyGroup><RootNamespace Condition=\"'$(X)'=='1'\">Other</RootNamespace></PropertyGroup></Project>");
+
+        NewFilePlacement.Check(Pack, project.Root, Path.Combine(dir, "A.cs"), null)
+            .Should().Contain("assembly 'Shop.Web'").And.Contain("namespace 'Shop.Web'");
+    }
+
+    [Fact]
+    public void A_commented_namespace_line_is_not_a_declaration()
+    {
+        using var project = new TempProject();
+        Csproj(project, "Shop.Agents", "Shop.Agents");
+        var file = Path.Combine(project.Root, "Shop.Agents", "A.cs");
+
+        NewFilePlacement.Check(Pack, project.Root, file, "// namespace Shop.Agents.Runtime.X;\nclass A;")
+            .Should().Contain("namespace 'Shop.Agents'");
+    }
+
+    [Fact]
+    public void With_several_namespace_declarations_the_first_wins()
+    {
+        using var project = new TempProject();
+        Csproj(project, "Shop.Agents", "Shop.Agents");
+        var file = Path.Combine(project.Root, "Shop.Agents", "A.cs");
+
+        NewFilePlacement.Check(Pack, project.Root, file, "namespace Shop.Agents.Runtime.A\n{\n}\nnamespace Elsewhere.B\n{\n}")
+            .Should().BeNull();
+        NewFilePlacement.Check(Pack, project.Root, file, "namespace Elsewhere.B\n{\n}\nnamespace Shop.Agents.Runtime.A\n{\n}")
+            .Should().Contain("namespace 'Elsewhere.B'");
+    }
+
+    [Theory]
+    [InlineData("namespace   Shop.Agents.Runtime.A   ;")]
+    [InlineData("\tnamespace\tShop.Agents.Runtime.A\n;")]
+    [InlineData("namespace Shop.Agents.Runtime.A{}")]
+    public void Unusual_spacing_still_finds_the_namespace(string content)
+    {
+        using var project = new TempProject();
+        Csproj(project, "Shop.Agents", "Shop.Agents");
+
+        NewFilePlacement.Check(Pack, project.Root, Path.Combine(project.Root, "Shop.Agents", "A.cs"), content).Should().BeNull();
+    }
+
+    [Fact]
+    public void A_global_qualified_name_in_the_content_is_not_a_namespace_declaration()
+    {
+        using var project = new TempProject();
+        Csproj(project, "Shop.Agents", "Shop.Agents");
+
+        NewFilePlacement.Check(Pack, project.Root, Path.Combine(project.Root, "Shop.Agents", "A.cs"), "using X = global::Shop.Agents.Runtime;\nclass A;")
+            .Should().Contain("namespace 'Shop.Agents'");
     }
 
     private static string RepoRoot
@@ -196,21 +307,46 @@ public class NewFilePlacementTests(ITestOutputHelper output)
         return resolved.Value;
     }
 
-    private List<string> Unplaced(RulePack pack, string root, string? sub = null)
+    // The files that were evaluated are those below a project and outside obj and bin, counted independently of the code under test.
+    private (List<string> Unplaced, List<string> Evaluated) Evaluate(RulePack pack, string root, string? sub = null)
     {
-        var result = new List<string>();
+        var unplaced = new List<string>();
+        var evaluated = new List<string>();
         var start = sub is null ? root : Path.Combine(root, sub);
         foreach (var file in Directory.EnumerateFiles(start, "*.cs", SearchOption.AllDirectories))
         {
             var relative = Path.GetRelativePath(root, file).Replace('\\', '/');
+            var segments = relative.Split('/');
+            if (Array.IndexOf(segments, "obj") >= 0 || Array.IndexOf(segments, "bin") >= 0 || !HasProjectAbove(root, file))
+            {
+                continue;
+            }
+
+            evaluated.Add(relative);
             var question = NewFilePlacement.Check(pack, root, file, File.ReadAllText(file), treatAsNew: true);
             if (question is not null)
             {
                 output.WriteLine(question);
-                result.Add(relative);
+                unplaced.Add(relative);
             }
         }
 
-        return result;
+        return (unplaced, evaluated);
+    }
+
+    private static bool HasProjectAbove(string root, string file)
+    {
+        var dir = Path.GetDirectoryName(file);
+        while (dir is not null && dir.StartsWith(root, StringComparison.Ordinal))
+        {
+            if (Directory.GetFiles(dir, "*.csproj").Length > 0)
+            {
+                return true;
+            }
+
+            dir = Path.GetDirectoryName(dir);
+        }
+
+        return false;
     }
 }

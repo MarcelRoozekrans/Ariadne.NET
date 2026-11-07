@@ -6,11 +6,6 @@ namespace Ariadne.NET.Hooks;
 /// </summary>
 public sealed class PreToolUseHook(IProjectRules rules) : IHook
 {
-    private static bool IsEditTool(string tool) =>
-        string.Equals(tool, "Write", StringComparison.Ordinal)
-        || string.Equals(tool, "Edit", StringComparison.Ordinal)
-        || string.Equals(tool, "MultiEdit", StringComparison.Ordinal);
-
     /// <inheritdoc />
     public string Event => "pre-tool-use";
 
@@ -27,12 +22,28 @@ public sealed class PreToolUseHook(IProjectRules rules) : IHook
             return Task.FromResult<string?>(null);
         }
 
-        EditedFiles.Record(input.SessionId, input.FilePath);
+        ArgumentNullException.ThrowIfNull(warn);
+
+        try
+        {
+            EditedFiles.Record(input.SessionId, input.FilePath);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            // Losing the record must not lose the question.
+            warn.WriteLine($"ariadne: could not record the edited file: {TextLimit.Shorten(e.Message)}");
+        }
 
         var root = input.Cwd ?? Directory.GetCurrentDirectory();
+        if (!File.Exists(Path.Combine(root, ".architecture", "rules.yaml")))
+        {
+            return Task.FromResult<string?>(null);
+        }
+
         var loaded = rules.Load(root);
         if (loaded.IsFailure)
         {
+            warn.WriteLine($"ariadne: could not load the project rules: {TextLimit.Shorten(loaded.Error.Message)}");
             return Task.FromResult<string?>(null);
         }
 
@@ -40,4 +51,9 @@ public sealed class PreToolUseHook(IProjectRules rules) : IHook
         var question = NewFilePlacement.Check(loaded.Value, root, input.FilePath, content);
         return Task.FromResult(question is null ? null : HookOutput.PreToolUseAsk(question));
     }
+
+    private static bool IsEditTool(string tool) =>
+        string.Equals(tool, "Write", StringComparison.Ordinal)
+        || string.Equals(tool, "Edit", StringComparison.Ordinal)
+        || string.Equals(tool, "MultiEdit", StringComparison.Ordinal);
 }
