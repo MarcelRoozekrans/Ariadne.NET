@@ -41,6 +41,7 @@ public static class RulePackDescriber
         return lines;
     }
 
+    /// <summary>The selector kinds that are set, joined by "; ", or <c>no selectors</c>.</summary>
     public static string Describe(TargetSelector selector)
     {
         ArgumentNullException.ThrowIfNull(selector);
@@ -54,7 +55,7 @@ public static class RulePackDescriber
             selector.Attributes);
     }
 
-    // Members in the order layer, kind, accessibility, implements, joined by ", ".
+    /// <summary>The requirement members in the order layer, kind, accessibility, implements, joined by ", ", or <c>no requirement</c>.</summary>
     public static string Describe(RuleRequirement? requirement)
     {
         if (requirement is null)

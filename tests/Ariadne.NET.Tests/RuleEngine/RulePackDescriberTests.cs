@@ -120,4 +120,33 @@ public class RulePackDescriberTests
         // The loader rejects a layer without selectors, so only the renderer can be pinned directly.
         RulePackDescriber.Describe(new TargetSelector()).Should().Be("no selectors");
     }
+
+    [Fact]
+    public void Describe_RequirementWithEveryMember_UsesTheDocumentedOrder()
+    {
+        var requirement = new RuleRequirement
+        {
+            Layer = "Domain",
+            Kind = CSharpTypeKind.Class,
+            Accessibility = "internal",
+            Implements = new TargetSelector { Interfaces = ["IDetector"] },
+        };
+
+        RulePackDescriber.Describe(requirement).Should().Be("layer Domain, kind class, internal, implements interfaces IDetector");
+    }
+
+    [Fact]
+    public void DescribeRule_UnknownKind_FallsBackToTheEnumName()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "R-UNKNOWN",
+            Because = "Because.",
+            Kind = (RuleKind)999,
+            From = new TargetSelector { Layers = ["A"] },
+            To = new TargetSelector { Layers = ["B"] },
+        };
+
+        RulePackDescriber.DescribeRule(rule)[0].Should().Be("R-UNKNOWN 999 layers A -> layers B");
+    }
 }
