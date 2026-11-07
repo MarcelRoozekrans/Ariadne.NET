@@ -16,6 +16,7 @@ public static class CliRootCommand
         rootCommand.Subcommands.Add(GenerateCommand.Create(provider));
         rootCommand.Subcommands.Add(ValidateCommand.Create(provider));
         rootCommand.Subcommands.Add(SyncCommand.Create(provider));
+        rootCommand.Subcommands.Add(HookCommand.Create(provider));
 
         return rootCommand;
     }
