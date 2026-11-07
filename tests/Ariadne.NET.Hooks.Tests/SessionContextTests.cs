@@ -79,18 +79,86 @@ public class SessionContextTests
     }
 
     [Fact]
-    public void Drops_roles_before_rules_before_layers()
+    public void Drops_roles_first_then_rules_then_layers_and_keeps_each_unit_whole()
     {
         var pack = CleanArchitecture();
         var full = SessionContext.Build(pack, [], []);
+        var rolesStart = full.IndexOf("Component roles:", StringComparison.Ordinal);
+        var rulesStart = full.IndexOf("Rules:", StringComparison.Ordinal);
 
-        var text = SessionContext.Build(pack, [], [], full.Length - 100);
-
-        text.Should().Contain("Truncated:").And.Contain("Layers:").And.Contain("Rules:");
-        text.Should().NotContain(pack.ComponentRoles[^1].Name + " (layer");
+        // Room for the layers, the rules and a few lines only: every role is dropped, rules stay whole.
+        var noRoles = SessionContext.Build(pack, [], [], rolesStart + 200);
+        noRoles.Should().NotContain("Component roles:").And.Contain("Truncated:");
         foreach (var rule in pack.Rules)
         {
-            text.Should().Contain(rule.Id);
+            noRoles.Should().Contain(rule.Id).And.Contain(rule.Because);
+        }
+
+        // Room for the layers and part of the rules: layers all stay, a kept rule always has its because line.
+        var someRules = SessionContext.Build(pack, [], [], rulesStart + 300);
+        someRules.Should().Contain("Layers:").And.NotContain("Component roles:");
+        pack.Rules.Count(r => someRules.Contains(r.Id, StringComparison.Ordinal)).Should().BeLessThan(pack.Rules.Count);
+        foreach (var rule in pack.Rules.Where(r => someRules.Contains(r.Id, StringComparison.Ordinal)))
+        {
+            someRules.Should().Contain(rule.Because);
+        }
+
+        // Room for one layer: rules and roles are gone.
+        var oneLayer = SessionContext.Build(pack, [], [], 400);
+        oneLayer.Should().NotContain("Rules:").And.NotContain("Component roles:");
+        oneLayer.Length.Should().BeLessThanOrEqualTo(400);
+    }
+
+    [Theory]
+    [InlineData(150)]
+    [InlineData(300)]
+    public void A_tiny_cap_still_ends_with_the_truncation_line(int cap)
+    {
+        var text = SessionContext.Build(CleanArchitecture(), ["shared@v1.2.0"], ["stale cache"], cap);
+
+        text.Length.Should().BeLessThanOrEqualTo(cap);
+        text.Split('\n')[^1].Should().StartWith("Truncated: ").And.EndWith("for all of them.");
+    }
+
+    [Fact]
+    public void Two_hundred_warnings_are_dropped_whole_within_the_cap()
+    {
+        var warnings = Enumerable.Range(0, 200).Select(i => $"import {i} is stale and needs a sync").ToList();
+
+        var text = SessionContext.Build(CleanArchitecture(), [], warnings, 1_000);
+
+        text.Length.Should().BeLessThanOrEqualTo(1_000);
+        text.Split('\n')[^1].Should().StartWith("Truncated: ");
+        text.Split('\n').Where(l => l.StartsWith("Warning:", StringComparison.Ordinal))
+            .Should().OnlyContain(l => l.EndsWith("needs a sync", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(10_000)]
+    [InlineData(300)]
+    public void One_twenty_thousand_char_warning_stays_within_the_cap(int cap)
+    {
+        var text = SessionContext.Build(CleanArchitecture(), [], [new string('x', 20_000)], cap);
+
+        text.Length.Should().BeLessThanOrEqualTo(cap);
+        if (cap < 10_000)
+        {
+            text.Split('\n')[^1].Should().StartWith("Truncated: ");
+        }
+    }
+
+    [Fact]
+    public void A_long_line_is_cut_without_splitting_a_surrogate_pair()
+    {
+        var emoji = string.Concat(Enumerable.Repeat("\U0001F600", 400));
+
+        var text = SessionContext.Build(CleanArchitecture(), [], [emoji]);
+
+        text.Length.Should().BeLessThanOrEqualTo(10_000);
+        foreach (var line in text.Split('\n'))
+        {
+            line.Should().NotBeEmpty();
+            char.IsHighSurrogate(line.Replace("…", "")[^1]).Should().BeFalse();
         }
     }
 

@@ -8,73 +8,66 @@ namespace Ariadne.NET.Hooks;
 public static class CacheFreshness
 {
     /// <summary>One warning per import whose cache is missing or no longer satisfies its version range.</summary>
-    public static IReadOnlyList<string> Check(string root, IImportsLoader loader)
-    {
-        ArgumentNullException.ThrowIfNull(root);
-        ArgumentNullException.ThrowIfNull(loader);
-
-        var manifest = LoadManifest(root, loader, out var failure);
-        if (failure is not null)
-        {
-            return [failure];
-        }
-
-        var warnings = new List<string>();
-        foreach (var import in manifest)
-        {
-            var tag = ReadResolvedTag(root, import.Name);
-            var range = SemVerRange.Parse(import.Version);
-            if (tag is null || range.IsFailure || !SemVer.TryParse(tag, out var cached) || !range.Value.IsSatisfiedBy(cached!))
-            {
-                warnings.Add($"Import '{import.Name}' is not cached for '{import.Version}'; run 'ariadne sync'.");
-            }
-        }
-
-        return warnings;
-    }
+    public static IReadOnlyList<string> Check(string root, IImportsLoader loader) => Read(root, loader).Warnings;
 
     /// <summary>The <c>name@resolvedTag</c> of every cached import.</summary>
-    public static IReadOnlyList<string> Versions(string root, IImportsLoader loader)
+    public static IReadOnlyList<string> Versions(string root, IImportsLoader loader) => Read(root, loader).Versions;
+
+    /// <summary>Reads <c>imports.yaml</c> once and returns both the warnings and the cached versions.</summary>
+    public static CacheStatus Read(string root, IImportsLoader loader)
     {
         ArgumentNullException.ThrowIfNull(root);
         ArgumentNullException.ThrowIfNull(loader);
 
-        var manifest = LoadManifest(root, loader, out _);
-        var versions = new List<string>();
-        foreach (var import in manifest)
+        var manifestPath = Path.Combine(root, ".architecture", "imports.yaml");
+        if (!File.Exists(manifestPath))
         {
-            var tag = ReadResolvedTag(root, import.Name);
+            return new CacheStatus([], []);
+        }
+
+        var loaded = loader.LoadFromFile(manifestPath);
+        if (loaded.IsFailure)
+        {
+            return new CacheStatus([$"imports.yaml could not be read: {TextLimit.Shorten(loaded.Error.Message)}"], []);
+        }
+
+        var cacheRoot = Path.Combine(root, ".architecture", ".cache", "git");
+        var warnings = new List<string>();
+        var versions = new List<string>();
+        foreach (var import in loaded.Value.Imports)
+        {
+            var name = TextLimit.Shorten(import.Name, 100);
+            if (!ImportNameRule.IsSingleDirectoryName(import.Name, cacheRoot))
+            {
+                warnings.Add($"Import name '{name}' is not a plain directory name, so its cache is not read.");
+                continue;
+            }
+
+            var range = SemVerRange.Parse(import.Version);
+            if (range.IsFailure)
+            {
+                warnings.Add($"Import '{name}' has a version range '{TextLimit.Shorten(import.Version, 100)}' that cannot be read.");
+                continue;
+            }
+
+            var tag = ReadResolvedTag(cacheRoot, import.Name);
             if (tag is not null)
             {
-                versions.Add(string.Create(CultureInfo.InvariantCulture, $"{import.Name}@{tag}"));
+                versions.Add(string.Create(CultureInfo.InvariantCulture, $"{name}@{TextLimit.Shorten(tag, 100)}"));
+            }
+
+            if (tag is null || !SemVer.TryParse(tag, out var cached) || !range.Value.IsSatisfiedBy(cached!))
+            {
+                warnings.Add($"Import '{name}' is not cached for '{TextLimit.Shorten(import.Version, 100)}'; run 'ariadne sync'.");
             }
         }
 
-        return versions;
+        return new CacheStatus(warnings, versions);
     }
 
-    private static IList<ImportDefinition> LoadManifest(string root, IImportsLoader loader, out string? failure)
+    private static string? ReadResolvedTag(string cacheRoot, string name)
     {
-        failure = null;
-        var path = Path.Combine(root, ".architecture", "imports.yaml");
-        if (!File.Exists(path))
-        {
-            return [];
-        }
-
-        var loaded = loader.LoadFromFile(path);
-        if (loaded.IsFailure)
-        {
-            failure = $"imports.yaml could not be read: {loaded.Error.Message}";
-            return [];
-        }
-
-        return loaded.Value.Imports;
-    }
-
-    private static string? ReadResolvedTag(string root, string name)
-    {
-        var file = Path.Combine(root, ".architecture", ".cache", "git", name, ".git-info.json");
+        var file = Path.Combine(cacheRoot, name, ".git-info.json");
         if (!File.Exists(file))
         {
             return null;

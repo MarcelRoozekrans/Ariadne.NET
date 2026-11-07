@@ -76,6 +76,29 @@ public class SessionStartHookTests
     }
 
     [Fact]
+    public async Task Rules_that_extend_an_unknown_builtin_pack_are_not_told_to_init()
+    {
+        using var project = new TempProject();
+        project.WriteRules("schema: 2\nname: shop\nextends:\n  - builtin://no-such-pack\n");
+
+        var context = await ContextAsync(project.Root).ConfigureAwait(true);
+
+        context.Should().Contain("could not load").And.Contain("no-such-pack").And.NotContain("ariadne init");
+    }
+
+    [Fact]
+    public async Task A_very_long_error_message_stays_within_the_cap()
+    {
+        using var project = new TempProject();
+        project.WriteRules($"schema: 2\nname: shop\nextends:\n  - builtin://{new string('z', 30_000)}\n");
+
+        var context = await ContextAsync(project.Root).ConfigureAwait(true);
+
+        context.Length.Should().BeLessThanOrEqualTo(10_000);
+        context.Should().Contain("could not load");
+    }
+
+    [Fact]
     public async Task A_stale_cache_warning_comes_first()
     {
         using var project = new TempProject();

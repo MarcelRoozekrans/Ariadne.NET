@@ -34,7 +34,7 @@ internal sealed class TempProject : IDisposable
         {
             Directory.Delete(Root, recursive: true);
         }
-        catch (IOException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             // Best effort: a leftover temp folder must not fail a test.
         }

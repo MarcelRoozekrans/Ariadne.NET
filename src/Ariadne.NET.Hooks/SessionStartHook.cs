@@ -1,4 +1,3 @@
-using Ariadne.NET.Abstractions;
 using Ariadne.NET.Sync;
 
 namespace Ariadne.NET.Hooks;
@@ -18,19 +17,23 @@ public sealed class SessionStartHook(IProjectRules rules, IImportsLoader imports
         ArgumentNullException.ThrowIfNull(input);
 
         var root = input.Cwd ?? Directory.GetCurrentDirectory();
-        var loaded = rules.Load(root);
         string context;
-        if (loaded.IsFailure)
+        if (!File.Exists(Path.Combine(root, ".architecture", "rules.yaml")))
         {
-            context = loaded.Error.Code == AriadneErrorCode.NotFound
-                ? NoRulesText
-                : $"Ariadne could not load the project rules: {loaded.Error.Message}";
+            context = NoRulesText;
         }
         else
         {
-            var warnings = CacheFreshness.Check(root, importsLoader);
-            var versions = CacheFreshness.Versions(root, importsLoader);
-            context = SessionContext.Build(loaded.Value, versions, warnings);
+            var loaded = rules.Load(root);
+            if (loaded.IsFailure)
+            {
+                context = $"Ariadne could not load the project rules: {TextLimit.Shorten(loaded.Error.Message)}";
+            }
+            else
+            {
+                var cache = CacheFreshness.Read(root, importsLoader);
+                context = SessionContext.Build(loaded.Value, cache.Versions, cache.Warnings);
+            }
         }
 
         return Task.FromResult<string?>(HookOutput.SessionStart(context));
