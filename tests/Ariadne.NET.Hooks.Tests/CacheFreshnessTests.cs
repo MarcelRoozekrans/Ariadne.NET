@@ -132,4 +132,17 @@ public class CacheFreshnessTests
         status.Versions.Should().Equal("shared@v2.0.0");
         status.Warnings.Should().ContainSingle();
     }
+
+    [Fact]
+    public void An_import_with_an_unreadable_range_is_not_listed_in_versions_even_when_cached()
+    {
+        using var project = new TempProject();
+        project.WriteImports("shared", "not-a-range");
+        project.WriteCache("shared", "v1.2.0");
+
+        var status = CacheFreshness.Read(project.Root, _loader);
+
+        status.Versions.Should().BeEmpty();
+        status.Warnings.Should().ContainSingle().Which.Should().Contain("cannot be read");
+    }
 }

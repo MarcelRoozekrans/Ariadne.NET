@@ -13,7 +13,6 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Ariadne.NET.Tests" />
-    <InternalsVisibleTo Include="Ariadne.NET.Hooks" />
   </ItemGroup>
 
   <ItemGroup>
