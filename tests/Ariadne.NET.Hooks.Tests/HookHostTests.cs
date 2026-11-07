@@ -117,4 +117,27 @@ public class HookHostTests
         err.Should().StartWith("ariadne hook: ").And.Contain("cancelled");
         hook.Received.Should().BeNull();
     }
+
+    [Fact]
+    public async Task A_hook_that_throws_cancellation_fails_open_as_cancelled()
+    {
+        var hook = new FakeHook("stop", _ => throw new OperationCanceledException());
+
+        var (exit, output, err) = await RunAsync([hook], "stop", ValidInput);
+
+        exit.Should().Be(0);
+        output.Should().BeEmpty();
+        err.Should().StartWith("ariadne hook: stop: cancelled");
+    }
+
+    [Fact]
+    public async Task A_multi_line_exception_message_collapses_to_one_stderr_line()
+    {
+        var hook = new FakeHook("stop", _ => throw new InvalidOperationException("first\r\nsecond\nthird"));
+
+        var (_, _, err) = await RunAsync([hook], "stop", ValidInput);
+
+        err.TrimEnd().Split('\n').Should().HaveCount(1);
+        err.Should().Contain("first").And.Contain("second").And.Contain("third");
+    }
 }

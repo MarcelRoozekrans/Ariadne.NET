@@ -30,13 +30,21 @@ public sealed class HookHost(IEnumerable<IHook> hooks)
             if (!string.IsNullOrEmpty(output))
             {
                 await stdout.WriteAsync(output).ConfigureAwait(false);
+                await stdout.FlushAsync(cancellationToken).ConfigureAwait(false);
             }
         }
 #pragma warning disable CA1031 // A hook must never fail the agent: every exception becomes a stderr line.
         catch (Exception ex)
 #pragma warning restore CA1031
         {
-            await stderr.WriteLineAsync($"ariadne hook: {eventName}: {Describe(ex)}").ConfigureAwait(false);
+            try
+            {
+                await stderr.WriteLineAsync($"ariadne hook: {eventName}: {Describe(ex)}").ConfigureAwait(false);
+            }
+            catch (Exception writeError) when (writeError is IOException or ObjectDisposedException)
+            {
+                // stderr is gone; there is nowhere left to report to, and the exit code must stay 0.
+            }
         }
 
         return 0;

@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 
@@ -37,6 +38,6 @@ public static class HookOutput
             writer.WriteEndObject();
         }
 
-        return System.Text.Encoding.UTF8.GetString(stream.ToArray());
+        return Encoding.UTF8.GetString(stream.ToArray());
     }
 }
