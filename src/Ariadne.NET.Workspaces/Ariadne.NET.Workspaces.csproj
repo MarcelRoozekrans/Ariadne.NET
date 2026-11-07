@@ -32,7 +32,7 @@
       MSBuildLocator loads Microsoft.Build.Framework from the .NET SDK, so the copy must stay out of the output. The
       exclusion does not flow to consumers: each project that references this one carries its own reference too.
     -->
-    <PackageReference Include="Microsoft.Build.Framework" Version="17.14.28" ExcludeAssets="runtime" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Build.Framework" Version="18.11.0" ExcludeAssets="runtime" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
