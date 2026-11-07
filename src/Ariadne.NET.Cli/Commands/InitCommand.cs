@@ -94,13 +94,16 @@ public static class InitCommand
             }
         }
 
+        var unchanged = plan.Value.TempPath is null;
         var committed = ClaudeSettingsFile.Commit(plan.Value, rulesWritten: !keepRules);
         if (committed.IsFailure)
         {
             return ErrorOutput.Report(committed.Error);
         }
 
-        Console.WriteLine($"Added the Ariadne hooks to {ClaudeSettingsFile.DisplayPath}");
+        Console.WriteLine(unchanged
+            ? $"The Ariadne hooks are already in {ClaudeSettingsFile.DisplayPath}"
+            : $"Added the Ariadne hooks to {ClaudeSettingsFile.DisplayPath}");
         return ExitCodes.Success;
     }
 

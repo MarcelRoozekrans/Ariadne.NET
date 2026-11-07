@@ -285,6 +285,7 @@ public sealed class InitAgentTests : IDisposable
         var old = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         File.SetLastWriteTimeUtc(Settings, old);
         var temps = TempFiles();
+        _out.GetStringBuilder().Clear();
 
         var exit = Run("init", "--agent", "claude");
         var output = _out.ToString();
@@ -295,7 +296,7 @@ public sealed class InitAgentTests : IDisposable
         temps.Should().BeEmpty();
         tempsAfter.Should().BeEmpty();
         stamp.Should().Be(old);
-        output.Should().Contain("Added the Ariadne hooks to .claude/settings.json");
+        output.Should().Contain("The Ariadne hooks are already in .claude/settings.json").And.NotContain("Added the Ariadne hooks");
     }
 
     [UnixFact]
