@@ -12,7 +12,7 @@ public static class ImportNameRule
         [.. Path.GetInvalidFileNameChars().Union(['/', '\\', ':', '*', '?', '"', '<', '>', '|'])];
 
     /// <summary>The message for an import name that <see cref="IsSingleDirectoryName"/> refuses.</summary>
-    public static string BadNameMessage(string name) =>
+    internal static string BadNameMessage(string name) =>
         $"Import name '{name}' must be a plain directory name: no path separators, drive, '.' or '..', or characters such as ':' or '*'.";
 
     /// <summary>
