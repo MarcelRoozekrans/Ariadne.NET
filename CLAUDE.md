@@ -20,7 +20,7 @@ dotnet test src/Ariadne.NET.slnx --filter "FullyQualifiedName~RulePackMergerTest
 dotnet test src/Ariadne.NET.slnx --filter "FullyQualifiedName=Ariadne.NET.Tests.RuleEngine.RulePackMergerTests.<Method>"
 
 # Run hosts
-dotnet run --project src/Ariadne.NET.Cli -- <init|rules|roles|generate|validate|sync|hook> [...]   # validate takes a .sln, .slnx, .slnf or .csproj, default .; hook <session-start|pre-tool-use|stop> reads Claude Code hook JSON on stdin
+dotnet run --project src/Ariadne.NET.Cli -- <init|rules|roles|generate|validate|sync|hook> [...]   # init --agent claude also installs the Claude Code hooks into .claude/settings.json (keeps an existing rules.yaml); validate takes a .sln, .slnx, .slnf or .csproj, default .; hook <session-start|pre-tool-use|stop> reads Claude Code hook JSON on stdin
 dotnet run --project src/Ariadne.NET.Mcp        # MCP over stdio
 dotnet run --project src/Ariadne.NET.Mcp.Http   # MCP over HTTP at /mcp
 
