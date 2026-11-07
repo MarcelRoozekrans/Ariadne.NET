@@ -228,6 +228,16 @@ public class NewFilePlacementTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void An_absolute_path_outside_the_root_is_allowed()
+    {
+        using var project = new TempProject();
+        using var other = new TempProject();
+        Csproj(other, "Shop.Web", "Shop.Web");
+
+        NewFilePlacement.Check(Pack, project.Root, Path.Combine(other.Root, "Shop.Web", "A.cs"), "class A;").Should().BeNull();
+    }
+
+    [Fact]
     public void A_path_that_leaves_the_root_is_allowed()
     {
         using var project = new TempProject();

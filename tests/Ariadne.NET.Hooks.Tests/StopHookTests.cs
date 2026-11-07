@@ -1,3 +1,4 @@
+using System.Runtime.Versioning;
 using System.Text.Json;
 using Ariadne.NET.Abstractions;
 using Ariadne.NET.Analysis;
@@ -364,5 +365,75 @@ public class StopHookTests
         {
             text.Should().Contain($"Rule {id}:");
         }
+    }
+
+    private const UnixFileMode Private = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+
+    // A read-only session folder lets the records be read but not deleted. A privileged process ignores the mode.
+    private static bool CanBlockDeletes => !Environment.IsPrivilegedProcess;
+
+    [UnsupportedOSPlatform("windows")]
+    private static void BlockDeletes(string session) =>
+        File.SetUnixFileMode(EditedFiles.SessionFolder(session), UnixFileMode.UserRead | UnixFileMode.UserExecute);
+
+    [UnsupportedOSPlatform("windows")]
+    private static void AllowDeletes(string session) => File.SetUnixFileMode(EditedFiles.SessionFolder(session), Private);
+
+    [UnixFact]
+    [UnsupportedOSPlatform("windows")]
+    public async Task A_stop_hook_that_cannot_clear_the_edits_after_the_check_warns_and_still_gives_feedback()
+    {
+        if (!CanBlockDeletes)
+        {
+            return;
+        }
+
+        using var project = ProjectWithSolution();
+        using var session = new TestSession();
+        EditedFiles.Record(session.Id, "/x/A.cs");
+        using var warn = new StringWriter();
+        string? json;
+        BlockDeletes(session.Id);
+        try
+        {
+            json = await RunAsync(Create(new FakeValidator(Report(Violation()))), project.Root, session.Id, warn: warn).ConfigureAwait(true);
+        }
+        finally
+        {
+            AllowDeletes(session.Id);
+        }
+
+        json.Should().Contain("SHOP-RULE");
+        warn.ToString().Should().Contain("could not clear the edited files");
+    }
+
+    [UnixFact]
+    [UnsupportedOSPlatform("windows")]
+    public async Task A_second_stop_that_cannot_clear_the_edits_warns_and_stays_silent()
+    {
+        if (!CanBlockDeletes)
+        {
+            return;
+        }
+
+        using var project = ProjectWithSolution();
+        using var session = new TestSession();
+        EditedFiles.Record(session.Id, "/x/A.cs");
+        using var warn = new StringWriter();
+        var validator = new FakeValidator(Report(Violation()));
+        string? json;
+        BlockDeletes(session.Id);
+        try
+        {
+            json = await RunAsync(Create(validator), project.Root, session.Id, active: true, warn: warn).ConfigureAwait(true);
+        }
+        finally
+        {
+            AllowDeletes(session.Id);
+        }
+
+        json.Should().BeNull();
+        validator.Calls.Should().Be(0);
+        warn.ToString().Should().Contain("could not clear the edited files");
     }
 }

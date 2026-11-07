@@ -245,6 +245,41 @@ public sealed class HookCommandTests : IDisposable
         console.Split('\n', StringSplitOptions.RemoveEmptyEntries).Should().ContainSingle().Which.Should().StartWith("ariadne hook:");
     }
 
+    private int RunWithStreams(Func<HookStreams> openStreams)
+    {
+        var root = CliRootCommand.Create(_provider, HookCommand.Create(_provider, openStreams));
+        return CliRootCommand.InvokeAsync(root, ["hook", "stop"], CancellationToken.None).GetAwaiter().GetResult();
+    }
+
+    [Fact]
+    public void Streams_that_cannot_be_opened_fail_open_and_name_only_the_exception_type()
+    {
+        var exit = RunWithStreams(() => throw new IOException("secret detail"));
+        var console = _consoleError.ToString();
+
+        exit.Should().Be(0);
+        console.Should().Contain("ariadne hook: the hook host is unavailable (IOException).").And.NotContain("secret detail");
+    }
+
+    [Fact]
+    public void A_stderr_that_cannot_be_written_still_exits_zero()
+    {
+        Console.SetError(new ThrowingWriter());
+
+        var exit = RunWithStreams(() => throw new InvalidOperationException("no streams"));
+
+        exit.Should().Be(0);
+    }
+
+    private sealed class ThrowingWriter : TextWriter
+    {
+        public override Encoding Encoding => Utf8;
+
+        public override void WriteLine(string? value) => throw new IOException("stderr closed");
+
+        public override void Write(char value) => throw new IOException("stderr closed");
+    }
+
     private sealed class ThrowingStream : Stream
     {
         public override bool CanRead => true;

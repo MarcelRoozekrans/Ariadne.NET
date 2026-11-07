@@ -145,4 +145,57 @@ public class CacheFreshnessTests
         status.Versions.Should().BeEmpty();
         status.Warnings.Should().ContainSingle().Which.Should().Contain("cannot be read");
     }
+
+    [Theory]
+    [InlineData("[]")]
+    [InlineData("{}")]
+    [InlineData("{\"resolvedTag\": 5}")]
+    [InlineData("{\"resolvedTag\": null}")]
+    public void A_git_info_file_without_a_string_resolved_tag_warns_and_lists_no_version(string json)
+    {
+        using var project = new TempProject();
+        project.WriteImports("shared", "^1.0.0");
+        var dir = Path.Combine(project.Root, ".architecture", ".cache", "git", "shared");
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, ".git-info.json"), json);
+
+        var status = CacheFreshness.Read(project.Root, _loader);
+
+        status.Versions.Should().BeEmpty();
+        status.Warnings.Should().ContainSingle().Which.Should().Contain("run 'ariadne sync'");
+    }
+
+    [Fact]
+    public void A_cached_tag_that_is_not_a_version_is_listed_but_warned_about()
+    {
+        using var project = new TempProject();
+        project.WriteImports("shared", "^1.0.0");
+        project.WriteCache("shared", "latest");
+
+        var status = CacheFreshness.Read(project.Root, _loader);
+
+        status.Versions.Should().Equal("shared@latest");
+        status.Warnings.Should().ContainSingle().Which.Should().Contain("not cached");
+    }
+
+    [Fact]
+    public void A_long_import_name_and_version_are_bounded_in_the_warning()
+    {
+        using var project = new TempProject();
+        project.WriteImports("shared", new string('v', 5_000));
+
+        var warnings = CacheFreshness.Check(project.Root, _loader);
+
+        warnings.Should().ContainSingle().Which.Length.Should().BeLessThan(400);
+    }
+
+    [Fact]
+    public void Null_arguments_are_refused()
+    {
+        var noRoot = () => CacheFreshness.Read(null!, _loader);
+        var noLoader = () => CacheFreshness.Read("/x", null!);
+
+        noRoot.Should().Throw<ArgumentNullException>();
+        noLoader.Should().Throw<ArgumentNullException>();
+    }
 }

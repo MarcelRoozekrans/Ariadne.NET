@@ -240,4 +240,14 @@ public class EditedFilesTests
             EditedFiles.Clear(id);
         }
     }
+
+    [Fact]
+    public void An_empty_record_file_is_ignored()
+    {
+        using var session = new TestSession();
+        EditedFiles.Record(session.Id, "/a/One.cs");
+        File.WriteAllText(Path.Combine(EditedFiles.SessionFolder(session.Id), "0-empty.rec"), "");
+
+        EditedFiles.Read(session.Id).Should().Equal("/a/One.cs");
+    }
 }

@@ -186,4 +186,24 @@ public class SessionContextTests
     {
         SessionContext.Build(CleanArchitecture(), [], []).Should().NotContain("Truncated:");
     }
+
+    [Fact]
+    public void A_cap_too_small_for_the_header_shortens_the_header_and_keeps_the_cap()
+    {
+        var source = CleanArchitecture();
+        var pack = new RulePack
+        {
+            Name = new string('n', 300),
+            Layers = source.Layers,
+            Rules = source.Rules,
+            ComponentRoles = source.ComponentRoles,
+            NamingConventions = source.NamingConventions,
+        };
+
+        var text = SessionContext.Build(pack, [], ["stale cache"], maxChars: 120);
+
+        text.Length.Should().BeLessThanOrEqualTo(120);
+        text.Should().Contain("Ariadne rules (nnn").And.Contain("…");
+        text.Split('\n')[^1].Should().StartWith("Truncated: ");
+    }
 }

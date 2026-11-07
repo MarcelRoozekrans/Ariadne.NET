@@ -373,4 +373,31 @@ public sealed class InitAgentTests : IDisposable
             File.SetUnixFileMode(".claude", UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         }
     }
+
+    [Fact]
+    public void Init_agent_claude_when_dot_architecture_is_a_file_fails_and_writes_no_settings()
+    {
+        File.WriteAllText(".architecture", "x");
+
+        var run = RunCapture("init", "--agent", "claude");
+        var settingsExists = File.Exists(Settings);
+        var temps = TempFiles();
+
+        run.Exit.Should().Be(2);
+        run.Err.Should().Contain("Cannot write .architecture/rules.yaml.");
+        run.Out.Should().NotContain("Added");
+        settingsExists.Should().BeFalse();
+        temps.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Init_when_dot_architecture_is_a_file_fails_with_the_write_error()
+    {
+        File.WriteAllText(".architecture", "x");
+
+        var run = RunCapture("init");
+
+        run.Exit.Should().Be(2);
+        run.Err.Should().Contain("Cannot write .architecture/rules.yaml.");
+    }
 }

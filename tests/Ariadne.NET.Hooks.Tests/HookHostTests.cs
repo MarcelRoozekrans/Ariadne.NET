@@ -154,4 +154,41 @@ public class HookHostTests
         lines.Should().ContainSingle();
         lines[0].Length.Should().BeLessThan(700);
     }
+
+    private sealed class BrokenWriter(Exception error) : TextWriter
+    {
+        public override System.Text.Encoding Encoding => System.Text.Encoding.UTF8;
+
+        public override Task WriteLineAsync(string? value) => Task.FromException(error);
+    }
+
+    [Theory]
+    [InlineData(typeof(IOException))]
+    [InlineData(typeof(ObjectDisposedException))]
+    public async Task A_stderr_that_cannot_be_written_still_exits_zero(Type errorType)
+    {
+        var error = errorType == typeof(IOException) ? new IOException("pipe closed") : (Exception)new ObjectDisposedException("stderr");
+        using var stdout = new StringWriter();
+        using var stderr = new BrokenWriter(error);
+        var hook = new FakeHook("stop", _ => throw new InvalidOperationException("boom"));
+
+        var exit = await new HookHost([hook]).RunAsync("stop", new StringReader(ValidInput), stdout, stderr, CancellationToken.None);
+
+        exit.Should().Be(0);
+        stdout.ToString().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Null_streams_are_refused()
+    {
+        var host = new HookHost([]);
+
+        Func<Task> noIn = () => host.RunAsync("stop", null!, TextWriter.Null, TextWriter.Null, CancellationToken.None);
+        Func<Task> noOut = () => host.RunAsync("stop", TextReader.Null, null!, TextWriter.Null, CancellationToken.None);
+        Func<Task> noErr = () => host.RunAsync("stop", TextReader.Null, TextWriter.Null, null!, CancellationToken.None);
+
+        await noIn.Should().ThrowAsync<ArgumentNullException>().ConfigureAwait(true);
+        await noOut.Should().ThrowAsync<ArgumentNullException>().ConfigureAwait(true);
+        await noErr.Should().ThrowAsync<ArgumentNullException>().ConfigureAwait(true);
+    }
 }

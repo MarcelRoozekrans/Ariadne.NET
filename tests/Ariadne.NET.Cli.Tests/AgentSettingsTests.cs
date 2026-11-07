@@ -243,4 +243,29 @@ public sealed class AgentSettingsTests
 
         Commands(Groups(root, "Stop")).Should().Equal("ariadne hook", "other ariadne hook stop", $"{Prefix} stop");
     }
+
+    [Fact]
+    public void Merge_skips_groups_without_a_hooks_array_and_adds_its_own_group()
+    {
+        var root = Parse(MergeOk("""{"hooks":{"Stop":["note",{"matcher":"x"},{"hooks":[{"type":"command","command":"ariadne hook stop"}]}]}}"""));
+
+        var stop = Groups(root, "Stop");
+        stop.Should().HaveCount(3);
+        ((string)stop[0]!).Should().Be("note");
+        ((string)stop[1]!["matcher"]!).Should().Be("x");
+        ((string)((JsonArray)stop[2]!["hooks"]!)[0]!["command"]!).Should().Be($"{Prefix} stop");
+    }
+
+    [Fact]
+    public void Merge_leaves_entries_without_a_string_command_alone()
+    {
+        var root = Parse(MergeOk(
+            """{"hooks":{"Stop":[{"hooks":[{"type":"command"},{"type":"command","command":7},"text"]}]}}"""));
+
+        var entries = (JsonArray)Groups(root, "Stop")[0]!["hooks"]!;
+        entries.Should().HaveCount(4);
+        entries[0]!.ToJsonString().Should().Be("""{"type":"command"}""");
+        entries[1]!.ToJsonString().Should().Be("""{"type":"command","command":7}""");
+        ((string)entries[3]!["command"]!).Should().Be($"{Prefix} stop");
+    }
 }
