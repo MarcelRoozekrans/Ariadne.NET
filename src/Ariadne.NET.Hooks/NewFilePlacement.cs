@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Ariadne.NET.Abstractions;
@@ -14,6 +15,11 @@ namespace Ariadne.NET.Hooks;
 /// </summary>
 public static partial class NewFilePlacement
 {
+    private const int MaxPath = 300;
+    private const int MaxName = 200;
+    private const int MaxLayerName = 80;
+    private const int MaxLayerList = 1_000;
+
     /// <summary>
     /// The question to put to the user, or null to let the write go ahead. A file that already exists, is not C#, sits
     /// under <c>obj</c> or <c>bin</c>, belongs to no project below <paramref name="root"/> or is covered by a pack without
@@ -69,8 +75,34 @@ public static partial class NewFilePlacement
             return null;
         }
 
-        return $"New file '{relative}' would be namespace '{ns}' in assembly '{assembly}', which no layer of the rules selects. "
-            + $"Layers: {string.Join(", ", layers)}. Ask the user where it belongs or add a layer.";
+        // The namespace, the path and the layer names come from files and rules, so each part is bounded and so is the whole.
+        return $"New file '{TextLimit.Shorten(relative, MaxPath)}' would be namespace '{TextLimit.Shorten(ns, MaxName)}' "
+            + $"in assembly '{TextLimit.Shorten(assembly, MaxName)}', which no layer of the rules selects. "
+            + $"Layers: {LayerList(layers)}. Ask the user where it belongs or add a layer.";
+    }
+
+    // Names are cut to MaxLayerName each and the list stops at MaxLayerList, saying how many were left out.
+    private static string LayerList(string[] layers)
+    {
+        var text = new StringBuilder();
+        for (var i = 0; i < layers.Length; i++)
+        {
+            var name = TextLimit.Shorten(layers[i], MaxLayerName);
+            if (text.Length + name.Length + 2 > MaxLayerList)
+            {
+                text.Append(", and ").Append(layers.Length - i).Append(" more");
+                break;
+            }
+
+            if (i > 0)
+            {
+                text.Append(", ");
+            }
+
+            text.Append(name);
+        }
+
+        return text.ToString();
     }
 
     // MSBuild turns a folder name into a namespace segment: invalid identifier characters become '_' and a leading digit gets '_'.

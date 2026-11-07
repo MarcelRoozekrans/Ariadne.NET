@@ -37,6 +37,54 @@ public class NewFilePlacementTests(ITestOutputHelper output)
             .Should().BeNull();
     }
 
+    private const string Instruction = "Ask the user where it belongs or add a layer.";
+
+    [Fact]
+    public void A_huge_namespace_gives_a_capped_question_that_still_ends_with_the_instruction()
+    {
+        using var project = new TempProject();
+        Csproj(project, "Shop.Web", "Shop.Web");
+
+        var question = NewFilePlacement.Check(
+            Pack, project.Root, Path.Combine(project.Root, "Shop.Web", "A.cs"), "namespace " + new string('n', 50_000) + ";");
+
+        question.Should().NotBeNull();
+        question!.Length.Should().BeLessThan(3_000);
+        question.Should().EndWith(Instruction).And.Contain("…");
+    }
+
+    [Fact]
+    public void A_very_long_relative_path_gives_a_capped_question_that_still_ends_with_the_instruction()
+    {
+        using var project = new TempProject();
+        Csproj(project, "Shop.Web", "Shop.Web");
+        var deep = Path.Combine([project.Root, "Shop.Web", .. Enumerable.Repeat(new string('d', 100), 200), "A.cs"]);
+
+        var question = NewFilePlacement.Check(Pack, project.Root, deep, null);
+
+        question.Should().NotBeNull();
+        question!.Length.Should().BeLessThan(3_000);
+        question.Should().EndWith(Instruction).And.Contain("…");
+    }
+
+    [Fact]
+    public void Five_hundred_layers_give_a_capped_question_that_still_ends_with_the_instruction()
+    {
+        using var project = new TempProject();
+        Csproj(project, "Shop.Web", "Shop.Web");
+        var layers = new List<LayerDefinition>();
+        for (var i = 0; i < 500; i++)
+        {
+            layers.Add(new LayerDefinition { Name = $"Layer{i}-{new string('l', 80)}", Id = $"S-{i}", Because = "x", Assemblies = [$"Shop.Other{i}"] });
+        }
+
+        var question = NewFilePlacement.Check(new RulePack { Name = "shop", Layers = layers }, project.Root, Path.Combine(project.Root, "Shop.Web", "A.cs"), null);
+
+        question.Should().NotBeNull();
+        question!.Length.Should().BeLessThan(3_000);
+        question.Should().EndWith(Instruction).And.Contain("more");
+    }
+
     [Fact]
     public void A_new_file_in_an_unselected_project_gets_a_question()
     {
