@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.Text;
 using Ariadne.NET.Hooks;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -10,7 +11,12 @@ namespace Ariadne.NET.Cli.Commands;
 /// </summary>
 public static class HookCommand
 {
-    public static Command Create(IServiceProvider provider)
+    // The hook protocol is UTF-8 JSON without a byte order mark, whatever the console code page is.
+    private static readonly Encoding Protocol = new UTF8Encoding(false);
+
+    public static Command Create(IServiceProvider provider) => Create(provider, OpenStandardStreams);
+
+    internal static Command Create(IServiceProvider provider, Func<HookStreams> openStreams)
     {
         var eventArgument = new Argument<string>("event")
         {
@@ -24,11 +30,15 @@ public static class HookCommand
 
         command.SetAction(async (parseResult, cancellationToken) =>
         {
-            var eventName = parseResult.GetValue(eventArgument)!;
             try
             {
+                var eventName = parseResult.GetValue(eventArgument)!;
                 var host = provider.GetRequiredService<HookHost>();
-                return await host.RunAsync(eventName, Console.In, Console.Out, Console.Error, cancellationToken).ConfigureAwait(false);
+                var streams = openStreams();
+                using var stdin = new StreamReader(streams.Input, Protocol, true);
+                using var stdout = new StreamWriter(streams.Output, Protocol) { AutoFlush = true };
+                using var stderr = new StreamWriter(streams.Error, Protocol) { AutoFlush = true };
+                return await host.RunAsync(eventName, stdin, stdout, stderr, cancellationToken).ConfigureAwait(false);
             }
 #pragma warning disable CA1031 // A hook must never fail the agent: nothing may escape the action.
             catch (Exception ex)
@@ -41,6 +51,9 @@ public static class HookCommand
 
         return command;
     }
+
+    private static HookStreams OpenStandardStreams() =>
+        new(Console.OpenStandardInput(), Console.OpenStandardOutput(), Console.OpenStandardError());
 
     private static void ReportUnavailable(Exception ex)
     {
