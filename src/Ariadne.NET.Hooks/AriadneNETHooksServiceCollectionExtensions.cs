@@ -10,6 +10,8 @@ public static class AriadneNETHooksServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        services.AddSingleton<IProjectRules, ProjectRules>();
+        services.AddSingleton<IHook, SessionStartHook>();
         services.AddSingleton<HookHost>();
         return services;
     }
