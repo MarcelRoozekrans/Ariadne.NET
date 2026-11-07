@@ -32,7 +32,7 @@
       runs for this library only: PrivateAssets keeps its analyzer and build assets out of consumers' builds, as Minos.NET
       does. NuGet may still flow the analyzer, NuGet/Home#6720, where it stays inert without [Instrument].
     -->
-    <PackageReference Include="ZeroAlloc.Telemetry" Version="1.12.7" PrivateAssets="analyzers;build;buildtransitive" />
+    <PackageReference Include="ZeroAlloc.Telemetry" Version="1.13.0" PrivateAssets="analyzers;build;buildtransitive" />
   </ItemGroup>
 
   <ItemGroup>
