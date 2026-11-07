@@ -13,6 +13,7 @@ public static class AriadneNETHooksServiceCollectionExtensions
         services.AddSingleton<IProjectRules, ProjectRules>();
         services.AddSingleton<IHook, SessionStartHook>();
         services.AddSingleton<IHook, PreToolUseHook>();
+        services.AddSingleton<IHook, StopHook>();
         services.AddSingleton<HookHost>();
         return services;
     }
