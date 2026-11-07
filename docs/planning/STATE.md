@@ -1,6 +1,6 @@
 # Session State
 
-**Last session:** 2026-11-06 (phase 2.3 built and merged as PR 44)
+**Last session:** 2026-11-07 (phase 5.6 implemented)
 **Repository:** `MarcelRoozekrans/Ariadne.NET`, public since 2026-11-03. The old private repository `MarcelRoozekrans/architecture-governance-engine` is frozen. Local clones: remote `ariadne` is the new repository, `origin` the old one; push with `git push ariadne HEAD:<branch>`, never to `origin`.
 
 ## Current Position
@@ -45,7 +45,14 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 - ZeroAlloc-Net/ZeroAlloc.TestHelpers#106: once fixed, switch the allocation tests from `GC.GetAllocatedBytesForCurrentThread` back to `AllocationGate`.
 - The old `docs/how-it-works/*` copy still describes removed features; Phase 2.6 deletes it.
 - Deferred minors from the reviews: the Daedalus fixture never exercises the Agents layer's `allowedDependencies`; `Owned<T>` and the reader have no further known gaps.
-- **Parked, approved 2026-11-06:** phases 5.6 Agent hooks and 5.7 Guidance delivery, designed in `docs/superpowers/specs/2026-11-06-agent-guidance-hooks-design.md` on branch `docs/agent-hooks-design`. Owner decisions: hooks are the delivery channel; Claude Code first; one tool with a separate `Ariadne.NET.Guidance` package; Ariadne owns structure and delivery while AI.Sentinel owns tool-call enforcement. Phase 2.3 merged as #44 (2026-11-06), so the plan can start. The 5.6 plan (stage A, 8 tasks) is written at `docs/superpowers/plans/2026-11-06-phase-5.6-agent-hooks.md` and passed a fresh builder check (four blockers fixed). The owner approved it as written on 2026-11-07, including all ten decisions beyond the design. It is not implemented: implementation starts only when the roadmap reaches Milestone 5. The ten decisions beyond the design, the main ones being that pack attachments move to 5.7, that `pre-tool-use` records edits for `stop`, and that the new-file check reads the namespace from the written content. `ariadne` is not a dotnet tool until phase 3.3.
+- **Parked, approved 2026-11-06:** phases 5.6 Agent hooks and 5.7 Guidance delivery, designed in `docs/superpowers/specs/2026-11-06-agent-guidance-hooks-design.md` on branch `docs/agent-hooks-design`. Owner decisions: hooks are the delivery channel; Claude Code first; one tool with a separate `Ariadne.NET.Guidance` package; Ariadne owns structure and delivery while AI.Sentinel owns tool-call enforcement. Phase 2.3 merged as #44 (2026-11-06), so the plan can start. The 5.6 plan (stage A, 8 tasks) is written at `docs/superpowers/plans/2026-11-06-phase-5.6-agent-hooks.md` and passed a fresh builder check (four blockers fixed). The owner approved it as written on 2026-11-07, including all ten decisions beyond the design. The ten decisions beyond the design, the main ones being that pack attachments move to 5.7, that `pre-tool-use` records edits for `stop`, and that the new-file check reads the namespace from the written content. `ariadne` is not a dotnet tool until phase 3.3.
+- **Phase 5.6 — Agent hooks:** [status: complete 2026-11-07]. Implemented on branch `feat/phase-5.6-agent-hooks`, pushed to remote `ariadne`, no PR yet. Plan `docs/superpowers/plans/2026-11-06-phase-5.6-agent-hooks.md`, all boxes ticked. Timings in `docs/perf/phase-5.6-hooks.md`: `session-start` and `pre-tool-use` about 0.1 s, `stop` with one edit about 13 s on this solution. Follow-ups:
+  - Pack attachments move to phase 5.7, together with `init --from <url>`.
+  - Per-edit validation through `PostToolUse`: the measurement says no; it would need a resident process.
+  - Make `Ariadne.NET.Hooks` packable in 5.7.
+  - Native AOT for the `ariadne hook` entry point only if a later measurement shows it slow; process start is about 0.1 s today.
+  - The `ariadne` command must be on `PATH`, which needs the dotnet tool of phase 3.3. The Milestone 5 hooks item stays unticked until then.
+  - One flaky Hooks test was seen once in a full run and not reproduced; its name was not captured. Watch the next full runs.
 
 ## Recommended Next Step
 
