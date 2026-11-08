@@ -1254,6 +1254,21 @@ public class PackYamlReaderTests
     }
 
     [Fact]
+    public void Members_SingleSegmentPattern_FailsInPackTerms()
+    {
+        // A member name always has a type segment, so a one-segment pattern can never match; '**' alone still matches every member.
+        var yaml = RequireHead + """
+                forbid:
+                  from: { layers: [Domain] }
+                  to: { members: ["Start", "**", "*.Start", "*"] }
+            """;
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(8, 23, "'Start' in the to of rule 'SH-001' is not a valid pattern: a member pattern needs a type and a member, as 'Namespace.Type.Member'; start it with '**.' to match the member in any type"),
+            new PackProblem(8, 49, "'*' in the to of rule 'SH-001' is not a valid pattern: a member pattern needs a type and a member, as 'Namespace.Type.Member'; start it with '**.' to match the member in any type"));
+    }
+
+    [Fact]
     public void Members_InFromSelector_FailsInPackTerms()
     {
         var yaml = RequireHead + """

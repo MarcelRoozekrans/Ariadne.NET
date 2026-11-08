@@ -608,6 +608,7 @@ internal static class PackYamlReader
                 {
                     "layers" => StringList(fields, "layers", where),
                     "assemblies" => PatternList(fields, "assemblies", where, Glob.Flat),
+                    "members" => PatternList(fields, "members", where, MemberPattern),
                     _ => PatternList(fields, keys[i], where, Glob.Dotted),
                 };
                 selectors[i] = (keys[i], lists[i]);
@@ -974,6 +975,13 @@ internal static class PackYamlReader
 
             return values;
         }
+
+        // A member name always has a type segment before the member, so a one-segment pattern could never match. A pattern
+        // that starts with '**' can still span both segments. The reason does not quote the pattern: the problem line does.
+        private static Result<Glob, string> MemberPattern(string pattern) =>
+            !pattern.Contains('.', StringComparison.Ordinal) && !pattern.StartsWith("**", StringComparison.Ordinal)
+                ? Result<Glob, string>.Failure("a member pattern needs a type and a member, as 'Namespace.Type.Member'; start it with '**.' to match the member in any type")
+                : Glob.Dotted(pattern);
 
         // The entries of a list-valued key; an absent key is an empty list.
         private IList<YamlNode> Items(Dictionary<string, Field> fields, string key, string where)
