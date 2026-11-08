@@ -10,6 +10,8 @@
 **Package manager:** NuGet (dotnet CLI)
 **Framework:** ASP.NET Core, System.CommandLine, ModelContextProtocol SDK
 **Datastore:** n/a
+**Build:** `dotnet build src/Ariadne.NET.slnx`
+**Test:** `dotnet test src/Ariadne.NET.slnx`
 
 ## Commits
 

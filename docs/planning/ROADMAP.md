@@ -91,7 +91,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Surface:** Backend
 **HelpWanted:** no
 **Design:** `docs/superpowers/specs/2026-11-08-phase-2.4-banned-packages-forbidden-apis-name-collisions-design.md`
-**Plan:** _to be written_
+**Plan:** `docs/superpowers/plans/2026-11-08-phase-2.4-banned-packages-forbidden-apis-name-collisions.md`
 
 ### Phase 2.5: Vacuity detection [status: pending]
 **Goal:** A rule or layer selector that matches no type fails with its own violation kind, unless the rule opts out with `allowEmpty: true`.
