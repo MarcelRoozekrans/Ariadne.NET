@@ -12,7 +12,8 @@ internal static class UniqueNameRules
     /// Returns one violation per selected <c>for</c> type and colliding <c>against</c> type, located at the <c>for</c> type.
     /// Two types collide when their simple names are equal, compared case-sensitively with the generic arity and without the
     /// namespace; a nested type uses its own name. A type in both selections never collides with itself. A type that several
-    /// graphs hold, as a project does for each of its target frameworks, counts once.
+    /// graphs hold, as a project does for each of its target frameworks, counts once. The violation's target is the colliding
+    /// type's full name without its assembly; when both full names are equal the message names the two assemblies.
     /// </summary>
     public static IReadOnlyList<ArchitectureViolation> Check(LayerMap layers, RulePack pack, IReadOnlyList<TypeGraph> graphs)
     {
@@ -67,9 +68,7 @@ internal static class UniqueNameRules
                     Target = other.Display,
                     Location = forType.Location,
                     Because = rule.Because,
-                    Message = string.Create(
-                        CultureInfo.InvariantCulture,
-                        $"Type '{forType.Display}' is selected by rule '{rule.Id}' and shares its name with '{other.Display}'"),
+                    Message = Message(rule.Id, forType.Id, in other),
                 });
             }
         }
@@ -111,6 +110,16 @@ internal static class UniqueNameRules
 
         return (againstByName, forTypes);
     }
+
+    // Two types with the same full name in different assemblies read the same, so the message then names the assemblies.
+    private static string Message(string ruleId, in TypeId type, in TypeId other) =>
+        string.Equals(type.Display, other.Display, StringComparison.Ordinal)
+            ? string.Create(
+                CultureInfo.InvariantCulture,
+                $"Type '{type.Display}' in assembly '{type.Assembly}' is selected by rule '{ruleId}' and shares its name with '{other.Display}' in assembly '{other.Assembly}'")
+            : string.Create(
+                CultureInfo.InvariantCulture,
+                $"Type '{type.Display}' is selected by rule '{ruleId}' and shares its name with '{other.Display}'");
 
     // Case-sensitive and without the namespace; the arity keeps Result and Result<T> apart.
     private static string NameOf(INamedTypeSymbol type) =>

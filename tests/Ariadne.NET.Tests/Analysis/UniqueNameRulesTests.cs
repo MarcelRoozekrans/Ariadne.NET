@@ -159,7 +159,13 @@ public class UniqueNameRulesTests
         var domain = TestCompilation.Create(source).WithAssemblyName("Shop.Domain");
 
         Check(pack, domain, web).Should().ContainSingle().Which.SourceType.Should().Be("Shop.Order");
-        Check(pack, web, domain).Should().ContainSingle().Which.SourceType.Should().Be("Shop.Order");
+        var violation = Check(pack, web, domain).Should().ContainSingle().Subject;
+        violation.SourceType.Should().Be("Shop.Order");
+
+        // Target stays the full name; the message names the assemblies, since the two full names alone read the same.
+        violation.Target.Should().Be("Shop.Order");
+        violation.Message.Should().Be(
+            "Type 'Shop.Order' in assembly 'Shop.Web' is selected by rule 'TEST-UNIQUE' and shares its name with 'Shop.Order' in assembly 'Shop.Domain'");
     }
 
     [Fact]
