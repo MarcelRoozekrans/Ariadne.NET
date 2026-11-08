@@ -17,6 +17,9 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
 
     /// <summary>Whether a constructor call could match, so an object creation is bound for its constructor at all.</summary>
     private readonly bool _constructorsCouldMatch;
+
+    /// <summary>Whether an indexer use could match, so an element access is bound for its indexer at all.</summary>
+    private readonly bool _indexersCouldMatch;
     private readonly Dictionary<INamedTypeSymbol, bool> _checkedTypes = new(SymbolEqualityComparer.Default);
     private SemanticModel? _model;
     private INamedTypeSymbol? _programType;
@@ -34,6 +37,7 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
 
         _filter = filter;
         _constructorsCouldMatch = filter.CouldMatch(MemberNames.ConstructorName);
+        _indexersCouldMatch = filter.CouldMatchIndexer;
         _cancellationToken = cancellationToken;
     }
 
@@ -128,10 +132,11 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
             return;
         }
 
-        var symbol = Resolve(Model.GetSymbolInfo(node, _cancellationToken));
+        var info = Model.GetSymbolInfo(node, _cancellationToken);
+        var symbol = Resolve(info);
 
         // Before the type edge, which a member of a written type such as 'Make' in 'Store.Make()' does not give.
-        AddMemberUse(symbol, node, node.Span);
+        AddMemberUses(info, node, node.Span);
 
         // 'nint' and 'nuint' are keywords that parse as identifiers; like 'var' and like 'int', they give no edge.
         if (symbol is INamedTypeSymbol { IsNativeIntegerType: true } && node.Identifier.ValueText is "nint" or "nuint")
@@ -158,9 +163,9 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     {
         if (_source is not null)
         {
-            var symbol = Resolve(Model.GetSymbolInfo(node, _cancellationToken));
-            AddEdge(NormalizeSymbol(symbol), node.Identifier.Span);
-            AddMemberUse(symbol, node, node.Identifier.Span);
+            var info = Model.GetSymbolInfo(node, _cancellationToken);
+            AddEdge(NormalizeSymbol(Resolve(info)), node.Identifier.Span);
+            AddMemberUses(info, node, node.Identifier.Span);
         }
 
         base.VisitGenericName(node);
@@ -170,9 +175,9 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     {
         if (_source is not null)
         {
-            var constructor = Resolve(Model.GetSymbolInfo(node, _cancellationToken));
-            AddEdge(NormalizeSymbol(constructor), node.NewKeyword.Span);
-            AddMemberUse(constructor, node, node.NewKeyword.Span);
+            var info = Model.GetSymbolInfo(node, _cancellationToken);
+            AddEdge(NormalizeSymbol(Resolve(info)), node.NewKeyword.Span);
+            AddMemberUses(info, node, node.NewKeyword.Span);
         }
 
         base.VisitImplicitObjectCreationExpression(node);
@@ -183,10 +188,51 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
         // The written type name gives the type edge; the constructor is bound only when a constructor pattern could match.
         if (_source is not null && _constructorsCouldMatch)
         {
-            AddMemberUse(Resolve(Model.GetSymbolInfo(node, _cancellationToken)), node, node.NewKeyword.Span);
+            AddMemberUses(Model.GetSymbolInfo(node, _cancellationToken), node, node.NewKeyword.Span);
         }
 
         base.VisitObjectCreationExpression(node);
+    }
+
+    public override void VisitConstructorInitializer(ConstructorInitializerSyntax node)
+    {
+        if (_source is not null && _constructorsCouldMatch)
+        {
+            AddMemberUses(Model.GetSymbolInfo(node, _cancellationToken), node, node.ThisOrBaseKeyword.Span);
+        }
+
+        base.VisitConstructorInitializer(node);
+    }
+
+    public override void VisitPrimaryConstructorBaseType(PrimaryConstructorBaseTypeSyntax node)
+    {
+        if (_source is not null && _constructorsCouldMatch)
+        {
+            AddMemberUses(Model.GetSymbolInfo(node, _cancellationToken), node, node.Type.Span);
+        }
+
+        base.VisitPrimaryConstructorBaseType(node);
+    }
+
+    // An array element access binds to no member, so only an indexer gives a member edge.
+    public override void VisitElementAccessExpression(ElementAccessExpressionSyntax node)
+    {
+        if (_source is not null && _indexersCouldMatch)
+        {
+            AddMemberUses(Model.GetSymbolInfo(node, _cancellationToken), node, node.ArgumentList.Span);
+        }
+
+        base.VisitElementAccessExpression(node);
+    }
+
+    public override void VisitElementBindingExpression(ElementBindingExpressionSyntax node)
+    {
+        if (_source is not null && _indexersCouldMatch)
+        {
+            AddMemberUses(Model.GetSymbolInfo(node, _cancellationToken), node, node.ArgumentList.Span);
+        }
+
+        base.VisitElementBindingExpression(node);
     }
 
     private SemanticModel Model => _model ?? throw new InvalidOperationException("The walker is not walking a tree.");
@@ -351,12 +397,33 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
         info.Symbol ?? (info.CandidateSymbols.Length > 0 ? info.CandidateSymbols[0] : null);
 
     /// <summary>
-    /// Records a member edge when the symbol is a member whose simple name passes the filter, and the name is not inside a
-    /// <c>nameof</c>. With an empty filter it returns at once, so a pack without <c>members</c> patterns pays nothing here.
+    /// Records the member use of the bound symbol or, when binding found no single symbol (a call with a dynamic argument, an
+    /// ambiguity), of every candidate: the edge set de-duplicates, and the candidates share a simple name. With an empty filter
+    /// it returns at once, so a pack without <c>members</c> patterns pays nothing here.
     /// </summary>
-    private void AddMemberUse(ISymbol? symbol, SyntaxNode node, TextSpan span)
+    private void AddMemberUses(SymbolInfo info, SyntaxNode node, TextSpan span)
     {
-        if (_filter.IsEmpty || _source is null || MemberNames.UsedMember(symbol) is not { } member
+        if (_filter.IsEmpty)
+        {
+            return;
+        }
+
+        if (info.Symbol is { } symbol)
+        {
+            AddMemberUse(symbol, node, span);
+            return;
+        }
+
+        foreach (var candidate in info.CandidateSymbols)
+        {
+            AddMemberUse(candidate, node, span);
+        }
+    }
+
+    /// <summary>Records a member edge when the symbol is a member whose simple name passes the filter, and the name is not inside a <c>nameof</c>.</summary>
+    private void AddMemberUse(ISymbol symbol, SyntaxNode node, TextSpan span)
+    {
+        if (_source is null || MemberNames.UsedMember(symbol) is not { } member
             || !_filter.CouldMatch(MemberNames.SimpleNameOf(member)) || IsInsideNameOf(node))
         {
             return;

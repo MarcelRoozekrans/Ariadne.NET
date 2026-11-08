@@ -41,6 +41,18 @@ public class MemberEdgeTests
                 int IDbCommand.ExecuteReader() => 2;
                 string? IDbCommand.Text { get; set; }
             }
+            public interface IGrid { int this[int i] { get; set; } }
+            public abstract class Grid : IGrid { public abstract int this[int i] { get; set; } }
+            public sealed class Sheet : Grid { public override int this[int i] { get => 0; set { } } }
+            public sealed class Text { [System.Runtime.CompilerServices.IndexerName("Chars")] public char this[int i] => 'a'; }
+            public class Connection { public Connection(string s) { } }
+            public record Audit(string S);
+            public static class Tools { public static int Run() => 0; public static int Run(int x) => x; public static int Run(string s) => 0; }
+            public class Level1 { public virtual void Go() { } }
+            public class Level2 : Level1 { public override void Go() { } }
+            public class Level3 : Level2 { public override void Go() { } }
+            public interface IRepo<T> { void Save(T entity); }
+            public class Repo<T> : IRepo<T> { public void Save(T entity) { } }
         }
         """;
 
@@ -280,8 +292,110 @@ public class MemberEdgeTests
         var explicitImpl = compilation.GetTypeByMetadataName("Shop.Data.Explicit")!
             .GetMembers().OfType<IMethodSymbol>().First(m => m.MethodKind == MethodKind.ExplicitInterfaceImplementation);
 
-        // The implementation's own name is never used, because code reaches it through the interface member.
-        MemberNames.Chain(explicitImpl).Should().HaveCount(2).And.EndWith("Shop.Data.IDbCommand.ExecuteReader");
+        // An explicit implementation is named by the interface member's simple name, not by its qualified own name.
+        MemberNames.Chain(explicitImpl).Should().Equal("Shop.Data.Explicit.ExecuteReader", "Shop.Data.IDbCommand.ExecuteReader");
+    }
+
+    [Fact]
+    public void ConstructorInitializer_RecordsCtor()
+    {
+        var graph = Build(["**.new"], """
+            namespace Shop.Domain
+            {
+                public class Order : Shop.Data.Connection
+                {
+                    public Order() : this("x") { }
+                    public Order(string s) : base(s) { }
+                }
+                public class Line(string s) : Shop.Data.Connection(s);
+                public record Entry(string S) : Shop.Data.Audit(S);
+            }
+            """);
+
+        graph.MemberEdges
+            .Where(e => string.Equals(e.Location.FilePath, "Order.cs", StringComparison.Ordinal))
+            .Select(e => (e.Source.ToDisplayString(), MemberNames.Chain(e.Member)[0], e.Location.Line, e.Location.Column))
+            .Should().Equal(
+                (Order, "Shop.Domain.Order.new", 5, 26),
+                (Order, "Shop.Data.Connection.new", 6, 34),
+                ("Shop.Domain.Line", "Shop.Data.Connection.new", 8, 35),
+                ("Shop.Domain.Entry", "Shop.Data.Audit.new", 9, 37));
+    }
+
+    [Fact]
+    public void IndexerAccess_RecordedAsItem()
+    {
+        var graph = Build(["**.Item", "**.Chars"], """
+            namespace Shop.Domain
+            {
+                public class Order
+                {
+                    public int Place(Shop.Data.Sheet sheet, Shop.Data.Text text, Shop.Data.Grid? grid, string name)
+                    {
+                        sheet[0] = sheet[1];
+                        var c = text[0];
+                        var g = grid?[2];
+                        var n = name[0];
+                        return c + n + (g ?? 0);
+                    }
+                }
+            }
+            """);
+
+        Uses(graph).Should().Equal(
+            ("Shop.Data.Sheet.Item", 7, 18),
+            ("Shop.Data.Sheet.Item", 7, 29),
+            ("Shop.Data.Text.Chars", 8, 25),
+            ("Shop.Data.Grid.Item", 9, 26),
+            ("System.String.Chars", 10, 25));
+        Chains(graph)[0].Should().Be("Shop.Data.Sheet.Item > Shop.Data.Grid.Item > Shop.Data.IGrid.Item");
+    }
+
+    [Fact]
+    public void DynamicArgument_RecordsEveryCandidate()
+    {
+        var graph = Build(["**.Tools.Run"], """
+            namespace Shop.Domain
+            {
+                public class Order
+                {
+                    public void Place(dynamic value) => Shop.Data.Tools.Run(value);
+                }
+            }
+            """);
+
+        Uses(graph).Should().HaveCountGreaterThan(1).And.OnlyContain(u => string.Equals(u.Member, "Shop.Data.Tools.Run", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void MoreUseForms_ChainsAndLocations()
+    {
+        var graph = Build(["**.ExecuteReader", "**.Run", "**.Go", "**.Save", "**.Timeout"], """
+            namespace Shop.Domain
+            {
+                using static Shop.Data.Tools;
+                public class Order : Shop.Data.SqlCommand
+                {
+                    public override int ExecuteReader() => base.ExecuteReader() + Run();
+                    public int Place(Shop.Data.Level3 level, Shop.Data.Repo<Order> repo, Shop.Data.SqlCommand? command)
+                    {
+                        level.Go();
+                        repo.Save(this);
+                        command!.Timeout += 1;
+                        return command?.Timeout ?? 0;
+                    }
+                }
+            }
+            """);
+
+        Uses(graph).Select(u => (u.Line, u.Column)).Should().Equal((6, 53), (6, 71), (9, 19), (10, 18), (11, 22), (12, 29));
+        Chains(graph).Should().Equal(
+            "Shop.Data.SqlCommand.ExecuteReader > Shop.Data.DbCommand.ExecuteReader > Shop.Data.IDbCommand.ExecuteReader",
+            "Shop.Data.Tools.Run",
+            "Shop.Data.Level3.Go > Shop.Data.Level2.Go > Shop.Data.Level1.Go",
+            "Shop.Data.Repo.Save > Shop.Data.IRepo.Save",
+            "Shop.Data.SqlCommand.Timeout",
+            "Shop.Data.SqlCommand.Timeout");
     }
 
     [Fact]
@@ -383,6 +497,8 @@ public class MemberEdgeTests
     [InlineData("System.Diagnostics.ProcessStartInfo.new", "new", true)]
     [InlineData("Shop.Data.SqlCommand.*", "Anything", true)]
     [InlineData("Shop.Data.**", "Anything", true)]
+    [InlineData("Start", "Start", true)]
+    [InlineData("Start", "Stop", false)]
     public void Filter_ComparesTheMemberSegment(string pattern, string memberName, bool expected) =>
         MemberNameFilter.From(PackWith(pattern)).CouldMatch(memberName).Should().Be(expected);
 
@@ -395,10 +511,16 @@ public class MemberEdgeTests
         var filter = MemberNameFilter.From(PackWith("**.DbCommand.Execute*", "**.Process.Start"));
         filter.CouldMatch("ExecuteReader").Should().BeTrue();
 
+        // An empty filter binds nothing for the visitors that bind only for member uses.
+        empty.IsEmpty.Should().BeTrue();
+        empty.CouldMatch(MemberNames.ConstructorName).Should().BeFalse();
+        empty.CouldMatchIndexer.Should().BeFalse();
+
         var before = GC.GetAllocatedBytesForCurrentThread();
         for (var i = 0; i < 1_000; i++)
         {
             empty.CouldMatch("ExecuteReader");
+            _ = empty.CouldMatchIndexer;
             filter.CouldMatch("ExecuteReader");
             filter.CouldMatch("Text");
         }
@@ -417,8 +539,12 @@ public class MemberEdgeTests
                     command.Text = created.Text;
                     command.Completed += (_, _) => { };
                     System.Func<int> run = command.ExecuteReader;
-                    return command.ExecuteReader() + command.Timeout;
+                    return command.ExecuteReader() + command.Timeout + new Shop.Data.Sheet()[0];
                 }
+            }
+            public class Pool() : Shop.Data.Connection("x")
+            {
+                public Pool(int size) : this() { }
             }
         }
         """;

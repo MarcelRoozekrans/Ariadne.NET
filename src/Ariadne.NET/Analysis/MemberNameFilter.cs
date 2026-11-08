@@ -29,6 +29,13 @@ internal sealed class MemberNameFilter
     public bool IsEmpty => !_matchesAll && _segments.Length == 0;
 
     /// <summary>
+    /// Whether an indexer use could match, so an element access is bound for its indexer at all. An indexer is named
+    /// <c>Item</c> unless <c>[IndexerName]</c> renames it, and the name is known only after binding, so any non-empty filter
+    /// could match one: this is true exactly when the filter is not empty.
+    /// </summary>
+    public bool CouldMatchIndexer => !IsEmpty;
+
+    /// <summary>
     /// Collects the member segment of every <c>members</c> pattern on the <c>to</c> selectors of the pack's rules. A segment of
     /// <c>*</c> or <c>**</c> lets every name through.
     /// </summary>

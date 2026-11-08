@@ -33,16 +33,29 @@ internal static class MemberNames
         return member?.ContainingType is { IsAnonymousType: false, TypeKind: not TypeKind.Error } ? member : null;
     }
 
-    /// <summary>The member's own name, <see cref="ConstructorName"/> for a constructor. Allocates nothing.</summary>
+    /// <summary>
+    /// The member's simple name: <see cref="ConstructorName"/> for a constructor; for an indexer its metadata name, <c>Item</c>
+    /// unless <c>[IndexerName]</c> renames it; for a C# explicit interface implementation, whose own name is qualified with the
+    /// interface, the simple name of the interface member. Allocates nothing.
+    /// </summary>
     /// <param name="member">The member.</param>
     /// <returns>The simple name.</returns>
     public static string SimpleNameOf(ISymbol member)
     {
         ArgumentNullException.ThrowIfNull(member);
 
-        return member is IMethodSymbol { MethodKind: MethodKind.Constructor or MethodKind.StaticConstructor }
-            ? ConstructorName
-            : member.Name;
+        if (member is IMethodSymbol { MethodKind: MethodKind.Constructor or MethodKind.StaticConstructor })
+        {
+            return ConstructorName;
+        }
+
+        var explicitImplementations = ExplicitImplementations(member);
+        if (explicitImplementations.Length > 0 && member.Name.Contains('.', StringComparison.Ordinal))
+        {
+            return SimpleNameOf(explicitImplementations[0]);
+        }
+
+        return member is IPropertySymbol { IsIndexer: true } ? member.MetadataName : member.Name;
     }
 
     /// <summary>The member's <c>Namespace.Type.Member</c> name. A member of a C# 14 extension block belongs to the static class around the block.</summary>
