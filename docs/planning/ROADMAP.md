@@ -86,7 +86,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Plan:** `docs/superpowers/plans/2026-11-06-phase-2.3-placement-and-code-feature-rules.md`
 **Completed:** 2026-11-06
 
-### Phase 2.4: Banned packages, forbidden APIs and name collisions [status: pending]
+### Phase 2.4: Banned packages, forbidden APIs and name collisions [status: active]
 **Goal:** Rule types for banned packages over the resolved package graph, member-level forbidden APIs per layer with the security worked example, and the same type name kept in two layers.
 **Surface:** Backend
 **HelpWanted:** no
