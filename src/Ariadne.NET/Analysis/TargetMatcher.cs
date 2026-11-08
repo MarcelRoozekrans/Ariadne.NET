@@ -58,8 +58,9 @@ internal sealed class TargetMatcher
 
         if (!_cache.TryGetValue(type, out var matches))
         {
-            matches = !_selector.HasMembers && (_layers.Count > 0 && _layerMap.LayerOf(type) is { } layer && _layers.Contains(layer))
-                || (!_selector.IsEmpty && _selector.Matches(type, _layerMap.Names));
+            matches = !_selector.HasMembers
+                && ((_layers.Count > 0 && _layerMap.LayerOf(type) is { } layer && _layers.Contains(layer))
+                    || (!_selector.IsEmpty && _selector.Matches(type, _layerMap.Names)));
             _cache.Add(type, matches);
         }
 
@@ -83,7 +84,7 @@ internal sealed class TargetMatcher
 
         if (!_chains.TryGetValue(edge.Member, out var chain))
         {
-            chain = BuildChain(edge.Member);
+            chain = MemberNames.NamedChain(edge.Member, _layerMap.Names);
             _chains.Add(edge.Member, chain);
         }
 
@@ -103,22 +104,6 @@ internal sealed class TargetMatcher
     /// <param name="edge">The member use.</param>
     /// <returns>True when the use is selected.</returns>
     public bool MatchesMember(in MemberEdge edge) => TryMatchMember(in edge, out _);
-
-    private MemberName[] BuildChain(ISymbol member)
-    {
-        var names = _layerMap.Names;
-        var chain = new List<MemberName>();
-        foreach (var current in MemberNames.ChainMembers(member))
-        {
-            var name = MemberNames.DisplayNameOf(current, names);
-            if (!chain.Exists(existing => string.Equals(existing.Name, name, StringComparison.Ordinal)))
-            {
-                chain.Add(new MemberName(name, current));
-            }
-        }
-
-        return [.. chain];
-    }
 
     // The other keys test the used member's containing type, cached per type.
     private bool ContainerMatches(ISymbol member)
@@ -142,9 +127,4 @@ internal sealed class TargetMatcher
 
         return matches;
     }
-
-    /// <summary>A member in a use's chain: its <c>Namespace.Type.Member</c> name and the symbol, as an original definition.</summary>
-    /// <param name="Name">The display name.</param>
-    /// <param name="Member">The member.</param>
-    internal readonly record struct MemberName(string Name, ISymbol Member);
 }

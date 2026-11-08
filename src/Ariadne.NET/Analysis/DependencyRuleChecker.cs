@@ -52,7 +52,7 @@ internal sealed class DependencyRuleChecker
             {
                 if (!rules[i].ToMembers && rules[i].Violates(in edge))
                 {
-                    Record(found, index, i, new Pair(rules[i], edge.Source, edge.Target, edge.Location, default));
+                    Record(found, index, i, edge.Source, edge.Target, edge.Location, default);
                 }
             }
         }
@@ -63,7 +63,7 @@ internal sealed class DependencyRuleChecker
             {
                 if (rules[i].ToMembers && rules[i].Violates(in edge, out var matched))
                 {
-                    Record(found, index, i, new Pair(rules[i], edge.Source, edge.Member, edge.Location, matched));
+                    Record(found, index, i, edge.Source, edge.Member, edge.Location, matched);
                 }
             }
         }
@@ -77,16 +77,16 @@ internal sealed class DependencyRuleChecker
         return violations;
     }
 
-    private static void Record(List<Pair> found, Dictionary<(int Rule, INamedTypeSymbol Source, ISymbol Target), int> index, int rule, Pair pair)
+    private void Record(List<Pair> found, Dictionary<(int Rule, INamedTypeSymbol Source, ISymbol Target), int> index, int rule, INamedTypeSymbol source, ISymbol target, in SourceLocation location, in MemberName matched)
     {
-        if (index.TryGetValue((rule, pair.Source, pair.Target), out var at))
+        if (index.TryGetValue((rule, source, target), out var at))
         {
             found[at].Count++;
         }
         else
         {
-            index.Add((rule, pair.Source, pair.Target), found.Count);
-            found.Add(pair);
+            index.Add((rule, source, target), found.Count);
+            found.Add(new Pair(_rules[rule], source, target, location, matched));
         }
     }
 
@@ -128,7 +128,7 @@ internal sealed class DependencyRuleChecker
     }
 
     // The member of the pattern, when it is not the used one: ", which overrides X" or ", which implements X".
-    private static string Via(in TargetMatcher.MemberName matched, string target)
+    private static string Via(in MemberName matched, string target)
     {
         if (matched.Member is null || string.Equals(matched.Name, target, StringComparison.Ordinal))
         {
@@ -136,7 +136,7 @@ internal sealed class DependencyRuleChecker
         }
 
         var verb = matched.Member.ContainingType.TypeKind == TypeKind.Interface ? "implements" : "overrides";
-        return $", which {verb} {matched.Name}";
+        return $" (which {verb} {matched.Name})";
     }
 
     private sealed class Compiled(RuleDefinition rule, TargetMatcher from, TargetMatcher to, TypeSelector[] exceptions, TypeNames names)
@@ -158,12 +158,25 @@ internal sealed class DependencyRuleChecker
                 : !from.Matches(edge.Source) && !to.Matches(edge.Source))
             && !IsExcepted(edge.Source);
 
-        // Under allowOnly a type may use its own members, as a type may reference itself.
-        public bool Violates(in MemberEdge edge, out TargetMatcher.MemberName matched) =>
+        // Under allowOnly a type may use its own members, and so may a type nested in it: that is its own implementation. A derived type may not.
+        private static bool IsWithin(INamedTypeSymbol source, INamedTypeSymbol declaring)
+        {
+            for (INamedTypeSymbol? current = source.OriginalDefinition; current is not null; current = current.ContainingType)
+            {
+                if (SymbolEqualityComparer.Default.Equals(current, declaring))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public bool Violates(in MemberEdge edge, out MemberName matched) =>
             to.TryMatchMember(edge, out matched)
             && (Rule.Kind == RuleKind.Forbid
                 ? from.Matches(edge.Source)
-                : !from.Matches(edge.Source) && !SymbolEqualityComparer.Default.Equals(edge.Member.ContainingType, edge.Source.OriginalDefinition))
+                : !from.Matches(edge.Source) && !IsWithin(edge.Source, edge.Member.ContainingType))
             && !IsExcepted(edge.Source);
 
         private bool IsExcepted(INamedTypeSymbol source)
@@ -192,7 +205,7 @@ internal sealed class DependencyRuleChecker
         }
     }
 
-    private sealed class Pair(Compiled rule, INamedTypeSymbol source, ISymbol target, SourceLocation location, TargetMatcher.MemberName matched)
+    private sealed class Pair(Compiled rule, INamedTypeSymbol source, ISymbol target, in SourceLocation location, in MemberName matched)
     {
         public Compiled Rule { get; } = rule;
 
@@ -202,7 +215,7 @@ internal sealed class DependencyRuleChecker
 
         public SourceLocation Location { get; } = location;
 
-        public TargetMatcher.MemberName Matched { get; } = matched;
+        public MemberName Matched { get; } = matched;
 
         public int Count { get; set; } = 1;
     }

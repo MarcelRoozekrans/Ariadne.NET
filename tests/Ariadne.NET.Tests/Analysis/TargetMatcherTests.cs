@@ -66,6 +66,15 @@ public class TargetMatcherTests
     }
 
     [Fact]
+    public void NamespacesWithMembers_MatchesNoType()
+    {
+        var compilation = TestCompilation.Create(Source);
+        var matcher = TargetMatcher.From(new TargetSelector { Namespaces = ["Shop.**"], Members = ["Shop.Domain.Order.Total"] }, new LayerMap(Pack));
+
+        matcher.Matches(Find(compilation, "Shop.Domain.Order")).Should().BeFalse();
+    }
+
+    [Fact]
     public void LayersMixedWithMembers_Throws()
     {
         var act = () => TargetMatcher.From(new TargetSelector { Layers = ["Domain"], Members = ["A.B.C"] }, new LayerMap(Pack));

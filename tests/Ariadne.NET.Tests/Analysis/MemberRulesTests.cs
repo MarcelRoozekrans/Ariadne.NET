@@ -26,6 +26,8 @@ public class MemberRulesTests
             }
             public class Cache<T> { public void Put(T item) { } }
             public interface IClock { int Now(); }
+            public abstract class Grid { public abstract int this[int i] { get; } }
+            public static class Extras { public static string Describe(this DbCommand c) => ""; }
         }
         namespace Other { public class SqlCommand { public int Timeout; } }
         """;
@@ -50,13 +52,14 @@ public class MemberRulesTests
         Exceptions = exceptions,
     };
 
-    private static RuleDefinition AllowOnly(TargetSelector to) => new()
+    private static RuleDefinition AllowOnly(TargetSelector to, TargetSelector? from = null, params RuleException[] exceptions) => new()
     {
         Id = "TEST-MEMBERS",
         Because = "SQL stays in infrastructure.",
         Kind = RuleKind.AllowOnly,
-        From = new TargetSelector { Layers = ["Infrastructure"] },
+        From = from ?? new TargetSelector { Layers = ["Infrastructure"] },
         To = to,
+        Exceptions = exceptions,
     };
 
     private static TargetSelector Members(params string[] members) => new() { Members = members };
@@ -75,7 +78,7 @@ public class MemberRulesTests
         v.Target.Should().Be("Shop.Data.SqlCommand.ExecuteReader");
         v.Location.Should().Be(new SourceLocation("Test.cs", 1, 85));
         v.ReferenceCount.Should().Be(1);
-        v.Message.Should().Be("Rule 'TEST-MEMBERS' forbids this dependency: Shop.Domain.Order calls Shop.Data.SqlCommand.ExecuteReader, which overrides Shop.Data.DbCommand.ExecuteReader");
+        v.Message.Should().Be("Rule 'TEST-MEMBERS' forbids this dependency: Shop.Domain.Order calls Shop.Data.SqlCommand.ExecuteReader (which overrides Shop.Data.DbCommand.ExecuteReader)");
     }
 
     [Fact]
@@ -225,7 +228,133 @@ public class MemberRulesTests
                 public class Order { public int Run(Clock c) => c.Now(); }
             }
             """, pack).Should().ContainSingle().Which.Message
-            .Should().Be("Rule 'TEST-MEMBERS' forbids this dependency: Shop.Domain.Order calls Shop.Domain.Clock.Now, which implements Shop.Data.IClock.Now");
+            .Should().Be("Rule 'TEST-MEMBERS' forbids this dependency: Shop.Domain.Order calls Shop.Domain.Clock.Now (which implements Shop.Data.IClock.Now)");
+    }
+
+    [Fact]
+    public void AllowOnly_TypeUsingItsOwnMember_NoViolation()
+    {
+        var pack = PackWith(AllowOnly(Members("Shop.Domain.Order.Total")));
+
+        Check("""
+            namespace Shop.Domain { public class Order { public int Total; public int Run() => Total; } }
+            """, pack, ViolationKind.DependencyNotPermitted).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AllowOnly_NestedTypeUsingOuterMember_NoViolation()
+    {
+        var pack = PackWith(AllowOnly(Members("Shop.Domain.Order.Total")));
+
+        Check("""
+            namespace Shop.Domain { public class Order { public int Total; public class Line { public int Run(Order o) => o.Total; } } }
+            """, pack, ViolationKind.DependencyNotPermitted).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AllowOnly_DerivedTypeCallingInheritedMember_Reported()
+    {
+        var pack = PackWith(AllowOnly(Members("Shop.Data.DbCommand.ExecuteReader")));
+
+        var v = Check("""
+            namespace Shop.Domain { public class Fast : Data.SqlCommand { public int Run() => ExecuteReader(); } }
+            """, pack, ViolationKind.DependencyNotPermitted).Should().ContainSingle().Subject;
+
+        v.SourceType.Should().Be("Shop.Domain.Fast");
+        v.Target.Should().Be("Shop.Data.SqlCommand.ExecuteReader");
+    }
+
+    [Fact]
+    public void AllowOnly_ExceptionNamingType_Suppresses()
+    {
+        var pack = PackWith(AllowOnly(
+            Members("Shop.Data.SqlCommand.Timeout"),
+            null,
+            new RuleException { Types = ["**.Order"], Because = "Order is a known bridge." }));
+
+        Check("""
+            namespace Shop.Domain
+            {
+                public class Order { public int Run(Data.SqlCommand c) => c.Timeout; }
+                public class Invoice { public int Run(Data.SqlCommand c) => c.Timeout; }
+            }
+            """, pack, ViolationKind.DependencyNotPermitted).Should().ContainSingle().Which.SourceType.Should().Be("Shop.Domain.Invoice");
+    }
+
+    [Fact]
+    public void AllowOnly_SourceSelectedByFrom_NoViolation()
+    {
+        var pack = PackWith(AllowOnly(Members("Shop.Data.SqlCommand.Timeout"), new TargetSelector { Types = ["**.Order"] }));
+
+        Check("""
+            namespace Shop.Domain
+            {
+                public class Order { public int Run(Data.SqlCommand c) => c.Timeout; }
+                public class Invoice { public int Run(Data.SqlCommand c) => c.Timeout; }
+            }
+            """, pack, ViolationKind.DependencyNotPermitted).Should().ContainSingle().Which.SourceType.Should().Be("Shop.Domain.Invoice");
+    }
+
+    [Fact]
+    public void Forbid_IndexerUse_Reported()
+    {
+        var pack = PackWith(Forbid(Members("Shop.Data.Grid.Item")));
+
+        Check("""
+            namespace Shop.Domain { public class Order { public int Run(Data.Grid g) => g[1]; } }
+            """, pack).Should().ContainSingle().Which.Target.Should().Be("Shop.Data.Grid.Item");
+    }
+
+    [Fact]
+    public void Forbid_ExtensionMethodCall_Reported()
+    {
+        var pack = PackWith(Forbid(Members("Shop.Data.Extras.Describe")));
+
+        Check("""
+            using Shop.Data;
+            namespace Shop.Domain { public class Order { public string Run(Data.SqlCommand c) => c.Describe(); } }
+            """, pack).Should().ContainSingle().Which.Target.Should().Be("Shop.Data.Extras.Describe");
+    }
+
+    [Fact]
+    public void Forbid_TargetTypedNew_Reported()
+    {
+        var pack = PackWith(Forbid(Members("Shop.Data.SqlCommand.new")));
+
+        Check("""
+            namespace Shop.Domain { public class Order { public Data.SqlCommand Make() => new(); } }
+            """, pack).Should().ContainSingle().Which.Target.Should().Be("Shop.Data.SqlCommand.new");
+    }
+
+    [Fact]
+    public void LayersWithMembers_ThrowsAtCompile()
+    {
+        var pack = PackWith(Forbid(new TargetSelector { Layers = ["Infrastructure"], Members = ["A.B.C"] }));
+        var act = () => ForbidRules.Compile(new LayerMap(pack), pack);
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void TypeRuleAndMembersRule_EachReportOnce()
+    {
+        var typeRule = new RuleDefinition
+        {
+            Id = "TEST-TYPES",
+            Because = "No SQL types.",
+            Kind = RuleKind.Forbid,
+            From = new TargetSelector { Namespaces = ["**.Domain.**"] },
+            To = new TargetSelector { Types = ["Shop.Data.SqlCommand"] },
+        };
+        var pack = new RulePack { Name = "test", Rules = [typeRule, Forbid(Members("Shop.Data.SqlCommand.Timeout"))] };
+
+        var violations = Check("""
+            namespace Shop.Domain { public class Order { public int Run(Data.SqlCommand c) => c.Timeout; } }
+            """, pack);
+
+        violations.Should().HaveCount(2);
+        violations.Single(v => string.Equals(v.RuleId, "TEST-TYPES", StringComparison.Ordinal)).Target.Should().Be("Shop.Data.SqlCommand");
+        violations.Single(v => string.Equals(v.RuleId, "TEST-MEMBERS", StringComparison.Ordinal)).Target.Should().Be("Shop.Data.SqlCommand.Timeout");
     }
 
     private static IReadOnlyList<ArchitectureViolation> Check(string source, RulePack pack, ViolationKind? kind = null)

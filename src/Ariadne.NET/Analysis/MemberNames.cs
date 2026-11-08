@@ -90,19 +90,35 @@ internal static class MemberNames
     /// <returns>The names, the used member's first.</returns>
     public static IReadOnlyList<string> Chain(ISymbol member, TypeNames names)
     {
-        ArgumentNullException.ThrowIfNull(names);
-
-        var chain = new List<string>();
-        foreach (var current in ChainMembers(member))
+        var named = NamedChain(member, names);
+        var chain = new string[named.Length];
+        for (var i = 0; i < chain.Length; i++)
         {
-            var name = DisplayNameOf(current, names);
-            if (!chain.Contains(name, StringComparer.Ordinal))
-            {
-                chain.Add(name);
-            }
+            chain[i] = named[i].Name;
         }
 
         return chain;
+    }
+
+    /// <summary>The chain with the member behind each name. A member whose name an earlier one already has is left out.</summary>
+    /// <param name="member">The used member, as a <see cref="MemberEdge"/> holds it.</param>
+    /// <param name="names">The type name cache of the check.</param>
+    /// <returns>The names and members, the used member's first.</returns>
+    public static MemberName[] NamedChain(ISymbol member, TypeNames names)
+    {
+        ArgumentNullException.ThrowIfNull(names);
+
+        var chain = new List<MemberName>();
+        foreach (var current in ChainMembers(member))
+        {
+            var name = DisplayNameOf(current, names);
+            if (!chain.Exists(existing => string.Equals(existing.Name, name, StringComparison.Ordinal)))
+            {
+                chain.Add(new MemberName(name, current));
+            }
+        }
+
+        return [.. chain];
     }
 
     /// <summary>The members behind <see cref="Chain(ISymbol, TypeNames)"/>: the used member, then every member it overrides or implements, upwards only and each once.</summary>
