@@ -52,12 +52,14 @@ run 5: load 3207 ms, check 1554.1 ms, check allocated 570,258,400 bytes
 
 The warm-up run is not listed. The load time does not depend on the rules; its difference is noise and a larger solution.
 
+One known load cost is new in phase 2.4: the loader parses each project's `obj/project.assets.json` once per target framework, whether or not the pack has a `bannedPackages` rule. It is not attributed separately; the load median is 3534 ms against 3362 ms at the 2.3 head (+5%, within the noise of this VM).
+
 ## What changed
 
 The check regressed by more than 25% against the Phase 2.2 figures in both time and allocations. The causes I can name:
 
 - The solution is larger. It has 261 types instead of 224 (+16.5%), because the phases since 2.2 added types and tests, and the type graph is built per type. That alone accounts for about 16 of the 38 points of allocation growth. Allocations per type still grew 19%, so the solution size is not the whole story.
-- Phase 2.4 widened what the type graph records. Member edges are recorded when a `members` pattern exists in the pack, and the Core-layer `System.Console.*` rule makes one exist here. With the filter non-empty, every method, property, field, event and indexer use in a compilation can become a member edge, and constructors and initializers are bound for it. The graph build already binds every syntax node through the semantic model (see the 2.2 section), so the extra edges and the extra bound constructor and initializer nodes are the likely cause of the growth per type.
+- Phase 2.4 widened what the type graph records. Member edges are recorded when a `members` pattern exists in the pack, and the Core-layer `System.Console.*` rule makes one exist here. With the filter non-empty, every method, property, field, event and indexer use in a compilation can become a member edge, and constructors and initializers are bound for it. The graph build already binds every syntax node through the semantic model (see the 2.2 section), so the extra edges and the extra bound constructor and initializer nodes are the likely cause of the growth per type. (Superseded by the [walker allocation investigation](#walker-allocation-investigation) below: the growth comes from the solution, not the walker.)
 - `bannedPackages` and `uniqueNames` are cheap passes. Neither walks syntax or binds anything: one looks at package references and the other compares type names.
 
 ### Attribution experiment
@@ -109,7 +111,7 @@ To see whether the 2.4 cost per type comes from the new rules or from the change
 
 Allocations per type with the new rules off are about 2.16 MB, 10% above the 2.3 head. So the three new rules together cost about 1.2% of the allocations, and nearly all of the 2.4 growth per type is there with every new feature off. The time difference of 180 ms is larger than the allocation difference suggests, but the two runs were minutes apart on a loaded VM, so I do not read it as the cost of the rules.
 
-My best guess for the cause is the unconditional change to the type graph build in phase 2.4, such as the walker's resolve and edge recording path or the constructor and initializer binding, which runs whether or not the pack has a `members` pattern. Part of it may also be the mix of types in the added code, because the 2.3 and 2.4 packs and solutions differ and I did not profile the build. I did not change production code. Phase 2.4 alone adds about 11% to allocations and time per type over the 2.3 head, just over the 10% bar.
+Superseded by the [walker allocation investigation](#walker-allocation-investigation) below, which refutes this guess. My best guess for the cause is the unconditional change to the type graph build in phase 2.4, such as the walker's resolve and edge recording path or the constructor and initializer binding, which runs whether or not the pack has a `members` pattern. Part of it may also be the mix of types in the added code, because the 2.3 and 2.4 packs and solutions differ and I did not profile the build. I did not change production code. Phase 2.4 alone adds about 11% to allocations and time per type over the 2.3 head, just over the 10% bar.
 
 ## Walker allocation investigation
 
