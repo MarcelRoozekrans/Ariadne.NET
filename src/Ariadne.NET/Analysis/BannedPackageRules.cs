@@ -82,6 +82,23 @@ internal static class BannedPackageRules
         /// <exception cref="ArgumentException">A covered project has no package list.</exception>
         public void RequirePackages(IReadOnlyList<AnalyzedProject> projects, string paramName)
         {
+            if (FindUncoveredProject(projects) is { } uncovered)
+            {
+                throw new ArgumentException(
+                    $"Rule '{uncovered.RuleId}' bans packages, but the packages of project '{uncovered.ProjectName}' are not known; analyse the project with its restored package list.",
+                    paramName);
+            }
+        }
+
+        /// <summary>
+        /// The first project, in rule then project order, that a bannedPackages rule covers while its packages are not known; null
+        /// when there is none. <see cref="RequirePackages"/> throws on it, and a caller that loaded the projects itself checks it
+        /// first to report the problem in its own terms.
+        /// </summary>
+        /// <param name="projects">The projects of the run.</param>
+        /// <returns>The rule and the project, or null.</returns>
+        internal UncoveredProject? FindUncoveredProject(IReadOnlyList<AnalyzedProject> projects)
+        {
             ArgumentNullException.ThrowIfNull(projects);
 
             foreach (ref readonly var rule in CollectionsMarshal.AsSpan(_rules))
@@ -90,14 +107,19 @@ internal static class BannedPackageRules
                 {
                     if (project is { Packages: null } && rule.Covers(AssemblyOf(project)))
                     {
-                        throw new ArgumentException(
-                            $"Rule '{rule.Rule.Id}' bans packages, but the packages of project '{project.Name}' are not known; analyse the project with its restored package list.",
-                            paramName);
+                        return new UncoveredProject(rule.Rule.Id, project.Name);
                     }
                 }
             }
+
+            return null;
         }
     }
+
+    /// <summary>A project that a bannedPackages rule covers while its packages are not known.</summary>
+    /// <param name="RuleId">The id of the rule that covers the project.</param>
+    /// <param name="ProjectName">The name of the project.</param>
+    internal readonly record struct UncoveredProject(string RuleId, string ProjectName);
 
     internal sealed record CompiledRule(RuleDefinition Rule, Glob[] Packages, Glob[] FromAssemblies, Glob[][] ExceptionAssemblies)
     {

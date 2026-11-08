@@ -8,7 +8,7 @@ namespace Ariadne.NET.Workspaces.Tests;
 
 /// <summary>
 /// A project whose assets file has no dependency group for its framework keeps unknown packages: a bannedPackages rule that covers
-/// it then rejects the run, and a pack without one still validates it. Works on a copy of the restored clean packages fixture.
+/// the solution validator then reports an error, and a pack without one still validates it. Works on a copy of the restored clean packages fixture.
 /// </summary>
 [Collection(FixtureSolutionCollection.Name)]
 public sealed class StaleAssetsTests : IDisposable
@@ -43,7 +43,7 @@ public sealed class StaleAssetsTests : IDisposable
     [Theory]
     [InlineData(NoGroups)]
     [InlineData(GroupsForOtherFrameworks)]
-    public async Task UnusableAssetsFile_BannedPackagesRuleRejectsTheRun_OtherPackWorks(string variant)
+    public async Task UnusableAssetsFile_BannedPackagesRuleReportsAnError_OtherPackWorks(string variant)
     {
         var solution = CopyWithAssets("Pkg.Core", variant);
         var validator = new SolutionValidator(_loader, new ArchitectureValidator());
@@ -63,10 +63,13 @@ public sealed class StaleAssetsTests : IDisposable
             ],
         };
 
-        var banned = async () => await validator.ValidateAsync(banning, solution).ConfigureAwait(false);
+        var banned = await validator.ValidateAsync(banning, solution);
         var plain = await validator.ValidateAsync(new RulePack { Name = "plain" }, solution);
 
-        (await banned.Should().ThrowAsync<ArgumentException>()).Which.Message.Should().Contain("Pkg.Core");
+        // A stale assets file is something the user fixes by restoring, so it is a reported error and not an exception.
+        banned.IsFailure.Should().BeTrue();
+        banned.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        banned.Error.Message.Should().Contain("'Pkg.Core'").And.Contain("TEST-BAN").And.Contain("project.assets.json").And.Contain("dotnet restore");
         plain.IsSuccess.Should().BeTrue(plain.IsFailure ? plain.Error.ToString() : null);
         plain.Value.Violations.Should().BeEmpty();
     }
