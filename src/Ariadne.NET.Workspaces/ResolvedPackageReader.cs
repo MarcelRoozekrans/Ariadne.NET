@@ -18,8 +18,8 @@ internal static class ResolvedPackageReader
     /// project. <c>IsDirect</c> comes from the project's own <c>projectFileDependencyGroups</c> entry for the framework, since
     /// <c>targets</c> lists direct and transitive packages alike. The path is found breadth first over the <c>dependencies</c> of
     /// <c>targets</c>, from the direct references and referenced projects in the order the file lists them.
-    /// The packages are unknown, not empty, when the file has no <c>targets</c> entry or no dependency group for the framework, since
-    /// an empty list would report a project clean that was never checked.
+    /// The packages are unknown, not empty, when the file has no <c>targets</c> entry or no dependency group for the framework, or
+    /// the framework's <c>targets</c> entry is not an object, since an empty list would report a project clean that was never checked.
     /// </summary>
     /// <param name="assetsPath">The assets file.</param>
     /// <param name="targetFramework">The target framework of the project, or null when the file holds a single one.</param>
@@ -37,7 +37,7 @@ internal static class ResolvedPackageReader
         var root = document.RootElement;
         if (root.ValueKind != JsonValueKind.Object
             || !root.TryGetProperty("targets", out var targets)
-            || Select(targets, targetFramework) is not { } target
+            || Select(targets, targetFramework) is not { ValueKind: JsonValueKind.Object } target
             || !root.TryGetProperty("projectFileDependencyGroups", out var groups)
             || Select(groups, targetFramework) is not { } group)
         {

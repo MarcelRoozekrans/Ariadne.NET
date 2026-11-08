@@ -131,6 +131,8 @@ public sealed class ResolvedPackageReaderTests : IDisposable
     [InlineData("""{ "targets": { "net10.0": {} }, "projectFileDependencyGroups": { "net10.0": [] } }""", "net9.0")]
     [InlineData("""{ "targets": { "net10.0": {} } }""", "net10.0")]
     [InlineData("""{ "targets": { "net10.0": {} }, "projectFileDependencyGroups": { "net9.0": [] } }""", "net10.0")]
+    [InlineData("""{ "targets": { "net10.0": [ 1 ] }, "projectFileDependencyGroups": { "net10.0": [] } }""", "net10.0")]
+    [InlineData("""{ "targets": { "net10.0": "x" }, "projectFileDependencyGroups": { "net10.0": [] } }""", null)]
     public void MissingOrUnmatchedEntry_IsUnknownNotEmpty(string json, string? framework)
     {
         var known = ResolvedPackageReader.TryRead(Write(json), framework, out var packages);
