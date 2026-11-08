@@ -1,6 +1,6 @@
 # Session State
 
-**Last session:** 2026-11-07 (phase 5.6 implemented)
+**Last session:** 2026-11-08 (phase 5.6 merged)
 **Repository:** `MarcelRoozekrans/Ariadne.NET`, public since 2026-11-03. The old private repository `MarcelRoozekrans/architecture-governance-engine` is frozen. Local clones: remote `ariadne` is the new repository, `origin` the old one; push with `git push ariadne HEAD:<branch>`, never to `origin`.
 
 ## Current Position
@@ -12,7 +12,7 @@
   - Plan: `docs/superpowers/plans/2026-11-05-phase-2.2-rule-schema-v2.md`, all boxes ticked.
   - Perf: the check on the repo pack is about 21% slower and allocates about 32% more than the 2.1 baseline; see `docs/perf/phase-2.1-baseline.md`.
 - **Phase 2.3 — Enforce placement and code-feature rules:** [status: complete]. Merged as #44 on 2026-11-06; completion merged as #45 and 0.4.0 released via #41. Design `docs/superpowers/specs/2026-11-06-phase-2.3-placement-and-code-feature-rules-design.md`, plan `docs/superpowers/plans/2026-11-06-phase-2.3-placement-and-code-feature-rules.md`, all boxes ticked. Owner decisions: one `require` rule with roles kept as engine-internal shorthand; `CODE-001` keeps its solution-wide meaning; no placement rules in the built-in packs, only in this repo's own pack.
-- **Phase 5.6 — Agent hooks:** [status: complete 2026-11-07]. Implemented on branch `feat/phase-5.6-hooks`, pushed to remote `ariadne`; the PR is open. Plan `docs/superpowers/plans/2026-11-06-phase-5.6-agent-hooks.md`, all boxes ticked; design `docs/superpowers/specs/2026-11-06-agent-guidance-hooks-design.md`. Timings in `docs/perf/phase-5.6-hooks.md`: `session-start` and `pre-tool-use` about 0.1 s, `stop` with one edit about 13 s on this solution. Owner decisions, approved 2026-11-07, beyond the design: pack attachments move to 5.7; `pre-tool-use` records edits for `stop`; the new-file check reads the namespace from the written content. Follow-ups:
+- **Phase 5.6 — Agent hooks:** [status: complete 2026-11-08]. Merged as #47 (e609dcf) on 2026-11-08 from `feat/phase-5.6-hooks`; CI was green. Release-please PR #48 (0.4.1) lists the hook features and fixes and is not merged. Plan `docs/superpowers/plans/2026-11-06-phase-5.6-agent-hooks.md`, all boxes ticked; design `docs/superpowers/specs/2026-11-06-agent-guidance-hooks-design.md`. Timings in `docs/perf/phase-5.6-hooks.md`: `session-start` and `pre-tool-use` about 0.1 s, `stop` with one edit about 13 s on this solution. Owner decisions, approved 2026-11-07, beyond the design: pack attachments move to 5.7; `pre-tool-use` records edits for `stop`; the new-file check reads the namespace from the written content. Follow-ups:
   - Pack attachments move to phase 5.7, together with `init --from <url>`.
   - Per-edit validation through `PostToolUse`: the measurement says no; it would need a resident process.
   - Make `Ariadne.NET.Hooks` packable in 5.7.
@@ -59,6 +59,6 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 
 ## Recommended Next Step
 
-Phase 5.6 is implemented and reviewed. Merge the 5.6 PR from `feat/phase-5.6-hooks`, then run `complete-phase` for 5.6. The PR is squash merged, with a `BEGIN_COMMIT_OVERRIDE` block in its body, one line per commit and no breaking changes. Check afterwards that release-please lists the new features. The next phase in Milestone 2 is 2.4: run `start-next-phase`, which routes to brainstorming because there is no design spec. Check the release-please PR afterwards that the commits were counted.
+Phase 5.6 is merged and closed. Ask the owner which comes first: phase 2.4 (run `start-next-phase`, which routes to brainstorming because there is no design spec), the three open 5.6 points above, or deleting the leftover branches `feat/phase-5.6-agent-hooks` and `docs/agent-hooks-design`, local and on `ariadne`, which the merged `feat/phase-5.6-hooks` supersedes. Delete nothing without an answer. Do not merge release-please PR #48 unless the owner asks.
 
 Commit rules: conventional commits; no `Co-Authored-By` trailer or session link; no nested parentheses in commit bodies; keep every footer line under 100 characters, because commitlint rejects longer ones; breaking commits carry `!` and a `BREAKING CHANGE` footer. Shared VM: one build or test at a time, no local AOT publish.
