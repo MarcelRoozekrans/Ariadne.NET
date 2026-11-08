@@ -72,3 +72,41 @@ To separate the member-edge cost, I ran the same command from a temporary direct
 The member rule costs about 6.7 MB, or 1.2%, of the check allocations, and about 1% of the time, which is within the noise. So the member-edge recording is not what makes the check larger than in phase 2.2. The remaining growth sits in the type graph build that happens with or without the rule: the 16.5% larger solution, and whatever changed since phase 2.2 in the graph build for every pack. I did not profile the graph build, and I did not re-measure the 2.2 commit on today's solution, so I cannot split the rest between the larger solution and per-type work.
 
 The check is still not a hot loop in normal use: it runs once per validation, next to a load of 3 to 4 seconds.
+
+## Attribution
+
+The regression over Phase 2.2 has two parts. Phase 2.3 recorded no perf figure, so I measured its head: commit `248c0e9`, the merge base of this branch with `ariadne/main` (the current `main` has moved on to phase 5.6 and is not comparable). It was built and measured the same way in a temporary worktree outside the repository, with its own `.architecture/rules.yaml`, on the same VM (load average 2.6 before the run). The worktree was removed afterwards.
+
+Phase 2.3 head: 12 projects, 235 types, 0 violations.
+
+```
+run 1: load 4273 ms, check 1333.7 ms, check allocated 461,561,536 bytes
+run 2: load 3331 ms, check 1266.6 ms, check allocated 461,505,920 bytes
+run 3: load 3130 ms, check 1273.9 ms, check allocated 461,488,600 bytes
+run 4: load 3362 ms, check 1264.8 ms, check allocated 461,495,472 bytes
+run 5: load 3397 ms, check 1236.3 ms, check allocated 456,906,656 bytes
+median (5 runs): load 3362 ms, check 1266.6 ms, check allocated 461,495,472 bytes
+```
+
+| Metric | Phase 2.2 | Phase 2.3 head | Phase 2.4 | 2.3 vs 2.2 | 2.4 vs 2.3 | 2.4 vs 2.2 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Types checked | 224 | 235 | 261 | +4.9% | +11.1% | +16.5% |
+| Check time | 1012.7 ms | 1266.6 ms | 1554.1 ms | +25% | +23% | +53% |
+| Check allocations | 412,696,312 bytes | 461,495,472 bytes | 570,256,824 bytes | +12% | +24% | +38% |
+| Allocations per type | about 1.84 MB | about 1.96 MB | about 2.18 MB | +7% | +11% | +19% |
+| Check time per type | about 4.5 ms | about 5.4 ms | about 5.95 ms | +19% | +10% | +32% |
+
+By allocations, which are the stable figure, about a third of the regression over 2.2 is phase 2.3 and two thirds is phase 2.4. Of the 2.4 part, 11 points are the larger solution (261 types against 235) and about 11 points are cost per type. By time, the split is about half and half, but the timings are noisy.
+
+### Experiment: every new feature off
+
+To see whether the 2.4 cost per type comes from the new rules or from the changed walker and validator, I ran the 2.4 build from a temporary directory with a copy of the pack that has the 4 layers and the first 4 rules only: no `members`, no `bannedPackages`, no `uniqueNames`. The copy was deleted afterwards and the real pack was not touched.
+
+| Pack | Check time (median of 5) | Check allocations (median of 5) |
+| --- | --- | --- |
+| Repo pack | 1554.1 ms | 570,256,824 bytes |
+| No `members`, `bannedPackages` or `uniqueNames` rules | 1374.5 ms | 563,343,792 bytes |
+
+Allocations per type with the new rules off are about 2.16 MB, 10% above the 2.3 head. So the three new rules together cost about 1.2% of the allocations, and nearly all of the 2.4 growth per type is there with every new feature off. The time difference of 180 ms is larger than the allocation difference suggests, but the two runs were minutes apart on a loaded VM, so I do not read it as the cost of the rules.
+
+My best guess for the cause is the unconditional change to the type graph build in phase 2.4, such as the walker's resolve and edge recording path or the constructor and initializer binding, which runs whether or not the pack has a `members` pattern. Part of it may also be the mix of types in the added code, because the 2.3 and 2.4 packs and solutions differ and I did not profile the build. I did not change production code. Phase 2.4 alone adds about 11% to allocations and time per type over the 2.3 head, just over the 10% bar.
