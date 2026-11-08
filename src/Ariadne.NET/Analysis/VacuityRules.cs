@@ -42,6 +42,8 @@ internal static class VacuityRules
 
     private static HashSet<string> CheckLayers(RulePack pack, LayerMap map, IReadOnlyList<TypeGraph> graphs, int count, List<ArchitectureViolation> violations)
     {
+        // A layer counts via LayersOf, so an overlapping type counts for each of its layers, while TargetMatcher.Matches uses
+        // LayerOf, where a type in two layers is in none. A rule from such a layer can still be vacuous; LayerOverlap is reported separately.
         var found = new HashSet<string>(StringComparer.Ordinal);
         foreach (var graph in graphs)
         {

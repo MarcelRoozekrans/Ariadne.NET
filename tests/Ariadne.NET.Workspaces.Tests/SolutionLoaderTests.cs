@@ -164,7 +164,7 @@ public sealed class SolutionLoaderTests : IDisposable
             project.Compilation.SyntaxTrees.Should().Contain(t => IsUnderObj(t.FilePath), "the SDK writes generated files under obj/");
         }
 
-        var report = new ArchitectureValidator().Validate(TestPacks.Layered(), loaded.Projects);
+        var report = new ArchitectureValidator().Validate(TestPacks.Layered("Domain", "Infrastructure"), loaded.Projects);
 
         report.Violations.Should().NotBeEmpty();
         report.Violations.Should().OnlyContain(v => v.Location == null || !IsUnderObj(v.Location.Value.FilePath));

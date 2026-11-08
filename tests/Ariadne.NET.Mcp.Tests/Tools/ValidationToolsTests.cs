@@ -1,3 +1,4 @@
+using Ariadne.NET.Abstractions;
 using Ariadne.NET.Analysis;
 using Ariadne.NET.Mcp.Tools;
 using Ariadne.NET.RuleEngine;
@@ -6,6 +7,7 @@ using Ariadne.NET.Tests.Shared;
 using Ariadne.NET.Workspaces;
 using FluentAssertions;
 using ModelContextProtocol;
+using ZeroAlloc.Results;
 
 namespace Ariadne.NET.Mcp.Tests.Tools;
 
@@ -31,10 +33,20 @@ public class ValidationToolsTests
     {
         FixtureProjects.EnsureRestored();
 
+        // The clean fixture has a Domain and a WebApi project only, and a layer that covers no type fails the run, so it is
+        // validated against a pack of those two layers and not the four of clean-architecture.
         var report = await ValidationTools.ValidateSource(
-            _helper, _validator,
-            path: FixtureProjects.Path("clean", "Shop.slnx"),
-            template: "clean-architecture");
+            new FixedPackHelper(new RulePack
+            {
+                Name = "shop",
+                Layers =
+                [
+                    new LayerDefinition { Name = "Domain", Id = "T-DOMAIN", Because = "The domain depends on nothing.", Namespaces = ["**.Domain.**"] },
+                    new LayerDefinition { Name = "WebApi", Id = "T-WEBAPI", Because = "The API composes the domain.", Namespaces = ["**.WebApi.**"], AllowedDependencies = ["Domain"] },
+                ],
+            }),
+            _validator,
+            path: FixtureProjects.Path("clean", "Shop.slnx"));
 
         report.IsValid.Should().BeTrue();
         report.TypesChecked.Should().BeGreaterThan(0);
@@ -65,5 +77,10 @@ public class ValidationToolsTests
             template: "clean-architecture");
 
         await act.Should().ThrowAsync<McpException>().WithMessage("Path '*' does not exist.*");
+    }
+
+    private sealed class FixedPackHelper(RulePack pack) : IRuleResolutionHelper
+    {
+        public Result<RulePack, AriadneError> Resolve(string? template) => Result<RulePack, AriadneError>.Success(pack);
     }
 }

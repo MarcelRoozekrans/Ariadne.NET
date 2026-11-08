@@ -48,6 +48,22 @@ public sealed class ExitCodeTests : IDisposable
 
     private int Run(params string[] args) => CliRootCommand.InvokeAsync(_provider, args).GetAwaiter().GetResult();
 
+    // A layer that covers no type fails the run, so a test on a small fixture writes a pack of the layers it has.
+    private void WriteLayerRules(params string[] layers)
+    {
+        var lines = new List<string> { "schema: 2", "name: shop", "layers:" };
+        foreach (var layer in layers)
+        {
+            lines.Add($"  - name: {layer}");
+            lines.Add($"    id: T-{layer.ToUpperInvariant()}");
+            lines.Add($"    because: The {layer} layer.");
+            lines.Add($"    namespaces: [\"**.{layer}.**\"]");
+            lines.Add(string.Equals(layer, "Domain", StringComparison.Ordinal) ? "    allowedDependencies: []" : "    allowedDependencies: [Domain]");
+        }
+
+        WriteRules(string.Join('\n', lines));
+    }
+
     private void WriteRules(string content) =>
         File.WriteAllText(Path.Combine(_tempDir, ".architecture", "rules.yaml"), content);
 
@@ -61,6 +77,7 @@ public sealed class ExitCodeTests : IDisposable
     [Fact]
     public void Validate_CleanFixture_ShouldReturnSuccess()
     {
+        WriteLayerRules("Domain", "WebApi");
         var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("clean", "Shop.slnx"));
 
         exitCode.Should().Be(ExitCodes.Success);
@@ -70,6 +87,7 @@ public sealed class ExitCodeTests : IDisposable
     [Fact]
     public void Validate_BrokenFixture_ShouldReturnViolations()
     {
+        WriteLayerRules("Domain", "Infrastructure");
         var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("broken", "Shop.slnx"));
 
         exitCode.Should().Be(ExitCodes.Violations);
@@ -194,7 +212,9 @@ public sealed class ExitCodeTests : IDisposable
         written.Should().StartWith("schema: 2");
         written.Should().Contain("- builtin://clean-architecture").And.Contain("- builtin://cqrs");
 
-        Run("validate", FixtureProjects.Path("clean", "Shop.slnx")).Should().Be(ExitCodes.Success);
+        // The pack covers four layers and no fixture has types in all of them, so a validate run would fail on a layer that
+        // covers no type. That the pack loads and resolves is checked with the rules command.
+        Run("rules").Should().Be(ExitCodes.Success);
     }
 
     [Theory]

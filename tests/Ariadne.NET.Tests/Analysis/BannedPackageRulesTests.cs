@@ -147,7 +147,12 @@ public class BannedPackageRulesTests
         var pack = PackWith(["FluentValidation"], new TargetSelector { Assemblies = ["Shop.Domain"] });
         var compilation = TestCompilation.Create("namespace Shop { public class A { } }");
 
-        var report = new ArchitectureValidator().Validate(pack, [new AnalyzedProject("Shop.Web", null, compilation.WithAssemblyName("Shop.Web"))]);
+        // Shop.Domain is covered by the rule, so the rule is not vacuous; Shop.Web is not covered and has no packages.
+        var report = new ArchitectureValidator().Validate(pack,
+        [
+            new AnalyzedProject("Shop.Web", null, compilation.WithAssemblyName("Shop.Web")),
+            new AnalyzedProject("Shop.Domain", null, compilation.WithAssemblyName("Shop.Domain")) { Packages = [] },
+        ]);
 
         report.IsValid.Should().BeTrue();
     }

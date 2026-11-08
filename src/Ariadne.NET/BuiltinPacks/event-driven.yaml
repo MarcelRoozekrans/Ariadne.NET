@@ -47,43 +47,51 @@ layers:
 componentRoles:
   - name: Event
     layer: Events
+    allowEmpty: true
     typeKind: Record
     requiresInterface: false
     description: "Event message"
   - name: IntegrationEvent
     layer: Events
+    allowEmpty: true
     typeKind: Record
     requiresInterface: false
     description: "Cross-boundary event"
   - name: EventProducer
     layer: Producers
+    allowEmpty: true
     typeKind: Class
     requiresInterface: true
     interfaceRole: EventProducerInterface
     description: "Publishes events"
   - name: EventProducerInterface
     layer: Producers
+    allowEmpty: true
     typeKind: Interface
     requiresInterface: false
     description: "Interface for event producer"
   - name: EventConsumer
     layer: Consumers
+    allowEmpty: true
     typeKind: Class
     requiresInterface: true
     interfaceRole: EventConsumerInterface
     description: "Handles events"
   - name: EventConsumerInterface
     layer: Consumers
+    allowEmpty: true
     typeKind: Interface
     requiresInterface: false
     description: "Interface for event consumer"
   - name: EventHandler
     layer: Consumers
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Alias for consumer"
   - name: MessageBrokerAdapter
     layer: Infrastructure
+    allowEmpty: true
     typeKind: Class
     requiresInterface: true
     interfaceRole: MessageBrokerInterface
@@ -91,6 +99,7 @@ componentRoles:
     description: "Broker implementation"
   - name: MessageBrokerInterface
     layer: Infrastructure
+    allowEmpty: true
     typeKind: Interface
     requiresInterface: false
     description: "Broker contract"

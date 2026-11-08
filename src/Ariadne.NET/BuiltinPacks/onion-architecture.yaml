@@ -47,55 +47,65 @@ layers:
 componentRoles:
   - name: Entity
     layer: DomainModel
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Domain entity with identity"
   - name: ValueObject
     layer: DomainModel
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Immutable value type"
   - name: DomainEnum
     layer: DomainModel
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Enumeration class"
   - name: RepositoryInterface
     layer: DomainServices
+    allowEmpty: true
     typeKind: Interface
     requiresInterface: false
     alternativeNames: [Repository]
     description: "Repository contract (defined in DomainServices)"
   - name: DomainServiceInterface
     layer: DomainServices
+    allowEmpty: true
     typeKind: Interface
     requiresInterface: false
     alternativeNames: [DomainService]
     description: "Domain service contract"
   - name: DomainEvent
     layer: DomainServices
+    allowEmpty: true
     typeKind: Record
     requiresInterface: false
     description: "Domain event"
   - name: ApplicationService
     layer: ApplicationServices
+    allowEmpty: true
     typeKind: Class
     requiresInterface: true
     interfaceRole: ApplicationServiceInterface
     description: "Application use case orchestrator"
   - name: ApplicationServiceInterface
     layer: ApplicationServices
+    allowEmpty: true
     typeKind: Interface
     requiresInterface: false
     alternativeNames: [ApplicationService]
     description: "Application service contract"
   - name: Dto
     layer: ApplicationServices
+    allowEmpty: true
     typeKind: Record
     requiresInterface: false
     description: "Data transfer object"
   - name: Repository
     layer: Infrastructure
+    allowEmpty: true
     typeKind: Class
     requiresInterface: true
     interfaceRole: RepositoryInterface
@@ -103,6 +113,7 @@ componentRoles:
     description: "Repository implementation"
   - name: DomainService
     layer: Infrastructure
+    allowEmpty: true
     typeKind: Class
     requiresInterface: true
     interfaceRole: DomainServiceInterface
@@ -110,16 +121,19 @@ componentRoles:
     description: "Domain service implementation"
   - name: DbContext
     layer: Infrastructure
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Database context"
   - name: Controller
     layer: Presentation
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "API controller"
   - name: ViewModel
     layer: Presentation
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "View model for UI binding"

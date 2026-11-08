@@ -6,47 +6,56 @@ author: platform-team
 componentRoles:
   - name: Aggregate
     layer: Domain
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Aggregate root entity"
   - name: AggregateRoot
     layer: Domain
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Alias for Aggregate"
   - name: ValueObject
     layer: Domain
+    allowEmpty: true
     typeKind: Record
     requiresInterface: false
     description: "Immutable value type"
   - name: DomainEvent
     layer: Domain
+    allowEmpty: true
     typeKind: Record
     requiresInterface: false
     description: "Domain event"
   - name: DomainService
     layer: Domain
+    allowEmpty: true
     typeKind: Class
     requiresInterface: true
     interfaceRole: DomainServiceInterface
     description: "Domain service"
   - name: DomainServiceInterface
     layer: Domain
+    allowEmpty: true
     typeKind: Interface
     requiresInterface: false
     description: "Interface for domain service"
   - name: Specification
     layer: Domain
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Query specification"
   - name: Factory
     layer: Domain
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Entity/aggregate factory"
   - name: DomainException
     layer: Domain
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Domain-specific exception"
