@@ -144,6 +144,32 @@ public class VacuityRulesTests
     }
 
     [Fact]
+    public void Rule_and_role_naming_a_vacuous_layer_in_another_case_get_no_second_violation()
+    {
+        var pack = Pack(
+            [Layer("Ghost", "**.Ghost.**")],
+            [Rule("R-1", RuleKind.Forbid, InLayer("ghost"), to: Ns("Shop.**"))],
+            [new ComponentRoleDefinition { Name = "Handler", Layer = "GHOST" }]);
+
+        Check(pack, TwoLayers).Should().ContainSingle().Which.Kind.Should().Be(ViolationKind.VacuousLayer);
+    }
+
+    [Fact]
+    public void Layer_found_under_another_case_is_not_vacuous_and_a_role_held_under_another_case_is_not_reported()
+    {
+        var pack = Pack(
+            [Layer("Domain", "**.Domain.**")],
+            [Rule("R-1", RuleKind.Forbid, InLayer("domain"), to: Ns("Shop.**"))],
+            [new ComponentRoleDefinition { Name = "Entity", Layer = "domain" }]);
+        var compilation = TestCompilation.Create(TwoLayers);
+        var graph = TypeGraphBuilder.Build(compilation, new HashSet<SyntaxTree>(), CancellationToken.None);
+        var held = new ComponentRoleDefinition { Name = "ENTITY", Layer = "Domain" };
+        var matches = new RoleMatches(graph, [(compilation.GetTypeByMetadataName("Shop.Domain.Order")!, held)]);
+
+        Run(pack, [graph], [matches], [Project(compilation)]).Should().BeEmpty();
+    }
+
+    [Fact]
     public void Role_in_a_vacuous_layer_gets_no_vacuous_rule()
     {
         var pack = Pack([Layer("Ghost", "**.Ghost.**")], roles: [new ComponentRoleDefinition { Name = "Handler", Layer = "Ghost" }]);

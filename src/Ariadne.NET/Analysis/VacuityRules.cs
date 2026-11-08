@@ -44,7 +44,7 @@ internal static class VacuityRules
     {
         // A layer counts via LayersOf, so an overlapping type counts for each of its layers, while TargetMatcher.Matches uses
         // LayerOf, where a type in two layers is in none. A rule from such a layer can still be vacuous; LayerOverlap is reported separately.
-        var found = new HashSet<string>(StringComparer.Ordinal);
+        var found = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var graph in graphs)
         {
             foreach (var type in graph.SourceTypes)
@@ -58,7 +58,7 @@ internal static class VacuityRules
             }
         }
 
-        var vacuous = new HashSet<string>(StringComparer.Ordinal);
+        var vacuous = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var layer in pack.Layers)
         {
             if (found.Contains(layer.Name))
@@ -129,7 +129,7 @@ internal static class VacuityRules
 
     private static HashSet<string> HeldRoles(IReadOnlyList<RoleMatches> roleMatches)
     {
-        var held = new HashSet<string>(StringComparer.Ordinal);
+        var held = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var matches in roleMatches)
         {
             foreach (var (_, role) in matches.Items)
