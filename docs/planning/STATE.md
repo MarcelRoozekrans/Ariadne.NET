@@ -1,6 +1,6 @@
 # Session State
 
-**Last session:** 2026-11-08 (phase 5.6 merged)
+**Last session:** 2026-11-08 (phase 2.4 built on `feat/phase-2.4-banned-packages-forbidden-apis-name-collisions`, no PR yet; phase 5.6 merged)
 **Repository:** `MarcelRoozekrans/Ariadne.NET`, public since 2026-11-03. The old private repository `MarcelRoozekrans/architecture-governance-engine` is frozen. Local clones: remote `ariadne` is the new repository, `origin` the old one; push with `git push ariadne HEAD:<branch>`, never to `origin`.
 
 ## Current Position
@@ -22,7 +22,11 @@
   - Owner decision pending: `stop_hook_active` currently clears the edit list. Not clearing it would check the edits made while fixing in the next turn.
   - A custom hook `timeout` on an existing Ariadne entry in `.claude/settings.json` is reset by every `init` run.
   - SIGTERM during `stop` can exit 143, which breaks the fail-open rule.
-- **Phase 2.4 — Banned packages, forbidden APIs and name collisions:** [status: pending], no design yet.
+- **Phase 2.4 — Banned packages, forbidden APIs and name collisions:** [status: complete 2026-11-08], built and reviewed on `feat/phase-2.4-banned-packages-forbidden-apis-name-collisions` (pushed to `ariadne`, merged with `ariadne/main` at c94acde, no PR opened). Design `docs/superpowers/specs/2026-11-08-phase-2.4-banned-packages-forbidden-apis-name-collisions-design.md`, plan `docs/superpowers/plans/2026-11-08-phase-2.4-banned-packages-forbidden-apis-name-collisions.md`, all boxes ticked. Adds `bannedPackages` (package graph from `project.assets.json`, transitive and through project references, unknown data is an error for a covering rule), `members` on the `to` selector of `forbid` and `allowOnly` (override and implement matching, initializers, implicit base constructor call, indexers by metadata name) and `uniqueNames`. Perf: `docs/perf/phase-2.4-baseline.md`; the walker and validator are within 0.1% of the 2.3 head, the extra cost per type is the larger solution. Stated limits are in the design and on the docs-site rule-schema page.
+  - **PR needs a `BEGIN_COMMIT_OVERRIDE` block:** the generated public `RuleDefinitionValidator` constructor gained a `TargetSelectorValidator` parameter for `Against` (commit 0b332ac, a `feat` without `!`). Put the breaking text in the subject of that override line; footers inside an override are ignored. All other commits are additive `feat`, `fix`, `docs`, `test` or `chore`.
+  - Issue #50: the new `InternalsVisibleTo Ariadne.NET.Workspaces` couples the two packages' versions; decide between pinning the dependency and a public coverage check.
+  - Leftover branch `docs/phase-2.4-design` on `ariadne` holds only the design and plan commits and is superseded by the feature branch; delete it with the owner's go-ahead.
+  - Not covered by a CLI or MCP level test: the stale-assets error (shared `SolutionValidator` is tested).
 - Issues filed from 2.2: #36 (child packs: amending `allowedDependencies`, locked rules sidestepped by retargeting, empty retargets) and #37 (child-layer error wording, duplicate roles, pack file size limit). #32 stays the module-isolation item.
 
 Phase 2.2 decisions by the owner, 2026-11-05:
@@ -59,6 +63,6 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 
 ## Recommended Next Step
 
-Phase 5.6 is merged and closed. Ask the owner which comes first: phase 2.4 (run `start-next-phase`, which routes to brainstorming because there is no design spec), the three open 5.6 points above, or deleting the leftover branches `feat/phase-5.6-agent-hooks` and `docs/agent-hooks-design`, local and on `ariadne`, which the merged `feat/phase-5.6-hooks` supersedes. Delete nothing without an answer. Do not merge release-please PR #48 unless the owner asks.
+Phase 2.4 is complete on its feature branch and waits for the owner. Open a PR only when the owner asks, with the `BEGIN_COMMIT_OVERRIDE` block above in the PR body, one line per commit. Then the next phase is 2.5 vacuity detection: run `start-next-phase`, which routes to brainstorming because there is no design spec. Also ask the owner about the three open 5.6 points above, and about deleting the leftover branches `feat/phase-5.6-agent-hooks`, `docs/agent-hooks-design` and `docs/phase-2.4-design`, local and on `ariadne`. Delete nothing without an answer. Do not merge release-please PR #48 unless the owner asks.
 
 Commit rules: conventional commits; no `Co-Authored-By` trailer or session link; no nested parentheses in commit bodies; keep every footer line under 100 characters, because commitlint rejects longer ones; breaking commits carry `!` and a `BREAKING CHANGE` footer. Shared VM: one build or test at a time, no local AOT publish.
