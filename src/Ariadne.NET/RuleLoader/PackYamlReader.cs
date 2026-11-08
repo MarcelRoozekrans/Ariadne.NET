@@ -61,13 +61,6 @@ internal static class PackYamlReader
 
     private const string RuleBodyKeys = "'forbid', 'allowOnly', 'require', 'bannedPackages' or 'uniqueNames'";
 
-    private enum ExceptionTarget
-    {
-        Types,
-        Projects,
-        ForTypes,
-    }
-
     private readonly record struct RuleBody(
         RuleKind Kind, TargetSelector From, TargetSelector To, RuleRequirement? Require, List<string> Packages, TargetSelector Against);
 
@@ -337,10 +330,10 @@ internal static class PackYamlReader
             var before = _problems.Count;
             var fields = Fields(map, RuleKeys, where);
             var id = RequiredString(fields, "id", where, map);
-            var target = fields.ContainsKey("bannedPackages") ? ExceptionTarget.Projects
-                : fields.ContainsKey("uniqueNames") ? ExceptionTarget.ForTypes
-                : ExceptionTarget.Types;
-            var exceptions = ReadExceptions(fields, where, target);
+            var exceptionKind = fields.ContainsKey("bannedPackages") ? RuleKind.BannedPackages
+                : fields.ContainsKey("uniqueNames") ? RuleKind.UniqueNames
+                : RuleKind.Forbid;
+            var exceptions = ReadExceptions(fields, where, exceptionKind);
 
             if (fields.ContainsKey("exceptions") && OnlyKeys(fields, AmendmentKeys))
             {
@@ -480,26 +473,9 @@ internal static class PackYamlReader
 
             var where = $"the uniqueNames of {ruleWhere}";
             var fields = Fields(map, UniqueNamesKeys, where);
-            var subject = ReadNamedSelector(fields, "for", where, ruleWhere, map);
-            var against = ReadNamedSelector(fields, "against", where, ruleWhere, map);
+            var subject = ReadTarget(fields, "for", where, ruleWhere, map);
+            var against = ReadTarget(fields, "against", where, ruleWhere, map);
             return subject is not null && against is not null ? (subject, against) : null;
-        }
-
-        private TargetSelector? ReadNamedSelector(Dictionary<string, Field> fields, string key, string where, string ruleWhere, YamlMappingNode parent)
-        {
-            if (!fields.TryGetValue(key, out var field))
-            {
-                Add(parent, $"{where} has no '{key}'");
-                return null;
-            }
-
-            if (field.Value is not YamlMappingNode map)
-            {
-                Add(field.Key, $"'{key}' in {where} must be a mapping");
-                return null;
-            }
-
-            return ReadSelector(map, $"the {key} of {ruleWhere}", ruleWhere, TargetKeys);
         }
 
         private (TargetSelector For, RuleRequirement Require)? ReadRequire(in Field field, string ruleWhere)
@@ -639,8 +615,8 @@ internal static class PackYamlReader
 
             if (fields.TryGetValue("layers", out var layersField) && OtherSelectorKeys.Any(fields.ContainsKey))
             {
-                var others = keys.Where(static k => !string.Equals(k, "layers", StringComparison.Ordinal)).Select(static k => $"'{k}'").ToArray();
-                Add(layersField.Key, $"a target in {ruleWhere} cannot mix 'layers' with {string.Join(", ", others[..^1])} or {others[^1]}");
+                var others = keys.Where(static k => !string.Equals(k, "layers", StringComparison.Ordinal)).ToArray();
+                Add(layersField.Key, $"a target in {ruleWhere} cannot mix 'layers' with {JoinOr(others)}");
             }
             else if (NoneSelected(fields, selectors))
             {
@@ -668,7 +644,7 @@ internal static class PackYamlReader
             return at < 0 ? [] : lists[at] ?? [];
         }
 
-        private List<RuleException> ReadExceptions(Dictionary<string, Field> ruleFields, string ruleWhere, ExceptionTarget target)
+        private List<RuleException> ReadExceptions(Dictionary<string, Field> ruleFields, string ruleWhere, RuleKind kind)
         {
             var exceptions = new List<RuleException>();
             var items = Items(ruleFields, "exceptions", ruleWhere);
@@ -687,10 +663,11 @@ internal static class PackYamlReader
                 var assemblies = PatternList(fields, "assemblies", where, Glob.Flat);
                 var types = PatternList(fields, "types", where, Glob.Dotted);
                 var because = RequiredString(fields, "because", where, map);
-                var misplaced = RejectMisplaced(fields, where, target);
+                var misplaced = RejectMisplaced(fields, where, kind);
                 if (!misplaced && NoneSelected(fields, [("namespaces", namespaces), ("assemblies", assemblies), ("types", types)]))
                 {
-                    Add(map, $"{where} needs at least one of 'namespaces', 'assemblies', 'types'");
+                    var allowed = ExceptionKeyRules.Allowed(kind);
+                    Add(map, allowed.Length == 1 ? $"{where} needs '{allowed[0]}'" : $"{where} needs at least one of {JoinList(allowed)}");
                 }
 
                 if (_problems.Count == before && because is not null)
@@ -708,23 +685,13 @@ internal static class PackYamlReader
             return exceptions;
         }
 
-        // A bannedPackages exception names a project and a uniqueNames exception names a type; the other keys do not apply.
-        private bool RejectMisplaced(Dictionary<string, Field> fields, string where, ExceptionTarget target)
+        // The keys the rule kind does not take are reported at the key itself.
+        private bool RejectMisplaced(Dictionary<string, Field> fields, string where, RuleKind kind)
         {
             var found = false;
             foreach (var (key, field) in fields)
             {
-                string? reason = null;
-                if (target == ExceptionTarget.Projects && (key is "types" or "namespaces"))
-                {
-                    reason = "a package belongs to a project, so the exception of a bannedPackages rule names it by 'assemblies'";
-                }
-                else if (target == ExceptionTarget.ForTypes && string.Equals(key, "assemblies", StringComparison.Ordinal))
-                {
-                    reason = "an exception of a uniqueNames rule names a 'for' type by 'types' or 'namespaces', and 'for' itself can select by 'assemblies'";
-                }
-
-                if (reason is not null)
+                if (ExceptionKeyRules.Rejection(kind, key) is { } reason)
                 {
                     Add(field.Key, $"'{key}' is not accepted in {where}; {reason}");
                     found = true;
@@ -733,6 +700,13 @@ internal static class PackYamlReader
 
             return found;
         }
+
+        private static string JoinList(string[] keys) => string.Join(", ", keys.Select(static k => $"'{k}'"));
+
+        private static string JoinOr(IReadOnlyList<string> keys) =>
+            keys.Count == 1
+                ? $"'{keys[0]}'"
+                : $"{string.Join(", ", keys.Take(keys.Count - 1).Select(static k => $"'{k}'"))} or '{keys[^1]}'";
 
         private void ReadRole(YamlNode node, int index, List<ComponentRoleDefinition> roles)
         {

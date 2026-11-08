@@ -187,7 +187,7 @@ public class RulePackMergerTests
                 Name = "child",
                 RuleAmendments =
                 [
-                    new RuleAmendment { Id = "B1", Exceptions = [Exception("two")] },
+                    new RuleAmendment { Id = "B1", Exceptions = [new RuleException { Because = "two", Assemblies = ["Shop.Legacy"] }] },
                     new RuleAmendment { Id = "U1", Exceptions = [Exception("two")] },
                 ],
             },
@@ -202,6 +202,61 @@ public class RulePackMergerTests
         mergedUnique.Kind.Should().Be(RuleKind.UniqueNames);
         mergedUnique.Against.Layers.Should().Equal("Application");
         mergedUnique.Exceptions.Should().ContainSingle();
+    }
+
+    private static RuleDefinition BannedRule() => new()
+    {
+        Id = "B1",
+        Because = "because",
+        Kind = RuleKind.BannedPackages,
+        From = new TargetSelector(),
+        Packages = ["FluentValidation"],
+    };
+
+    private static RuleDefinition UniqueRule() => new()
+    {
+        Id = "U1",
+        Because = "because",
+        Kind = RuleKind.UniqueNames,
+        From = new TargetSelector { Layers = ["Web"] },
+        Against = new TargetSelector { Layers = ["Application"] },
+    };
+
+    private ZeroAlloc.Results.Result<RulePack, AriadneError> Amend(RuleDefinition rule, RuleException exception) => _merger.Merge(
+    [
+        new RulePack { Name = "parent", Rules = [rule] },
+        new RulePack { Name = "child", RuleAmendments = [new RuleAmendment { Id = rule.Id, Exceptions = [exception] }] },
+    ]);
+
+    [Fact]
+    public void Amendment_TypesOnBannedPackagesRule_Fails()
+    {
+        var result = Amend(BannedRule(), new RuleException { Because = "x", Types = ["X.Y"] });
+
+        Problems(result).Should().ContainSingle().Which.Should().StartWith("pack 'child' adds an exception to rule 'B1' with 'types'");
+    }
+
+    [Fact]
+    public void Amendment_NamespacesOnBannedPackagesRule_Fails()
+    {
+        var result = Amend(BannedRule(), new RuleException { Because = "x", Namespaces = ["X.Y"] });
+
+        Problems(result).Should().ContainSingle().Which.Should().StartWith("pack 'child' adds an exception to rule 'B1' with 'namespaces'");
+    }
+
+    [Fact]
+    public void Amendment_AssembliesOnUniqueNamesRule_Fails()
+    {
+        var result = Amend(UniqueRule(), new RuleException { Because = "x", Assemblies = ["X.Y"] });
+
+        Problems(result).Should().ContainSingle().Which.Should().StartWith("pack 'child' adds an exception to rule 'U1' with 'assemblies'");
+    }
+
+    [Fact]
+    public void Amendment_AllowedKeysForEachKind_Merge()
+    {
+        Amend(BannedRule(), new RuleException { Because = "x", Assemblies = ["X.Y"] }).IsSuccess.Should().BeTrue();
+        Amend(UniqueRule(), new RuleException { Because = "x", Types = ["X.Y"], Namespaces = ["X"] }).IsSuccess.Should().BeTrue();
     }
 
     [Fact]

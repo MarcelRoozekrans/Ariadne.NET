@@ -123,6 +123,11 @@ public sealed class RulePackMerger : IRulePackMerger
                 continue;
             }
 
+            if (RejectMisplacedExceptions(pack, amendment, inherited, problems))
+            {
+                continue;
+            }
+
             rules.Replace(amendment.Id, new RuleDefinition
             {
                 Id = inherited.Id,
@@ -138,6 +143,31 @@ public sealed class RulePackMerger : IRulePackMerger
                 Locked = inherited.Locked,
             });
         }
+    }
+
+    // The amendment does not say which kind it amends, so the inherited rule decides which exception keys can match.
+    private static bool RejectMisplacedExceptions(RulePack pack, RuleAmendment amendment, RuleDefinition inherited, List<string> problems)
+    {
+        var rejected = false;
+        foreach (var exception in amendment.Exceptions)
+        {
+            (string Key, bool Used)[] keys =
+            [
+                ("namespaces", exception.Namespaces.Count > 0),
+                ("assemblies", exception.Assemblies.Count > 0),
+                ("types", exception.Types.Count > 0),
+            ];
+            foreach (var (key, used) in keys)
+            {
+                if (used && ExceptionKeyRules.Rejection(inherited.Kind, key) is { } reason)
+                {
+                    problems.Add($"pack '{PackText.Show(pack.Name)}' adds an exception to rule '{PackText.Show(inherited.Id)}' with '{key}'; {reason}");
+                    rejected = true;
+                }
+            }
+        }
+
+        return rejected;
     }
 
     private sealed record Entry<T>(T Item, int PackIndex, string PackName);
