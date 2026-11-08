@@ -3,7 +3,7 @@ using ZeroAlloc.Results;
 namespace Ariadne.NET.Analysis;
 
 /// <summary>
-/// An ordinal, case-sensitive glob over namespaces, type names or assembly names. Built once, matched without allocating.
+/// An ordinal glob, case-sensitive unless compiled to ignore case, over namespaces, type names or assembly names. Built once, matched without allocating.
 /// </summary>
 internal sealed class Glob
 {
@@ -11,11 +11,13 @@ internal sealed class Glob
 
     private readonly string[] _segments;
     private readonly bool _dotted;
+    private readonly bool _ignoreCase;
 
-    private Glob(string[] segments, bool dotted)
+    private Glob(string[] segments, bool dotted, bool ignoreCase)
     {
         _segments = segments;
         _dotted = dotted;
+        _ignoreCase = ignoreCase;
     }
 
     /// <summary>
@@ -25,7 +27,13 @@ internal sealed class Glob
     /// </summary>
     /// <param name="pattern">The pattern to compile.</param>
     /// <returns>The glob, or a message for the loader when the pattern is malformed.</returns>
-    public static Result<Glob, string> Dotted(string pattern)
+    public static Result<Glob, string> Dotted(string pattern) => Dotted(pattern, ignoreCase: false);
+
+    /// <summary>Compiles a dotted pattern like <see cref="Dotted(string)"/>, matching characters without regard to case when asked to.</summary>
+    /// <param name="pattern">The pattern to compile.</param>
+    /// <param name="ignoreCase">Whether letters match whatever their case, as NuGet package ids do.</param>
+    /// <returns>The glob, or a message for the loader when the pattern is malformed.</returns>
+    public static Result<Glob, string> Dotted(string pattern, bool ignoreCase)
     {
         ArgumentNullException.ThrowIfNull(pattern);
         if (pattern.Length == 0)
@@ -56,7 +64,7 @@ internal sealed class Glob
             segments.Add(segment);
         }
 
-        return Result<Glob, string>.Success(new Glob([.. segments], dotted: true));
+        return Result<Glob, string>.Success(new Glob([.. segments], dotted: true, ignoreCase));
     }
 
     /// <summary>Compiles a flat pattern, in which <c>*</c> matches any run of characters, dots included.</summary>
@@ -67,7 +75,7 @@ internal sealed class Glob
         ArgumentNullException.ThrowIfNull(pattern);
         return pattern.Length == 0
             ? Result<Glob, string>.Failure("pattern must not be empty")
-            : Result<Glob, string>.Success(new Glob([pattern], dotted: false));
+            : Result<Glob, string>.Success(new Glob([pattern], dotted: false, ignoreCase: false));
     }
 
     /// <summary>
@@ -79,7 +87,7 @@ internal sealed class Glob
     public bool IsMatch(ReadOnlySpan<char> name) =>
         _dotted
             ? MatchSegments(0, name, name.Length == 0 ? -1 : 0)
-            : MatchWithin(_segments[0], name);
+            : MatchWithin(_segments[0], name, _ignoreCase);
 
     // position is the start of the next unconsumed name segment, or -1 when the name is exhausted.
     private bool MatchSegments(int index, ReadOnlySpan<char> name, int position)
@@ -115,7 +123,7 @@ internal sealed class Glob
             }
 
             var end = SegmentEnd(name, position);
-            if (!MatchWithin(pattern, name[position..end]))
+            if (!MatchWithin(pattern, name[position..end], _ignoreCase))
             {
                 return false;
             }
@@ -136,8 +144,11 @@ internal sealed class Glob
         return end;
     }
 
+    private static bool Same(char pattern, char text, bool ignoreCase) =>
+        pattern == text || (ignoreCase && char.ToUpperInvariant(pattern) == char.ToUpperInvariant(text));
+
     // Classic star matching: remember the last star and retry from one character further on a mismatch.
-    private static bool MatchWithin(string pattern, ReadOnlySpan<char> text)
+    private static bool MatchWithin(string pattern, ReadOnlySpan<char> text, bool ignoreCase)
     {
         var p = 0;
         var t = 0;
@@ -150,7 +161,7 @@ internal sealed class Glob
                 star = p++;
                 resume = t;
             }
-            else if (p < pattern.Length && pattern[p] == text[t])
+            else if (p < pattern.Length && Same(pattern[p], text[t], ignoreCase))
             {
                 p++;
                 t++;

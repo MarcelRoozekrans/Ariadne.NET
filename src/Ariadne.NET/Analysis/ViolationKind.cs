@@ -27,6 +27,9 @@ public enum ViolationKind
     /// <summary>A type a require rule selects is not in the layer the rule requires.</summary>
     WrongLayer = 8,
 
+    /// <summary>A project references a package that a bannedPackages rule bars it from.</summary>
+    BannedPackage = 9,
+
     /// <summary>A type keeps the simple name of another type that its uniqueNames rule sets it apart from.</summary>
     NameCollision = 10,
 }

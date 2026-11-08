@@ -11,4 +11,7 @@ public sealed record AnalyzedProject(string Name, string? TargetFramework, Compi
 {
     /// <summary>Syntax trees produced by source generators; types declared only there are not checked.</summary>
     public IReadOnlySet<SyntaxTree> GeneratedTrees { get; init; } = FrozenSet<SyntaxTree>.Empty;
+
+    /// <summary>The packages the project resolves, direct and transitive; null when they are not known, which a bannedPackages rule that covers the project does not accept.</summary>
+    public IReadOnlyList<ResolvedPackage>? Packages { get; init; }
 }

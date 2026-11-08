@@ -24,6 +24,7 @@ public sealed class ArchitectureValidator : IArchitectureValidator
         ArgumentNullException.ThrowIfNull(projects);
 
         RejectMixedTargetFrameworks(projects);
+        BannedPackageRules.RequirePackages(resolvedPack, projects);
 
         // The layer map and the matchers depend on the pack only, so one set serves every project, and a type's layer,
         // names and matches are worked out once per run.
@@ -38,14 +39,7 @@ public sealed class ArchitectureValidator : IArchitectureValidator
             ArgumentNullException.ThrowIfNull(project, nameof(projects));
             cancellationToken.ThrowIfCancellationRequested();
 
-            var graph = TypeGraphBuilder.Build(project.Compilation, project.GeneratedTrees, cancellationToken);
-            var violations = new List<ArchitectureViolation>(LayerRules.Check(graph, layers, resolvedPack));
-            violations.AddRange(forbid.Check(graph));
-            violations.AddRange(allowOnly.Check(graph));
-            violations.AddRange(require.Check(graph));
-            var matches = RoleRules.Match(graph, layers, resolvedPack);
-            violations.AddRange(RoleRules.CheckShape(matches));
-            entries.Add(new Entry(project, graph, matches, violations));
+            entries.Add(AnalyzeProject(project, layers, resolvedPack, new Matchers(forbid, allowOnly, require), cancellationToken));
         }
 
         AddMissingInterfaceViolations(entries, resolvedPack);
@@ -74,6 +68,19 @@ public sealed class ArchitectureValidator : IArchitectureValidator
             Projects = checkedProjects,
             TypesChecked = typesChecked,
         };
+    }
+
+    private static Entry AnalyzeProject(AnalyzedProject project, LayerMap layers, RulePack pack, in Matchers matchers, CancellationToken cancellationToken)
+    {
+        var graph = TypeGraphBuilder.Build(project.Compilation, project.GeneratedTrees, cancellationToken);
+        var violations = new List<ArchitectureViolation>(LayerRules.Check(graph, layers, pack));
+        violations.AddRange(matchers.Forbid.Check(graph));
+        violations.AddRange(matchers.AllowOnly.Check(graph));
+        violations.AddRange(matchers.Require.Check(graph));
+        var matches = RoleRules.Match(graph, layers, pack);
+        violations.AddRange(RoleRules.CheckShape(matches));
+        violations.AddRange(BannedPackageRules.Check(pack, project));
+        return new Entry(project, graph, matches, violations);
     }
 
     private static List<TypeGraph> GraphsOf(List<Entry> entries)
@@ -237,6 +244,8 @@ public sealed class ArchitectureValidator : IArchitectureValidator
 
         return result == 0 ? x.Kind.CompareTo(y.Kind) : result;
     }
+
+    private readonly record struct Matchers(DependencyRuleChecker Forbid, DependencyRuleChecker AllowOnly, RequireRules.Checker Require);
 
     private sealed class Entry(AnalyzedProject project, TypeGraph graph, RoleMatches matches, List<ArchitectureViolation> violations)
     {
