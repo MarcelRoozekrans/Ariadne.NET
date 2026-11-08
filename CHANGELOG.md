@@ -1,5 +1,75 @@
 # Changelog
 
+## [0.5.0](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.4.1...v0.5.0) (2026-11-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* **abstractions:** add banned package and unique name rule kinds and member selectors; the generated public RuleDefinitionValidator constructor gained a TargetSelectorValidator parameter for the new Against property
+
+### Features
+
+* **abstractions:** add banned package and unique name rule kinds and member selectors; the generated public RuleDefinitionValidator constructor gained a TargetSelectorValidator parameter for the new Against property ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **analysis:** ban packages by id from a project's resolved graph ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **analysis:** compile banned package globs once per run ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **analysis:** exempt the declaring type and its nested types under allowOnly ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **analysis:** forbid and confine APIs by member ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **analysis:** keep indexer uses that implement a renamed interface indexer ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **analysis:** name the compilation parameter when packages are unknown ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **analysis:** record constructor initializers and indexers as member uses ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **analysis:** record member uses in the type graph ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **analysis:** report types that keep a name from another layer ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **analysis:** tell same-named types in different assemblies apart ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **cli:** list the new rule kinds and enforce them on this repository ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **rule-loader:** read bannedPackages, uniqueNames and members ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **rule-loader:** reject misplaced exception keys on amended rules ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **workspaces:** read the resolved package graph from project.assets.json ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **workspaces:** treat a missing target framework entry as unknown packages ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+
+
+### Bug Fixes
+
+* **analysis:** let an extension block's own class use its members ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **analysis:** name the assemblies when two colliding names are equal ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **analysis:** record the implicit base constructor call as a member use ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **analysis:** record the implicit base constructor call at the first walked declaration ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **rule-loader:** reject a member pattern without a type segment ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **workspaces:** report an unusable assets file as an error ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **workspaces:** treat a non-object targets entry as unknown packages ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+
+
+### Code Refactoring
+
+* **workspaces:** share the runtime identifier split ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+
+
+### Documentation
+
+* **analysis:** list the bannedPackages and uniqueNames rules in the validator summary ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **perf:** attribute the phase 2.4 cost to phase 2.3 and 2.4 ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **perf:** measure the phase 2.4 cost after the final review fixes ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **perf:** record the phase 2.4 baseline ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **perf:** record the walker allocation investigation ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **plan:** carry amended rule fields in task 2 of the phase 2.4 plan ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **plan:** correct the uniqueNames example and spell constructors as new ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **plan:** design phase 2.4 banned packages, forbidden APIs and name collisions ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **plan:** extend the member use list and write nested types with dots ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **plan:** name indexers by metadata name and note the implicit base constructor limit ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **plan:** plan phase 2.4 banned packages, forbidden APIs and name collisions ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **plan:** qualify the name filter claim for indexers ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **plan:** state who allowOnly exempts for member rules ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **rule-schema:** fix stale exception and rule kind sentences ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* state the member use limits and the RuleDefinitionValidator break ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+
+
+### Tests
+
+* **analysis:** pin one name collision across target frameworks ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **analysis:** pin that unrelated member uses record nothing ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **aot:** cover the bannedPackages and uniqueNames rules in the AOT smoke pack ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **hooks:** expect the phase 2.4 rules on the broken daedalus fixture ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+* **workspaces:** pin unknown packages for a stale assets file ([bc3d67b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/bc3d67b2e093cee1cd8d40c85647cbb2167b7202))
+
 ## [0.4.1](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.4.0...v0.4.1) (2026-11-08)
 
 
