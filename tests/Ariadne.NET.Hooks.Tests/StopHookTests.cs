@@ -85,6 +85,29 @@ public class StopHookTests
     }
 
     [Fact]
+    public async Task Stop_hook_blocks_on_a_vacuous_layer()
+    {
+        using var project = ProjectWithSolution();
+        using var session = new TestSession();
+        EditedFiles.Record(session.Id, "/x/A.cs");
+        var vacuous = new ArchitectureViolation
+        {
+            RuleId = "SHOP-LAYER-DOMAIN",
+            Kind = ViolationKind.VacuousLayer,
+            SourceType = "Domain",
+            Message = "Layer 'Domain' covers no type in the 1 project(s) loaded.",
+        };
+        var validator = new FakeValidator(Report(vacuous));
+
+        var json = await RunAsync(Create(validator), project.Root, session.Id).ConfigureAwait(true);
+
+        json.Should().NotBeNull();
+        using var doc = JsonDocument.Parse(json!);
+        doc.RootElement.GetProperty("hookSpecificOutput").GetProperty("additionalContext").GetString()
+            .Should().Contain("[VacuousLayer] Domain").And.Contain("covers no type");
+    }
+
+    [Fact]
     public async Task Edits_and_a_violation_return_a_stop_document_and_clear_the_list()
     {
         using var project = ProjectWithSolution();

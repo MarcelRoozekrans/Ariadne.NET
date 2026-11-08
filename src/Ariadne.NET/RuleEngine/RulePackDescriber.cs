@@ -19,7 +19,7 @@ public static class RulePackDescriber
         return $"{layer.Name} [{layer.Id}]: {selectors}; depends on {deps}";
     }
 
-    /// <summary>The rule line, the exception count when there are exceptions, and the because line last.</summary>
+    /// <summary>The rule line, the exception count when there are exceptions, <c>allowEmpty</c> when the rule may match nothing, and the because line last.</summary>
     public static IReadOnlyList<string> DescribeRule(RuleDefinition rule)
     {
         ArgumentNullException.ThrowIfNull(rule);
@@ -43,6 +43,11 @@ public static class RulePackDescriber
         if (rule.Exceptions.Count > 0)
         {
             lines.Add($"{rule.Exceptions.Count} exception(s)");
+        }
+
+        if (rule.AllowEmpty)
+        {
+            lines.Add("allowEmpty");
         }
 
         lines.Add(rule.Because);

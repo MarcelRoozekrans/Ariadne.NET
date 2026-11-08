@@ -27,7 +27,7 @@ public static class RolesCommand
             foreach (var role in pack.ComponentRoles)
             {
                 Console.WriteLine(
-                    $"  {role.Name,-20} {role.Layer,-20} {role.TypeKind,-10} {(role.RequiresInterface ? "Yes" : "No"),-10} {role.Description}");
+                    $"  {role.Name,-20} {role.Layer,-20} {role.TypeKind,-10} {(role.RequiresInterface ? "Yes" : "No"),-10} {role.Description}{(role.AllowEmpty ? " (allowEmpty)" : string.Empty)}");
             }
 
             return ExitCodes.Success;

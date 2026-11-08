@@ -16,6 +16,7 @@ public sealed class ComponentRoleDefinition
     /// <summary>
     /// When <see langword="true"/>, the role is allowed to match no types without being reported as vacuous.
     /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool AllowEmpty { get; init; }
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> AlternativeNames { get; init; } = [];
 

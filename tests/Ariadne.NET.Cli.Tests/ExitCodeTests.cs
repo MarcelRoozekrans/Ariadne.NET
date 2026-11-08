@@ -156,6 +156,91 @@ public sealed class ExitCodeTests : IDisposable
     }
 
     [Fact]
+    public void Validate_reports_a_vacuous_layer_by_kind_name()
+    {
+        var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("broken", "Shop.slnx"));
+
+        exitCode.Should().Be(ExitCodes.Violations);
+        stdout.Should().Contain("  [VacuousLayer] Application")
+            .And.Contain("Layer 'Application' covers no type");
+    }
+
+    [Fact]
+    public void Print_vacuous_violations_without_a_location_show_the_kind_and_the_name()
+    {
+        var report = new ArchitectureReport
+        {
+            Violations =
+            [
+                new ArchitectureViolation { RuleId = "L", Kind = ViolationKind.VacuousLayer, SourceType = "Domain", Message = "Layer 'Domain' covers no type in the 1 project(s) loaded." },
+                new ArchitectureViolation { RuleId = "SH-1", Kind = ViolationKind.VacuousRule, SourceType = "SH-1", Message = "Rule 'SH-1' selects no type." },
+            ],
+            Projects = [new CheckedProject("Shop.Domain", ["net10.0"])],
+            TypesChecked = 1,
+        };
+        using var writer = new StringWriter();
+
+        ValidateCommand.Print(writer, report, _tempDir);
+
+        var lines = writer.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        lines.Should().Contain("  [VacuousLayer] Domain").And.Contain("  [VacuousRule] SH-1");
+    }
+
+    [Fact]
+    public void Describer_shows_allowEmpty_only_when_true()
+    {
+        WriteRules("""
+            schema: 2
+            name: shop
+            extends:
+              - builtin://clean-architecture
+            rules:
+              - id: SH-030
+                because: Reserved for later.
+                allowEmpty: true
+                forbid:
+                  from: { layers: [Domain] }
+                  to: { namespaces: ["Later.**"] }
+              - id: SH-031
+                because: Active now.
+                forbid:
+                  from: { layers: [Domain] }
+                  to: { namespaces: ["Now.**"] }
+            """);
+
+        var (_, rules) = RunCapturingStdout("rules");
+        var ruleLines = rules.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
+            .SkipWhile(l => !string.Equals(l, "Rules:", StringComparison.Ordinal)).Skip(1).TakeWhile(l => l.StartsWith("  ", StringComparison.Ordinal)).ToArray();
+        ruleLines.Should().Equal(
+            "  SH-030 forbid layers Domain -> namespaces Later.**",
+            "    allowEmpty",
+            "    Reserved for later.",
+            "  SH-031 forbid layers Domain -> namespaces Now.**",
+            "    Active now.");
+    }
+
+    [Fact]
+    public void Roles_marks_allowEmpty_only_when_true()
+    {
+        WriteRules("""
+            schema: 2
+            name: shop
+            layers:
+              - { name: Domain, id: SH-L-D, because: Domain., namespaces: ["**.Domain.**"] }
+            componentRoles:
+              - { name: Reserved, layer: Domain, description: Later., allowEmpty: true }
+              - { name: Active, layer: Domain, description: Now. }
+            """);
+
+        var (exitCode, stdout) = RunCapturingStdout("roles");
+
+        exitCode.Should().Be(ExitCodes.Success);
+        var lines = stdout.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        lines.Should().ContainSingle(l => l.Contains("Reserved", StringComparison.Ordinal)).Which.Should().EndWith("Later. (allowEmpty)");
+        lines.Should().ContainSingle(l => l.Contains("Active", StringComparison.Ordinal)).Which.Should().EndWith("Now.");
+    }
+
+    [Fact]
     public void Print_ViolationInSeveralTargetFrameworks_ListsThemCommaSeparated()
     {
         var report = new ArchitectureReport

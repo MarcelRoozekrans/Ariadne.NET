@@ -200,4 +200,26 @@ public class RulePackDescriberTests
 
         RulePackDescriber.DescribeRule(rule)[0].Should().Be("R-UNKNOWN 999 layers A -> layers B");
     }
+
+    [Fact]
+    public void Describer_shows_allowEmpty_only_when_true()
+    {
+        RuleDefinition Rule(bool allowEmpty) => new()
+        {
+            Id = "R-EMPTY",
+            Because = "Reserved for later.",
+            Kind = RuleKind.Forbid,
+            From = new TargetSelector { Layers = ["Domain"] },
+            To = new TargetSelector { Layers = ["Infrastructure"] },
+            AllowEmpty = allowEmpty,
+        };
+
+        RulePackDescriber.DescribeRule(Rule(true)).Should().Equal(
+            "R-EMPTY forbid layers Domain -> layers Infrastructure",
+            "allowEmpty",
+            "Reserved for later.");
+        RulePackDescriber.DescribeRule(Rule(false)).Should().Equal(
+            "R-EMPTY forbid layers Domain -> layers Infrastructure",
+            "Reserved for later.");
+    }
 }
