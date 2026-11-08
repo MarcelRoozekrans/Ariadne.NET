@@ -69,7 +69,7 @@ A type's layer comes from the selectors of the pack's layers: a type belongs to 
 
 **Allow-only rules.** An `allowOnly` rule is violated by an edge to a type in `to` from a source that is neither in `from` nor in `to` itself, unless an exception matches the source type. Kind `DependencyNotPermitted`, aggregated as for `forbid`.
 
-Both kinds carry the rule's `id` and `because`. A selector that matches no type in the solution is not an error; the rule has nothing to check.
+Both kinds carry the rule's `id` and `because`. A rule whose `from` matches no type is reported as vacuous; see [Vacuous rules, roles and layers](#vacuous-rules-roles-and-layers).
 
 **Require rules.** A `require` rule selects types with its `for` selector and checks each selected type against the requirement. A source type, nested types included, is checked once per failed requirement, unless an exception matches it. The kinds are:
 
@@ -80,7 +80,7 @@ Both kinds carry the rule's `id` and `because`. A selector that matches no type 
 | `AccessibilityMismatch` | The rule asks for `internal` and the type is not | The rule says `internal` but the type is `public` |
 | `MissingInterface` | The type implements no interface that the `implements` selector matches, including interfaces it gets through a base class | A repository that implements no `I*Repository` |
 
-The violation carries the rule's `id` and `because`. A selector that matches no type is not an error.
+The violation carries the rule's `id` and `because`. A `require` rule whose `for` matches no type is reported as vacuous.
 
 **Role rules.** A source type in a role's layer whose name ends with the role name or one of its `alternativeNames` matches the role. Nested types are included. Enums and delegates are never matched to a role. Each match is checked for:
 
@@ -94,6 +94,19 @@ The type kind is read from the symbol, so `record` and `record struct` are told 
 
 Role violations carry generated rule ids and a `because`. `ROLE-<Name>` is the type kind check of the role `<Name>`, and its `because` is the role's description, or `Role '<Name>' defines this shape.` when there is none. `CODE-002` is the accessibility check and `CODE-001` the missing-interface check. Their `because` text is fixed by the engine. The ids `CODE-001`, `CODE-002` and anything starting with `ROLE-` are reserved, and a pack that declares one fails to load.
 
+### Vacuous rules, roles and layers
+
+An element that selects no type in the projects loaded cannot fail, so it is a violation itself. A rule or a component role is reported as `VacuousRule`, and a layer as `VacuousLayer`. Both are solution-level, with no file or line, and the message names the number of projects loaded.
+
+- The check covers the subject side only: `from` of `forbid` and `allowOnly`, `for` of `require` and `uniqueNames`. `to`, `against`, `members` and exceptions are never checked.
+- A `bannedPackages` rule is vacuous only when its `from.assemblies` is non-empty and matches no loaded project.
+- A role is vacuous when no type in its layer matches it.
+- A rule or role whose subject resolves only through layers already reported as vacuous gets no second violation.
+- `allowEmpty: true` on a rule or a role accepts the empty selection. A layer has no opt-out; retarget it in the pack that extends the base pack. The built-in packs set `allowEmpty` on every role.
+- Vacuity is relative to the projects loaded. A run on a single `.csproj` reports layers that live in other projects as vacuous.
+
+See [Rule Schema](03-rule-schema.md#rules-that-select-nothing).
+
 ### The report
 
 ```
@@ -103,7 +116,8 @@ ArchitectureReport
   │     ├── RuleId: string                   (a layer id, a rule id, ROLE-<Name>, CODE-001 or CODE-002)
   │     ├── Kind: ViolationKind              (DependencyNotAllowed, ForbiddenDependency,
   │     │                                     DependencyNotPermitted, LayerOverlap, TypeKindMismatch,
-  │     │                                     AccessibilityMismatch, MissingInterface, WrongLayer)
+  │     │                                     AccessibilityMismatch, MissingInterface, WrongLayer,
+  │     │                                     VacuousRule, VacuousLayer)
   │     ├── SourceType: string               (fully qualified name)
   │     ├── Target: string?                  (the type depended on, absent for role, require and overlap checks)
   │     ├── Location: SourceLocation?        (file path, line, column; the first reference)

@@ -98,6 +98,8 @@ A layer says which types it covers and which other layers those types may depend
 
 Layer selectors take `namespaces` and `assemblies` only, not `types`. They apply to types from referenced assemblies as well as to source types, so a layer can cover external code by assembly.
 
+A layer that covers no type in the projects loaded is reported as `VacuousLayer` and fails the run. It has no `allowEmpty`; retarget it in the extending pack. See [Rules that select nothing](#rules-that-select-nothing).
+
 An empty `allowedDependencies` makes the layer a leaf: it depends on no other layer.
 
 **How the engine checks a layer.** For every dependency from a type in layer L to a type in layer M, with M different from L and not in L's `allowedDependencies`, the engine reports `DependencyNotAllowed` with L's `id` and `because`. The check is open-world:
@@ -160,6 +162,7 @@ A rule is an entry in `rules:`. It has exactly one of `forbid`, `allowOnly`, `re
 | `uniqueNames` | one of | `{ for: <target>, against: <target> }`: no type in `for` may share a simple name with a type in `against`. Reported as `NameCollision`. See [Unique names](#unique-names). |
 | `exceptions` | no | List of selectors, each with a required `because`. A source type that an exception matches is exempt from the rule. On a `bannedPackages` rule an exception takes `assemblies` only, and on a `uniqueNames` rule `namespaces` and `types` only. |
 | `locked` | no, default `false` | A child pack cannot add exceptions to this rule. |
+| `allowEmpty` | no, default `false` | Accepts that the rule selects no type. See [Rules that select nothing](#rules-that-select-nothing). |
 
 A **target** is either `layers: [...]` or a [selector](#selectors) made of `namespaces`, `assemblies`, `types`, `baseTypes`, `interfaces` and `attributes`. Mixing `layers` with selector kinds in one target is a load error, and a target must select something.
 
@@ -181,7 +184,7 @@ rules:
         because: DI registration wires the interface to its implementation.
 ```
 
-The C# model is `RuleDefinition`, with `Id`, `Because`, `Description`, `Kind` (`RuleKind.Forbid`, `RuleKind.AllowOnly`, `RuleKind.Require`, `RuleKind.BannedPackages` or `RuleKind.UniqueNames`), `From` and `To` (`TargetSelector`), `Require` (`RuleRequirement?`, with `Layer`, `Kind`, `Accessibility` and `Implements`), `Packages` (`IList<string>`), `Against` (`TargetSelector`), `Exceptions` (`IList<RuleException>`) and `Locked`. For a `require` or `uniqueNames` rule `From` holds the `for` selector, and for a `bannedPackages` rule it holds `from`.
+The C# model is `RuleDefinition`, with `Id`, `Because`, `Description`, `Kind` (`RuleKind.Forbid`, `RuleKind.AllowOnly`, `RuleKind.Require`, `RuleKind.BannedPackages` or `RuleKind.UniqueNames`), `From` and `To` (`TargetSelector`), `Require` (`RuleRequirement?`, with `Layer`, `Kind`, `Accessibility` and `Implements`), `Packages` (`IList<string>`), `Against` (`TargetSelector`), `Exceptions` (`IList<RuleException>`), `Locked` and `AllowEmpty`. For a `require` or `uniqueNames` rule `From` holds the `for` selector, and for a `bannedPackages` rule it holds `from`.
 
 ### Require rules
 
@@ -214,7 +217,32 @@ rules:
 
 `interfaces` selects a type that implements a matching interface, and that includes an interface that extends one. `interface IOrderRepository : IRepository<Order>` is therefore selected by `**.I*Repository` too, and without the Domain exception it would be reported as `WrongLayer`, `TypeKindMismatch` and `AccessibilityMismatch`.
 
-A `require` rule yields one violation per selected type and failed requirement, with the rule's `id` and `because`. Exceptions exempt a type, and a rule with no match checks nothing.
+A `require` rule yields one violation per selected type and failed requirement, with the rule's `id` and `because`. Exceptions exempt a type. A rule whose `for` selects no type is reported as vacuous; see [Rules that select nothing](#rules-that-select-nothing).
+
+### Rules that select nothing
+
+A rule, a component role or a layer that selects no type cannot fail, so a clean report would say nothing about it. The run therefore fails: each such element is reported as a violation without a file or line, and `validate` exits non-zero.
+
+| Kind | Reported for | Message starts with |
+|------|--------------|---------------------|
+| `VacuousRule` | a rule whose subject selects no type, and a component role that matches no type in its layer | `Rule '<id>' selects no type` or `Role '<Name>' matches no type` |
+| `VacuousLayer` | a layer that covers no type | `Layer '<Name>' covers no type` |
+
+Only the subject side is checked: the `from` of `forbid`, `allowOnly`, `require` and `uniqueNames` (for the last two, the `for` selector). The `to`, `against` and `members` sides and the `exceptions` are never checked, since a rule about something that does not exist yet is still sound. A `bannedPackages` rule is vacuous only when it has a non-empty `from.assemblies` that matches no loaded project; without `from` it applies to every project. A rule or role whose subject resolves only through layers that are already reported as vacuous gets no second violation, because fixing the layer fixes it.
+
+Vacuity is relative to the projects loaded. A run on a single `.csproj` reports every layer that lives in another project as vacuous, and the message says how many projects were loaded. Validate the solution, or mark the rules and roles that belong to other projects.
+
+To accept a rule or role that selects nothing, set `allowEmpty: true` on it. A layer has no opt-out: retarget it in the pack that extends the base pack, so that it covers the types of the solution. The built-in packs set `allowEmpty: true` on every role, because a solution rarely has all of them. The `rules` command and the `get_rules` tool show `allowEmpty` only when it is `true`.
+
+```yaml
+rules:
+  - id: SHOP-NO-DIRECT-SQL
+    because: Data access goes through repositories.
+    allowEmpty: true
+    forbid:
+      from: { namespaces: ["Shop.Web.**"] }
+      to: { namespaces: ["System.Data.SqlClient"] }
+```
 
 ### Banned packages
 
@@ -303,7 +331,7 @@ Component roles merge by name, case-insensitively, and the last role with a name
 
 ## ComponentRoleDefinition
 
-A role maps a role name to a layer, a C# type kind, an accessibility and an interface requirement. Roles drive code generation and the role checks of `validate`. Their keys are `name`, `layer`, `typeKind`, `requiresInterface`, `interfaceRole`, `accessibility`, `description` and `alternativeNames`, and the loader checks them as strictly as the rest of the pack. `layer` must name a layer of the merged pack, once that pack has at least one layer.
+A role maps a role name to a layer, a C# type kind, an accessibility and an interface requirement. Roles drive code generation and the role checks of `validate`. Their keys are `name`, `layer`, `typeKind`, `requiresInterface`, `interfaceRole`, `accessibility`, `description`, `alternativeNames` and `allowEmpty`, and the loader checks them as strictly as the rest of the pack. `layer` must name a layer of the merged pack, once that pack has at least one layer.
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
@@ -315,6 +343,7 @@ A role maps a role name to a layer, a C# type kind, an accessibility and an inte
 | `Accessibility` | `string` | `"public"` | Access modifier: `public`, `internal`, `private`, `protected`, `protected internal`, `private protected` |
 | `Description` | `string` | `""` | Purpose and usage guidance |
 | `AlternativeNames` | `IList<string>` | `[]` | Aliases for role matching (used by the layer inference engine) |
+| `AllowEmpty` | `bool` | `false` | YAML key `allowEmpty`. Accepts that no type in the layer matches the role; otherwise the run reports a `VacuousRule`. See [Rules that select nothing](#rules-that-select-nothing). |
 
 **Interface pairing pattern:**
 
