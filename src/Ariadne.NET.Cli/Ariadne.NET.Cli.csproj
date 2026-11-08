@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Ariadne.NET\Ariadne.NET.csproj" />
     <ProjectReference Include="..\Ariadne.NET.Workspaces\Ariadne.NET.Workspaces.csproj" />
+    <ProjectReference Include="..\Ariadne.NET.Hooks\Ariadne.NET.Hooks.csproj" />
   </ItemGroup>
 
   <ItemGroup>

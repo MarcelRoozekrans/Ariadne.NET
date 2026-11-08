@@ -25,6 +25,8 @@ ariadne init --template clean-architecture+cqrs+ddd-tactical
 - Validates each pack name exists in the registry
 - Creates `.architecture/rules.yaml` with `schema: 2`, a `name` taken from the current directory and the `extends` list
 
+`ariadne init --agent claude` also installs the hooks. It merges the three entries shown under "Install the hooks without `init`" into `.claude/settings.json` and keeps every other setting, replaces the entries it wrote on an earlier run instead of duplicating them, and keeps an existing `.architecture/rules.yaml`. It fails without writing anything when the settings file is not valid JSON or has an unexpected shape. The first run may reformat an existing settings file, because it is written back as indented JSON. It prints `Added the Ariadne hooks to .claude/settings.json`, or `The Ariadne hooks are already in .claude/settings.json` when the file needed no change. The only accepted agent is `claude`.
+
 ### `rules` — Print resolved layer rules
 
 ```bash
@@ -98,6 +100,57 @@ ariadne sync --no-cache                   # force fresh fetch
 - Loads `.architecture/imports.yaml`
 - Cache directory: `.architecture/.cache/git/`
 - Prints import name, resolved version, and cached/fetched status
+
+### `hook` — Run an agent hook
+
+```bash
+ariadne hook session-start
+ariadne hook pre-tool-use
+ariadne hook stop
+```
+
+`ariadne hook <event>` is the entry point Claude Code runs for its hooks. It reads the hook input as JSON on stdin and prints a JSON answer on stdout, both UTF-8 without a byte order mark. The root it works in is the nearest folder from the `cwd` of the input upwards that has `.architecture/rules.yaml`, so it keeps working after the agent has run `cd` into a subfolder. When no folder has one, it uses the folder the `CLAUDE_PROJECT_DIR` environment variable names, if that is set and exists, and otherwise the `cwd` itself.
+
+| Event | What it does |
+|-------|--------------|
+| `session-start` | Adds the resolved layers, the rules with their `because`, the component roles, the naming conventions and the versions of the cached rule packs to the session. It warns when an import is missing from the cache or no longer satisfies its version range. The text is capped at 10,000 characters; when it does not fit, whole roles, rules and layers are dropped from the end, then the naming line, then the warnings, and a final `Truncated` line says how many lines went. Without a rules file it tells the agent to run `ariadne init`. |
+| `pre-tool-use` | Answers only `ask`, and only for a new `.cs` file whose assembly and namespace no layer selects. The namespace is read from the content that is written, with the folder as the fallback. It also records every `.cs` file that `Write`, `Edit` and `MultiEdit` touch, for `stop`. |
+| `stop` | Once per turn, when the agent edited `.cs` files, validates the solution found from the working directory and feeds at most 20 violations back through `additionalContext`, each with its message and, when it has one, its rule id and `because`. The text is capped at 10,000 characters too, and a final line says how many violations were left out. It prints nothing when the solution is clean, when `stop_hook_active` is set, and when no `.cs` file was edited. |
+
+The stale-cache check is offline. It compares the version ranges in `.architecture/imports.yaml` with `resolvedTag` in `.architecture/.cache/git/<name>/.git-info.json` and never touches the network. Run `ariadne sync` to refresh the cache.
+
+The hooks fail open. Every error becomes one line on stderr, stdout stays empty and the exit code is 0, because in Claude Code exit code 2 blocks a tool call and any other non-zero code is reported as an error. The only exception is a missing event argument, which is a usage error with exit code 1.
+
+Limits to know about:
+
+- A project that no layer selects, such as tests, samples and tools, makes the new-file check ask on every new file there.
+- `stop` loads the whole solution, so it takes seconds; see `docs/perf/phase-5.6-hooks.md` for numbers.
+- The `ariadne` command must be on `PATH`. It is not a dotnet tool until phase 3.3. To try a hook from a checkout, run `dotnet run --project src/Ariadne.NET.Cli -- hook session-start`, or run the built dll with `dotnet <path to Ariadne.NET.Cli.dll> hook session-start`.
+
+Ariadne's hooks run beside AI.Sentinel's hook. Ariadne owns the structure rules and getting them to the agent; AI.Sentinel owns tool-call enforcement. Claude Code runs the matching hooks in parallel and resolves `PreToolUse` decisions as deny, then defer, then ask, then allow, so Ariadne's `ask` never overrides a deny from AI.Sentinel.
+
+#### Install the hooks without `init`
+
+`ariadne init --agent claude` writes these entries for you. A project that does not use `init` adds them to `.claude/settings.json` by hand:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [ { "type": "command", "command": "ariadne hook session-start", "timeout": 30 } ] }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [ { "type": "command", "command": "ariadne hook pre-tool-use", "timeout": 10 } ]
+      }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "ariadne hook stop", "timeout": 300 } ] }
+    ]
+  }
+}
+```
 
 ### Rules file resolution
 

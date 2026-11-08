@@ -6,7 +6,9 @@ namespace Ariadne.NET.Cli;
 
 public static class CliRootCommand
 {
-    public static RootCommand Create(IServiceProvider provider)
+    public static RootCommand Create(IServiceProvider provider) => Create(provider, HookCommand.Create(provider));
+
+    internal static RootCommand Create(IServiceProvider provider, Command hookCommand)
     {
         var rootCommand = new RootCommand("Ariadne.NET CLI");
 
@@ -16,17 +18,21 @@ public static class CliRootCommand
         rootCommand.Subcommands.Add(GenerateCommand.Create(provider));
         rootCommand.Subcommands.Add(ValidateCommand.Create(provider));
         rootCommand.Subcommands.Add(SyncCommand.Create(provider));
+        rootCommand.Subcommands.Add(hookCommand);
 
         return rootCommand;
     }
 
-    public static async Task<int> InvokeAsync(IServiceProvider provider, string[] args, CancellationToken cancellationToken = default)
+    public static Task<int> InvokeAsync(IServiceProvider provider, string[] args, CancellationToken cancellationToken = default) =>
+        InvokeAsync(Create(provider), args, cancellationToken);
+
+    internal static async Task<int> InvokeAsync(RootCommand rootCommand, string[] args, CancellationToken cancellationToken)
     {
         // Expected failures come back as results with their own exit code. This handler is for unexpected
         // exceptions only, and the default handler would exit with 1, which reads as "violations found".
         try
         {
-            var parseResult = CommandLineParser.Parse(Create(provider), args, new ParserConfiguration());
+            var parseResult = CommandLineParser.Parse(rootCommand, args, new ParserConfiguration());
             return await parseResult.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException ex) when (ex.CancellationToken.IsCancellationRequested || cancellationToken.IsCancellationRequested)
