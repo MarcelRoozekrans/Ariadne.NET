@@ -63,6 +63,6 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 
 ## Recommended Next Step
 
-Phase 2.4 is complete on its feature branch and waits for the owner. Open a PR only when the owner asks, with the `BEGIN_COMMIT_OVERRIDE` block above in the PR body, one line per commit. Then the next phase is 2.5 vacuity detection: run `start-next-phase`, which routes to brainstorming because there is no design spec. Also ask the owner about the three open 5.6 points above, and about deleting the leftover branches `feat/phase-5.6-agent-hooks`, `docs/agent-hooks-design` and `docs/phase-2.4-design`, local and on `ariadne`. Delete nothing without an answer. Do not merge release-please PR #48 unless the owner asks.
+Phases 2.1 to 2.5 are merged. Release 0.5.0 was released by the owner (#52). Release-please PR #54 (0.6.0) waits for the owner; do not merge it unless asked. The next phase is 2.6 pack reference and JSON Schema: run `start-next-phase`, which routes to brainstorming because there is no design spec; branch from `ariadne/main`. The owner decisions of 2026-11-08 on #50 and the three 5.6 points are recorded above and still need scheduling into a phase or a fix PR.
 
 Commit rules: conventional commits; no `Co-Authored-By` trailer or session link; no nested parentheses in commit bodies; keep every footer line under 100 characters, because commitlint rejects longer ones; breaking commits carry `!` and a `BREAKING CHANGE` footer. Shared VM: one build or test at a time, no local AOT publish.
