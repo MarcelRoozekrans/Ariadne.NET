@@ -497,6 +497,89 @@ public class PackYamlReaderTests
             new PackProblem(4, 1, "'namingConventions' in the pack must be a mapping"));
     }
 
+    private const string AllowEmptyPack = """
+        schema: 2
+        name: shop
+        rules:
+          - id: SH-001
+            because: x
+            forbid:
+              from: { layers: [Domain] }
+              to: { namespaces: ["System.**"] }
+            allowEmpty: true
+          - id: SH-002
+            because: y
+            forbid:
+              from: { layers: [Domain] }
+              to: { namespaces: ["System.**"] }
+        componentRoles:
+          - name: Entity
+            layer: Domain
+            allowEmpty: true
+          - name: Service
+            layer: Domain
+        """;
+
+    [Fact]
+    public void Rule_with_allowEmpty_true_loads_with_AllowEmpty_true()
+    {
+        var result = PackYamlReader.Read(AllowEmptyPack);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        result.Value.Rules[0].AllowEmpty.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Role_with_allowEmpty_true_loads_with_AllowEmpty_true()
+    {
+        var result = PackYamlReader.Read(AllowEmptyPack);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        result.Value.ComponentRoles[0].AllowEmpty.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Rule_and_role_default_to_AllowEmpty_false()
+    {
+        var result = PackYamlReader.Read(AllowEmptyPack);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        result.Value.Rules[1].AllowEmpty.Should().BeFalse();
+        result.Value.ComponentRoles[1].AllowEmpty.Should().BeFalse();
+    }
+
+    [Fact]
+    public void AllowEmpty_with_a_non_bool_value_is_a_pack_problem()
+    {
+        var yaml = """
+            schema: 2
+            name: shop
+            componentRoles:
+              - name: Entity
+                layer: Domain
+                allowEmpty: maybe
+            """;
+
+        Problems(yaml).Should().Equal(new PackProblem(6, 5, "'allowEmpty' in role 'Entity' must be true or false"));
+    }
+
+    [Fact]
+    public void AllowEmpty_on_a_layer_is_an_unknown_key()
+    {
+        var yaml = """
+            schema: 2
+            name: shop
+            layers:
+              - name: Domain
+                id: SH-DOMAIN
+                because: The domain holds the business rules.
+                namespaces: ["**.Domain.**"]
+                allowEmpty: true
+            """;
+
+        Problems(yaml).Should().ContainSingle().Which.Message.Should().StartWith("unknown key 'allowEmpty' in layer 'Domain'");
+    }
+
     [Fact]
     public void LockedNotBool_Fails()
     {

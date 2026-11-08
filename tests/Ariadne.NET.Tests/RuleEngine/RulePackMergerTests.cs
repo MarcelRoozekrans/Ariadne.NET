@@ -272,6 +272,54 @@ public class RulePackMergerTests
     }
 
     [Fact]
+    public void Amending_a_rule_with_exceptions_keeps_AllowEmpty()
+    {
+        var parentRule = new RuleDefinition
+        {
+            Id = "R1",
+            Because = "because",
+            Kind = RuleKind.Forbid,
+            From = new TargetSelector { Layers = ["A"] },
+            To = new TargetSelector { Layers = ["B"] },
+            AllowEmpty = true,
+        };
+
+        var result = _merger.Merge(
+        [
+            new RulePack { Name = "parent", Rules = [parentRule] },
+            new RulePack { Name = "child", RuleAmendments = [new RuleAmendment { Id = "R1", Exceptions = [Exception("two")] }] },
+        ]);
+
+        result.IsSuccess.Should().BeTrue();
+        var merged = result.Value.Rules.Should().ContainSingle().Subject;
+        merged.Exceptions.Should().HaveCount(1);
+        merged.AllowEmpty.Should().BeTrue();
+    }
+
+    [Fact]
+    public void A_role_inherited_from_a_parent_keeps_AllowEmpty()
+    {
+        var result = _merger.Merge(
+        [
+            new RulePack
+            {
+                Name = "base",
+                Layers = [Layer("Domain", "**.Domain.**")],
+                ComponentRoles = [new ComponentRoleDefinition { Name = "Entity", Layer = "Domain", AllowEmpty = true }],
+            },
+            new RulePack
+            {
+                Name = "child",
+                ComponentRoles = [new ComponentRoleDefinition { Name = "Command", Layer = "Domain" }],
+            },
+        ]);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.ComponentRoles.First(r => string.Equals(r.Name, "Entity", StringComparison.Ordinal)).AllowEmpty.Should().BeTrue();
+        result.Value.ComponentRoles.First(r => string.Equals(r.Name, "Command", StringComparison.Ordinal)).AllowEmpty.Should().BeFalse();
+    }
+
+    [Fact]
     public void AmendmentUnknownRule_Fails()
     {
         var result = _merger.Merge(

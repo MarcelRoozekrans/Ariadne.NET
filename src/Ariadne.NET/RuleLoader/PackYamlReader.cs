@@ -34,7 +34,7 @@ internal static class PackYamlReader
     private static readonly string[] RetargetKeys = ["name", "namespaces", "assemblies"];
 
     private static readonly string[] RuleKeys =
-        ["id", "because", "description", "forbid", "allowOnly", "require", "bannedPackages", "uniqueNames", "exceptions", "locked"];
+        ["id", "because", "description", "forbid", "allowOnly", "require", "bannedPackages", "uniqueNames", "exceptions", "locked", "allowEmpty"];
 
     private static readonly string[] AmendmentKeys = ["id", "exceptions"];
 
@@ -66,7 +66,7 @@ internal static class PackYamlReader
 
     private static readonly string[] RoleKeys =
     [
-        "name", "layer", "typeKind", "requiresInterface", "interfaceRole", "accessibility", "description", "alternativeNames",
+        "name", "layer", "typeKind", "requiresInterface", "interfaceRole", "accessibility", "description", "alternativeNames", "allowEmpty",
     ];
 
     private static readonly string[] NamingKeys = ["namespace", "filePath"];
@@ -353,6 +353,7 @@ internal static class PackYamlReader
             var because = RequiredString(fields, "because", where, map);
             var description = OptionalString(fields, "description", where);
             var locked = OptionalBool(fields, "locked", where);
+            var allowEmpty = OptionalBool(fields, "allowEmpty", where);
 
             var body = ReadRuleBody(fields, map, where);
             if (_problems.Count == before && id is not null && because is not null && body is { } read)
@@ -370,6 +371,7 @@ internal static class PackYamlReader
                     Against = read.Against,
                     Exceptions = exceptions,
                     Locked = locked ?? false,
+                    AllowEmpty = allowEmpty ?? false,
                 });
             }
         }
@@ -728,6 +730,7 @@ internal static class PackYamlReader
             var accessibility = OptionalString(fields, "accessibility", where);
             var description = OptionalString(fields, "description", where);
             var alternativeNames = StringList(fields, "alternativeNames", where);
+            var allowEmpty = OptionalBool(fields, "allowEmpty", where);
 
             if (_problems.Count == before && name is not null && layer is not null)
             {
@@ -742,6 +745,7 @@ internal static class PackYamlReader
                     Accessibility = accessibility ?? defaults.Accessibility,
                     Description = description ?? "",
                     AlternativeNames = alternativeNames ?? [],
+                    AllowEmpty = allowEmpty ?? false,
                 });
             }
         }

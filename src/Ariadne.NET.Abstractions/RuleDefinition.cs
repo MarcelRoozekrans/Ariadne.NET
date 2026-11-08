@@ -18,5 +18,10 @@ public sealed class RuleDefinition
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<RuleException> Exceptions { get; init; } = [];
     public bool Locked { get; init; }
 
+    /// <summary>
+    /// When <see langword="true"/>, the rule is allowed to match nothing without being reported as vacuous.
+    /// </summary>
+    public bool AllowEmpty { get; init; }
+
     internal bool HasNoNullEntries<T>(IList<T>? items) => NullEntries.None(items);
 }
