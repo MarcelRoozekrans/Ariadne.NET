@@ -531,7 +531,30 @@ public class MemberEdgeTests
     }
 
     [Fact]
-    public void FilterWithoutMatchingName_RecordsNothing()
+    public void FilterWithoutMatchingName_RecordsNothingWithoutIndexers()
+    {
+        var graph = Build(["Shop.Data.SqlCommand.Dispose*"], """
+            namespace Shop.Domain
+            {
+                public class Order : Shop.Data.Connection
+                {
+                    public Order() : base("x") { }
+                    public int Place(Shop.Data.SqlCommand command)
+                    {
+                        var created = new Shop.Data.SqlCommand("x");
+                        command.Text = created.Text;
+                        command.Completed += (_, _) => { };
+                        return command.ExecuteReader() + command.Timeout + Shop.Data.SqlCommand.Count;
+                    }
+                }
+            }
+            """);
+
+        graph.MemberEdges.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void FilterWithoutMatchingName_RecordsOnlyIndexerUses()
     {
         var graph = Build(["Shop.Data.SqlCommand.Dispose*"], UsesEverything);
 
