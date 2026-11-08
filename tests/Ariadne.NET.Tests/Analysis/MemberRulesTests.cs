@@ -123,6 +123,24 @@ public class MemberRulesTests
     }
 
     [Fact]
+    public void Forbid_ConstructorPattern_SubclassWithImplicitConstructor_Reported()
+    {
+        var pack = PackWith(Forbid(Members("Shop.Data.SqlCommand.new")));
+
+        // new Client() calls Client's implicit constructor, which calls the forbidden one: the subclass is the user.
+        var v = Check("""
+            namespace Shop.Domain
+            {
+                public class Client : Data.SqlCommand { }
+                public class Order { public object Make() => new Client(); }
+            }
+            """, pack).Should().ContainSingle().Subject;
+
+        v.SourceType.Should().Be("Shop.Domain.Client");
+        v.Target.Should().Be("Shop.Data.SqlCommand.new");
+    }
+
+    [Fact]
     public void AllowOnly_OutsideAllowedLayer_ReportsDependencyNotPermitted()
     {
         var pack = PackWith(AllowOnly(Members("Shop.Data.SqlCommand.*")));

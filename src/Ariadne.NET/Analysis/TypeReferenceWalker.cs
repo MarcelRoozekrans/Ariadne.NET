@@ -67,6 +67,7 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     public override void VisitClassDeclaration(ClassDeclarationSyntax node)
     {
         var previous = EnterType(node, node.Identifier);
+        AddImplicitBaseConstructorCalls(node);
         base.VisitClassDeclaration(node);
         _source = previous;
     }
@@ -88,6 +89,7 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     public override void VisitRecordDeclaration(RecordDeclarationSyntax node)
     {
         var previous = EnterType(node, node.Identifier);
+        AddImplicitBaseConstructorCalls(node);
         base.VisitRecordDeclaration(node);
         _source = previous;
     }
@@ -212,6 +214,103 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
         }
 
         base.VisitPrimaryConstructorBaseType(node);
+    }
+
+    /// <summary>
+    /// Records the base constructor call that C# inserts when a class or record constructor names no base arguments: an implicit
+    /// constructor, a declared one without a <c>: base(...)</c> or <c>: this(...)</c> initializer, and a primary constructor
+    /// whose base type has no argument list. The call goes to the base constructor that takes no arguments, the parameterless
+    /// one or else one whose parameters are all optional or <c>params</c>. It is located at the constructor that makes it: the
+    /// identifier of a declared constructor, or the type's identifier for an implicit or primary constructor. A struct has no
+    /// base constructor call, a static constructor calls none, and a call to <see cref="object"/> is not recorded.
+    /// </summary>
+    private void AddImplicitBaseConstructorCalls(TypeDeclarationSyntax node)
+    {
+        if (_source is not { TypeKind: TypeKind.Class, IsStatic: false } type
+            || !_constructorsCouldMatch
+            || type.BaseType is not { SpecialType: not SpecialType.System_Object, TypeKind: not TypeKind.Error } baseType
+            || ParameterlessConstructorOf(baseType) is not { } baseConstructor)
+        {
+            return;
+        }
+
+        if (node.ParameterList is not null)
+        {
+            if (!HasBaseArguments(node))
+            {
+                AddMemberUse(baseConstructor, node, node.Identifier.Span);
+            }
+
+            return;
+        }
+
+        foreach (var member in node.Members)
+        {
+            if (member is ConstructorDeclarationSyntax { Initializer: null } constructor
+                && !constructor.Modifiers.Any(SyntaxKind.StaticKeyword))
+            {
+                AddMemberUse(baseConstructor, constructor, constructor.Identifier.Span);
+            }
+        }
+
+        if (HasImplicitConstructor(type) && IsFirstDeclaration(type, node))
+        {
+            AddMemberUse(baseConstructor, node, node.Identifier.Span);
+        }
+    }
+
+    private static bool HasBaseArguments(TypeDeclarationSyntax node)
+    {
+        if (node.BaseList is { } baseList)
+        {
+            foreach (var baseType in baseList.Types)
+            {
+                if (baseType is PrimaryConstructorBaseTypeSyntax)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // The default constructor C# declares for a class without constructors; a record's copy constructor takes an argument.
+    private static bool HasImplicitConstructor(INamedTypeSymbol type)
+    {
+        foreach (var constructor in type.InstanceConstructors)
+        {
+            if (constructor is { IsImplicitlyDeclared: true, Parameters.Length: 0 })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // A partial class has one implicit constructor, recorded at its first declaration only.
+    private static bool IsFirstDeclaration(INamedTypeSymbol type, SyntaxNode node) =>
+        type.DeclaringSyntaxReferences is [var first, ..] && first.SyntaxTree == node.SyntaxTree && first.Span == node.Span;
+
+    // The constructor a call without arguments binds to: the parameterless one, or else one whose parameters all have defaults or are params.
+    private static IMethodSymbol? ParameterlessConstructorOf(INamedTypeSymbol type)
+    {
+        IMethodSymbol? fallback = null;
+        foreach (var constructor in type.InstanceConstructors)
+        {
+            if (constructor.Parameters.IsEmpty)
+            {
+                return constructor;
+            }
+
+            if (fallback is null && constructor.Parameters.All(p => p.IsOptional || p.IsParams))
+            {
+                fallback = constructor;
+            }
+        }
+
+        return fallback;
     }
 
     // An array element access binds to no member, so only an indexer gives a member edge.

@@ -47,6 +47,8 @@ public class MemberEdgeTests
             public sealed class Text { [System.Runtime.CompilerServices.IndexerName("Chars")] public char this[int i] => 'a'; }
             public class Connection { public Connection(string s) { } }
             public record Audit(string S);
+            public abstract record Base { protected Base() { } protected Base(int x) { } }
+            public class Optional { public Optional(int x = 0, params string[] rest) { } }
             public static class Tools { public static int Run() => 0; public static int Run(int x) => x; public static int Run(string s) => 0; }
             public class Level1 { public virtual void Go() { } }
             public class Level2 : Level1 { public override void Go() { } }
@@ -251,7 +253,8 @@ public class MemberEdgeTests
             }
             """);
 
-        graph.MemberEdges.Where(e => string.Equals(e.Source.ToDisplayString(), Order, StringComparison.Ordinal)).Should().BeEmpty();
+        // Only the base constructor call of Order's implicit constructor is a use; the declarations are not.
+        Uses(graph).Should().Equal(("Shop.Data.DbCommand.new", 3, 18));
         graph.Edges.Should().Contain(e => string.Equals(e.Target.ToDisplayString(), "Shop.Data.SqlCommand", StringComparison.Ordinal));
     }
 
@@ -330,6 +333,63 @@ public class MemberEdgeTests
                 (Order, "Shop.Data.Connection.new", 6, 34),
                 ("Shop.Domain.Line", "Shop.Data.Connection.new", 8, 35),
                 ("Shop.Domain.Entry", "Shop.Data.Audit.new", 9, 37));
+    }
+
+    [Fact]
+    public void ImplicitBaseConstructorCall_RecordsTheParameterlessBaseCtor()
+    {
+        var graph = Build(["**.new"], """
+            namespace Shop.Domain
+            {
+                public class Implicit : Shop.Data.SqlCommand { }
+                public class Explicit : Shop.Data.SqlCommand
+                {
+                    public Explicit(int x) { }
+                    public Explicit(string s) => System.Console.WriteLine(s);
+                    static Explicit() { }
+                }
+                public class WithInitializer : Shop.Data.SqlCommand
+                {
+                    public WithInitializer() : base("x") { }
+                }
+                public record Positional(int X) : Shop.Data.Base;
+                public record Plain : Shop.Data.Base;
+                public class Primary(int x) : Shop.Data.Optional;
+                public class Mid : Shop.Data.SqlCommand { }
+                public class Top : Mid { }
+                public class Root { public Root() { } }
+                public struct Value { public Value(int x) { } }
+                public static class Helpers { }
+                public partial class Split : Shop.Data.SqlCommand { }
+                public partial class Split { }
+            }
+            """);
+
+        // The call is located at the constructor that makes it: its identifier for a declared constructor, the type's
+        // identifier for an implicit or primary constructor. A constructor with an initializer records only that.
+        graph.MemberEdges
+            .Where(e => string.Equals(e.Location.FilePath, "Order.cs", StringComparison.Ordinal))
+            .Select(e => (e.Source.ToDisplayString(), MemberNames.Chain(e.Member)[0], e.Location.Line, e.Location.Column))
+            .Should().Equal(
+                ("Shop.Domain.Implicit", "Shop.Data.SqlCommand.new", 3, 18),
+                ("Shop.Domain.Explicit", "Shop.Data.SqlCommand.new", 6, 16),
+                ("Shop.Domain.Explicit", "Shop.Data.SqlCommand.new", 7, 16),
+                ("Shop.Domain.WithInitializer", "Shop.Data.SqlCommand.new", 12, 36),
+                ("Shop.Domain.Positional", "Shop.Data.Base.new", 14, 19),
+                ("Shop.Domain.Plain", "Shop.Data.Base.new", 15, 19),
+                ("Shop.Domain.Primary", "Shop.Data.Optional.new", 16, 18),
+                ("Shop.Domain.Mid", "Shop.Data.SqlCommand.new", 17, 18),
+                ("Shop.Domain.Top", "Shop.Domain.Mid.new", 18, 18),
+                ("Shop.Domain.Split", "Shop.Data.SqlCommand.new", 22, 26));
+        graph.MemberEdges.Where(e => e.Member.ContainingType.SpecialType == SpecialType.System_Object).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ImplicitBaseConstructorCall_EmptyFilter_RecordsNothing()
+    {
+        var graph = Build([], "namespace Shop.Domain { public class Implicit : Shop.Data.SqlCommand { } }");
+
+        graph.MemberEdges.Should().BeEmpty();
     }
 
     [Fact]
