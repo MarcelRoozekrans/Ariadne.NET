@@ -1,8 +1,8 @@
 using Ariadne.NET.Abstractions;
 using Ariadne.NET.Analysis;
 using Ariadne.NET.RuleEngine;
-using Ariadne.NET.Tests.Analysis;
 using Ariadne.NET.RuleLoader;
+using Ariadne.NET.Tests.Analysis;
 using FluentAssertions;
 using Microsoft.CodeAnalysis;
 
@@ -14,6 +14,8 @@ namespace Ariadne.NET.Tests.Integration;
 /// </summary>
 public sealed class RepoPackRuleTests
 {
+    private static readonly HashSet<string> OwnRuleIds = new HashSet<string>(StringComparer.Ordinal) { "ARIADNE-HOST-NAMES-OWN", "ARIADNE-CORE-NO-CONSOLE", "ARIADNE-NO-NEWTONSOFT-JSON" };
+
     private static readonly Lazy<RulePack> Pack = new(LoadRepoPack);
 
     private static RulePack LoadRepoPack()
@@ -38,7 +40,7 @@ public sealed class RepoPackRuleTests
 
     private static IReadOnlyList<ArchitectureViolation> Validate(params AnalyzedProject[] projects) =>
         new ArchitectureValidator().Validate(Pack.Value, projects).Violations
-            .Where(v => v.RuleId.StartsWith("ARIADNE-", StringComparison.Ordinal) && !v.RuleId.StartsWith("ARIADNE-LAYER-", StringComparison.Ordinal))
+            .Where(v => OwnRuleIds.Contains(v.RuleId))
             .ToList();
 
     [Fact]

@@ -176,9 +176,17 @@ internal static class ResolvedPackageReader
         && (name[targetFramework.Length] == '-'
             || (char.IsAsciiDigit(name[targetFramework.Length]) && targetFramework.Contains('-', StringComparison.Ordinal)));
 
+    // net10.0/linux-x64 -> net10.0
+    private static string WithoutRuntimeIdentifier(string entryName)
+    {
+        var slash = entryName.IndexOf('/', StringComparison.Ordinal);
+        return slash < 0 ? entryName : entryName[..slash];
+    }
+
     // The framework's entry: by full name, then by the name before a runtime identifier suffix (net10.0/linux-x64), then a name that
-    // extends the framework with a platform (net10.0-windows7.0). Without a framework, the file's only framework, by its plain entry before any runtime identifier one. Null when none fits, so
-    // a file restored for another framework is unknown and not taken for this one.
+    // extends the framework with a platform (net10.0-windows7.0). Without a framework, the file's only framework, by its plain
+    // entry before any runtime identifier one. Null when none fits, so a file restored for another framework is unknown and not
+    // taken for this one.
     private static JsonElement? Select(JsonElement entries, string? targetFramework)
     {
         if (entries.ValueKind != JsonValueKind.Object)
@@ -196,7 +204,7 @@ internal static class ResolvedPackageReader
             if (targetFramework is null)
             {
                 // A runtime identifier restore (PublishAot) lists net10.0 and net10.0/linux-x64: one framework, whose plain entry wins.
-                var entryBase = entry.Name.Contains('/', StringComparison.Ordinal) ? entry.Name[..entry.Name.IndexOf('/', StringComparison.Ordinal)] : entry.Name;
+                var entryBase = WithoutRuntimeIdentifier(entry.Name);
                 if (!string.Equals(entryBase, onlyBase, StringComparison.OrdinalIgnoreCase))
                 {
                     distinct++;
@@ -216,8 +224,7 @@ internal static class ResolvedPackageReader
                 return entry.Value;
             }
 
-            var slash = entry.Name.IndexOf('/', StringComparison.Ordinal);
-            var name = slash < 0 ? entry.Name : entry.Name[..slash];
+            var name = WithoutRuntimeIdentifier(entry.Name);
             if (string.Equals(name, targetFramework, StringComparison.OrdinalIgnoreCase))
             {
                 byBase ??= entry;
