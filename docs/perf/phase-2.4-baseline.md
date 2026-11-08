@@ -110,3 +110,33 @@ To see whether the 2.4 cost per type comes from the new rules or from the change
 Allocations per type with the new rules off are about 2.16 MB, 10% above the 2.3 head. So the three new rules together cost about 1.2% of the allocations, and nearly all of the 2.4 growth per type is there with every new feature off. The time difference of 180 ms is larger than the allocation difference suggests, but the two runs were minutes apart on a loaded VM, so I do not read it as the cost of the rules.
 
 My best guess for the cause is the unconditional change to the type graph build in phase 2.4, such as the walker's resolve and edge recording path or the constructor and initializer binding, which runs whether or not the pack has a `members` pattern. Part of it may also be the mix of types in the added code, because the 2.3 and 2.4 packs and solutions differ and I did not profile the build. I did not change production code. Phase 2.4 alone adds about 11% to allocations and time per type over the 2.3 head, just over the 10% bar.
+
+## Walker allocation investigation
+
+The experiment above left open whether phase 2.4 code costs about 10% more per type even with every new feature off. It does not. When the input is held fixed, the 2.4 code allocates the same as the 2.3 head, within 0.1%. The growth per type comes from the solution being checked, not from the code that checks it. I changed no production code.
+
+Every comparison below ran the 2.3 head (`248c0e9`, built in a temporary worktree outside the repository and removed afterwards) and this branch on the same input, one run at a time, on the same VM, Release builds. Each figure is a median, and a warm-up run comes first.
+
+### Type graph build only, fixed compilation
+
+I wrote a scratch harness outside the repository. It builds one Roslyn compilation of the 2.3 head's `src/Ariadne.NET` and `src/Ariadne.NET.Abstractions` sources, 103 trees, and calls `TypeGraphBuilder.Build` with the empty filter (the 3-argument overload) on it. It also runs `ArchitectureValidator.Validate` on a small pack of 2 layers and 1 `forbid` rule. Allocations are `GC.GetTotalAllocatedBytes(true)`, median of 7 runs.
+
+| Measurement | 2.3 head | Phase 2.4 | Change |
+| --- | --- | --- | --- |
+| Graph build, fresh compilation | 25,403,888 bytes | 25,427,552 bytes | +0.09% |
+| Graph build, same compilation again | 21,122,848 bytes | 21,092,872 bytes | -0.14% |
+| `Validate`, fresh compilation | 25,493,856 bytes | 25,517,032 bytes | +0.09% |
+| Type edges found | 4,027 | 4,027 | same |
+
+### Whole check with the perf tool, the input held fixed
+
+I ran `tools/perf/Ariadne.NET.Perf` (5 runs) from each tree on the same solution, with the 2.3 pack, which has no `members`, `bannedPackages` or `uniqueNames` rules.
+
+| Solution checked | 2.3 head tool | Phase 2.4 tool | Change |
+| --- | --- | --- | --- |
+| 2.3 head solution, 235 types | 461,387,360 bytes, 1128.0 ms | 461,671,888 bytes, 1143.3 ms | +0.06% |
+| Phase 2.4 solution, 261 types | 563,496,864 bytes, 1341.6 ms | 563,385,776 bytes, 1365.8 ms | -0.02% |
+
+The 2.3 tool checking the 2.4 solution allocates 563.5 MB, as much as the 2.4 tool does. The roughly 102 MB of growth, about 2.16 MB per type against 1.96 MB, therefore appears with the 2.3 code too. It comes from what the phase 2.4 solution contains: the added types are heavier to bind than the average 2.3 type. The time differences are within the noise of the shared VM.
+
+So no unconditional allocation was found in the type graph build or the validator. The member-edge work stays off for a pack without `members` patterns, as the attribution experiment above already showed (1.2% for the repo pack's one member rule).
