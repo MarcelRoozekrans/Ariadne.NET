@@ -252,6 +252,33 @@ public class MemberRulesTests
     }
 
     [Fact]
+    public void AllowOnly_ExtensionBlockMemberUsedByItsOwnStaticClass_NoViolation_UsedElsewhere_Reported()
+    {
+        var pack = PackWith(AllowOnly(Members("Shop.Domain.CommandExtensions.Persist")));
+
+        // The walker attributes the code inside an extension block to the static class around it, so that class uses its own member.
+        var violations = Check("""
+            namespace Shop.Domain
+            {
+                public static class CommandExtensions
+                {
+                    extension(Shop.Data.SqlCommand command)
+                    {
+                        public void Persist() { }
+                        public void PersistTwice() { command.Persist(); command.Persist(); }
+                    }
+                    public static void Save(Shop.Data.SqlCommand command) => command.Persist();
+                }
+                public class Order { public void Place(Shop.Data.SqlCommand command) => command.Persist(); }
+            }
+            """, pack, ViolationKind.DependencyNotPermitted);
+
+        var v = violations.Should().ContainSingle().Subject;
+        v.SourceType.Should().Be("Shop.Domain.Order");
+        v.Target.Should().Be("Shop.Domain.CommandExtensions.Persist");
+    }
+
+    [Fact]
     public void AllowOnly_DerivedTypeCallingInheritedMember_Reported()
     {
         var pack = PackWith(AllowOnly(Members("Shop.Data.DbCommand.ExecuteReader")));

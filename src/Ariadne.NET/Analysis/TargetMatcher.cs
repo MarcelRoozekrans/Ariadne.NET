@@ -113,12 +113,7 @@ internal sealed class TargetMatcher
             return true;
         }
 
-        var type = member.ContainingType;
-        if (type is { IsExtension: true, ContainingType: { } outer })
-        {
-            type = outer;
-        }
-
+        var type = MemberNames.DeclaringTypeOf(member);
         if (!_containers.TryGetValue(type, out var matches))
         {
             matches = _selector.Matches(type, _layerMap.Names);

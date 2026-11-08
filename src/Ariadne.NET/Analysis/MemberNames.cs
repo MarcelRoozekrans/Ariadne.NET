@@ -67,13 +67,22 @@ internal static class MemberNames
         ArgumentNullException.ThrowIfNull(member);
         ArgumentNullException.ThrowIfNull(names);
 
-        var type = member.ContainingType ?? throw new ArgumentException("The symbol is not a member of a type.", nameof(member));
-        if (type is { IsExtension: true, ContainingType: { } outer })
-        {
-            type = outer;
-        }
+        return string.Concat(names.FullNameOf(DeclaringTypeOf(member).OriginalDefinition), ".", SimpleNameOf(member));
+    }
 
-        return string.Concat(names.FullNameOf(type.OriginalDefinition), ".", SimpleNameOf(member));
+    /// <summary>
+    /// The type a member belongs to for naming and matching: its containing type, except that a member of a C# 14 extension
+    /// block belongs to the static class around the block, as the walker attributes the code inside the block to that class.
+    /// </summary>
+    /// <param name="member">The member.</param>
+    /// <returns>The declaring type.</returns>
+    /// <exception cref="ArgumentException">The symbol is not a member of a type.</exception>
+    public static INamedTypeSymbol DeclaringTypeOf(ISymbol member)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+
+        var type = member.ContainingType ?? throw new ArgumentException("The symbol is not a member of a type.", nameof(member));
+        return type is { IsExtension: true, ContainingType: { } outer } ? outer : type;
     }
 
     /// <summary>

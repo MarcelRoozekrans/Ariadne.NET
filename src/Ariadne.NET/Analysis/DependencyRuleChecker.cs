@@ -127,7 +127,7 @@ internal sealed class DependencyRuleChecker
         };
     }
 
-    // The member of the pattern, when it is not the used one: ", which overrides X" or ", which implements X".
+    // The member of the pattern, when it is not the used one: " (which overrides X)" or " (which implements X)".
     private static string Via(in MemberName matched, string target)
     {
         if (matched.Member is null || string.Equals(matched.Name, target, StringComparison.Ordinal))
@@ -176,7 +176,7 @@ internal sealed class DependencyRuleChecker
             to.TryMatchMember(edge, out matched)
             && (Rule.Kind == RuleKind.Forbid
                 ? from.Matches(edge.Source)
-                : !from.Matches(edge.Source) && !IsWithin(edge.Source, edge.Member.ContainingType))
+                : !from.Matches(edge.Source) && !IsWithin(edge.Source, MemberNames.DeclaringTypeOf(edge.Member)))
             && !IsExcepted(edge.Source);
 
         private bool IsExcepted(INamedTypeSymbol source)
