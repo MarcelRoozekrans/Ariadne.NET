@@ -14,18 +14,22 @@ public sealed class ArchitectureValidator : IArchitectureValidator
     {
         ArgumentNullException.ThrowIfNull(compilation);
 
-        return Validate(resolvedPack, [new AnalyzedProject(compilation.AssemblyName ?? string.Empty, null, compilation)], cancellationToken);
+        return Validate(resolvedPack, [new AnalyzedProject(compilation.AssemblyName ?? string.Empty, null, compilation)], nameof(compilation), cancellationToken);
     }
 
     /// <inheritdoc />
-    public ArchitectureReport Validate(RulePack resolvedPack, IReadOnlyList<AnalyzedProject> projects, CancellationToken cancellationToken = default)
+    public ArchitectureReport Validate(RulePack resolvedPack, IReadOnlyList<AnalyzedProject> projects, CancellationToken cancellationToken = default) =>
+        Validate(resolvedPack, projects, nameof(projects), cancellationToken);
+
+    // paramName is the argument the caller passed, so a guard failure names a parameter of the overload that was called.
+    private ArchitectureReport Validate(RulePack resolvedPack, IReadOnlyList<AnalyzedProject> projects, string paramName, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(resolvedPack);
         ArgumentNullException.ThrowIfNull(projects);
 
         RejectMixedTargetFrameworks(projects);
         var bannedPackages = BannedPackageRules.Compile(resolvedPack);
-        bannedPackages.RequirePackages(projects);
+        bannedPackages.RequirePackages(projects, paramName);
 
         // The layer map and the matchers depend on the pack only, so one set serves every project, and a type's layer,
         // names and matches are worked out once per run.

@@ -78,8 +78,9 @@ internal static class BannedPackageRules
 
         /// <summary>Rejects a run in which a bannedPackages rule covers a project whose packages are not known, since a clean report would claim what was not checked. An excepted project is never checked, so it cannot trip this.</summary>
         /// <param name="projects">The projects of the run.</param>
+        /// <param name="paramName">The argument of the public call that held them, named by the exception.</param>
         /// <exception cref="ArgumentException">A covered project has no package list.</exception>
-        public void RequirePackages(IReadOnlyList<AnalyzedProject> projects)
+        public void RequirePackages(IReadOnlyList<AnalyzedProject> projects, string paramName)
         {
             ArgumentNullException.ThrowIfNull(projects);
 
@@ -91,7 +92,7 @@ internal static class BannedPackageRules
                     {
                         throw new ArgumentException(
                             $"Rule '{rule.Rule.Id}' bans packages, but the packages of project '{project.Name}' are not known; analyse the project with its restored package list.",
-                            nameof(projects));
+                            paramName);
                     }
                 }
             }

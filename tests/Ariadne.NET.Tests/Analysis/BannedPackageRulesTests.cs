@@ -233,4 +233,24 @@ public class BannedPackageRulesTests
 
         report.Violations.Should().ContainSingle().Which.TargetFrameworks.Should().Equal("net8.0");
     }
+
+    [Fact]
+    public void ValidateWithCompilation_BannedPackagesRuleAndNoPackages_ThrowsForCompilationParameter()
+    {
+        var compilation = TestCompilation.Create("namespace Shop { public class A { } }");
+
+        var act = () => new ArchitectureValidator().Validate(Pack, compilation);
+
+        act.Should().Throw<ArgumentException>().WithParameterName("compilation").WithMessage("*TestAssembly*");
+    }
+
+    [Fact]
+    public void ValidateWithProjects_BannedPackagesRuleAndNoPackages_ThrowsForProjectsParameter()
+    {
+        var compilation = TestCompilation.Create("namespace Shop { public class A { } }");
+
+        var act = () => new ArchitectureValidator().Validate(Pack, [new AnalyzedProject("Shop.Domain", null, compilation)]);
+
+        act.Should().Throw<ArgumentException>().WithParameterName("projects").WithMessage("*Shop.Domain*");
+    }
 }
