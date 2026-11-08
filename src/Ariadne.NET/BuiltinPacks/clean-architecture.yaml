@@ -38,80 +38,95 @@ layers:
 componentRoles:
   - name: Entity
     layer: Domain
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Domain entity with identity"
   - name: ValueObject
     layer: Domain
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Immutable value type"
   - name: DomainService
     layer: Domain
+    allowEmpty: true
     typeKind: Class
     requiresInterface: true
     interfaceRole: DomainServiceInterface
     description: "Domain logic that doesn't belong to a single entity"
   - name: DomainServiceInterface
     layer: Domain
+    allowEmpty: true
     typeKind: Interface
     requiresInterface: false
     description: "Interface for domain service"
   - name: DomainEvent
     layer: Domain
+    allowEmpty: true
     typeKind: Record
     requiresInterface: false
     description: "Domain event"
   - name: Specification
     layer: Domain
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Query specification"
   - name: CommandHandler
     layer: Application
+    allowEmpty: true
     typeKind: Class
     requiresInterface: true
     interfaceRole: CommandHandlerInterface
     description: "Handles a command"
   - name: CommandHandlerInterface
     layer: Application
+    allowEmpty: true
     typeKind: Interface
     requiresInterface: false
     description: "Interface for command handler"
   - name: QueryHandler
     layer: Application
+    allowEmpty: true
     typeKind: Class
     requiresInterface: true
     interfaceRole: QueryHandlerInterface
     description: "Handles a query"
   - name: QueryHandlerInterface
     layer: Application
+    allowEmpty: true
     typeKind: Interface
     requiresInterface: false
     description: "Interface for query handler"
   - name: Dto
     layer: Application
+    allowEmpty: true
     typeKind: Record
     requiresInterface: false
     description: "Data transfer object"
   - name: Mapper
     layer: Application
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Maps between domain and DTOs"
   - name: Validator
     layer: Application
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Input validator"
   - name: RepositoryInterface
     layer: Domain
+    allowEmpty: true
     typeKind: Interface
     requiresInterface: false
     alternativeNames: [Repository]
     description: "Repository contract (defined in Domain)"
   - name: Repository
     layer: Infrastructure
+    allowEmpty: true
     typeKind: Class
     requiresInterface: true
     interfaceRole: RepositoryInterface
@@ -119,12 +134,14 @@ componentRoles:
     description: "Repository implementation"
   - name: ExternalServiceInterface
     layer: Application
+    allowEmpty: true
     typeKind: Interface
     requiresInterface: false
     alternativeNames: [ExternalService]
     description: "External service contract"
   - name: ExternalService
     layer: Infrastructure
+    allowEmpty: true
     typeKind: Class
     requiresInterface: true
     interfaceRole: ExternalServiceInterface
@@ -132,11 +149,13 @@ componentRoles:
     description: "External service implementation"
   - name: Controller
     layer: WebApi
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "API controller"
   - name: Middleware
     layer: WebApi
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "HTTP middleware"

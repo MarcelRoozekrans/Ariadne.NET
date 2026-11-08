@@ -31,9 +31,10 @@ public class ValidationToolsTests
     {
         FixtureProjects.EnsureRestored();
 
+        // The fourlayer fixture has a type in each of the four clean-architecture layers.
         var report = await ValidationTools.ValidateSource(
             _helper, _validator,
-            path: FixtureProjects.Path("clean", "Shop.slnx"),
+            path: FixtureProjects.Path("fourlayer", "Shop.csproj"),
             template: "clean-architecture");
 
         report.IsValid.Should().BeTrue();

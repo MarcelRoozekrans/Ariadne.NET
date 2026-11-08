@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using ZeroAlloc.Validation;
 
 namespace Ariadne.NET.Abstractions;
@@ -13,6 +14,12 @@ public sealed class ComponentRoleDefinition
     [NotNull] public string Accessibility { get; init; } = "public";
     public string Description { get; init; } = "";
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> AlternativeNames { get; init; } = [];
+
+    /// <summary>
+    /// When <see langword="true"/>, the role is allowed to match no types without being reported as vacuous.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool AllowEmpty { get; init; }
 
     internal bool HasNoNullEntries<T>(IList<T>? items) => NullEntries.None(items);
 }

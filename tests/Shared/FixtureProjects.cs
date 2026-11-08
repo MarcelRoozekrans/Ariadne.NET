@@ -16,6 +16,7 @@ internal static class FixtureProjects
         "clean/Shop.slnx",
         "broken/Shop.slnx",
         "multitarget/Multi.csproj",
+        "fourlayer/Shop.csproj",
         "compile-error/Broken.csproj",
         "generator/Gen.App/Gen.App.csproj",
         "daedalus/clean/Daedalus.slnx",

@@ -54,6 +54,8 @@ public sealed class ArchitectureValidator : IArchitectureValidator
         // once over all graphs and not merged per project.
         var nameCollisions = UniqueNameRules.Check(layers, resolvedPack, GraphsOf(entries));
 
+        var vacuity = VacuityRules.Check(resolvedPack, layers, GraphsOf(entries), MatchesOf(entries), projects);
+
         var ordered = GroupByProject(entries);
         var allViolations = new List<ArchitectureViolation>();
         var checkedProjects = new List<CheckedProject>(ordered.Count);
@@ -66,6 +68,7 @@ public sealed class ArchitectureValidator : IArchitectureValidator
         }
 
         allViolations.AddRange(nameCollisions);
+        allViolations.AddRange(vacuity);
         KeepOneOverlapPerType(allViolations);
         allViolations.Sort(CompareViolations);
         return new ArchitectureReport
@@ -98,6 +101,17 @@ public sealed class ArchitectureValidator : IArchitectureValidator
         }
 
         return graphs;
+    }
+
+    private static List<RoleMatches> MatchesOf(List<Entry> entries)
+    {
+        var matches = new List<RoleMatches>(entries.Count);
+        foreach (ref readonly var entry in CollectionsMarshal.AsSpan(entries))
+        {
+            matches.Add(entry.Matches);
+        }
+
+        return matches;
     }
 
     // The entries of each project, in the order the projects first appear.

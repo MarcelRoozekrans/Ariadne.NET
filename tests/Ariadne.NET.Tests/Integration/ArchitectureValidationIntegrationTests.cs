@@ -63,11 +63,16 @@ public sealed class ArchitectureValidationIntegrationTests
                 {
                     public Order? GetById(Guid id) => null;
                 }
+                """),
+            ("OrdersEndpoint.cs", """
+                namespace MyApp.Orders.WebApi;
+
+                public class OrdersEndpoint { }
                 """));
 
         report.IsValid.Should().BeTrue();
         report.Violations.Should().BeEmpty();
-        report.TypesChecked.Should().Be(5);
+        report.TypesChecked.Should().Be(6);
     }
 
     [Fact]
@@ -223,6 +228,11 @@ public sealed class ArchitectureValidationIntegrationTests
                 {
                     public string ConnectionString { get; init; } = "";
                 }
+                """),
+            ("OrdersEndpoint.cs", """
+                namespace MyApp.Orders.WebApi;
+
+                public class OrdersEndpoint { }
                 """));
 
         report.IsValid.Should().BeTrue();

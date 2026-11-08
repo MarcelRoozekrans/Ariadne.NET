@@ -141,6 +141,7 @@ public sealed class RulePackMerger : IRulePackMerger
                 Against = inherited.Against,
                 Exceptions = [.. inherited.Exceptions, .. amendment.Exceptions],
                 Locked = inherited.Locked,
+                AllowEmpty = inherited.AllowEmpty,
             });
         }
     }

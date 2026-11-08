@@ -28,41 +28,49 @@ layers:
 componentRoles:
   - name: Request
     layer: Feature
+    allowEmpty: true
     typeKind: Record
     requiresInterface: false
     description: "Incoming request/command"
   - name: Response
     layer: Feature
+    allowEmpty: true
     typeKind: Record
     requiresInterface: false
     description: "Outgoing response/result"
   - name: Handler
     layer: Feature
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Handles the request"
   - name: Validator
     layer: Feature
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Validates input"
   - name: Endpoint
     layer: Feature
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "API endpoint/controller"
   - name: SharedEntity
     layer: SharedKernel
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Shared domain entity"
   - name: SharedDto
     layer: SharedKernel
+    allowEmpty: true
     typeKind: Record
     requiresInterface: false
     description: "Shared DTO"
   - name: DbContext
     layer: Infrastructure
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Database context"

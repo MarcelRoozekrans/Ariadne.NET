@@ -214,6 +214,11 @@ public sealed class WorkspaceIntegrationTests : IDisposable
             .SelectMany(r => r.GeneratedFiles)
             .Select(f => CSharpSyntaxTree.ParseText(f.Code, path: f.FilePath))
             .ToList();
+
+        // The generated components cover some layers only. A layer that covers no type fails the run, so each layer gets
+        // one anchor type, which no role matches.
+        trees.AddRange(pack.Layers.Select(l => CSharpSyntaxTree.ParseText(
+            $"namespace Anchor.{l.Name}.Anchor {{ public sealed class {l.Name}Anchor {{ }} }}", path: $"{l.Name}Anchor.cs")));
         var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
             .Split(Path.PathSeparator)
             .Select(p => (MetadataReference)MetadataReference.CreateFromFile(p))

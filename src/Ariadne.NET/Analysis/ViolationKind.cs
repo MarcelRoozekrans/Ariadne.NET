@@ -35,4 +35,13 @@ public enum ViolationKind
     /// type's full name, without its assembly; when the two full names are equal, the message names both assemblies.
     /// </summary>
     NameCollision = 10,
+
+    /// <summary>
+    /// A rule or component role selects no type in the projects loaded, so it cannot fail and a clean report says nothing about
+    /// it. It has no location and no target; the source is the rule id or role name. A rule or role marked <c>allowEmpty</c> is exempt.
+    /// </summary>
+    VacuousRule = 11,
+
+    /// <summary>A layer covers no type in the projects loaded, so no rule that names it can fire. It has no location and no target; the source is the layer name.</summary>
+    VacuousLayer = 12,
 }

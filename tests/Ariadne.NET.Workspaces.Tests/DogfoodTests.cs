@@ -30,6 +30,7 @@ public sealed class DogfoodTests
         var result = await validator.ValidateAsync(resolved.Value, Path.Combine(root!, "src", "Ariadne.NET.slnx"));
 
         result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.ToString() : null);
+        // Violations must be empty, which includes VacuousLayer and VacuousRule: a layer or rule whose selector matches no type fails this test.
         result.Value.Violations.Should().BeEmpty(
             string.Join(Environment.NewLine, result.Value.Violations.Select(v => $"{v.RuleId} {v.SourceType} -> {v.Target}")));
     }

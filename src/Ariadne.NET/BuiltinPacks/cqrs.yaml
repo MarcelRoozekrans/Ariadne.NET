@@ -6,38 +6,45 @@ author: platform-team
 componentRoles:
   - name: Command
     layer: Application
+    allowEmpty: true
     typeKind: Record
     requiresInterface: false
     description: "Command message"
   - name: CommandHandler
     layer: Application
+    allowEmpty: true
     typeKind: Class
     requiresInterface: true
     interfaceRole: CommandHandlerInterface
     description: "Handles a command"
   - name: CommandHandlerInterface
     layer: Application
+    allowEmpty: true
     typeKind: Interface
     requiresInterface: false
     description: "Interface for command handler"
   - name: Query
     layer: Application
+    allowEmpty: true
     typeKind: Record
     requiresInterface: false
     description: "Query message"
   - name: QueryHandler
     layer: Application
+    allowEmpty: true
     typeKind: Class
     requiresInterface: true
     interfaceRole: QueryHandlerInterface
     description: "Handles a query"
   - name: QueryHandlerInterface
     layer: Application
+    allowEmpty: true
     typeKind: Interface
     requiresInterface: false
     description: "Interface for query handler"
   - name: QueryResult
     layer: Application
+    allowEmpty: true
     typeKind: Record
     requiresInterface: false
     description: "Query result DTO"

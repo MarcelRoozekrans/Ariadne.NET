@@ -17,7 +17,7 @@ public sealed class SolutionValidatorTests
     [Fact]
     public async Task Validator_Clean_IsValid()
     {
-        var report = await ValidateAsync("clean", "Shop.slnx");
+        var report = await ValidateWithLayersAsync(["Domain", "WebApi"], "clean", "Shop.slnx");
 
         report.IsValid.Should().BeTrue();
         report.Projects.Select(p => p.Name).Should().BeEquivalentTo("Shop.Domain", "Shop.WebApi");
@@ -28,7 +28,7 @@ public sealed class SolutionValidatorTests
     [Fact]
     public async Task Validator_Broken_OneViolationWithCount3AndRelativeFile()
     {
-        var report = await ValidateAsync("broken", "Shop.slnx");
+        var report = await ValidateWithLayersAsync(["Domain", "Infrastructure"], "broken", "Shop.slnx");
 
         var violation = report.Violations.Should().ContainSingle().Which;
         violation.Kind.Should().Be(ViolationKind.DependencyNotAllowed);
@@ -42,7 +42,7 @@ public sealed class SolutionValidatorTests
     [Fact]
     public async Task Validator_BrokenSlnfWithoutDomain_IsValid()
     {
-        var report = await ValidateAsync("broken", "Shop.Infrastructure-only.slnf");
+        var report = await ValidateWithLayersAsync(["Infrastructure"], "broken", "Shop.Infrastructure-only.slnf");
 
         report.IsValid.Should().BeTrue();
         report.Projects.Select(p => p.Name).Should().Equal("Shop.Infrastructure");
@@ -51,7 +51,7 @@ public sealed class SolutionValidatorTests
     [Fact]
     public async Task Validator_MultiTarget_ViolationListsNet10Only()
     {
-        var report = await ValidateAsync("multitarget", "Multi.csproj");
+        var report = await ValidateWithLayersAsync(["Domain", "Infrastructure"], "multitarget", "Multi.csproj");
 
         var violation = report.Violations.Should().ContainSingle().Which;
         violation.Target.Should().Be("Multi.Infrastructure.SqlStore");
@@ -63,7 +63,7 @@ public sealed class SolutionValidatorTests
     public async Task Validator_Generator_IsValid()
     {
         // The generated Registrations.cs sits in Domain and references Infrastructure; generated code is not a dependency source.
-        var report = await ValidateAsync("generator", "Gen.App", "Gen.App.csproj");
+        var report = await ValidateWithLayersAsync(["Domain", "Infrastructure"], "generator", "Gen.App", "Gen.App.csproj");
 
         report.IsValid.Should().BeTrue();
         report.TypesChecked.Should().Be(2);
@@ -119,9 +119,12 @@ public sealed class SolutionValidatorTests
         provider.GetRequiredService<ISolutionValidator>().Should().BeSameAs(provider.GetRequiredService<ISolutionValidator>());
     }
 
-    private async Task<ArchitectureReport> ValidateAsync(params string[] parts)
+    private async Task<ArchitectureReport> ValidateAsync(params string[] parts) =>
+        await ValidateWithLayersAsync([], parts).ConfigureAwait(false);
+
+    private async Task<ArchitectureReport> ValidateWithLayersAsync(string[] layers, params string[] parts)
     {
-        var result = await _validator.ValidateAsync(TestPacks.Layered(), FixtureProjects.Path(parts)).ConfigureAwait(false);
+        var result = await _validator.ValidateAsync(TestPacks.Layered(layers), FixtureProjects.Path(parts)).ConfigureAwait(false);
         result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.ToString() : null);
         return result.Value;
     }

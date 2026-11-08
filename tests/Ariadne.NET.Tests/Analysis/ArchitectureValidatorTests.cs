@@ -21,11 +21,21 @@ public class ArchitectureValidatorTests
         ],
         ComponentRoles =
         [
-            new ComponentRoleDefinition { Name = "Command", Layer = "Application", TypeKind = CSharpTypeKind.Record },
-            new ComponentRoleDefinition { Name = "Repository", Layer = "Infrastructure", TypeKind = CSharpTypeKind.Class, RequiresInterface = true, InterfaceRole = "RepositoryInterface", Accessibility = "internal" },
-            new ComponentRoleDefinition { Name = "RepositoryInterface", Layer = "Domain", TypeKind = CSharpTypeKind.Interface, AlternativeNames = ["Repository"] },
+            new ComponentRoleDefinition { AllowEmpty = true, Name = "Command", Layer = "Application", TypeKind = CSharpTypeKind.Record },
+            new ComponentRoleDefinition { AllowEmpty = true, Name = "Repository", Layer = "Infrastructure", TypeKind = CSharpTypeKind.Class, RequiresInterface = true, InterfaceRole = "RepositoryInterface", Accessibility = "internal" },
+            new ComponentRoleDefinition { AllowEmpty = true, Name = "RepositoryInterface", Layer = "Domain", TypeKind = CSharpTypeKind.Interface, AlternativeNames = ["Repository"] },
         ],
     };
+
+    // The fixture pack above has three layers. A test that does not cover all of them validates against the layers it covers.
+    private static RulePack PackOf(params string[] layers) => new()
+    {
+        Name = Pack.Name,
+        Layers = Pack.Layers.Where(l => Array.IndexOf(layers, l.Name) >= 0).ToList(),
+        ComponentRoles = Pack.ComponentRoles.Where(r => Array.IndexOf(layers, r.Layer) >= 0).ToList(),
+    };
+
+    private static readonly RulePack ApplicationOnly = PackOf("Application");
 
     private const string BrokenCommand = "namespace MyApp.Orders.Application; public class CreateOrderCommand { }";
 
@@ -34,14 +44,14 @@ public class ArchitectureValidatorTests
     [Fact]
     public void SingleCompilation_CleanAndBroken()
     {
-        var clean = _validator.Validate(Pack, TestCompilation.Create("namespace MyApp.Orders.Application; public record CreateOrderCommand;"));
+        var clean = _validator.Validate(ApplicationOnly, TestCompilation.Create("namespace MyApp.Orders.Application; public record CreateOrderCommand;"));
         clean.IsValid.Should().BeTrue();
         clean.TypesChecked.Should().Be(1);
         var project = clean.Projects.Should().ContainSingle().Subject;
         project.Name.Should().Be("TestAssembly");
         project.TargetFrameworks.Should().BeEmpty();
 
-        var broken = _validator.Validate(Pack, TestCompilation.Create(BrokenCommand));
+        var broken = _validator.Validate(ApplicationOnly, TestCompilation.Create(BrokenCommand));
         broken.IsValid.Should().BeFalse();
         var violation = broken.Violations.Should().ContainSingle().Subject;
         violation.Kind.Should().Be(ViolationKind.TypeKindMismatch);
@@ -52,7 +62,7 @@ public class ArchitectureValidatorTests
     [Fact]
     public void TwoTargetFrameworks_SameViolation_ReportedOnceWithEmptyList()
     {
-        var report = _validator.Validate(Pack,
+        var report = _validator.Validate(ApplicationOnly,
         [
             new AnalyzedProject("App", "net8.0", TestCompilation.Create(BrokenCommand)),
             new AnalyzedProject("App", "net10.0", TestCompilation.Create(BrokenCommand)),
@@ -75,7 +85,7 @@ public class ArchitectureValidatorTests
             #endif
             """;
 
-        var report = _validator.Validate(Pack,
+        var report = _validator.Validate(ApplicationOnly,
         [
             new AnalyzedProject("App", "net8.0", Compile(source, "OLD")),
             new AnalyzedProject("App", "net10.0", Compile(source)),
@@ -106,7 +116,7 @@ public class ArchitectureValidatorTests
             }
             """;
 
-        var report = _validator.Validate(Pack,
+        var report = _validator.Validate(PackOf("Domain", "Infrastructure"),
         [
             new AnalyzedProject("App", "net8.0", Compile(source, "SINGLE")),
             new AnalyzedProject("App", "net10.0", Compile(source)),
@@ -138,7 +148,7 @@ public class ArchitectureValidatorTests
     [Fact]
     public void TwoProjectsSameTypeName_NotMerged()
     {
-        var report = _validator.Validate(Pack,
+        var report = _validator.Validate(ApplicationOnly,
         [
             new AnalyzedProject("A", null, TestCompilation.Create(BrokenCommand)),
             new AnalyzedProject("B", null, TestCompilation.Create(BrokenCommand)),
@@ -175,7 +185,8 @@ public class ArchitectureValidatorTests
         var compilation = TestCompilation.Create(
             ("B.cs", "namespace MyApp.Orders.Application; public class BCommand { }"),
             ("A.cs", "namespace MyApp.Orders.Application; public class ACommand { }"),
-            ("C.cs", "namespace MyApp.Orders.Infrastructure; internal class OrderRepository { }"));
+            ("C.cs", "namespace MyApp.Orders.Infrastructure; internal class OrderRepository { }"),
+            ("D.cs", "namespace MyApp.Orders.Domain; public class Order { }"));
 
         var report = _validator.Validate(Pack, compilation);
 
@@ -191,13 +202,13 @@ public class ArchitectureValidatorTests
         var repository = ("Repo.cs", "namespace MyApp.Orders.Infrastructure; internal class OrderRepository { }");
         var contract = ("Contract.cs", "namespace MyApp.Orders.Domain; public interface IOrderRepository { }");
 
-        _validator.Validate(Pack,
+        _validator.Validate(PackOf("Domain", "Infrastructure"),
         [
             new AnalyzedProject("Infra", "net8.0", TestCompilation.Create(repository)),
             new AnalyzedProject("Domain", "net8.0", TestCompilation.Create(contract)),
         ]).IsValid.Should().BeTrue();
 
-        _validator.Validate(Pack,
+        _validator.Validate(PackOf("Domain", "Infrastructure"),
         [
             new AnalyzedProject("Infra", null, TestCompilation.Create(repository)),
             new AnalyzedProject("Domain", null, TestCompilation.Create(contract)),
@@ -210,7 +221,7 @@ public class ArchitectureValidatorTests
         var repository = ("Repo.cs", "namespace MyApp.Orders.Infrastructure; internal class OrderRepository { }");
         var contract = ("Contract.cs", "namespace MyApp.Orders.Domain; public interface IOrderRepository { }");
 
-        var report = _validator.Validate(Pack,
+        var report = _validator.Validate(PackOf("Domain", "Infrastructure"),
         [
             new AnalyzedProject("Infra", "net8.0", TestCompilation.Create(repository)),
             new AnalyzedProject("Domain", "net10.0", TestCompilation.Create(contract)),
@@ -226,7 +237,7 @@ public class ArchitectureValidatorTests
         var contract = ("Contract.cs", "namespace MyApp.Orders.Domain; public interface IOrderRepository { }");
 
         // Workspaces gives a single-target project a null framework and each framework of a multi-target project its name.
-        _validator.Validate(Pack,
+        _validator.Validate(PackOf("Domain", "Infrastructure"),
         [
             new AnalyzedProject("Domain", null, TestCompilation.Create(contract)),
             new AnalyzedProject("Infra", "netstandard2.0", TestCompilation.Create(repository)),
@@ -240,7 +251,7 @@ public class ArchitectureValidatorTests
         var repository = ("Repo.cs", "namespace MyApp.Orders.Infrastructure; internal class OrderRepository { }");
         var contract = ("Contract.cs", "namespace MyApp.Orders.Domain; public interface IOrderRepository { }");
 
-        _validator.Validate(Pack,
+        _validator.Validate(PackOf("Domain", "Infrastructure"),
         [
             new AnalyzedProject("Domain", "netstandard2.0", TestCompilation.Create(contract)),
             new AnalyzedProject("Domain", "net8.0", TestCompilation.Create(contract)),
@@ -251,11 +262,20 @@ public class ArchitectureValidatorTests
     [Fact]
     public void NoProjects_IsValidAndEmpty()
     {
-        var report = _validator.Validate(Pack, []);
+        var report = _validator.Validate(new RulePack { Name = "test" }, []);
 
         report.IsValid.Should().BeTrue();
         report.Projects.Should().BeEmpty();
         report.TypesChecked.Should().Be(0);
+    }
+
+    [Fact]
+    public void NoProjects_WithLayers_ReportsEachLayerAsVacuous()
+    {
+        var report = _validator.Validate(PackOf("Domain", "Application"), []);
+
+        report.Violations.Should().HaveCount(2).And.OnlyContain(v => v.Kind == ViolationKind.VacuousLayer && v.Message.Contains("0 project(s)", StringComparison.Ordinal));
+        report.Violations.Select(v => v.SourceType).Should().BeEquivalentTo("Domain", "Application");
     }
 
     [Fact]
@@ -274,7 +294,11 @@ public class ArchitectureValidatorTests
 
         var report = _validator.Validate(
             resolved.Value,
-            TestCompilation.Create("namespace Shop.Domain { public class Order { } }"));
+            TestCompilation.Create("""
+                namespace Shop.Domain { public class Order { } }
+                namespace Shop.Infrastructure { public class Store { } }
+                namespace Shop.WebApi { public class Endpoint { } }
+                """));
 
         var v = report.Violations.Should().ContainSingle().Subject;
         v.Kind.Should().Be(ViolationKind.LayerOverlap);
@@ -334,7 +358,7 @@ public class ArchitectureValidatorTests
             [.. references, core.ToMetadataReference()],
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
 
-        var report = _validator.Validate(Pack,
+        var report = _validator.Validate(PackOf("Domain", "Application"),
         [
             new AnalyzedProject("Core", null, core),
             new AnalyzedProject("B", null, User("B")),
@@ -363,7 +387,7 @@ public class ArchitectureValidatorTests
             [.. references, library.ToMetadataReference()],
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
 
-        var report = _validator.Validate(Pack,
+        var report = _validator.Validate(PackOf("Domain", "Application"),
         [
             new AnalyzedProject("B", null, User("B")),
             new AnalyzedProject("C", null, User("C")),
@@ -392,6 +416,7 @@ public class ArchitectureValidatorTests
     {
         const string source = """
             namespace Web { public class Client { } }
+            namespace Hosts { public class Host { } }
             namespace Shop.Domain
             {
                 public class Order
@@ -499,6 +524,172 @@ public class ArchitectureValidatorTests
         violation.SourceType.Should().Be("Shop.Web.Order");
         violation.Target.Should().Be("Shop.Domain.Order");
         violation.TargetFrameworks.Should().BeEmpty();
+    }
+
+    private static LayerDefinition VLayer(string name, string ns) =>
+        new() { Name = name, Id = "V-" + name.ToUpperInvariant(), Because = "Layer " + name + ".", Namespaces = [ns] };
+
+    private static RuleDefinition VRule(string id, TargetSelector from, TargetSelector? to = null) =>
+        new() { Id = id, Because = "Because " + id + ".", Kind = RuleKind.Forbid, From = from, To = to ?? new TargetSelector { Namespaces = ["Shop.**"] } };
+
+    private static TargetSelector VNs(string ns) => new() { Namespaces = [ns] };
+
+    private const string ShopWeb = "namespace Shop.Web { public class Page { } }";
+
+    private const string ShopDomain = "namespace Shop.Domain { public class Order { } }";
+
+    [Fact]
+    public void Pack_layer_with_no_type_in_the_solution_reports_one_vacuous_layer()
+    {
+        var pack = new RulePack { Name = "test", Layers = [VLayer("Web", "Shop.Web.**"), VLayer("Ghost", "Nowhere.**")] };
+
+        var report = _validator.Validate(pack, TestCompilation.Create(ShopWeb));
+
+        var violation = report.Violations.Should().ContainSingle().Subject;
+        violation.Kind.Should().Be(ViolationKind.VacuousLayer);
+        violation.RuleId.Should().Be("V-GHOST");
+        violation.SourceType.Should().Be("Ghost");
+        violation.Location.Should().BeNull();
+    }
+
+    [Fact]
+    public void Rule_matching_in_no_project_reports_one_vacuous_rule()
+    {
+        var pack = new RulePack { Name = "test", Rules = [VRule("R-1", VNs("Nowhere.**"))] };
+
+        var report = _validator.Validate(pack,
+        [
+            new AnalyzedProject("A", null, TestCompilation.Create(ShopWeb)),
+            new AnalyzedProject("B", null, TestCompilation.Create(ShopDomain)),
+        ]);
+
+        var violation = report.Violations.Should().ContainSingle().Subject;
+        violation.Kind.Should().Be(ViolationKind.VacuousRule);
+        violation.RuleId.Should().Be("R-1");
+        violation.Message.Should().Contain("in the 2 project(s) loaded");
+    }
+
+    [Fact]
+    public void Rule_matching_in_one_of_two_projects_is_not_vacuous()
+    {
+        var pack = new RulePack { Name = "test", Rules = [VRule("R-1", VNs("Shop.Web.**"))] };
+
+        var report = _validator.Validate(pack,
+        [
+            new AnalyzedProject("A", null, TestCompilation.Create(ShopWeb)),
+            new AnalyzedProject("B", null, TestCompilation.Create(ShopDomain)),
+        ]);
+
+        report.Violations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Two_target_frameworks_of_one_project_report_a_vacuous_rule_once()
+    {
+        var pack = new RulePack { Name = "test", Rules = [VRule("R-1", VNs("Nowhere.**"))] };
+
+        var report = _validator.Validate(pack,
+        [
+            new AnalyzedProject("App", "net8.0", TestCompilation.Create(ShopWeb)),
+            new AnalyzedProject("App", "net10.0", TestCompilation.Create(ShopWeb)),
+        ]);
+
+        var violation = report.Violations.Should().ContainSingle().Subject;
+        violation.Kind.Should().Be(ViolationKind.VacuousRule);
+        violation.Message.Should().Contain("in the 1 project(s) loaded", "two target frameworks of one project count once");
+    }
+
+    [Fact]
+    public void Rule_matching_in_both_target_frameworks_is_not_reported()
+    {
+        var pack = new RulePack { Name = "test", Rules = [VRule("R-1", VNs("Shop.Web.**"))] };
+
+        var report = _validator.Validate(pack,
+        [
+            new AnalyzedProject("App", "net8.0", TestCompilation.Create(ShopWeb)),
+            new AnalyzedProject("App", "net10.0", TestCompilation.Create(ShopWeb)),
+        ]);
+
+        report.Violations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Rule_whose_from_names_one_live_and_one_vacuous_layer_is_not_vacuous()
+    {
+        var pack = new RulePack
+        {
+            Name = "test",
+            Layers = [VLayer("Web", "Shop.Web.**"), VLayer("Ghost", "Nowhere.**")],
+            Rules = [VRule("R-1", new TargetSelector { Layers = ["Web", "Ghost"] })],
+        };
+
+        var report = _validator.Validate(pack, TestCompilation.Create(ShopWeb));
+
+        var violation = report.Violations.Should().ContainSingle().Subject;
+        violation.Kind.Should().Be(ViolationKind.VacuousLayer);
+        violation.RuleId.Should().Be("V-GHOST");
+        violation.SourceType.Should().Be("Ghost");
+    }
+
+    [Fact]
+    public void Child_pack_retargeting_a_vacuous_layer_clears_the_violation()
+    {
+        var parent = new RulePack { Name = "parent", Layers = [VLayer("Domain", "Nowhere.**")] };
+        var child = new RulePack { Name = "child", LayerRetargets = [new LayerRetarget { Name = "Domain", Namespaces = ["Shop.Domain.**"] }] };
+        var source = TestCompilation.Create(ShopDomain);
+
+        _validator.Validate(parent, source).Violations.Should().ContainSingle().Which.Kind.Should().Be(ViolationKind.VacuousLayer);
+
+        var merged = new RulePackMerger().Merge([parent, child]);
+        merged.IsSuccess.Should().BeTrue();
+        _validator.Validate(merged.Value, source).Violations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Vacuity_does_not_depend_on_project_order()
+    {
+        var pack = new RulePack
+        {
+            Name = "test",
+            Layers = [VLayer("Web", "Shop.Web.**"), VLayer("Ghost", "Nowhere.**")],
+            Rules = [VRule("R-1", VNs("Shop.Domain.**"))],
+        };
+        var a = new AnalyzedProject("A", null, TestCompilation.Create(ShopWeb));
+        var b = new AnalyzedProject("B", null, TestCompilation.Create(ShopDomain));
+
+        var forward = _validator.Validate(pack, [a, b]);
+        var backward = _validator.Validate(pack, [b, a]);
+
+        forward.Violations.Should().ContainSingle().Which.Kind.Should().Be(ViolationKind.VacuousLayer);
+        backward.Violations.Select(v => (v.Kind, v.RuleId, v.Message)).Should().Equal(forward.Violations.Select(v => (v.Kind, v.RuleId, v.Message)));
+    }
+
+    [Fact]
+    public void Role_matching_no_type_reports_one_vacuous_rule_named_after_the_role_unless_allow_empty()
+    {
+        RulePack PackWithRole(bool allowEmpty) => new()
+        {
+            Name = "test",
+            Layers = [VLayer("Web", "Shop.Web.**")],
+            ComponentRoles = [new ComponentRoleDefinition { Name = "Controller", Layer = "Web", TypeKind = CSharpTypeKind.Class, AllowEmpty = allowEmpty }],
+        };
+
+        var report = _validator.Validate(PackWithRole(false), TestCompilation.Create(ShopWeb));
+
+        var violation = report.Violations.Should().ContainSingle().Subject;
+        violation.Kind.Should().Be(ViolationKind.VacuousRule);
+        violation.RuleId.Should().Be("Controller");
+        violation.Location.Should().BeNull();
+
+        _validator.Validate(PackWithRole(true), TestCompilation.Create(ShopWeb)).Violations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Report_IsValid_is_false_for_a_vacuous_layer()
+    {
+        var pack = new RulePack { Name = "test", Layers = [VLayer("Ghost", "Nowhere.**")] };
+
+        _validator.Validate(pack, TestCompilation.Create(ShopWeb)).IsValid.Should().BeFalse();
     }
 
     private static CSharpCompilation Compile(string source, params string[] symbols)

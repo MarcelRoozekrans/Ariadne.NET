@@ -46,49 +46,58 @@ layers:
 componentRoles:
   - name: Entity
     layer: Domain
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Domain entity with identity"
   - name: Aggregate
     layer: Domain
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Aggregate root"
   - name: ValueObject
     layer: Domain
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Immutable value type"
   - name: DomainEvent
     layer: Domain
+    allowEmpty: true
     typeKind: Record
     requiresInterface: false
     description: "Internal domain event"
   - name: RepositoryInterface
     layer: Domain
+    allowEmpty: true
     typeKind: Interface
     requiresInterface: false
     alternativeNames: [Repository]
     description: "Repository contract"
   - name: Handler
     layer: Application
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Command or query handler"
   - name: ApplicationService
     layer: Application
+    allowEmpty: true
     typeKind: Class
     requiresInterface: true
     interfaceRole: ApplicationServiceInterface
     description: "Application service"
   - name: ApplicationServiceInterface
     layer: Application
+    allowEmpty: true
     typeKind: Interface
     requiresInterface: false
     alternativeNames: [ApplicationService]
     description: "Application service contract"
   - name: Repository
     layer: Infrastructure
+    allowEmpty: true
     typeKind: Class
     requiresInterface: true
     interfaceRole: RepositoryInterface
@@ -96,41 +105,49 @@ componentRoles:
     description: "Repository implementation"
   - name: DbContext
     layer: Infrastructure
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Database context"
   - name: MessagePublisher
     layer: Infrastructure
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Publishes integration events to message broker"
   - name: MessageConsumer
     layer: Infrastructure
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Consumes integration events from message broker"
   - name: Controller
     layer: Api
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "REST API controller"
   - name: GrpcService
     layer: Api
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "gRPC service endpoint"
   - name: IntegrationEvent
     layer: Contracts
+    allowEmpty: true
     typeKind: Record
     requiresInterface: false
     description: "Event published to other services"
   - name: ApiRequest
     layer: Contracts
+    allowEmpty: true
     typeKind: Record
     requiresInterface: false
     description: "Public API request model"
   - name: ApiResponse
     layer: Contracts
+    allowEmpty: true
     typeKind: Record
     requiresInterface: false
     description: "Public API response model"

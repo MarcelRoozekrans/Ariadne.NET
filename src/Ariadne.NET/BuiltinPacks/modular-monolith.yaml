@@ -38,21 +38,25 @@ layers:
 componentRoles:
   - name: ModuleContract
     layer: Module.Public
+    allowEmpty: true
     typeKind: Interface
     requiresInterface: false
     description: "Public module interface"
   - name: ModuleEvent
     layer: Module.Public
+    allowEmpty: true
     typeKind: Record
     requiresInterface: false
     description: "Inter-module event"
   - name: ModuleDto
     layer: Module.Public
+    allowEmpty: true
     typeKind: Record
     requiresInterface: false
     description: "Public DTO"
   - name: ModuleService
     layer: Module.Core
+    allowEmpty: true
     typeKind: Class
     requiresInterface: true
     interfaceRole: ModuleContract
@@ -60,11 +64,13 @@ componentRoles:
     description: "Module implementation"
   - name: ModuleEntity
     layer: Module.Core
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "Internal entity"
   - name: ModuleRepository
     layer: Module.Infrastructure
+    allowEmpty: true
     typeKind: Class
     requiresInterface: true
     interfaceRole: ModuleRepositoryInterface
@@ -72,12 +78,14 @@ componentRoles:
     description: "Data access"
   - name: ModuleRepositoryInterface
     layer: Module.Core
+    allowEmpty: true
     typeKind: Interface
     requiresInterface: false
     alternativeNames: [ModuleRepository, Repository]
     description: "Repository contract"
   - name: ModuleRegistration
     layer: Host
+    allowEmpty: true
     typeKind: Class
     requiresInterface: false
     description: "DI registration for module"

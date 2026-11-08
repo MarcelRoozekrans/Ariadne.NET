@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using ZeroAlloc.Validation;
 
 namespace Ariadne.NET.Abstractions;
@@ -17,6 +18,12 @@ public sealed class RuleDefinition
     [NotNull] public TargetSelector Against { get; init; } = new TargetSelector();
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<RuleException> Exceptions { get; init; } = [];
     public bool Locked { get; init; }
+
+    /// <summary>
+    /// When <see langword="true"/>, the rule is allowed to match nothing without being reported as vacuous.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool AllowEmpty { get; init; }
 
     internal bool HasNoNullEntries<T>(IList<T>? items) => NullEntries.None(items);
 }

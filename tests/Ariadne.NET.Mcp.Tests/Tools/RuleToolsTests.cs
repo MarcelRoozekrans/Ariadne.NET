@@ -124,6 +124,38 @@ public class RuleToolsTests
     }
 
     [Fact]
+    public void Describer_shows_allowEmpty_only_when_true()
+    {
+        RuleDefinition Rule(string id, bool allowEmpty) => new()
+        {
+            Id = id,
+            Because = "Because.",
+            Kind = RuleKind.Forbid,
+            From = new TargetSelector { Layers = ["Domain"] },
+            AllowEmpty = allowEmpty,
+        };
+        var pack = new RulePack
+        {
+            Name = "shop",
+            Rules = [Rule("R-1", true), Rule("R-2", false)],
+            ComponentRoles =
+            [
+                new ComponentRoleDefinition { Name = "Reserved", Layer = "Domain", AllowEmpty = true },
+                new ComponentRoleDefinition { Name = "Active", Layer = "Domain" },
+            ],
+        };
+        var options = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web);
+
+        var rules = System.Text.Json.JsonSerializer.SerializeToElement(RuleTools.GetRules(new FixedHelper(pack), template: null), options);
+        var roles = System.Text.Json.JsonSerializer.SerializeToElement(RuleTools.GetComponentRoles(new FixedHelper(pack), template: null), options);
+
+        rules[0].GetProperty("allowEmpty").GetBoolean().Should().BeTrue();
+        rules[1].TryGetProperty("allowEmpty", out _).Should().BeFalse();
+        roles[0].GetProperty("allowEmpty").GetBoolean().Should().BeTrue();
+        roles[1].TryGetProperty("allowEmpty", out _).Should().BeFalse();
+    }
+
+    [Fact]
     public void GetRules_BuiltinWithoutRules_ReturnsEmpty()
     {
         RuleTools.GetRules(_helper, "clean-architecture").Should().BeEmpty();

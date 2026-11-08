@@ -184,16 +184,22 @@ jobs:
       # too: Workspaces keeps its own copy out of the output because MSBuildLocator loads the SDK's, and that exclusion
       # does not flow to consumers, so the consumer carries its own reference with the runtime assets excluded or the
       # build fails with MSBL001. The sample also checks a directory against the pack, and the step runs it twice. First
-      # against the consumer's own project, whose only source is a Program.cs without a namespace: no violations, so it
-      # must exit 0. Then against a fixture class library written under RUNNER_TEMP, a Domain type that references a
-      # WebApi type, which the clean-architecture pack forbids: it must exit exactly 1, so a crash fails too. The second
-      # run proves the packed library reports a violation, not only that it stays quiet on clean code.
+      # against the consumer's own project, whose sources are a Program.cs without a namespace and one empty type in each
+      # layer: no violations, so it must exit 0. Then against a fixture class library written under RUNNER_TEMP, a Domain
+      # type that references a WebApi type, which the clean-architecture pack forbids, with an empty type in the other two
+      # layers: it must exit exactly 1, so a crash fails too. The second run proves the packed library reports a
+      # violation, not only that it stays quiet on clean code.
       - name: Restore, build and run a consumer from the local feed
         shell: bash
         run: |
           app="$RUNNER_TEMP/consumer"
           dotnet new console -o "$app" --framework net10.0
           cp tools/release/consumer/Program.cs "$app/Program.cs"
+          # The pack fails a layer that covers no type, so the consumer holds one empty type in each layer of the
+          # clean-architecture pack and the clean run below has nothing to report.
+          for layer in Domain Application Infrastructure WebApi; do
+            printf 'namespace Shop.%s;\npublic class Anchor { }\n' "$layer" > "$app/Anchor$layer.cs"
+          done
           dotnet add "$app" package Ariadne.NET.Workspaces --version "$PACKAGE_VERSION" --no-restore
           dotnet add "$app" package Microsoft.Extensions.DependencyInjection --version 10.0.14 --no-restore
           # dotnet add package cannot set ExcludeAssets, so add the reference and then rewrite it in place. The grep
@@ -218,7 +224,7 @@ jobs:
           dotnet build "$app" -c Release
           dotnet run --project "$app" --no-build -c Release -- "$app"
           fixture="$RUNNER_TEMP/violation-fixture"
-          mkdir -p "$fixture/Domain" "$fixture/WebApi"
+          mkdir -p "$fixture/Domain" "$fixture/Application" "$fixture/Infrastructure" "$fixture/WebApi"
           cat > "$fixture/Fixture.csproj" <<EOF
           <Project Sdk="Microsoft.NET.Sdk">
             <PropertyGroup>
@@ -229,6 +235,8 @@ jobs:
           EOF
           printf 'namespace Shop.Domain;\npublic class Order { public Shop.WebApi.Controller? Controller { get; init; } }\n' > "$fixture/Domain/Order.cs"
           printf 'namespace Shop.WebApi;\npublic class Controller { }\n' > "$fixture/WebApi/Controller.cs"
+          printf 'namespace Shop.Application;\npublic class Anchor { }\n' > "$fixture/Application/Anchor.cs"
+          printf 'namespace Shop.Infrastructure;\npublic class Anchor { }\n' > "$fixture/Infrastructure/Anchor.cs"
           dotnet restore "$fixture"
           set +e
           output=$(dotnet run --project "$app" --no-build -c Release -- "$fixture")
