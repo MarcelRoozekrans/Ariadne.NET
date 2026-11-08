@@ -63,12 +63,12 @@ internal sealed class TypeSelector
         ArgumentNullException.ThrowIfNull(attributes);
 
         return new TypeSelector(
-            Compile(namespaces, Glob.Dotted),
-            Compile(assemblies, Glob.Flat),
-            Compile(types, Glob.Dotted),
-            Compile(baseTypes, Glob.Dotted),
-            Compile(interfaces, Glob.Dotted),
-            Compile(attributes, Glob.Dotted));
+            Glob.CompileAll(namespaces, Glob.Dotted),
+            Glob.CompileAll(assemblies, Glob.Flat),
+            Glob.CompileAll(types, Glob.Dotted),
+            Glob.CompileAll(baseTypes, Glob.Dotted),
+            Glob.CompileAll(interfaces, Glob.Dotted),
+            Glob.CompileAll(attributes, Glob.Dotted));
     }
 
     /// <summary>Whether the type satisfies every non-empty list. Ordinal and case-sensitive.</summary>
@@ -80,17 +80,17 @@ internal sealed class TypeSelector
         ArgumentNullException.ThrowIfNull(type);
         ArgumentNullException.ThrowIfNull(names);
 
-        if (_namespaces.Length > 0 && !AnyMatch(_namespaces, names.NamespaceOf(type)))
+        if (_namespaces.Length > 0 && !Glob.AnyMatch(_namespaces, names.NamespaceOf(type)))
         {
             return false;
         }
 
-        if (_assemblies.Length > 0 && !AnyMatch(_assemblies, type.ContainingAssembly?.Name ?? string.Empty))
+        if (_assemblies.Length > 0 && !Glob.AnyMatch(_assemblies, type.ContainingAssembly?.Name ?? string.Empty))
         {
             return false;
         }
 
-        if (_types.Length > 0 && !AnyMatch(_types, names.FullNameOf(type)))
+        if (_types.Length > 0 && !Glob.AnyMatch(_types, names.FullNameOf(type)))
         {
             return false;
         }
@@ -104,7 +104,7 @@ internal sealed class TypeSelector
     {
         for (var current = type.BaseType; current is { SpecialType: not SpecialType.System_Object }; current = current.BaseType)
         {
-            if (AnyMatch(_baseTypes, names.FullNameOf(current.OriginalDefinition)))
+            if (Glob.AnyMatch(_baseTypes, names.FullNameOf(current.OriginalDefinition)))
             {
                 return true;
             }
@@ -117,7 +117,7 @@ internal sealed class TypeSelector
     {
         foreach (var implemented in type.AllInterfaces)
         {
-            if (AnyMatch(_interfaces, names.FullNameOf(implemented.OriginalDefinition)))
+            if (Glob.AnyMatch(_interfaces, names.FullNameOf(implemented.OriginalDefinition)))
             {
                 return true;
             }
@@ -130,37 +130,7 @@ internal sealed class TypeSelector
     {
         foreach (var attribute in type.GetAttributes())
         {
-            if (attribute.AttributeClass is { } attributeClass && AnyMatch(_attributes, names.FullNameOf(attributeClass.OriginalDefinition)))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static Glob[] Compile(IList<string> patterns, Func<string, ZeroAlloc.Results.Result<Glob, string>> compile)
-    {
-        var globs = new Glob[patterns.Count];
-        for (var i = 0; i < globs.Length; i++)
-        {
-            var result = compile(patterns[i]);
-            if (result.IsFailure)
-            {
-                throw new ArgumentException(result.Error, nameof(patterns));
-            }
-
-            globs[i] = result.Value;
-        }
-
-        return globs;
-    }
-
-    private static bool AnyMatch(Glob[] globs, string name)
-    {
-        foreach (var glob in globs)
-        {
-            if (glob.IsMatch(name))
+            if (attribute.AttributeClass is { } attributeClass && Glob.AnyMatch(_attributes, names.FullNameOf(attributeClass.OriginalDefinition)))
             {
                 return true;
             }

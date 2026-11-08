@@ -24,7 +24,8 @@ public sealed class ArchitectureValidator : IArchitectureValidator
         ArgumentNullException.ThrowIfNull(projects);
 
         RejectMixedTargetFrameworks(projects);
-        BannedPackageRules.RequirePackages(resolvedPack, projects);
+        var bannedPackages = BannedPackageRules.Compile(resolvedPack);
+        bannedPackages.RequirePackages(projects);
 
         // The layer map and the matchers depend on the pack only, so one set serves every project, and a type's layer,
         // names and matches are worked out once per run.
@@ -39,7 +40,7 @@ public sealed class ArchitectureValidator : IArchitectureValidator
             ArgumentNullException.ThrowIfNull(project, nameof(projects));
             cancellationToken.ThrowIfCancellationRequested();
 
-            entries.Add(AnalyzeProject(project, layers, resolvedPack, new Matchers(forbid, allowOnly, require), cancellationToken));
+            entries.Add(AnalyzeProject(project, layers, resolvedPack, new Matchers(forbid, allowOnly, require, bannedPackages), cancellationToken));
         }
 
         AddMissingInterfaceViolations(entries, resolvedPack);
@@ -79,7 +80,7 @@ public sealed class ArchitectureValidator : IArchitectureValidator
         violations.AddRange(matchers.Require.Check(graph));
         var matches = RoleRules.Match(graph, layers, pack);
         violations.AddRange(RoleRules.CheckShape(matches));
-        violations.AddRange(BannedPackageRules.Check(pack, project));
+        violations.AddRange(matchers.BannedPackages.Check(project));
         return new Entry(project, graph, matches, violations);
     }
 
@@ -245,7 +246,7 @@ public sealed class ArchitectureValidator : IArchitectureValidator
         return result == 0 ? x.Kind.CompareTo(y.Kind) : result;
     }
 
-    private readonly record struct Matchers(DependencyRuleChecker Forbid, DependencyRuleChecker AllowOnly, RequireRules.Checker Require);
+    private readonly record struct Matchers(DependencyRuleChecker Forbid, DependencyRuleChecker AllowOnly, RequireRules.Checker Require, BannedPackageRules.Compiled BannedPackages);
 
     private sealed class Entry(AnalyzedProject project, TypeGraph graph, RoleMatches matches, List<ArchitectureViolation> violations)
     {

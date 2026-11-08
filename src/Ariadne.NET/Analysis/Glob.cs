@@ -78,6 +78,50 @@ internal sealed class Glob
             : Result<Glob, string>.Success(new Glob([pattern], dotted: false, ignoreCase: false));
     }
 
+    /// <summary>Compiles every pattern with the given factory. The loader validates patterns, so an invalid one is a programming error.</summary>
+    /// <param name="patterns">The patterns to compile.</param>
+    /// <param name="compile">The factory, such as <see cref="Dotted(string)"/> or <see cref="Flat"/>.</param>
+    /// <returns>The globs, in pattern order.</returns>
+    /// <exception cref="ArgumentException">A pattern is invalid.</exception>
+    public static Glob[] CompileAll(IList<string> patterns, Func<string, Result<Glob, string>> compile)
+    {
+        ArgumentNullException.ThrowIfNull(patterns);
+        ArgumentNullException.ThrowIfNull(compile);
+
+        var globs = new Glob[patterns.Count];
+        for (var i = 0; i < globs.Length; i++)
+        {
+            var result = compile(patterns[i]);
+            if (result.IsFailure)
+            {
+                throw new ArgumentException(result.Error, nameof(patterns));
+            }
+
+            globs[i] = result.Value;
+        }
+
+        return globs;
+    }
+
+    /// <summary>Whether any of the globs matches the name.</summary>
+    /// <param name="globs">The globs to try.</param>
+    /// <param name="name">The name to match.</param>
+    /// <returns>True when one matches.</returns>
+    public static bool AnyMatch(Glob[] globs, string name)
+    {
+        ArgumentNullException.ThrowIfNull(globs);
+
+        foreach (var glob in globs)
+        {
+            if (glob.IsMatch(name))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>
     /// Whether the glob matches the name. The empty name is the global namespace and matches only <c>**</c>.
     /// Malformed names (leading, trailing or doubled dots) are not rejected; a <c>*</c> may match an empty segment.

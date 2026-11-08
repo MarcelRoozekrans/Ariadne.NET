@@ -29,6 +29,9 @@ public class BannedPackageRulesTests
     private static AnalyzedProject Project(string name, string assembly, params ResolvedPackage[] packages) =>
         new(name, null, TestCompilation.Create("namespace Shop { public class A { } }").WithAssemblyName(assembly)) { Packages = packages };
 
+    private static IReadOnlyList<ArchitectureViolation> Check(RulePack pack, AnalyzedProject project) =>
+        BannedPackageRules.Compile(pack).Check(project);
+
     private static ResolvedPackage Direct(string id, string version = "11.9.0") => new(id, version, true, [id]);
 
     private static ResolvedPackage Transitive(string id, params string[] hops) => new(id, "11.9.0", false, [.. hops, id]);
@@ -36,7 +39,7 @@ public class BannedPackageRulesTests
     [Fact]
     public void DirectPackage_ReportsDirect()
     {
-        var violations = BannedPackageRules.Check(Pack, Project("Shop.Domain", "Shop.Domain", Direct("FluentValidation")));
+        var violations = Check(Pack, Project("Shop.Domain", "Shop.Domain", Direct("FluentValidation")));
 
         var v = violations.Should().ContainSingle().Subject;
         v.Kind.Should().Be(ViolationKind.BannedPackage);
@@ -51,7 +54,7 @@ public class BannedPackageRulesTests
     [Fact]
     public void TransitivePackage_ReportsPathThroughParent()
     {
-        var violations = BannedPackageRules.Check(Pack, Project("Daedalus.Domain", "Daedalus.Domain", Transitive("FluentValidation", "ZeroAlloc.Validation.Compat")));
+        var violations = Check(Pack, Project("Daedalus.Domain", "Daedalus.Domain", Transitive("FluentValidation", "ZeroAlloc.Validation.Compat")));
 
         violations.Should().ContainSingle().Which.Message.Should()
             .Be("Daedalus.Domain references FluentValidation 11.9.0 through ZeroAlloc.Validation.Compat, which rule 'TEST-BANNED' bans");
@@ -62,7 +65,7 @@ public class BannedPackageRulesTests
     {
         var hops = Enumerable.Range(1, 10).Select(i => $"Hop{i}").ToArray();
 
-        var violations = BannedPackageRules.Check(Pack, Project("App", "App", Transitive("FluentValidation", hops)));
+        var violations = Check(Pack, Project("App", "App", Transitive("FluentValidation", hops)));
 
         violations.Should().ContainSingle().Which.Message.Should()
             .Contain("through Hop1 -> Hop2 -> Hop3 -> ... (4 more hops left out) -> Hop8 -> Hop9 -> Hop10,");
@@ -73,9 +76,10 @@ public class BannedPackageRulesTests
     {
         var pack = PackWith(["Newtonsoft.**"], new TargetSelector());
 
-        var violations = BannedPackageRules.Check(pack, Project("App", "App", Direct("Newtonsoft.Json"), Direct("Newtonsoft.Json.Bson"), Direct("Other.Json")));
+        var violations = Check(pack, Project("App", "App", Direct("Newtonsoft.Json"), Direct("Newtonsoft.Json.Bson"), Direct("Other.Json")));
 
         violations.Select(v => v.Target).Should().Equal("Newtonsoft.Json", "Newtonsoft.Json.Bson");
+        Check(pack, Project("App", "App", Direct("Newtonsoft"))).Should().ContainSingle();
     }
 
     [Theory]
@@ -86,7 +90,7 @@ public class BannedPackageRulesTests
     {
         var pack = PackWith([pattern], new TargetSelector());
 
-        BannedPackageRules.Check(pack, Project("App", "App", Direct(id))).Should().ContainSingle();
+        Check(pack, Project("App", "App", Direct(id))).Should().ContainSingle();
     }
 
     [Fact]
@@ -94,8 +98,8 @@ public class BannedPackageRulesTests
     {
         var pack = PackWith(["FluentValidation"], new TargetSelector { Assemblies = ["Shop.Domain"] });
 
-        BannedPackageRules.Check(pack, Project("Shop.Domain", "Shop.Domain", Direct("FluentValidation"))).Should().ContainSingle();
-        BannedPackageRules.Check(pack, Project("Shop.Web", "Shop.Web", Direct("FluentValidation"))).Should().BeEmpty();
+        Check(pack, Project("Shop.Domain", "Shop.Domain", Direct("FluentValidation"))).Should().ContainSingle();
+        Check(pack, Project("Shop.Web", "Shop.Web", Direct("FluentValidation"))).Should().BeEmpty();
     }
 
     [Fact]
@@ -105,7 +109,7 @@ public class BannedPackageRulesTests
         var project = new AnalyzedProject("Shop.Domain", null, compilation) { Packages = [Direct("FluentValidation")] };
         var pack = PackWith(["FluentValidation"], new TargetSelector { Assemblies = ["Shop.Domain"] });
 
-        BannedPackageRules.Check(pack, project).Should().ContainSingle().Which.SourceType.Should().Be("Shop.Domain");
+        Check(pack, project).Should().ContainSingle().Which.SourceType.Should().Be("Shop.Domain");
     }
 
     [Fact]
@@ -113,15 +117,15 @@ public class BannedPackageRulesTests
     {
         var pack = PackWith(["FluentValidation"], new TargetSelector(), new RuleException { Because = "Legacy keeps it.", Assemblies = ["Shop.Legacy"] });
 
-        BannedPackageRules.Check(pack, Project("Shop.Legacy", "Shop.Legacy", Direct("FluentValidation"))).Should().BeEmpty();
-        BannedPackageRules.Check(pack, Project("Shop.Web", "Shop.Web", Direct("FluentValidation"))).Should().ContainSingle();
+        Check(pack, Project("Shop.Legacy", "Shop.Legacy", Direct("FluentValidation"))).Should().BeEmpty();
+        Check(pack, Project("Shop.Web", "Shop.Web", Direct("FluentValidation"))).Should().ContainSingle();
     }
 
     [Fact]
     public void PackageNotPresent_NoViolation()
     {
-        BannedPackageRules.Check(Pack, Project("App", "App", Direct("Serilog"))).Should().BeEmpty();
-        BannedPackageRules.Check(Pack, Project("App", "App")).Should().BeEmpty();
+        Check(Pack, Project("App", "App", Direct("Serilog"))).Should().BeEmpty();
+        Check(Pack, Project("App", "App")).Should().BeEmpty();
     }
 
     [Fact]
@@ -171,5 +175,62 @@ public class BannedPackageRulesTests
         var v = report.Violations.Should().ContainSingle().Subject;
         v.Kind.Should().Be(ViolationKind.BannedPackage);
         v.TargetFrameworks.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void FromAssembliesGlob_StarCrossesDots()
+    {
+        var pack = PackWith(["FluentValidation"], new TargetSelector { Assemblies = ["Shop.*"] });
+
+        Check(pack, Project("Shop.Domain.Core", "Shop.Domain.Core", Direct("FluentValidation"))).Should().ContainSingle();
+        Check(pack, Project("Other", "Other", Direct("FluentValidation"))).Should().BeEmpty();
+        Check(PackWith(["FluentValidation"], new TargetSelector { Assemblies = ["**"] }), Project("Other", "Other", Direct("FluentValidation"))).Should().ContainSingle();
+    }
+
+    [Fact]
+    public void ExceptionWithoutAssemblies_MatchesNothing()
+    {
+        var pack = PackWith(["FluentValidation"], new TargetSelector(), new RuleException { Because = "Empty." });
+
+        Check(pack, Project("App", "App", Direct("FluentValidation"))).Should().ContainSingle();
+    }
+
+    [Fact]
+    public void PackagesNullInExceptedProject_DoesNotThrow()
+    {
+        var pack = PackWith(["FluentValidation"], new TargetSelector(), new RuleException { Because = "Legacy keeps it.", Assemblies = ["Shop.Legacy"] });
+        var compilation = TestCompilation.Create("namespace Shop { public class A { } }").WithAssemblyName("Shop.Legacy");
+
+        new ArchitectureValidator().Validate(pack, [new AnalyzedProject("Shop.Legacy", null, compilation)]).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void TwoTargetFrameworks_DifferentVersions_ReportedOnce()
+    {
+        var compilation = TestCompilation.Create("namespace Shop { public class A { } }");
+
+        var report = new ArchitectureValidator().Validate(Pack,
+        [
+            new AnalyzedProject("App", "net8.0", compilation) { Packages = [Direct("FluentValidation", "11.9.0")] },
+            new AnalyzedProject("App", "net10.0", compilation) { Packages = [Direct("FluentValidation", "11.10.0")] },
+        ]);
+
+        var v = report.Violations.Should().ContainSingle().Subject;
+        v.Message.Should().Contain("11.9.0");
+        v.TargetFrameworks.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ViolationInOneTargetFramework_NamesThatFramework()
+    {
+        var compilation = TestCompilation.Create("namespace Shop { public class A { } }");
+
+        var report = new ArchitectureValidator().Validate(Pack,
+        [
+            new AnalyzedProject("App", "net8.0", compilation) { Packages = [Direct("FluentValidation")] },
+            new AnalyzedProject("App", "net10.0", compilation) { Packages = [Direct("Serilog")] },
+        ]);
+
+        report.Violations.Should().ContainSingle().Which.TargetFrameworks.Should().Equal("net8.0");
     }
 }
