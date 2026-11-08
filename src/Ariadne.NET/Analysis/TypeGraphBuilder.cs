@@ -6,16 +6,28 @@ namespace Ariadne.NET.Analysis;
 /// <summary>Builds the type dependency graph of a compilation's hand-written code.</summary>
 internal static class TypeGraphBuilder
 {
-    /// <summary>Walks every non-generated tree of the compilation and collects its type edges and source types.</summary>
+    /// <summary>Walks every non-generated tree of the compilation and collects its type edges and source types, and no member edges.</summary>
     public static TypeGraph Build(
         Compilation compilation,
         IReadOnlySet<SyntaxTree> generatedTrees,
+        CancellationToken cancellationToken) =>
+        Build(compilation, generatedTrees, MemberNameFilter.Empty, cancellationToken);
+
+    /// <summary>
+    /// Walks every non-generated tree of the compilation and collects its type edges, source types and the member uses whose
+    /// name passes the filter.
+    /// </summary>
+    public static TypeGraph Build(
+        Compilation compilation,
+        IReadOnlySet<SyntaxTree> generatedTrees,
+        MemberNameFilter filter,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(compilation);
         ArgumentNullException.ThrowIfNull(generatedTrees);
+        ArgumentNullException.ThrowIfNull(filter);
 
-        var walker = new TypeReferenceWalker(cancellationToken);
+        var walker = new TypeReferenceWalker(filter, cancellationToken);
         foreach (var tree in compilation.SyntaxTrees)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -41,7 +53,19 @@ internal static class TypeGraphBuilder
             sourceTypes.Add(declaration.Type);
         }
 
-        return new TypeGraph(edges, sourceTypes, walker.SourceTypes);
+        return new TypeGraph(edges, SortedMemberEdges(walker.MemberEdges), sourceTypes, walker.SourceTypes);
+    }
+
+    private static IReadOnlyList<MemberEdge> SortedMemberEdges(HashSet<MemberEdge> found)
+    {
+        if (found.Count == 0)
+        {
+            return [];
+        }
+
+        var memberEdges = new List<MemberEdge>(found);
+        memberEdges.Sort(static (x, y) => CompareMemberEdges(in x, in y));
+        return memberEdges;
     }
 
     /// <summary>Orders locations by file path, line and column.</summary>
@@ -65,6 +89,17 @@ internal static class TypeGraphBuilder
         }
 
         return result == 0 ? CompareNames(x.Target, y.Target) : result;
+    }
+
+    private static int CompareMemberEdges(in MemberEdge x, in MemberEdge y)
+    {
+        var result = Compare(x.Location, y.Location);
+        if (result == 0)
+        {
+            result = CompareNames(x.Source, y.Source);
+        }
+
+        return result == 0 ? string.CompareOrdinal(x.Member.ToDisplayString(), y.Member.ToDisplayString()) : result;
     }
 
     private static int CompareDeclarations(

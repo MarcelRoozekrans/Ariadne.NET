@@ -6,10 +6,17 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace Ariadne.NET.Analysis;
 
-/// <summary>Binds the type names in hand-written syntax trees and records an edge from the enclosing type to each referenced type.</summary>
+/// <summary>
+/// Binds the type names in hand-written syntax trees and records an edge from the enclosing type to each referenced type, and
+/// a member edge for each member use whose name passes the <see cref="MemberNameFilter"/>.
+/// </summary>
 internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
 {
     private readonly CancellationToken _cancellationToken;
+    private readonly MemberNameFilter _filter;
+
+    /// <summary>Whether a constructor call could match, so an object creation is bound for its constructor at all.</summary>
+    private readonly bool _constructorsCouldMatch;
     private readonly Dictionary<INamedTypeSymbol, bool> _checkedTypes = new(SymbolEqualityComparer.Default);
     private SemanticModel? _model;
     private INamedTypeSymbol? _programType;
@@ -21,10 +28,20 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     /// <summary>The current edge source, or null outside a type or inside a type that is not checked.</summary>
     private INamedTypeSymbol? _source;
 
-    public TypeReferenceWalker(CancellationToken cancellationToken) => _cancellationToken = cancellationToken;
+    public TypeReferenceWalker(MemberNameFilter filter, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+
+        _filter = filter;
+        _constructorsCouldMatch = filter.CouldMatch(MemberNames.ConstructorName);
+        _cancellationToken = cancellationToken;
+    }
 
     /// <summary>The edges found so far; a set, so a repeated edge at one location is kept once.</summary>
     public HashSet<TypeEdge> Edges { get; } = [];
+
+    /// <summary>The member uses found so far whose name passed the filter; a set, so a repeated use at one location is kept once.</summary>
+    public HashSet<MemberEdge> MemberEdges { get; } = [];
 
     /// <summary>Each checked type, with the location of its first declaration seen.</summary>
     public Dictionary<INamedTypeSymbol, SourceLocation> SourceTypes { get; } = new(SymbolEqualityComparer.Default);
@@ -113,6 +130,9 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
 
         var symbol = Resolve(Model.GetSymbolInfo(node, _cancellationToken));
 
+        // Before the type edge, which a member of a written type such as 'Make' in 'Store.Make()' does not give.
+        AddMemberUse(symbol, node, node.Span);
+
         // 'nint' and 'nuint' are keywords that parse as identifiers; like 'var' and like 'int', they give no edge.
         if (symbol is INamedTypeSymbol { IsNativeIntegerType: true } && node.Identifier.ValueText is "nint" or "nuint")
         {
@@ -138,7 +158,9 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     {
         if (_source is not null)
         {
-            AddEdge(Model.GetSymbolInfo(node, _cancellationToken), node.Identifier.Span);
+            var symbol = Resolve(Model.GetSymbolInfo(node, _cancellationToken));
+            AddEdge(NormalizeSymbol(symbol), node.Identifier.Span);
+            AddMemberUse(symbol, node, node.Identifier.Span);
         }
 
         base.VisitGenericName(node);
@@ -148,10 +170,23 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     {
         if (_source is not null)
         {
-            AddEdge(Model.GetSymbolInfo(node, _cancellationToken), node.NewKeyword.Span);
+            var constructor = Resolve(Model.GetSymbolInfo(node, _cancellationToken));
+            AddEdge(NormalizeSymbol(constructor), node.NewKeyword.Span);
+            AddMemberUse(constructor, node, node.NewKeyword.Span);
         }
 
         base.VisitImplicitObjectCreationExpression(node);
+    }
+
+    public override void VisitObjectCreationExpression(ObjectCreationExpressionSyntax node)
+    {
+        // The written type name gives the type edge; the constructor is bound only when a constructor pattern could match.
+        if (_source is not null && _constructorsCouldMatch)
+        {
+            AddMemberUse(Resolve(Model.GetSymbolInfo(node, _cancellationToken)), node, node.NewKeyword.Span);
+        }
+
+        base.VisitObjectCreationExpression(node);
     }
 
     private SemanticModel Model => _model ?? throw new InvalidOperationException("The walker is not walking a tree.");
@@ -315,7 +350,36 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     private static ISymbol? Resolve(SymbolInfo info) =>
         info.Symbol ?? (info.CandidateSymbols.Length > 0 ? info.CandidateSymbols[0] : null);
 
-    private void AddEdge(SymbolInfo info, TextSpan span) => AddEdge(NormalizeSymbol(Resolve(info)), span);
+    /// <summary>
+    /// Records a member edge when the symbol is a member whose simple name passes the filter, and the name is not inside a
+    /// <c>nameof</c>. With an empty filter it returns at once, so a pack without <c>members</c> patterns pays nothing here.
+    /// </summary>
+    private void AddMemberUse(ISymbol? symbol, SyntaxNode node, TextSpan span)
+    {
+        if (_filter.IsEmpty || _source is null || MemberNames.UsedMember(symbol) is not { } member
+            || !_filter.CouldMatch(MemberNames.SimpleNameOf(member)) || IsInsideNameOf(node))
+        {
+            return;
+        }
+
+        MemberEdges.Add(new MemberEdge(_source, member, ToLocation(span)));
+    }
+
+    /// <summary>True when the node is part of the argument of a <c>nameof</c>, which names a member without using it.</summary>
+    private bool IsInsideNameOf(SyntaxNode node)
+    {
+        for (var current = node.Parent; current is ExpressionSyntax or ArgumentSyntax or ArgumentListSyntax; current = current.Parent)
+        {
+            if (current is InvocationExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.ValueText: "nameof" } name } invocation
+                && invocation.ArgumentList.Span.Contains(node.Span)
+                && Model.GetSymbolInfo(name, _cancellationToken).Symbol is null)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private void AddEdge(INamedTypeSymbol? target, TextSpan span)
     {

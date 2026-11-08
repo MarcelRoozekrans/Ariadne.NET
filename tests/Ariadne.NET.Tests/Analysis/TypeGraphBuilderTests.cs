@@ -910,6 +910,41 @@ public class TypeGraphBuilderTests
     }
 
     [Fact]
+    public void TypeEdges_UnchangedByMemberEdges()
+    {
+        var compilation = TestCompilation.Create(("Store.cs", StoreClass + ExpansionTypes.Replace("public class Store { }", "", StringComparison.Ordinal)), ("Order.cs", """
+            namespace Shop.Domain
+            {
+                using Shop.Infra;
+                public class Order
+                {
+                    public event System.EventHandler? Placed;
+                    public void Place(Factory factory)
+                    {
+                        var store = Store.Make();
+                        store.Save();
+                        Store.Count++;
+                        Repo<Store> repo = factory.Make();
+                        repo.Name = nameof(Store.Save);
+                        repo.Save(new());
+                        System.Action save = store.Save;
+                        Placed += (_, _) => Base<Store>.Foo();
+                    }
+                }
+            }
+            """));
+
+        var withoutMembers = TypeGraphBuilder.Build(compilation, NoGeneratedTrees, CancellationToken.None);
+        var withMembers = TypeGraphBuilder.Build(
+            compilation, NoGeneratedTrees, MemberNameFilter.From(MemberEdgeTests.PackWith("**")), CancellationToken.None);
+
+        withMembers.MemberEdges.Should().NotBeEmpty();
+        withoutMembers.MemberEdges.Should().BeEmpty();
+        withMembers.Edges.Should().Equal(withoutMembers.Edges);
+        withMembers.SourceTypes.Should().Equal(withoutMembers.SourceTypes);
+    }
+
+    [Fact]
     public void SourceTypes_ExcludesGeneratedTypes()
     {
         var graph = Build(

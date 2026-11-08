@@ -37,6 +37,7 @@ public sealed class ArchitectureValidator : IArchitectureValidator
         var forbid = ForbidRules.Compile(layers, resolvedPack);
         var allowOnly = AllowOnlyRules.Compile(layers, resolvedPack);
         var require = RequireRules.Compile(layers, resolvedPack);
+        var memberFilter = MemberNameFilter.From(resolvedPack);
 
         var entries = new List<Entry>(projects.Count);
         foreach (var project in projects)
@@ -44,7 +45,7 @@ public sealed class ArchitectureValidator : IArchitectureValidator
             ArgumentNullException.ThrowIfNull(project, nameof(projects));
             cancellationToken.ThrowIfCancellationRequested();
 
-            entries.Add(AnalyzeProject(project, layers, resolvedPack, new Matchers(forbid, allowOnly, require, bannedPackages), cancellationToken));
+            entries.Add(AnalyzeProject(project, layers, resolvedPack, new Matchers(forbid, allowOnly, require, bannedPackages, memberFilter), cancellationToken));
         }
 
         AddMissingInterfaceViolations(entries, resolvedPack);
@@ -77,7 +78,7 @@ public sealed class ArchitectureValidator : IArchitectureValidator
 
     private static Entry AnalyzeProject(AnalyzedProject project, LayerMap layers, RulePack pack, in Matchers matchers, CancellationToken cancellationToken)
     {
-        var graph = TypeGraphBuilder.Build(project.Compilation, project.GeneratedTrees, cancellationToken);
+        var graph = TypeGraphBuilder.Build(project.Compilation, project.GeneratedTrees, matchers.MemberFilter, cancellationToken);
         var violations = new List<ArchitectureViolation>(LayerRules.Check(graph, layers, pack));
         violations.AddRange(matchers.Forbid.Check(graph));
         violations.AddRange(matchers.AllowOnly.Check(graph));
@@ -250,7 +251,12 @@ public sealed class ArchitectureValidator : IArchitectureValidator
         return result == 0 ? x.Kind.CompareTo(y.Kind) : result;
     }
 
-    private readonly record struct Matchers(DependencyRuleChecker Forbid, DependencyRuleChecker AllowOnly, RequireRules.Checker Require, BannedPackageRules.Compiled BannedPackages);
+    private readonly record struct Matchers(
+        DependencyRuleChecker Forbid,
+        DependencyRuleChecker AllowOnly,
+        RequireRules.Checker Require,
+        BannedPackageRules.Compiled BannedPackages,
+        MemberNameFilter MemberFilter);
 
     private sealed class Entry(AnalyzedProject project, TypeGraph graph, RoleMatches matches, List<ArchitectureViolation> violations)
     {
