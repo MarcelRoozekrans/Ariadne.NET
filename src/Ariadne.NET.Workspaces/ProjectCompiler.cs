@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Globalization;
+using System.Text.Json;
 using Ariadne.NET.Abstractions;
 using Ariadne.NET.Analysis;
 using Microsoft.CodeAnalysis;
@@ -66,8 +67,34 @@ internal static class ProjectCompiler
 
         var generatedTrees = compilation.SyntaxTrees.Where(t => generatedPaths.Contains(t.FilePath)).ToFrozenSet();
         var (name, targetFramework) = ProjectName.Split(project);
+        var packages = TryReadPackages(project, targetFramework, out var resolved) ? resolved : null;
         return Result<AnalyzedProject, AriadneError>.Success(
-            new AnalyzedProject(name, targetFramework, compilation) { GeneratedTrees = generatedTrees });
+            new AnalyzedProject(name, targetFramework, compilation)
+            {
+                GeneratedTrees = generatedTrees,
+                Packages = packages,
+            });
+    }
+
+    // False when the assets file cannot be found or read, so the packages stay unknown rather than empty: a bannedPackages rule that
+    // covers such a project then rejects the run instead of passing it.
+    private static bool TryReadPackages(Project project, string? targetFramework, out IReadOnlyList<ResolvedPackage> packages)
+    {
+        packages = [];
+        if (FindAssetsFile(project) is not { } assetsPath)
+        {
+            return false;
+        }
+
+        try
+        {
+            packages = ResolvedPackageReader.Read(assetsPath, targetFramework);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return false;
+        }
     }
 
     // MSBuildWorkspace keeps a Compile item whose file is gone as a document with empty text, so it compiles clean where a build fails.
@@ -182,7 +209,7 @@ internal static class ProjectCompiler
     // The lookup is a heuristic that only adds a hint to a project that fails anyway; it never fails a project by itself.
     private static AriadneError WithHint(Project project, string subject, List<string> lines, bool mentionsAssets)
     {
-        if (mentionsAssets || (project.FilePath is { Length: > 0 } && !HasAssetsFile(project)))
+        if (mentionsAssets || (project.FilePath is { Length: > 0 } && FindAssetsFile(project) is null))
         {
             lines.Add(RestoreHint);
             return new AriadneError(AriadneErrorCode.Invalid, $"{subject}{RestoreSuffix}.", string.Join('\n', lines));
@@ -193,27 +220,34 @@ internal static class ProjectCompiler
 
     // obj/project.assets.json beside the project file, else in the intermediate output folder or one of its parents, which covers
     // the artifacts layout and a custom BaseIntermediateOutputPath.
-    private static bool HasAssetsFile(Project project)
+    private static string? FindAssetsFile(Project project)
     {
-        if (File.Exists(Path.Combine(Path.GetDirectoryName(project.FilePath!)!, "obj", AssetsFileName)))
+        if (project.FilePath is not { Length: > 0 } filePath)
         {
-            return true;
+            return null;
+        }
+
+        var beside = Path.Combine(Path.GetDirectoryName(filePath)!, "obj", AssetsFileName);
+        if (File.Exists(beside))
+        {
+            return beside;
         }
 
         if (project.CompilationOutputInfo.AssemblyPath is not { Length: > 0 } assemblyPath)
         {
-            return false;
+            return null;
         }
 
         for (var directory = Path.GetDirectoryName(assemblyPath); !string.IsNullOrEmpty(directory); directory = Path.GetDirectoryName(directory))
         {
-            if (File.Exists(Path.Combine(directory, AssetsFileName)))
+            var candidate = Path.Combine(directory, AssetsFileName);
+            if (File.Exists(candidate))
             {
-                return true;
+                return candidate;
             }
         }
 
-        return false;
+        return null;
     }
 
     // path:line:column: id message, with the path relative to the root; a diagnostic without a source location uses the project name.

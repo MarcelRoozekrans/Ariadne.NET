@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- ZeroAlloc.Validation brings ZeroAlloc.Pipeline with it; Meziantou.Analyzer is an analyzer package no consumer receives. -->
+  <ItemGroup>
+    <PackageReference Include="ZeroAlloc.Validation" Version="2.5.0" />
+    <PackageReference Include="Meziantou.Analyzer" Version="3.0.321" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

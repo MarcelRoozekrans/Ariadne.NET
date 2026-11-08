@@ -60,3 +60,30 @@ rules:
         because: The runner implements the interface it serves.
       - types: ["Daedalus.Api.Composition.AgentRegistration"]
         because: The composition root creates and registers the runner.
+  # The three banned-package rows. Each is scoped to the one project that the broken variant gives the package, in the three ways a
+  # package reaches a project: its own reference, a package it references, and a project it references.
+  - id: DAE-APP-NO-VALIDATION-LIB
+    because: Validation lives in the domain, so the application takes no validation library of its own.
+    bannedPackages:
+      packages: ["ZeroAlloc.Validation"]
+      from:
+        assemblies: ["Daedalus.Application"]
+  - id: DAE-AGENTS-NO-STATE-MACHINE
+    because: Agents keep their state in plain types, so no state machine library comes in, not even through a resilience package.
+    bannedPackages:
+      packages: ["ZeroAlloc.StateMachine"]
+      from:
+        assemblies: ["Daedalus.Agents"]
+  - id: DAE-DOMAIN-NO-YAML
+    because: The domain reads no configuration files, and nothing it references may pull in a YAML library.
+    bannedPackages:
+      packages: ["YamlDotNet"]
+      from:
+        assemblies: ["Daedalus.Domain"]
+  - id: DAE-API-KEEPS-NO-COPY-OF-DTOS
+    because: The web layer maps to its own view models and never copies an application DTO.
+    uniqueNames:
+      for:
+        layers: [WebApi]
+      against:
+        namespaces: ["Daedalus.Application.**.Dtos"]

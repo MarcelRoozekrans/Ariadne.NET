@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Pkg.Core/Pkg.Core.csproj" />
+  <Project Path="Pkg.App/Pkg.App.csproj" />
+</Solution>

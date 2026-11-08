@@ -8,6 +8,7 @@
   <!-- Unlike the clean variant, no Domain reference here or in Infrastructure: this variant's Domain references
        Infrastructure, which references Application, so either would be a project cycle. -->
   <ItemGroup>
+    <PackageReference Include="ZeroAlloc.Validation" Version="2.5.0" />
     <ProjectReference Include="..\Daedalus.Agents\Daedalus.Agents.csproj" />
   </ItemGroup>
 

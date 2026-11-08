@@ -17,8 +17,12 @@ public sealed class DaedalusFixtureTests
     private const string NotOnAgentsBecause = "Use cases reach agents only through interfaces they own, so the application never depends on agent code.";
     private const string RagNetBecause = "Retrieval stays inside the agents layer, so no other layer takes a dependency on Rag.NET.";
     private const string SubagentRunnerBecause = "Only the executor uses the subagent runner directly, and the registered composition code wires it.";
+    private const string NoValidationLibBecause = "Validation lives in the domain, so the application takes no validation library of its own.";
+    private const string NoStateMachineBecause = "Agents keep their state in plain types, so no state machine library comes in, not even through a resilience package.";
+    private const string NoYamlBecause = "The domain reads no configuration files, and nothing it references may pull in a YAML library.";
+    private const string NoCopyOfDtosBecause = "The web layer maps to its own view models and never copies an application DTO.";
 
-    private readonly SolutionValidator _validator = new(new SolutionLoader(), new ArchitectureValidator());
+    private static readonly SolutionValidator Validator = new(new SolutionLoader(), new ArchitectureValidator());
 
     public DaedalusFixtureTests() => FixtureProjects.EnsureRestored();
 
@@ -46,10 +50,14 @@ public sealed class DaedalusFixtureTests
                 ("DAE-APP-NOT-ON-AGENTS", ViolationKind.ForbiddenDependency, NotOnAgentsBecause),
                 ("DAE-RAGNET-ONLY-IN-AGENTS", ViolationKind.DependencyNotPermitted, RagNetBecause),
                 ("DAE-SUBAGENT-RUNNER", ViolationKind.DependencyNotPermitted, SubagentRunnerBecause),
+                ("DAE-APP-NO-VALIDATION-LIB", ViolationKind.BannedPackage, NoValidationLibBecause),
+                ("DAE-AGENTS-NO-STATE-MACHINE", ViolationKind.BannedPackage, NoStateMachineBecause),
+                ("DAE-DOMAIN-NO-YAML", ViolationKind.BannedPackage, NoYamlBecause),
+                ("DAE-API-KEEPS-NO-COPY-OF-DTOS", ViolationKind.NameCollision, NoCopyOfDtosBecause),
             });
     }
 
-    private async Task<ArchitectureReport> ValidateAsync(string variant)
+    internal static async Task<ArchitectureReport> ValidateAsync(string variant)
     {
         var loader = new YamlRulePackLoader();
         var rulesPath = FixtureProjects.Path("daedalus", "daedalus.rules.yaml");
@@ -60,7 +68,7 @@ public sealed class DaedalusFixtureTests
         var resolved = resolver.Resolve(loaded.Value);
         resolved.IsSuccess.Should().BeTrue(resolved.IsFailure ? $"{resolved.Error.Message} {resolved.Error.Detail}" : "");
 
-        var result = await _validator.ValidateAsync(resolved.Value, FixtureProjects.Path("daedalus", variant, "Daedalus.slnx")).ConfigureAwait(false);
+        var result = await Validator.ValidateAsync(resolved.Value, FixtureProjects.Path("daedalus", variant, "Daedalus.slnx")).ConfigureAwait(false);
         result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.ToString() : null);
         return result.Value;
     }
