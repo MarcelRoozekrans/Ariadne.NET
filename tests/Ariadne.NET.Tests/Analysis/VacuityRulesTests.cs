@@ -66,7 +66,12 @@ public class VacuityRulesTests
             Rule("R-OK", RuleKind.Require, Ns("Shop.**")),
         ]);
 
-        Check(pack, TwoLayers).Select(v => v.RuleId).Should().Equal("R-REQ", "R-UNQ", "R-ALLOW");
+        var violations = Check(pack, TwoLayers);
+
+        violations.Select(v => v.RuleId).Should().Equal("R-REQ", "R-UNQ", "R-ALLOW");
+        violations[0].Message.Should().Be("Rule 'R-REQ' selects no type: its 'for' selector matches nothing in the 1 project(s) loaded.");
+        violations[1].Message.Should().Be("Rule 'R-UNQ' selects no type: its 'for' selector matches nothing in the 1 project(s) loaded.");
+        violations[2].Message.Should().Be("Rule 'R-ALLOW' selects no type: its 'from' selector matches nothing in the 1 project(s) loaded.");
     }
 
     [Fact]
@@ -194,7 +199,9 @@ public class VacuityRulesTests
             Rule("R-PKG-OK", RuleKind.BannedPackages, new TargetSelector { Assemblies = ["TestAssembly"] }),
         ]);
 
-        Check(pack, TwoLayers).Should().ContainSingle().Which.RuleId.Should().Be("R-PKG");
+        var v = Check(pack, TwoLayers).Should().ContainSingle().Subject;
+        v.RuleId.Should().Be("R-PKG");
+        v.Message.Should().Be("Rule 'R-PKG' selects no type: its 'from.assemblies' matches none of the 1 project(s) loaded.");
     }
 
     [Fact]

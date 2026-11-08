@@ -225,12 +225,12 @@ A rule, a component role or a layer that selects no type cannot fail, so a clean
 
 | Kind | Reported for | Message starts with |
 |------|--------------|---------------------|
-| `VacuousRule` | a rule whose subject selects no type, and a component role that matches no type in its layer | `Rule '<id>' selects no type` or `Role '<Name>' matches no type` |
+| `VacuousRule` | a rule whose subject selects no type, and a component role that matches no type in its layer | `Rule '<id>' selects no type: its 'from' selector matches nothing` (`'for' selector` for `require` and `uniqueNames`, `'from.assemblies' matches none of the` projects for `bannedPackages`) or `Role '<Name>' matches no type` |
 | `VacuousLayer` | a layer that covers no type | `Layer '<Name>' covers no type` |
 
 Only the subject side is checked: the `from` of `forbid`, `allowOnly`, `require` and `uniqueNames` (for the last two, the `for` selector). The `to`, `against` and `members` sides and the `exceptions` are never checked, since a rule about something that does not exist yet is still sound. A `bannedPackages` rule is vacuous only when it has a non-empty `from.assemblies` that matches no loaded project; without `from` it applies to every project. A rule or role whose subject resolves only through layers that are already reported as vacuous gets no second violation, because fixing the layer fixes it.
 
-Vacuity is relative to the projects loaded. A run on a single `.csproj` reports every layer that lives in another project as vacuous, and the message says how many projects were loaded. Validate the solution, or mark the rules and roles that belong to other projects.
+Vacuity is relative to the projects loaded. A run on a single `.csproj` reports as vacuous every layer whose types the loaded projects neither declare nor reference, and the message says how many projects were loaded. A layer in another project still counts as covered when a loaded project references its types. A layer that holds only generated types is vacuous, since generated code is not analyzed. Validate the solution, or mark the rules and roles that belong to other projects.
 
 To accept a rule or role that selects nothing, set `allowEmpty: true` on it. A layer has no opt-out: retarget it in the pack that extends the base pack, so that it covers the types of the solution. The built-in packs set `allowEmpty: true` on every role, because a solution rarely has all of them. The `rules` command and the `get_rules` tool show `allowEmpty` only when it is `true`.
 

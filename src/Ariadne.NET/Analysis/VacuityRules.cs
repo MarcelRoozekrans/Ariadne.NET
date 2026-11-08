@@ -96,10 +96,17 @@ internal static class VacuityRules
                 Kind = ViolationKind.VacuousRule,
                 SourceType = rule.Id,
                 Because = rule.Because,
-                Message = string.Create(CultureInfo.InvariantCulture, $"Rule '{rule.Id}' selects no type: its 'from' selector matches nothing in the {count} project(s) loaded."),
+                Message = string.Create(CultureInfo.InvariantCulture, $"Rule '{rule.Id}' selects no type: {Cause(rule, count)}."),
             });
         }
     }
+
+    private static string Cause(RuleDefinition rule, int count) => rule.Kind switch
+    {
+        RuleKind.BannedPackages => string.Create(CultureInfo.InvariantCulture, $"its 'from.assemblies' matches none of the {count} project(s) loaded"),
+        RuleKind.Require or RuleKind.UniqueNames => string.Create(CultureInfo.InvariantCulture, $"its 'for' selector matches nothing in the {count} project(s) loaded"),
+        _ => string.Create(CultureInfo.InvariantCulture, $"its 'from' selector matches nothing in the {count} project(s) loaded"),
+    };
 
     private static void CheckRoles(RulePack pack, IReadOnlyList<RoleMatches> roleMatches, HashSet<string> vacuousLayers, int count, List<ArchitectureViolation> violations)
     {
