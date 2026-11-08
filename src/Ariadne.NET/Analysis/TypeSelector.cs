@@ -14,9 +14,11 @@ internal sealed class TypeSelector
     private readonly Glob[] _baseTypes;
     private readonly Glob[] _interfaces;
     private readonly Glob[] _attributes;
+    private readonly Glob[] _members;
 
-    private TypeSelector(Glob[] namespaces, Glob[] assemblies, Glob[] types, Glob[] baseTypes, Glob[] interfaces, Glob[] attributes)
+    private TypeSelector(Glob[] namespaces, Glob[] assemblies, Glob[] types, Glob[] baseTypes, Glob[] interfaces, Glob[] attributes, Glob[] members)
     {
+        _members = members;
         _namespaces = namespaces;
         _assemblies = assemblies;
         _types = types;
@@ -25,7 +27,10 @@ internal sealed class TypeSelector
         _attributes = attributes;
     }
 
-    /// <summary>Whether no list constrains anything, so the selector would match every type.</summary>
+    /// <summary>Whether the selector holds <c>members</c> globs, which select member uses and never types.</summary>
+    public bool HasMembers => _members.Length > 0;
+
+    /// <summary>Whether no type list constrains anything, so the selector would match every type. The <c>members</c> globs do not count: they never select a type.</summary>
     public bool IsEmpty => _namespaces.Length == 0 && _assemblies.Length == 0 && _types.Length == 0
         && _baseTypes.Length == 0 && _interfaces.Length == 0 && _attributes.Length == 0;
 
@@ -53,8 +58,29 @@ internal sealed class TypeSelector
         IList<string> types,
         IList<string> baseTypes,
         IList<string> interfaces,
-        IList<string> attributes)
+        IList<string> attributes) =>
+        From(namespaces, assemblies, types, baseTypes, interfaces, attributes, []);
+
+    /// <summary>Compiles the patterns once. The loader validates patterns, so an invalid one is a programming error.</summary>
+    /// <param name="namespaces">Dotted namespace globs.</param>
+    /// <param name="assemblies">Flat assembly-name globs.</param>
+    /// <param name="types">Dotted globs over the type name, containing types included and arity left out.</param>
+    /// <param name="baseTypes">Dotted globs over every class in the base chain, System.Object left out.</param>
+    /// <param name="interfaces">Dotted globs over every interface the type implements, inherited ones included.</param>
+    /// <param name="attributes">Dotted globs over the full name of the attribute classes applied to the type.</param>
+    /// <param name="members">Dotted globs over <c>Namespace.Type.Member</c>, matched by <see cref="AnyMemberMatches"/>.</param>
+    /// <returns>The selector.</returns>
+    /// <exception cref="ArgumentException">A pattern is invalid.</exception>
+    public static TypeSelector From(
+        IList<string> namespaces,
+        IList<string> assemblies,
+        IList<string> types,
+        IList<string> baseTypes,
+        IList<string> interfaces,
+        IList<string> attributes,
+        IList<string> members)
     {
+        ArgumentNullException.ThrowIfNull(members);
         ArgumentNullException.ThrowIfNull(namespaces);
         ArgumentNullException.ThrowIfNull(assemblies);
         ArgumentNullException.ThrowIfNull(types);
@@ -68,8 +94,14 @@ internal sealed class TypeSelector
             Glob.CompileAll(types, Glob.Dotted),
             Glob.CompileAll(baseTypes, Glob.Dotted),
             Glob.CompileAll(interfaces, Glob.Dotted),
-            Glob.CompileAll(attributes, Glob.Dotted));
+            Glob.CompileAll(attributes, Glob.Dotted),
+            Glob.CompileAll(members, Glob.Dotted));
     }
+
+    /// <summary>Whether a member name matches any <c>members</c> glob. Ordinal and case-sensitive.</summary>
+    /// <param name="memberName">A <c>Namespace.Type.Member</c> name.</param>
+    /// <returns>True when a glob matches.</returns>
+    public bool AnyMemberMatches(string memberName) => Glob.AnyMatch(_members, memberName);
 
     /// <summary>Whether the type satisfies every non-empty list. Ordinal and case-sensitive.</summary>
     /// <param name="type">The type to test.</param>

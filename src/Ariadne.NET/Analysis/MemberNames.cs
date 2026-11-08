@@ -90,11 +90,30 @@ internal static class MemberNames
     /// <returns>The names, the used member's first.</returns>
     public static IReadOnlyList<string> Chain(ISymbol member, TypeNames names)
     {
-        ArgumentNullException.ThrowIfNull(member);
         ArgumentNullException.ThrowIfNull(names);
 
-        var start = UsedMember(member) ?? throw new ArgumentException("The symbol is not a member a use can name.", nameof(member));
         var chain = new List<string>();
+        foreach (var current in ChainMembers(member))
+        {
+            var name = DisplayNameOf(current, names);
+            if (!chain.Contains(name, StringComparer.Ordinal))
+            {
+                chain.Add(name);
+            }
+        }
+
+        return chain;
+    }
+
+    /// <summary>The members behind <see cref="Chain(ISymbol, TypeNames)"/>: the used member, then every member it overrides or implements, upwards only and each once.</summary>
+    /// <param name="member">The used member, as a <see cref="MemberEdge"/> holds it.</param>
+    /// <returns>The original definitions, the used member's first.</returns>
+    public static IReadOnlyList<ISymbol> ChainMembers(ISymbol member)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+
+        var start = UsedMember(member) ?? throw new ArgumentException("The symbol is not a member a use can name.", nameof(member));
+        var chain = new List<ISymbol>();
         var visited = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
         var pending = new Queue<ISymbol>();
         pending.Enqueue(start);
@@ -105,12 +124,7 @@ internal static class MemberNames
                 continue;
             }
 
-            var name = DisplayNameOf(current, names);
-            if (!chain.Contains(name, StringComparer.Ordinal))
-            {
-                chain.Add(name);
-            }
-
+            chain.Add(current);
             if (OverriddenMember(current) is { } overridden)
             {
                 pending.Enqueue(overridden.OriginalDefinition);
