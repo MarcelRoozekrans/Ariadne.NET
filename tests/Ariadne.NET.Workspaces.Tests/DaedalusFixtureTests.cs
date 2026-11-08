@@ -22,14 +22,12 @@ public sealed class DaedalusFixtureTests
     private const string NoYamlBecause = "The domain reads no configuration files, and nothing it references may pull in a YAML library.";
     private const string NoCopyOfDtosBecause = "The web layer maps to its own view models and never copies an application DTO.";
 
-    private static readonly SolutionValidator Validator = new(new SolutionLoader(), new ArchitectureValidator());
-
     public DaedalusFixtureTests() => FixtureProjects.EnsureRestored();
 
     [Fact]
     public async Task Clean_NoViolations()
     {
-        var report = await ValidateAsync("clean");
+        var report = await DaedalusReports.ValidateAsync("clean");
 
         report.Violations.Should().BeEmpty();
         report.SkippedProjects.Should().BeEmpty();
@@ -40,7 +38,7 @@ public sealed class DaedalusFixtureTests
     [Fact]
     public async Task Broken_ExactlyOneViolationPerRule()
     {
-        var report = await ValidateAsync("broken");
+        var report = await DaedalusReports.ValidateAsync("broken");
 
         report.Violations.Select(v => (v.RuleId, v.Kind, v.Because)).Should().BeEquivalentTo(
             new (string, ViolationKind, string)[]
@@ -55,21 +53,5 @@ public sealed class DaedalusFixtureTests
                 ("DAE-DOMAIN-NO-YAML", ViolationKind.BannedPackage, NoYamlBecause),
                 ("DAE-API-KEEPS-NO-COPY-OF-DTOS", ViolationKind.NameCollision, NoCopyOfDtosBecause),
             });
-    }
-
-    internal static async Task<ArchitectureReport> ValidateAsync(string variant)
-    {
-        var loader = new YamlRulePackLoader();
-        var rulesPath = FixtureProjects.Path("daedalus", "daedalus.rules.yaml");
-        var loaded = loader.LoadFromFile(rulesPath);
-        loaded.IsSuccess.Should().BeTrue(loaded.IsFailure ? $"{loaded.Error.Message} {loaded.Error.Detail}" : "");
-
-        var resolver = new RulePackResolver(new BuiltinPackRegistry(loader), loader, new RulePackMerger());
-        var resolved = resolver.Resolve(loaded.Value);
-        resolved.IsSuccess.Should().BeTrue(resolved.IsFailure ? $"{resolved.Error.Message} {resolved.Error.Detail}" : "");
-
-        var result = await Validator.ValidateAsync(resolved.Value, FixtureProjects.Path("daedalus", variant, "Daedalus.slnx")).ConfigureAwait(false);
-        result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.ToString() : null);
-        return result.Value;
     }
 }

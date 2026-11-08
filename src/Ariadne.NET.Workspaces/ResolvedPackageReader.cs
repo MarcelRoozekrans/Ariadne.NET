@@ -13,33 +13,39 @@ internal static class ResolvedPackageReader
     /// <summary>
     /// Every package entry of the target framework counts, whatever its assets, so analyzer and build-only packages are listed.
     /// <c>type: project</c> entries are not packages, but they carry the packages of a referenced project, so such a package counts
-    /// for the referencing project and its path names the project. <c>IsDirect</c> comes from the project's own
-    /// <c>projectFileDependencyGroups</c> entry for the framework, since <c>targets</c> lists direct and transitive packages alike.
-    /// The path is found breadth first over the <c>dependencies</c> of <c>targets</c>, from the direct references and referenced
-    /// projects in the order the file lists them.
+    /// for the referencing project and its path names the project. A referenced project's <c>PrivateAssets</c> analyzer packages are
+    /// absent from the referencing project's <c>targets</c>, so they are not listed there; they stay enforced on the referenced
+    /// project. <c>IsDirect</c> comes from the project's own <c>projectFileDependencyGroups</c> entry for the framework, since
+    /// <c>targets</c> lists direct and transitive packages alike. The path is found breadth first over the <c>dependencies</c> of
+    /// <c>targets</c>, from the direct references and referenced projects in the order the file lists them.
+    /// The packages are unknown, not empty, when the file has no <c>targets</c> entry or no dependency group for the framework, since
+    /// an empty list would report a project clean that was never checked.
     /// </summary>
     /// <param name="assetsPath">The assets file.</param>
-    /// <param name="targetFramework">The target framework of the project, or null to use the single one in the file.</param>
-    /// <returns>The packages, in the order of the file.</returns>
+    /// <param name="targetFramework">The target framework of the project, or null when the file holds a single one.</param>
+    /// <param name="packages">The packages, in the order of the file; empty when they are unknown.</param>
+    /// <returns>True when the packages are known.</returns>
     /// <exception cref="IOException">The file cannot be read.</exception>
     /// <exception cref="JsonException">The file is not valid JSON.</exception>
-    public static IReadOnlyList<ResolvedPackage> Read(string assetsPath, string? targetFramework)
+    public static bool TryRead(string assetsPath, string? targetFramework, out IReadOnlyList<ResolvedPackage> packages)
     {
         ArgumentNullException.ThrowIfNull(assetsPath);
 
+        packages = [];
         using var stream = File.OpenRead(assetsPath);
         using var document = JsonDocument.Parse(stream);
         var root = document.RootElement;
-        if (!root.TryGetProperty("targets", out var targets) || Select(targets, targetFramework) is not { } target)
+        if (root.ValueKind != JsonValueKind.Object
+            || !root.TryGetProperty("targets", out var targets)
+            || Select(targets, targetFramework) is not { } target
+            || !root.TryGetProperty("projectFileDependencyGroups", out var groups)
+            || Select(groups, targetFramework) is not { } group)
         {
-            return [];
+            return false;
         }
 
-        var nodes = Nodes(target);
-        var roots = root.TryGetProperty("projectFileDependencyGroups", out var groups) && Select(groups, targetFramework) is { } group
-            ? Roots(group)
-            : [];
-        return Resolve(nodes, roots);
+        packages = Resolve(Nodes(target), Roots(group)).ToArray();
+        return true;
     }
 
     // A node is a targets entry keyed "id/version", with the ids it depends on.
@@ -50,6 +56,11 @@ internal static class ResolvedPackageReader
         var nodes = new List<Node>();
         foreach (var entry in target.EnumerateObject())
         {
+            if (entry.Value.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
             var key = entry.Name;
             var slash = key.IndexOf('/', StringComparison.Ordinal);
             var id = slash < 0 ? key : key[..slash];
@@ -157,8 +168,15 @@ internal static class ResolvedPackageReader
         return paths;
     }
 
-    // The framework's entry: by name, then the name before a runtime identifier suffix, then a name that extends the framework with
-    // a platform such as net10.0-windows7.0. Without a framework, or when the file has a single entry, that entry.
+    // net10.0-windows7.0 extends net10.0 and net10.0-windows: after the framework comes a platform or its version.
+    private static bool ExtendsWithPlatform(string name, string targetFramework) =>
+        name.Length > targetFramework.Length
+        && name.StartsWith(targetFramework, StringComparison.OrdinalIgnoreCase)
+        && (name[targetFramework.Length] == '-' || char.IsAsciiDigit(name[targetFramework.Length]));
+
+    // The framework's entry: by full name, then by the name before a runtime identifier suffix (net10.0/linux-x64), then a name that
+    // extends the framework with a platform (net10.0-windows7.0). Without a framework, the file's only entry. Null when none fits, so
+    // a file restored for another framework is unknown and not taken for this one.
     private static JsonElement? Select(JsonElement entries, string? targetFramework)
     {
         if (entries.ValueKind != JsonValueKind.Object)
@@ -168,7 +186,8 @@ internal static class ResolvedPackageReader
 
         JsonProperty? only = null;
         var count = 0;
-        JsonProperty? byPrefix = null;
+        JsonProperty? byBase = null;
+        JsonProperty? byPlatform = null;
         foreach (var entry in entries.EnumerateObject())
         {
             count++;
@@ -183,17 +202,23 @@ internal static class ResolvedPackageReader
                 return entry.Value;
             }
 
-            if (entry.Name.StartsWith(targetFramework + "-", StringComparison.OrdinalIgnoreCase))
+            var slash = entry.Name.IndexOf('/', StringComparison.Ordinal);
+            var name = slash < 0 ? entry.Name : entry.Name[..slash];
+            if (string.Equals(name, targetFramework, StringComparison.OrdinalIgnoreCase))
             {
-                byPrefix ??= entry;
+                byBase ??= entry;
+            }
+            else if (ExtendsWithPlatform(name, targetFramework))
+            {
+                byPlatform ??= entry;
             }
         }
 
-        if (byPrefix is { } prefixed)
+        if (targetFramework is null)
         {
-            return prefixed.Value;
+            return count == 1 ? only?.Value : null;
         }
 
-        return count == 1 || targetFramework is null ? only?.Value : null;
+        return (byBase ?? byPlatform)?.Value;
     }
 }

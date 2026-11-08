@@ -76,8 +76,8 @@ internal static class ProjectCompiler
             });
     }
 
-    // False when the assets file cannot be found or read, so the packages stay unknown rather than empty: a bannedPackages rule that
-    // covers such a project then rejects the run instead of passing it.
+    // False when the assets file cannot be found or read, or has no entry for the target framework, so the packages stay unknown
+    // rather than empty: a bannedPackages rule that covers such a project then rejects the run instead of passing it.
     private static bool TryReadPackages(Project project, string? targetFramework, out IReadOnlyList<ResolvedPackage> packages)
     {
         packages = [];
@@ -88,8 +88,7 @@ internal static class ProjectCompiler
 
         try
         {
-            packages = ResolvedPackageReader.Read(assetsPath, targetFramework);
-            return true;
+            return ResolvedPackageReader.TryRead(assetsPath, targetFramework, out packages);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {

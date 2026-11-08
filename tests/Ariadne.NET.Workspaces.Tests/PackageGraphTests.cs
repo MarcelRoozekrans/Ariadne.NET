@@ -119,7 +119,7 @@ public sealed class PackageGraphTests
     [Fact]
     public async Task Daedalus_BannedPackageInDomain_FailsWithRuleId()
     {
-        var report = await DaedalusFixtureTests.ValidateAsync("broken");
+        var report = await DaedalusReports.ValidateAsync("broken");
 
         var violation = Violation(report, "DAE-DOMAIN-NO-YAML");
         violation.Kind.Should().Be(ViolationKind.BannedPackage);
@@ -131,14 +131,6 @@ public sealed class PackageGraphTests
             "Daedalus.Agents references ZeroAlloc.StateMachine 1.5.3 through ZeroAlloc.Resilience, which rule 'DAE-AGENTS-NO-STATE-MACHINE' bans");
         Violation(report, "DAE-APP-NO-VALIDATION-LIB").Message.Should().Be(
             "Daedalus.Application references ZeroAlloc.Validation 2.5.0 directly, which rule 'DAE-APP-NO-VALIDATION-LIB' bans");
-    }
-
-    [Fact]
-    public async Task Daedalus_Clean_Passes()
-    {
-        var report = await DaedalusFixtureTests.ValidateAsync("clean");
-
-        report.Violations.Should().BeEmpty();
     }
 
     private static ResolvedPackage Package(IReadOnlyList<ResolvedPackage> packages, string id)
