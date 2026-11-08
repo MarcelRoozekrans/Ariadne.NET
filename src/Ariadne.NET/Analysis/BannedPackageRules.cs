@@ -138,6 +138,11 @@ internal static class BannedPackageRules
                 exceptions);
         }
 
+        /// <summary>Whether the rule's <c>from.assemblies</c> selects the assembly, ignoring exceptions; true when it is empty.</summary>
+        /// <param name="assembly">The assembly name of a project.</param>
+        /// <returns>True when the assembly is selected.</returns>
+        public bool SelectsAssembly(string assembly) => FromAssemblies.Length == 0 || Glob.AnyMatch(FromAssemblies, assembly);
+
         // An empty from covers every project; an exception with no assemblies matches nothing.
         public bool Covers(string assembly)
         {
@@ -158,7 +163,10 @@ internal static class BannedPackageRules
         }
     }
 
-    private static string AssemblyOf(AnalyzedProject project) => project.Compilation.AssemblyName ?? project.Name;
+    /// <summary>The assembly name of the project's compilation, or the project name when it has none.</summary>
+    /// <param name="project">The project.</param>
+    /// <returns>The assembly name.</returns>
+    internal static string AssemblyOf(AnalyzedProject project) => project.Compilation.AssemblyName ?? project.Name;
 
     private static ArchitectureViolation Violation(RuleDefinition rule, AnalyzedProject project, ResolvedPackage package) =>
         new()
