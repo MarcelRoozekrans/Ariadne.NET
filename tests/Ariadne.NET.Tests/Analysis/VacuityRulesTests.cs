@@ -48,6 +48,22 @@ public class VacuityRulesTests
     }
 
     [Fact]
+    public void Rule_whose_only_subject_types_are_all_excepted_is_not_vacuous()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "R-1",
+            Because = "Because R-1.",
+            Kind = RuleKind.Forbid,
+            From = Ns("Shop.Domain"),
+            To = Ns("Shop.**"),
+            Exceptions = [new RuleException { Types = ["Shop.Domain.Order"], Because = "Excepted." }],
+        };
+
+        Check(Pack([], [rule]), TwoLayers).Should().BeEmpty();
+    }
+
+    [Fact]
     public void Allow_empty_silences_a_vacuous_rule()
     {
         var pack = Pack([], [Rule("R-1", RuleKind.Forbid, Ns("Nowhere.**"), allowEmpty: true)]);

@@ -270,6 +270,15 @@ public class ArchitectureValidatorTests
     }
 
     [Fact]
+    public void NoProjects_WithLayers_ReportsEachLayerAsVacuous()
+    {
+        var report = _validator.Validate(PackOf("Domain", "Application"), []);
+
+        report.Violations.Should().HaveCount(2).And.OnlyContain(v => v.Kind == ViolationKind.VacuousLayer && v.Message.Contains("0 project(s)", StringComparison.Ordinal));
+        report.Violations.Select(v => v.SourceType).Should().BeEquivalentTo("Domain", "Application");
+    }
+
+    [Fact]
     public void RetargetIntoOverlap_ReportsLayerOverlap()
     {
         var loader = new YamlRulePackLoader();

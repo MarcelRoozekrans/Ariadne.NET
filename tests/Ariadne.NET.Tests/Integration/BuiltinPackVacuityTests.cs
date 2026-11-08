@@ -70,9 +70,33 @@ public sealed class BuiltinPackVacuityTests
 
         var result = new ArchitectureValidator().Validate(pack, [project]);
 
-        // A layer that selects nothing in a one-type solution is expected; a vacuous rule or role is not.
+        // Every layer selects nothing in a one-type solution, and each is reported exactly once.
+        result.Violations.Where(v => v.Kind == ViolationKind.VacuousLayer).Select(v => v.RuleId)
+            .Should().BeEquivalentTo(pack.Layers.Select(l => l.Id.Length > 0 ? l.Id : l.Name));
+
+        // A vacuous rule or role is not expected, and the layer cascade must not be what hides one.
         result.Violations.Where(v => v.Kind == ViolationKind.VacuousRule)
             .Select(v => $"{v.RuleId}: {v.Message}")
             .Should().BeEmpty($"pack '{packName}' must stay quiet about empty rules and roles");
+    }
+
+    [Theory]
+    [MemberData(nameof(PackNames))]
+    public void Every_builtin_pack_has_no_vacuous_rule_or_layer_when_each_layer_holds_a_type(string packName)
+    {
+        var pack = Load(packName);
+        var sources = pack.Layers.Select(l =>
+        {
+            // Every built-in layer selects one namespace of the form **.Name.**, so Anchor.Name.Anchor is inside it.
+            var inner = l.Namespaces[0].Replace("**.", "", StringComparison.Ordinal).Replace(".**", "", StringComparison.Ordinal);
+            return ($"{inner}Anchor.cs", $"namespace Anchor.{inner}.Anchor {{ public sealed class {inner}Anchor {{ }} }}");
+        }).ToArray();
+        var project = new AnalyzedProject("Anchors", null, TestCompilation.Create(sources).WithAssemblyName("Anchors"));
+
+        var result = new ArchitectureValidator().Validate(pack, [project]);
+
+        result.Violations.Where(v => v.Kind is ViolationKind.VacuousRule or ViolationKind.VacuousLayer)
+            .Select(v => $"{v.Kind} {v.RuleId}: {v.Message}")
+            .Should().BeEmpty($"every layer of pack '{packName}' holds a type, so only a rule or role that opted out can be quiet");
     }
 }
