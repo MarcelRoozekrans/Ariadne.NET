@@ -21,6 +21,13 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     /// <summary>Whether an indexer use could match, so an element access is bound for its indexer at all.</summary>
     private readonly bool _indexersCouldMatch;
     private readonly Dictionary<INamedTypeSymbol, bool> _checkedTypes = new(SymbolEqualityComparer.Default);
+
+    /// <summary>
+    /// The types whose implicit constructor's base call is recorded already. A partial class has one implicit constructor, recorded
+    /// at its first walked declaration: a declaration in a generated tree is never walked, so the first declaring reference may
+    /// not be. Trees are walked in compilation order, so the choice is deterministic. Created only when a constructor could match.
+    /// </summary>
+    private HashSet<INamedTypeSymbol>? _implicitCallsRecorded;
     private SemanticModel? _model;
     private INamedTypeSymbol? _programType;
 
@@ -221,8 +228,9 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     /// constructor, a declared one without a <c>: base(...)</c> or <c>: this(...)</c> initializer, and a primary constructor
     /// whose base type has no argument list. The call goes to the base constructor that takes no arguments, the parameterless
     /// one or else one whose parameters are all optional or <c>params</c>. It is located at the constructor that makes it: the
-    /// identifier of a declared constructor, or the type's identifier for an implicit or primary constructor. A struct has no
-    /// base constructor call, a static constructor calls none, and a call to <see cref="object"/> is not recorded.
+    /// identifier of a declared constructor, or the type's identifier for an implicit or primary constructor, which for a partial
+    /// class is its first walked declaration. A struct has no base constructor call, a static constructor calls none, and a call
+    /// to <see cref="object"/> is not recorded.
     /// </summary>
     private void AddImplicitBaseConstructorCalls(TypeDeclarationSyntax node)
     {
@@ -253,7 +261,7 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
             }
         }
 
-        if (HasImplicitConstructor(type) && IsFirstDeclaration(type, node))
+        if (HasImplicitConstructor(type) && (_implicitCallsRecorded ??= new(SymbolEqualityComparer.Default)).Add(type))
         {
             AddMemberUse(baseConstructor, node, node.Identifier.Span);
         }
@@ -288,10 +296,6 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
 
         return false;
     }
-
-    // A partial class has one implicit constructor, recorded at its first declaration only.
-    private static bool IsFirstDeclaration(INamedTypeSymbol type, SyntaxNode node) =>
-        type.DeclaringSyntaxReferences is [var first, ..] && first.SyntaxTree == node.SyntaxTree && first.Span == node.Span;
 
     // The constructor a call without arguments binds to: the parameterless one, or else one whose parameters all have defaults or are params.
     private static IMethodSymbol? ParameterlessConstructorOf(INamedTypeSymbol type)

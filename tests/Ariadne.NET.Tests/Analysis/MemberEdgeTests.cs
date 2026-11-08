@@ -239,7 +239,7 @@ public class MemberEdgeTests
     }
 
     [Fact]
-    public void Declaration_NotRecorded()
+    public void DeclarationsRecordOnlyTheImplicitBaseConstructorCall()
     {
         var graph = Build(["**"], """
             namespace Shop.Domain
@@ -382,6 +382,31 @@ public class MemberEdgeTests
                 ("Shop.Domain.Top", "Shop.Domain.Mid.new", 18, 18),
                 ("Shop.Domain.Split", "Shop.Data.SqlCommand.new", 22, 26));
         graph.MemberEdges.Where(e => e.Member.ContainingType.SpecialType == SpecialType.System_Object).Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("Split.g.cs", "Split.cs", "Split.cs")]
+    [InlineData("Split.cs", "Split.g.cs", "Split.cs")]
+    [InlineData("Split.cs", "Other.cs", "Split.cs")]
+    [InlineData("Other.cs", "Split.cs", "Other.cs")]
+    public void ImplicitBaseConstructorCall_PartialClass_RecordedOnceAtTheFirstWalkedDeclaration(string firstFile, string secondFile, string expectedFile)
+    {
+        // A generated tree is not walked, so the call is located in the first hand-written declaration, wherever the generated
+        // one sits. The first tree holds the base list.
+        var graph = TypeGraphBuilder.Build(
+            TestCompilation.Create(
+                ("Data.cs", DataTypes),
+                (firstFile, "namespace Shop.Domain { public partial class Split : Shop.Data.SqlCommand { } }"),
+                (secondFile, "namespace Shop.Domain { public partial class Split { } }")),
+            new HashSet<SyntaxTree>(),
+            MemberNameFilter.From(PackWith("Shop.Data.SqlCommand.new")),
+            CancellationToken.None);
+
+        var use = graph.MemberEdges
+            .Where(e => string.Equals(e.Source.ToDisplayString(), "Shop.Domain.Split", StringComparison.Ordinal))
+            .Should().ContainSingle().Subject;
+        MemberNames.Chain(use.Member)[0].Should().Be("Shop.Data.SqlCommand.new");
+        use.Location.FilePath.Should().Be(expectedFile);
     }
 
     [Fact]
