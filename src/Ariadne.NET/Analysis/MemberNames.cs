@@ -49,10 +49,10 @@ internal static class MemberNames
             return ConstructorName;
         }
 
-        var explicitImplementations = ExplicitImplementations(member);
-        if (explicitImplementations.Length > 0 && member.Name.Contains('.', StringComparison.Ordinal))
+        // The dot test comes first: it is cheap, and only an explicit implementation has a dotted name.
+        if (member.Name.Contains('.', StringComparison.Ordinal) && ExplicitImplementations(member) is [var implemented, ..])
         {
-            return SimpleNameOf(explicitImplementations[0]);
+            return SimpleNameOf(implemented);
         }
 
         return member is IPropertySymbol { IsIndexer: true } ? member.MetadataName : member.Name;

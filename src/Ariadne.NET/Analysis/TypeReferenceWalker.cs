@@ -421,10 +421,19 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     }
 
     /// <summary>Records a member edge when the symbol is a member whose simple name passes the filter, and the name is not inside a <c>nameof</c>.</summary>
+    /// <remarks>
+    /// A name that binds to a constructor is an attribute name, and an attribute constructor is not a use. An indexer skips the
+    /// name filter: C# matches an indexer to the interface indexer it implements by signature, not by name, so an indexer
+    /// named <c>Chars</c> can implement one named <c>Item</c>, and only its chain shows that name. Element accesses are bound
+    /// whenever the filter is not empty, so this adds no binding.
+    /// </remarks>
     private void AddMemberUse(ISymbol symbol, SyntaxNode node, TextSpan span)
     {
-        if (_source is null || MemberNames.UsedMember(symbol) is not { } member
-            || !_filter.CouldMatch(MemberNames.SimpleNameOf(member)) || IsInsideNameOf(node))
+        if (_source is null
+            || (node is SimpleNameSyntax && symbol is IMethodSymbol { MethodKind: MethodKind.Constructor })
+            || MemberNames.UsedMember(symbol) is not { } member
+            || (member is not IPropertySymbol { IsIndexer: true } && !_filter.CouldMatch(MemberNames.SimpleNameOf(member)))
+            || IsInsideNameOf(node))
         {
             return;
         }

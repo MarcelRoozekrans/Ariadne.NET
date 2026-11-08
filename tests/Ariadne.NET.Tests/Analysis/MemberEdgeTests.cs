@@ -52,6 +52,16 @@ public class MemberEdgeTests
             public class Level2 : Level1 { public override void Go() { } }
             public class Level3 : Level2 { public override void Go() { } }
             public interface IRepo<T> { void Save(T entity); }
+            public interface INamed { [System.Runtime.CompilerServices.IndexerName("Cell")] int this[int i] { get; } }
+            public sealed class Plain : INamed { public int this[int i] => 0; }
+            public sealed class Letters : System.Collections.Generic.IReadOnlyList<char>
+            {
+                [System.Runtime.CompilerServices.IndexerName("Chars")] public char this[int i] => 'a';
+                public int Count => 0;
+                public System.Collections.Generic.IEnumerator<char> GetEnumerator() => throw new System.NotSupportedException();
+                System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+            }
+            public sealed class MarkerAttribute : System.Attribute { public MarkerAttribute(int value) { } }
             public class Repo<T> : IRepo<T> { public void Save(T entity) { } }
         }
         """;
@@ -352,6 +362,43 @@ public class MemberEdgeTests
     }
 
     [Fact]
+    public void IndexerImplementingRenamedInterfaceIndexer_Recorded()
+    {
+        var graph = Build(["**.INamed.Cell", "**.IReadOnlyList.Item"], """
+            namespace Shop.Domain
+            {
+                public class Order
+                {
+                    public int Place(Shop.Data.Plain plain, Shop.Data.Letters letters) => plain[0] + letters[0];
+                }
+            }
+            """);
+
+        Chains(graph).Should().Equal(
+            "Shop.Data.Plain.Item > Shop.Data.INamed.Cell",
+            "Shop.Data.Letters.Chars > System.Collections.Generic.IReadOnlyList.Item");
+    }
+
+    [Fact]
+    public void AttributeConstructor_NotRecorded()
+    {
+        var graph = Build(["**.new"], """
+            namespace Shop.Domain
+            {
+                [System.Obsolete("x")]
+                public class Order
+                {
+                    [Shop.Data.Marker(1)]
+                    public void Place() { }
+                }
+            }
+            """);
+
+        Uses(graph).Should().BeEmpty();
+        graph.Edges.Should().Contain(e => string.Equals(e.Target.ToDisplayString(), "Shop.Data.MarkerAttribute", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void DynamicArgument_RecordsEveryCandidate()
     {
         var graph = Build(["**.Tools.Run"], """
@@ -488,7 +535,9 @@ public class MemberEdgeTests
     {
         var graph = Build(["Shop.Data.SqlCommand.Dispose*"], UsesEverything);
 
-        graph.MemberEdges.Should().BeEmpty();
+        // An indexer skips the name filter, because it can implement an interface indexer of another name.
+        graph.MemberEdges.Should().ContainSingle();
+        graph.MemberEdges[0].Member.Should().BeAssignableTo<IPropertySymbol>().Which.IsIndexer.Should().BeTrue();
     }
 
     [Theory]
