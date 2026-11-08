@@ -51,21 +51,13 @@ public sealed class BuiltinPackVacuityTests
 
     [Theory]
     [MemberData(nameof(PackNames))]
-    public void No_builtin_pack_rule_or_layer_sets_allow_empty(string packName)
+    public void No_builtin_pack_rule_sets_allow_empty(string packName)
     {
+        // Layers cannot carry the key because the loader rejects it, pinned by the loader test AllowEmpty_on_a_layer_is_an_unknown_key.
         var pack = Load(packName);
 
         pack.Rules.Where(r => r.AllowEmpty).Select(r => r.Id)
             .Should().BeEmpty($"pack '{packName}' must not exempt a rule from vacuity detection");
-
-        // LayerDefinition has no AllowEmpty property, so a layer that tried to opt out can only show in the YAML text.
-        var yaml = File.ReadAllText(Path.Combine(BuiltinPackDirectory(), packName + ".yaml"));
-        var layers = yaml.Split('\n')
-            .SkipWhile(l => !l.StartsWith("layers:", StringComparison.Ordinal))
-            .Skip(1)
-            .TakeWhile(l => l.Length == 0 || char.IsWhiteSpace(l[0]) || l[0] == '#')
-            .Where(l => l.Contains("allowEmpty", StringComparison.OrdinalIgnoreCase));
-        layers.Should().BeEmpty($"pack '{packName}' must not exempt a layer from vacuity detection");
     }
 
     [Theory]
@@ -82,17 +74,5 @@ public sealed class BuiltinPackVacuityTests
         result.Violations.Where(v => v.Kind == ViolationKind.VacuousRule)
             .Select(v => $"{v.RuleId}: {v.Message}")
             .Should().BeEmpty($"pack '{packName}' must stay quiet about empty rules and roles");
-    }
-
-    private static string BuiltinPackDirectory()
-    {
-        var dir = AppContext.BaseDirectory;
-        while (dir is not null && !File.Exists(Path.Combine(dir, "src", "Ariadne.NET.slnx")))
-        {
-            dir = Path.GetDirectoryName(dir);
-        }
-
-        dir.Should().NotBeNull("the repository root must be reachable from the test output directory");
-        return Path.Combine(dir!, "src", "Ariadne.NET", "BuiltinPacks");
     }
 }
