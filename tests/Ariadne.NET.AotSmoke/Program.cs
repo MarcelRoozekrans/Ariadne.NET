@@ -26,6 +26,22 @@ var pack = new RulePack
             From = new TargetSelector { Interfaces = ["IHandler"] },
             Require = new RuleRequirement { Layer = "Domain", Kind = CSharpTypeKind.Class, Accessibility = "public", Implements = new TargetSelector { Types = ["IHandler"] } },
         },
+        new RuleDefinition
+        {
+            Id = "no-json-net",
+            Because = "One JSON library.",
+            Kind = RuleKind.BannedPackages,
+            From = new TargetSelector { Assemblies = ["Domain"] },
+            Packages = ["Newtonsoft.Json"],
+        },
+        new RuleDefinition
+        {
+            Id = "distinct-names",
+            Because = "Domain names stay apart from infrastructure names.",
+            Kind = RuleKind.UniqueNames,
+            From = new TargetSelector { Layers = ["Domain"] },
+            Against = new TargetSelector { Namespaces = ["Infrastructure.**"] },
+        },
     ],
 };
 
