@@ -76,6 +76,15 @@ public sealed class ResolvedPackageReaderTests : IDisposable
     }
 
     [Fact]
+    public void FrameworkThatIsAPrefixOfAnotherFramework_DoesNotMatchIt()
+    {
+        var known = ResolvedPackageReader.TryRead(
+            Write(Assets(""" "net48": { "P/1.0.0": { "type": "package" } } """, """ "net48": [ "P >= 1.0.0" ] """)), "net4", out _);
+
+        known.Should().BeFalse();
+    }
+
+    [Fact]
     public void NoFramework_UsesTheOnlyEntry()
     {
         var packages = Read(Assets(""" "net10.0": { "P/1.0.0": { "type": "package" } } """, """ "net10.0": [ "P >= 1.0.0" ] """), null);

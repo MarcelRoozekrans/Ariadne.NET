@@ -168,11 +168,13 @@ internal static class ResolvedPackageReader
         return paths;
     }
 
-    // net10.0-windows7.0 extends net10.0 and net10.0-windows: after the framework comes a platform or its version.
+    // net10.0-windows7.0 extends net10.0 and net10.0-windows: after the framework comes "-" and a platform, or, when the framework
+    // already names a platform, its version. A bare digit after a plain framework is another framework, so net4 never matches net48.
     private static bool ExtendsWithPlatform(string name, string targetFramework) =>
         name.Length > targetFramework.Length
         && name.StartsWith(targetFramework, StringComparison.OrdinalIgnoreCase)
-        && (name[targetFramework.Length] == '-' || char.IsAsciiDigit(name[targetFramework.Length]));
+        && (name[targetFramework.Length] == '-'
+            || (char.IsAsciiDigit(name[targetFramework.Length]) && targetFramework.Contains('-', StringComparison.Ordinal)));
 
     // The framework's entry: by full name, then by the name before a runtime identifier suffix (net10.0/linux-x64), then a name that
     // extends the framework with a platform (net10.0-windows7.0). Without a framework, the file's only entry. Null when none fits, so
