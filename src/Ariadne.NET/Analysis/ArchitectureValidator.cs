@@ -5,7 +5,7 @@ using ZeroAlloc.Inject;
 
 namespace Ariadne.NET.Analysis;
 
-/// <summary>Builds the type graph of each project and target framework, runs the layer, forbid, allowOnly, require and role rules and merges the results per project.</summary>
+/// <summary>Builds the type graph of each project and target framework, runs the layer, forbid, allowOnly, require, role and bannedPackages rules, merges the results per project, then runs the uniqueNames rules once across all projects.</summary>
 [Singleton]
 public sealed class ArchitectureValidator : IArchitectureValidator
 {
