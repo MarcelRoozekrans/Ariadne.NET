@@ -212,6 +212,20 @@ extends:
 
 Private repos work out of the box — the engine uses your existing git credentials (SSH keys, credential managers).
 
+## Agent Hooks
+
+`ariadne hook <event>` gives a Claude Code agent the structural rules and feeds violations back to it. `ariadne init --agent claude` installs the hooks in `.claude/settings.json`. See [Host Applications](how-it-works/10-host-applications.md) for the details.
+
+| Event | What it does |
+|-------|--------------|
+| `session-start` | Adds the resolved layers, the rules with their `because`, the component roles, the naming conventions and the cached pack versions to the session. It warns when the cache is missing or stale. The text is capped at 10,000 characters and ends in a `Truncated` line when it was cut, dropping roles, rules, layers, the naming line and warnings in that order. |
+| `pre-tool-use` | Asks the user, and never denies, before the agent writes a new `.cs` file whose assembly and namespace no layer selects. It also records the edited `.cs` files for `stop`. |
+| `stop` | Once per turn, after `.cs` edits, validates the solution and feeds at most 20 violations back, each with its message and, when it has one, its rule id and `because`; the text is capped at 10,000 characters. Silent when the solution is clean. |
+
+The hooks fail open: an error is one line on stderr, stdout stays empty and the exit code is 0. The stale-cache check reads only `.architecture/imports.yaml` and the cache folder and never uses the network. The `ariadne` command must be on `PATH`; until the dotnet tool ships in phase 3.3, add it yourself or write the settings entries by hand as shown in [Host Applications](how-it-works/10-host-applications.md).
+
+Ariadne's hooks run beside AI.Sentinel's hook. Ariadne owns the structure rules and their delivery; AI.Sentinel owns tool-call enforcement.
+
 ## MCP Server Integration
 
 The engine exposes its full capability set as MCP tools and resources for AI agent integration.

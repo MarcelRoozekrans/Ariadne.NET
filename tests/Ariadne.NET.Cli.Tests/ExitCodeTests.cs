@@ -436,19 +436,6 @@ public sealed class ExitCodeTests : IDisposable
     }
 
     [Fact]
-    public void Describe_RequirementKind_UsesTheYamlSpelling()
-    {
-        RulesCommand.Describe(new RuleRequirement { Kind = CSharpTypeKind.RecordStruct }).Should().Be("kind recordStruct");
-    }
-
-    [Fact]
-    public void Describe_SelectorWithNothingSelected_SaysNoSelectors()
-    {
-        // The loader rejects a layer without selectors, so only the renderer can be pinned directly.
-        RulesCommand.Describe(new TargetSelector()).Should().Be("no selectors");
-    }
-
-    [Fact]
     public void Rules_WithoutRules_PrintsNoneUnderRules()
     {
         var (exitCode, stdout) = RunCapturingStdout("rules");

@@ -1,5 +1,62 @@
 # Changelog
 
+## [0.4.1](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.4.0...v0.4.1) (2026-11-08)
+
+
+### Features
+
+* **analysis:** add LayerProbe to find the layers of an assembly and namespace ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* **cli:** add the hook command for Claude Code ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* **cli:** install the hooks with init --agent claude ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* **hooks:** add the hook host with wire types and fail-open handling ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* **hooks:** ask before a new file lands outside every layer ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* **hooks:** feed validator violations back when a turn ends ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* **hooks:** give the agent the resolved rules at session start ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+
+
+### Bug Fixes
+
+* **cli:** make init --agent claude fail cleanly and preserve the settings file ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* **cli:** read and write the hook protocol as UTF-8 ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* **cli:** say when init --agent claude changed nothing ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* **hooks:** bound and test the stop hook's failure paths ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* **hooks:** cap the pre-tool-use question ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* **hooks:** harden the host's stderr write and cover cancellation ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* **hooks:** keep the session context within the cap on every path ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* **hooks:** make the placement hook robust and its gates meaningful ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* **hooks:** record edits without races and find the project root after cd ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* **hooks:** remove every record the stop hook read ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+
+
+### Code Refactoring
+
+* **rules:** move rule text into the engine for reuse by the hooks ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* **sync:** make the import name rule public instead of sharing internals ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+
+
+### Documentation
+
+* add design for agent guidance and guardrails via hooks ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* add phases 5.6 and 5.7 for agent hooks and guidance ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* add the phase 5.6 agent hooks implementation plan ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* align hook design with current Ariadne code and roadmap ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* correct the merged state of phases 2.2 and 2.3 ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* describe the hook root resolution and record the flaky test finding ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* **hooks:** bring the state file and hook docs in line with the code ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* **hooks:** document the agent hooks and record the measurements ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* point the state file at the phase 5.6 pull request branch ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* record owner approval of the phase 5.6 plan ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* record that the 5.6 plan can start ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* scope hook design as structural hooks plus Guidance package ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* split hook design between structure and AI.Sentinel enforcement ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+
+
+### Tests
+
+* **cli:** cover the settings commit failure and make cleanup best effort ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* **hooks:** expect the Hooks project in the repo pack ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+* **rules:** cover requirement text and document the describer ([e609dcf](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e609dcf5f6e2a9660ce61dbbaa04680d5719b820))
+
 ## [0.4.0](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.3.0...v0.4.0) (2026-11-06)
 
 
