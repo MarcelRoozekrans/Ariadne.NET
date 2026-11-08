@@ -54,7 +54,7 @@ internal static class UniqueNameRules
 
             foreach (ref readonly var other in CollectionsMarshal.AsSpan(colliding))
             {
-                if (string.Equals(other, forType.Display, StringComparison.Ordinal))
+                if (other == forType.Id)
                 {
                     continue;
                 }
@@ -64,29 +64,29 @@ internal static class UniqueNameRules
                     RuleId = rule.Id,
                     Kind = ViolationKind.NameCollision,
                     SourceType = forType.Display,
-                    Target = other,
+                    Target = other.Display,
                     Location = forType.Location,
                     Because = rule.Because,
                     Message = string.Create(
                         CultureInfo.InvariantCulture,
-                        $"Type '{forType.Display}' is selected by rule '{rule.Id}' and shares its name with '{other}'"),
+                        $"Type '{forType.Display}' is selected by rule '{rule.Id}' and shares its name with '{other.Display}'"),
                 });
             }
         }
     }
 
-    private static (Dictionary<string, List<string>> AgainstByName, List<ForType> ForTypes) Collect(
+    private static (Dictionary<string, List<TypeId>> AgainstByName, List<ForType> ForTypes) Collect(
         TargetMatcher from, TargetMatcher against, TypeSelector[] exceptions, LayerMap layers, IReadOnlyList<TypeGraph> graphs)
     {
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        var againstByName = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        var seen = new HashSet<TypeId>();
+        var againstByName = new Dictionary<string, List<TypeId>>(StringComparer.Ordinal);
         var forTypes = new List<ForType>();
         foreach (var graph in graphs)
         {
             foreach (var type in graph.SourceTypes)
             {
-                var display = type.ToDisplayString();
-                if (!seen.Add(display))
+                var id = new TypeId(type.ContainingAssembly?.Name ?? string.Empty, type.ToDisplayString());
+                if (!seen.Add(id))
                 {
                     continue;
                 }
@@ -99,12 +99,12 @@ internal static class UniqueNameRules
                         againstByName.Add(name, list = []);
                     }
 
-                    list.Add(display);
+                    list.Add(id);
                 }
 
                 if (from.Matches(type) && !IsExcepted(exceptions, type, layers.Names))
                 {
-                    forTypes.Add(new ForType(name, display, graph.SourceTypeLocations[type]));
+                    forTypes.Add(new ForType(name, id, graph.SourceTypeLocations[type]));
                 }
             }
         }
@@ -129,5 +129,12 @@ internal static class UniqueNameRules
         return false;
     }
 
-    private readonly record struct ForType(string Name, string Display, SourceLocation Location);
+    private readonly record struct ForType(string Name, TypeId Id, SourceLocation Location)
+    {
+        public string Display => Id.Display;
+    }
+
+    // The assembly name is the project identity: the graphs of one project's target frameworks share it, while distinct
+    // projects that declare the same full name stay apart.
+    private readonly record struct TypeId(string Assembly, string Display);
 }

@@ -463,6 +463,7 @@ public class ArchitectureValidatorTests
         violation.Because.Should().Be("Names stay unique.");
         violation.SourceType.Should().Be("Shop.Web.Order");
         violation.Target.Should().Be("Shop.Domain.Order");
+        violation.TargetFrameworks.Should().BeEmpty();
     }
 
     private static CSharpCompilation Compile(string source, params string[] symbols)

@@ -136,6 +136,55 @@ public class UniqueNameRulesTests
             """).Should().BeEmpty();
     }
 
+    [Fact]
+    public void SameFullNameInTwoAssemblies_SelectedByAssembly_Collide()
+    {
+        var pack = new RulePack
+        {
+            Name = "test",
+            Rules =
+            [
+                new RuleDefinition
+                {
+                    Id = "TEST-UNIQUE",
+                    Because = "Web keeps its own names.",
+                    Kind = RuleKind.UniqueNames,
+                    From = new TargetSelector { Assemblies = ["Shop.Web"] },
+                    Against = new TargetSelector { Assemblies = ["Shop.Domain"] },
+                },
+            ],
+        };
+        const string source = "namespace Shop { public class Order { } }";
+        var web = TestCompilation.Create(source).WithAssemblyName("Shop.Web");
+        var domain = TestCompilation.Create(source).WithAssemblyName("Shop.Domain");
+
+        Check(pack, domain, web).Should().ContainSingle().Which.SourceType.Should().Be("Shop.Order");
+        Check(pack, web, domain).Should().ContainSingle().Which.SourceType.Should().Be("Shop.Order");
+    }
+
+    [Fact]
+    public void NestedType_CollidesByItsOwnName()
+    {
+        var violations = Check(Pack, """
+            namespace Shop.Domain { public class Order { } }
+            namespace Shop.Web { public class Page { public class Order { } } }
+            """);
+
+        violations.Should().ContainSingle().Which.SourceType.Should().Be("Shop.Web.Page.Order");
+    }
+
+    [Fact]
+    public void ForTypeCollidesWithAgainstTypeInThirdProject()
+    {
+        var other = TestCompilation.Create("namespace Shop.Other { public class Unrelated { } }");
+        var domain = TestCompilation.Create("namespace Shop.Domain { public class Order { } }");
+        var web = TestCompilation.Create("namespace Shop.Web { public class Order { } }");
+
+        var violation = Check(Pack, other, domain, web).Should().ContainSingle().Subject;
+        violation.SourceType.Should().Be("Shop.Web.Order");
+        violation.Target.Should().Be("Shop.Domain.Order");
+    }
+
     private static IReadOnlyList<ArchitectureViolation> Check(RulePack pack, params string[] sources) =>
         Check(pack, sources.Select(s => TestCompilation.Create(s)).ToArray());
 
