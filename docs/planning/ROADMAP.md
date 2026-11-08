@@ -207,13 +207,13 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **HelpWanted:** no
 **Plan:** _to be written_
 
-### Phase 5.6: Agent hooks [status: complete 2026-11-07]
+### Phase 5.6: Agent hooks [status: complete 2026-11-08]
 **Goal:** `ariadne hook` gives a Claude Code agent the resolved structural rules at session start and the validator's violations, with each rule's reason, at the end of a turn.
 **Surface:** Backend
 **HelpWanted:** no
 **Design:** `docs/superpowers/specs/2026-11-06-agent-guidance-hooks-design.md` (approved 2026-11-06, stage A)
-**Note:** Starts after phase 2.3, which changes the loader the pack attachments extend. Runs next to AI.Sentinel's hook, which keeps tool-call enforcement. Implemented; timings in `docs/perf/phase-5.6-hooks.md`. The Milestone 5 item "A Claude Code agent gets the structural rules and violation feedback through `ariadne hook`" stays unticked: the hooks need `ariadne` on `PATH`, which needs the dotnet tool from phase 3.3.
-**Plan:** `docs/superpowers/plans/2026-11-06-phase-5.6-agent-hooks.md` (written 2026-11-06, approved by the owner 2026-11-07; all tasks done on `feat/phase-5.6-agent-hooks`, no PR yet)
+**Note:** Starts after phase 2.3, which changes the loader the pack attachments extend. Runs next to AI.Sentinel's hook, which keeps tool-call enforcement. Merged as #47 (e609dcf) on 2026-11-08; timings in `docs/perf/phase-5.6-hooks.md`. The Milestone 5 item "A Claude Code agent gets the structural rules and violation feedback through `ariadne hook`" stays unticked: the hooks need `ariadne` on `PATH`, which needs the dotnet tool from phase 3.3.
+**Plan:** `docs/superpowers/plans/2026-11-06-phase-5.6-agent-hooks.md` (written 2026-11-06, approved by the owner 2026-11-07; all tasks done, merged from `feat/phase-5.6-hooks` as #47)
 
 ### Phase 5.7: Guidance delivery [status: pending]
 **Goal:** Packs carry standards, skills and opaque files, and `ariadne sync` delivers them to projects, so a new project connects once instead of copying rules.
