@@ -431,6 +431,76 @@ public class ArchitectureValidatorTests
         report.Violations.Should().OnlyContain(v => v.TargetFrameworks.Count == 0);
     }
 
+    [Fact]
+    public void UniqueNamesRule_ReportsNameCollisionWithRuleIdAndBecause()
+    {
+        var pack = new RulePack
+        {
+            Name = "test",
+            Rules =
+            [
+                new RuleDefinition
+                {
+                    Id = "R-UNIQUE",
+                    Because = "Names stay unique.",
+                    Kind = RuleKind.UniqueNames,
+                    From = new TargetSelector { Namespaces = ["Shop.Web.**"] },
+                    Against = new TargetSelector { Namespaces = ["Shop.Domain.**"] },
+                },
+            ],
+        };
+
+        var report = _validator.Validate(pack,
+        [
+            new AnalyzedProject("Domain", "net8.0", TestCompilation.Create("namespace Shop.Domain { public class Order { } }")),
+            new AnalyzedProject("Domain", "net10.0", TestCompilation.Create("namespace Shop.Domain { public class Order { } }")),
+            new AnalyzedProject("Web", null, TestCompilation.Create("namespace Shop.Web { public class Order { } }")),
+        ]);
+
+        var violation = report.Violations.Should().ContainSingle().Subject;
+        violation.Kind.Should().Be(ViolationKind.NameCollision);
+        violation.RuleId.Should().Be("R-UNIQUE");
+        violation.Because.Should().Be("Names stay unique.");
+        violation.SourceType.Should().Be("Shop.Web.Order");
+        violation.Target.Should().Be("Shop.Domain.Order");
+    }
+
+    [Fact]
+    public void UniqueNamesRule_TypeInTwoTargetFrameworks_ReportsNameCollisionOnce()
+    {
+        var pack = new RulePack
+        {
+            Name = "test",
+            Rules =
+            [
+                new RuleDefinition
+                {
+                    Id = "R-UNIQUE",
+                    Because = "Names stay unique.",
+                    Kind = RuleKind.UniqueNames,
+                    From = new TargetSelector { Namespaces = ["Shop.Web.**"] },
+                    Against = new TargetSelector { Namespaces = ["Shop.Domain.**"] },
+                },
+            ],
+        };
+        const string web = "namespace Shop.Web { public class Order { } }";
+
+        var report = _validator.Validate(pack,
+        [
+            new AnalyzedProject("Web", "net8.0", TestCompilation.Create(web)),
+            new AnalyzedProject("Web", "net10.0", TestCompilation.Create(web)),
+            new AnalyzedProject("Domain", null, TestCompilation.Create("namespace Shop.Domain { public class Order { } }")),
+        ]);
+
+        var violation = report.Violations.Should().ContainSingle().Subject;
+        violation.Kind.Should().Be(ViolationKind.NameCollision);
+        violation.RuleId.Should().Be("R-UNIQUE");
+        violation.Because.Should().Be("Names stay unique.");
+        violation.SourceType.Should().Be("Shop.Web.Order");
+        violation.Target.Should().Be("Shop.Domain.Order");
+        violation.TargetFrameworks.Should().BeEmpty();
+    }
+
     private static CSharpCompilation Compile(string source, params string[] symbols)
     {
         var tree = CSharpSyntaxTree.ParseText(

@@ -67,3 +67,24 @@ rules:
       for:
         interfaces: ["Ariadne.NET.Abstractions.IRulePackLoader"]
       layer: Core
+  - id: ARIADNE-HOST-NAMES-OWN
+    because: A host type that reuses a Core type name reads as the same type in stack traces, logs and imports, and hides which layer owns it.
+    description: "Host types never copy a type name from Core"
+    uniqueNames:
+      for:
+        layers: [Host]
+      against:
+        layers: [Core]
+  - id: ARIADNE-CORE-NO-CONSOLE
+    because: Core is a library that runs inside every host, so only a host decides what is written to the console, and the MCP stdio server reserves stdout for its protocol.
+    description: "Core never writes to or reads from System.Console"
+    forbid:
+      from:
+        layers: [Core]
+      to:
+        members: ["System.Console.*"]
+  - id: ARIADNE-NO-NEWTONSOFT-JSON
+    because: The repository serializes with System.Text.Json, which stays trim and Native AOT safe; Newtonsoft.Json relies on reflection and would break the AOT smoke test.
+    description: "No project references Newtonsoft.Json, directly or transitively"
+    bannedPackages:
+      packages: ["Newtonsoft.Json"]

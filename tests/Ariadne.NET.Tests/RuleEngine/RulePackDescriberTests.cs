@@ -50,6 +50,57 @@ public class RulePackDescriberTests
     }
 
     [Fact]
+    public void DescribeRule_BannedPackages_PrintsThePackagesAsTarget()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "R-PACKAGES",
+            Because = "No second JSON library.",
+            Kind = RuleKind.BannedPackages,
+            From = new TargetSelector { Assemblies = ["Shop.Domain"] },
+            Packages = ["Newtonsoft.Json", "FluentValidation"],
+        };
+
+        RulePackDescriber.DescribeRule(rule).Should().Equal(
+            "R-PACKAGES bannedPackages assemblies Shop.Domain -> packages Newtonsoft.Json, FluentValidation",
+            "No second JSON library.");
+    }
+
+    [Fact]
+    public void DescribeRule_UniqueNames_PrintsTheAgainstSelectorAsTarget()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "R-NAMES",
+            Because = "Web keeps no copy of an application DTO.",
+            Kind = RuleKind.UniqueNames,
+            From = new TargetSelector { Layers = ["Web"] },
+            Against = new TargetSelector { Namespaces = ["Shop.Application.**.Dtos"] },
+        };
+
+        RulePackDescriber.DescribeRule(rule).Should().Equal(
+            "R-NAMES uniqueNames layers Web -> against namespaces Shop.Application.**.Dtos",
+            "Web keeps no copy of an application DTO.");
+    }
+
+    [Fact]
+    public void DescribeRule_MembersSelector_ListsMembersLast()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "R-MEMBERS",
+            Because = "Domain does not write to the console.",
+            Kind = RuleKind.Forbid,
+            From = new TargetSelector { Layers = ["Domain"] },
+            To = new TargetSelector { Members = ["System.Console.*"] },
+        };
+
+        RulePackDescriber.DescribeRule(rule).Should().Equal(
+            "R-MEMBERS forbid layers Domain -> members System.Console.*",
+            "Domain does not write to the console.");
+    }
+
+    [Fact]
     public void DescribeRule_AllowOnly_UsesTheYamlSpelling()
     {
         var rule = new RuleDefinition

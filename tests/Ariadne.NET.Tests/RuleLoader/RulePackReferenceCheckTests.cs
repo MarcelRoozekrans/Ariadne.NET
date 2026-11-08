@@ -227,6 +227,22 @@ public class RulePackReferenceCheckTests
     }
 
     [Fact]
+    public void UniqueNames_UnknownLayerInAgainst_Fails()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "R-1",
+            Because = "because",
+            Kind = RuleKind.UniqueNames,
+            From = new TargetSelector { Layers = ["Domain"] },
+            Against = new TargetSelector { Layers = ["Ghost"] },
+        };
+        var pack = new RulePack { Name = "p", Layers = [Layer("Domain")], Rules = [rule] };
+
+        Resolve(pack).Error.Detail.Should().Contain("rule 'R-1' refers to unknown layer 'Ghost'");
+    }
+
+    [Fact]
     public void RequireRule_NamingKnownLayer_Passes()
     {
         var pack = new RulePack { Name = "p", Layers = [Layer("Domain")], Rules = [RequireRule("R-1", "domain")] };

@@ -30,7 +30,10 @@ internal sealed class DependencyRuleChecker
         return new DependencyRuleChecker(rules);
     }
 
-    /// <summary>Returns one violation per rule, source type and target type, with the number of references and the location of the first.</summary>
+    /// <summary>
+    /// Returns one violation per rule, source type and target, with the number of references and the location of the first. A
+    /// rule whose <c>to</c> holds <c>members</c> is evaluated on the member edges and a rule without on the type edges.
+    /// </summary>
     public IReadOnlyList<ArchitectureViolation> Check(TypeGraph graph)
     {
         ArgumentNullException.ThrowIfNull(graph);
@@ -42,24 +45,25 @@ internal sealed class DependencyRuleChecker
         }
 
         var found = new List<Pair>();
-        var index = new Dictionary<(int Rule, INamedTypeSymbol Source, INamedTypeSymbol Target), int>(KeyComparer.Instance);
+        var index = new Dictionary<(int Rule, INamedTypeSymbol Source, ISymbol Target), int>(KeyComparer.Instance);
         foreach (var edge in graph.Edges)
         {
             for (var i = 0; i < rules.Count; i++)
             {
-                if (!rules[i].Violates(in edge))
+                if (!rules[i].ToMembers && rules[i].Violates(in edge))
                 {
-                    continue;
+                    Record(found, index, i, edge.Source, edge.Target, edge.Location, default);
                 }
+            }
+        }
 
-                if (index.TryGetValue((i, edge.Source, edge.Target), out var at))
+        foreach (var edge in graph.MemberEdges)
+        {
+            for (var i = 0; i < rules.Count; i++)
+            {
+                if (rules[i].ToMembers && rules[i].Violates(in edge, out var matched))
                 {
-                    found[at].Count++;
-                }
-                else
-                {
-                    index.Add((i, edge.Source, edge.Target), found.Count);
-                    found.Add(new Pair(rules[i], edge));
+                    Record(found, index, i, edge.Source, edge.Member, edge.Location, matched);
                 }
             }
         }
@@ -71,6 +75,19 @@ internal sealed class DependencyRuleChecker
         }
 
         return violations;
+    }
+
+    private void Record(List<Pair> found, Dictionary<(int Rule, INamedTypeSymbol Source, ISymbol Target), int> index, int rule, INamedTypeSymbol source, ISymbol target, in SourceLocation location, in MemberName matched)
+    {
+        if (index.TryGetValue((rule, source, target), out var at))
+        {
+            found[at].Count++;
+        }
+        else
+        {
+            index.Add((rule, source, target), found.Count);
+            found.Add(new Pair(_rules[rule], source, target, location, matched));
+        }
     }
 
     private static Compiled Compile(RuleDefinition rule, LayerMap layers)
@@ -88,12 +105,14 @@ internal sealed class DependencyRuleChecker
     private static ArchitectureViolation ToViolation(Pair pair)
     {
         var rule = pair.Rule.Rule;
-        var source = pair.First.Source.ToDisplayString();
-        var target = pair.First.Target.ToDisplayString();
+        var source = pair.Source.ToDisplayString();
+        var target = pair.Target is INamedTypeSymbol type ? type.ToDisplayString() : pair.Rule.DisplayNameOf(pair.Target);
+        var matched = pair.Matched;
         var forbid = rule.Kind == RuleKind.Forbid;
+        var verb = pair.Target is INamedTypeSymbol ? "references" : pair.Target is IMethodSymbol ? "calls" : "uses";
         var message = forbid
-            ? $"Rule '{rule.Id}' forbids this dependency: {source} references {target}"
-            : $"Rule '{rule.Id}' allows only selected types to depend on {target}: {source} references {target}";
+            ? $"Rule '{rule.Id}' forbids this dependency: {source} {verb} {target}"
+            : $"Rule '{rule.Id}' allows only selected types to depend on {target}: {source} {verb} {target}";
 
         return new ArchitectureViolation
         {
@@ -101,11 +120,23 @@ internal sealed class DependencyRuleChecker
             Kind = forbid ? ViolationKind.ForbiddenDependency : ViolationKind.DependencyNotPermitted,
             SourceType = source,
             Target = target,
-            Location = pair.First.Location,
+            Location = pair.Location,
             Because = rule.Because,
             ReferenceCount = pair.Count,
-            Message = message + (pair.Count > 1 ? string.Create(CultureInfo.InvariantCulture, $" {pair.Count} times") : string.Empty),
+            Message = message + Via(in matched, target) + (pair.Count > 1 ? string.Create(CultureInfo.InvariantCulture, $" {pair.Count} times") : string.Empty),
         };
+    }
+
+    // The member of the pattern, when it is not the used one: " (which overrides X)" or " (which implements X)".
+    private static string Via(in MemberName matched, string target)
+    {
+        if (matched.Member is null || string.Equals(matched.Name, target, StringComparison.Ordinal))
+        {
+            return string.Empty;
+        }
+
+        var verb = matched.Member.ContainingType.TypeKind == TypeKind.Interface ? "implements" : "overrides";
+        return $" (which {verb} {matched.Name})";
     }
 
     private sealed class Compiled(RuleDefinition rule, TargetMatcher from, TargetMatcher to, TypeSelector[] exceptions, TypeNames names)
@@ -115,23 +146,38 @@ internal sealed class DependencyRuleChecker
 
         public RuleDefinition Rule { get; } = rule;
 
-        public bool Violates(in TypeEdge edge)
-        {
-            if (!to.Matches(edge.Target))
-            {
-                return false;
-            }
+        public string DisplayNameOf(ISymbol member) => MemberNames.DisplayNameOf(member, names);
 
-            var applies = Rule.Kind == RuleKind.Forbid
+        /// <summary>Whether the rule selects member uses instead of types.</summary>
+        public bool ToMembers { get; } = to.HasMembers;
+
+        public bool Violates(in TypeEdge edge) =>
+            to.Matches(edge.Target)
+            && (Rule.Kind == RuleKind.Forbid
                 ? from.Matches(edge.Source)
-                : !from.Matches(edge.Source) && !to.Matches(edge.Source);
-            if (!applies)
+                : !from.Matches(edge.Source) && !to.Matches(edge.Source))
+            && !IsExcepted(edge.Source);
+
+        // Under allowOnly a type may use its own members, and so may a type nested in it: that is its own implementation. A derived type may not.
+        private static bool IsWithin(INamedTypeSymbol source, INamedTypeSymbol declaring)
+        {
+            for (INamedTypeSymbol? current = source.OriginalDefinition; current is not null; current = current.ContainingType)
             {
-                return false;
+                if (SymbolEqualityComparer.Default.Equals(current, declaring))
+                {
+                    return true;
+                }
             }
 
-            return !IsExcepted(edge.Source);
+            return false;
         }
+
+        public bool Violates(in MemberEdge edge, out MemberName matched) =>
+            to.TryMatchMember(edge, out matched)
+            && (Rule.Kind == RuleKind.Forbid
+                ? from.Matches(edge.Source)
+                : !from.Matches(edge.Source) && !IsWithin(edge.Source, MemberNames.DeclaringTypeOf(edge.Member)))
+            && !IsExcepted(edge.Source);
 
         private bool IsExcepted(INamedTypeSymbol source)
         {
@@ -159,25 +205,31 @@ internal sealed class DependencyRuleChecker
         }
     }
 
-    private sealed class Pair(Compiled rule, TypeEdge first)
+    private sealed class Pair(Compiled rule, INamedTypeSymbol source, ISymbol target, in SourceLocation location, in MemberName matched)
     {
         public Compiled Rule { get; } = rule;
 
-        public TypeEdge First { get; } = first;
+        public INamedTypeSymbol Source { get; } = source;
+
+        public ISymbol Target { get; } = target;
+
+        public SourceLocation Location { get; } = location;
+
+        public MemberName Matched { get; } = matched;
 
         public int Count { get; set; } = 1;
     }
 
-    private sealed class KeyComparer : IEqualityComparer<(int Rule, INamedTypeSymbol Source, INamedTypeSymbol Target)>
+    private sealed class KeyComparer : IEqualityComparer<(int Rule, INamedTypeSymbol Source, ISymbol Target)>
     {
         public static readonly KeyComparer Instance = new();
 
-        public bool Equals((int Rule, INamedTypeSymbol Source, INamedTypeSymbol Target) x, (int Rule, INamedTypeSymbol Source, INamedTypeSymbol Target) y) =>
+        public bool Equals((int Rule, INamedTypeSymbol Source, ISymbol Target) x, (int Rule, INamedTypeSymbol Source, ISymbol Target) y) =>
             x.Rule == y.Rule
             && SymbolEqualityComparer.Default.Equals(x.Source, y.Source)
             && SymbolEqualityComparer.Default.Equals(x.Target, y.Target);
 
-        public int GetHashCode((int Rule, INamedTypeSymbol Source, INamedTypeSymbol Target) obj) =>
+        public int GetHashCode((int Rule, INamedTypeSymbol Source, ISymbol Target) obj) =>
             HashCode.Combine(obj.Rule, SymbolEqualityComparer.Default.GetHashCode(obj.Source), SymbolEqualityComparer.Default.GetHashCode(obj.Target));
     }
 }

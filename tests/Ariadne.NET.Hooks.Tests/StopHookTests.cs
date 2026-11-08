@@ -360,8 +360,9 @@ public class StopHookTests
         json.Should().NotBeNull();
         using var doc = JsonDocument.Parse(json!);
         var text = doc.RootElement.GetProperty("hookSpecificOutput").GetProperty("additionalContext").GetString()!;
-        text.Should().StartWith("Ariadne found 5 architecture violation(s)");
-        foreach (var id in new[] { "CA-LAYER-DOMAIN", "DAE-NO-EFCORE-IN-DOMAIN", "DAE-APP-NOT-ON-AGENTS", "DAE-RAGNET-ONLY-IN-AGENTS", "DAE-SUBAGENT-RUNNER" })
+        text.Should().StartWith("Ariadne found 9 architecture violation(s)");
+        foreach (var id in new[] { "CA-LAYER-DOMAIN", "DAE-NO-EFCORE-IN-DOMAIN", "DAE-APP-NOT-ON-AGENTS", "DAE-RAGNET-ONLY-IN-AGENTS", "DAE-SUBAGENT-RUNNER",
+            "DAE-API-KEEPS-NO-COPY-OF-DTOS", "DAE-AGENTS-NO-STATE-MACHINE", "DAE-APP-NO-VALIDATION-LIB", "DAE-DOMAIN-NO-YAML" })
         {
             text.Should().Contain($"Rule {id}:");
         }

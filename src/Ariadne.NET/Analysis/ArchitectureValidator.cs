@@ -5,7 +5,7 @@ using ZeroAlloc.Inject;
 
 namespace Ariadne.NET.Analysis;
 
-/// <summary>Builds the type graph of each project and target framework, runs the layer, forbid, allowOnly, require and role rules and merges the results per project.</summary>
+/// <summary>Builds the type graph of each project and target framework, runs the layer, forbid, allowOnly, require, role and bannedPackages rules, merges the results per project, then runs the uniqueNames rules once across all projects.</summary>
 [Singleton]
 public sealed class ArchitectureValidator : IArchitectureValidator
 {
@@ -14,16 +14,22 @@ public sealed class ArchitectureValidator : IArchitectureValidator
     {
         ArgumentNullException.ThrowIfNull(compilation);
 
-        return Validate(resolvedPack, [new AnalyzedProject(compilation.AssemblyName ?? string.Empty, null, compilation)], cancellationToken);
+        return Validate(resolvedPack, [new AnalyzedProject(compilation.AssemblyName ?? string.Empty, null, compilation)], nameof(compilation), cancellationToken);
     }
 
     /// <inheritdoc />
-    public ArchitectureReport Validate(RulePack resolvedPack, IReadOnlyList<AnalyzedProject> projects, CancellationToken cancellationToken = default)
+    public ArchitectureReport Validate(RulePack resolvedPack, IReadOnlyList<AnalyzedProject> projects, CancellationToken cancellationToken = default) =>
+        Validate(resolvedPack, projects, nameof(projects), cancellationToken);
+
+    // paramName is the argument the caller passed, so a guard failure names a parameter of the overload that was called.
+    private ArchitectureReport Validate(RulePack resolvedPack, IReadOnlyList<AnalyzedProject> projects, string paramName, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(resolvedPack);
         ArgumentNullException.ThrowIfNull(projects);
 
         RejectMixedTargetFrameworks(projects);
+        var bannedPackages = BannedPackageRules.Compile(resolvedPack);
+        bannedPackages.RequirePackages(projects, paramName);
 
         // The layer map and the matchers depend on the pack only, so one set serves every project, and a type's layer,
         // names and matches are worked out once per run.
@@ -31,6 +37,7 @@ public sealed class ArchitectureValidator : IArchitectureValidator
         var forbid = ForbidRules.Compile(layers, resolvedPack);
         var allowOnly = AllowOnlyRules.Compile(layers, resolvedPack);
         var require = RequireRules.Compile(layers, resolvedPack);
+        var memberFilter = MemberNameFilter.From(resolvedPack);
 
         var entries = new List<Entry>(projects.Count);
         foreach (var project in projects)
@@ -38,17 +45,14 @@ public sealed class ArchitectureValidator : IArchitectureValidator
             ArgumentNullException.ThrowIfNull(project, nameof(projects));
             cancellationToken.ThrowIfCancellationRequested();
 
-            var graph = TypeGraphBuilder.Build(project.Compilation, project.GeneratedTrees, cancellationToken);
-            var violations = new List<ArchitectureViolation>(LayerRules.Check(graph, layers, resolvedPack));
-            violations.AddRange(forbid.Check(graph));
-            violations.AddRange(allowOnly.Check(graph));
-            violations.AddRange(require.Check(graph));
-            var matches = RoleRules.Match(graph, layers, resolvedPack);
-            violations.AddRange(RoleRules.CheckShape(matches));
-            entries.Add(new Entry(project, graph, matches, violations));
+            entries.Add(AnalyzeProject(project, layers, resolvedPack, new Matchers(forbid, allowOnly, require, bannedPackages, memberFilter), cancellationToken));
         }
 
         AddMissingInterfaceViolations(entries, resolvedPack);
+
+        // Name collisions span projects, and a type seen in several target frameworks counts once, so they are found
+        // once over all graphs and not merged per project.
+        var nameCollisions = UniqueNameRules.Check(layers, resolvedPack, GraphsOf(entries));
 
         var ordered = GroupByProject(entries);
         var allViolations = new List<ArchitectureViolation>();
@@ -61,6 +65,7 @@ public sealed class ArchitectureValidator : IArchitectureValidator
             typesChecked += group.TypesChecked;
         }
 
+        allViolations.AddRange(nameCollisions);
         KeepOneOverlapPerType(allViolations);
         allViolations.Sort(CompareViolations);
         return new ArchitectureReport
@@ -69,6 +74,30 @@ public sealed class ArchitectureValidator : IArchitectureValidator
             Projects = checkedProjects,
             TypesChecked = typesChecked,
         };
+    }
+
+    private static Entry AnalyzeProject(AnalyzedProject project, LayerMap layers, RulePack pack, in Matchers matchers, CancellationToken cancellationToken)
+    {
+        var graph = TypeGraphBuilder.Build(project.Compilation, project.GeneratedTrees, matchers.MemberFilter, cancellationToken);
+        var violations = new List<ArchitectureViolation>(LayerRules.Check(graph, layers, pack));
+        violations.AddRange(matchers.Forbid.Check(graph));
+        violations.AddRange(matchers.AllowOnly.Check(graph));
+        violations.AddRange(matchers.Require.Check(graph));
+        var matches = RoleRules.Match(graph, layers, pack);
+        violations.AddRange(RoleRules.CheckShape(matches));
+        violations.AddRange(matchers.BannedPackages.Check(project));
+        return new Entry(project, graph, matches, violations);
+    }
+
+    private static List<TypeGraph> GraphsOf(List<Entry> entries)
+    {
+        var graphs = new List<TypeGraph>(entries.Count);
+        foreach (ref readonly var entry in CollectionsMarshal.AsSpan(entries))
+        {
+            graphs.Add(entry.Graph);
+        }
+
+        return graphs;
     }
 
     // The entries of each project, in the order the projects first appear.
@@ -221,6 +250,13 @@ public sealed class ArchitectureValidator : IArchitectureValidator
 
         return result == 0 ? x.Kind.CompareTo(y.Kind) : result;
     }
+
+    private readonly record struct Matchers(
+        DependencyRuleChecker Forbid,
+        DependencyRuleChecker AllowOnly,
+        RequireRules.Checker Require,
+        BannedPackageRules.Compiled BannedPackages,
+        MemberNameFilter MemberFilter);
 
     private sealed class Entry(AnalyzedProject project, TypeGraph graph, RoleMatches matches, List<ArchitectureViolation> violations)
     {

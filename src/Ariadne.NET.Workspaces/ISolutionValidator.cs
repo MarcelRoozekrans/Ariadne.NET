@@ -13,6 +13,11 @@ namespace Ariadne.NET.Workspaces;
 public interface ISolutionValidator
 {
     /// <summary>Loads <paramref name="path"/>, checks its projects, lists the skipped ones in the report and releases the workspace.</summary>
+    /// <remarks>
+    /// When a <c>bannedPackages</c> rule covers a project whose package list is unknown, because its
+    /// <c>obj/project.assets.json</c> is missing, stale or does not match its target framework, the result is an
+    /// <see cref="AriadneErrorCode.Invalid"/> error that names the project and asks for a restore; nothing is checked.
+    /// </remarks>
     /// <param name="resolvedPack">The resolved rule pack.</param>
     /// <param name="path">A solution, solution filter or project file, or a directory that holds exactly one.</param>
     /// <param name="cancellationToken">Cancels the load and the check.</param>

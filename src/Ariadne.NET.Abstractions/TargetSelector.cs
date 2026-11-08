@@ -13,6 +13,7 @@ public sealed class TargetSelector
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> BaseTypes { get; init; } = [];
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> Interfaces { get; init; } = [];
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> Attributes { get; init; } = [];
+    [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> Members { get; init; } = [];
 
     internal bool HasNoNullEntries<T>(IList<T>? items) => NullEntries.None(items);
 }

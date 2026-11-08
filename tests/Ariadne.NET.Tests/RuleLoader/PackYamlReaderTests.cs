@@ -277,14 +277,14 @@ public class PackYamlReaderTests
             """;
 
         Problems(yaml).Should().Equal(
-            new PackProblem(9, 5, "rule 'SH-001' must have exactly one of 'forbid', 'allowOnly' or 'require'"));
+            new PackProblem(9, 5, "rule 'SH-001' must have exactly one of 'forbid', 'allowOnly', 'require', 'bannedPackages' or 'uniqueNames'"));
     }
 
     [Fact]
     public void RuleWithNeitherForbidNorAllowOnly()
     {
         Problems("schema: 2\nname: shop\nrules:\n  - id: SH-001\n    because: x\n    locked: false\n").Should().Equal(
-            new PackProblem(4, 5, "rule 'SH-001' must have exactly one of 'forbid', 'allowOnly' or 'require'"));
+            new PackProblem(4, 5, "rule 'SH-001' must have exactly one of 'forbid', 'allowOnly', 'require', 'bannedPackages' or 'uniqueNames'"));
     }
 
     [Fact]
@@ -364,7 +364,7 @@ public class PackYamlReaderTests
             """;
 
         Problems(yaml).Should().Equal(
-            new PackProblem(8, 11, "the to of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes'"));
+            new PackProblem(8, 11, "the to of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'members'"));
     }
 
     [Fact]
@@ -1009,7 +1009,7 @@ public class PackYamlReaderTests
             """;
 
         Problems(yaml).Should().Equal(
-            new PackProblem(9, 5, "rule 'SH-001' must have exactly one of 'forbid', 'allowOnly' or 'require'"));
+            new PackProblem(9, 5, "rule 'SH-001' must have exactly one of 'forbid', 'allowOnly', 'require', 'bannedPackages' or 'uniqueNames'"));
     }
 
     [Theory]
@@ -1084,6 +1084,332 @@ public class PackYamlReaderTests
         var problem = Problems(yaml).Should().ContainSingle().Subject;
         problem.Line.Should().Be(7);
         problem.Message.Should().Contain("cannot mix 'layers'");
+    }
+
+    [Fact]
+    public void BannedPackages_Valid_ReadsPackagesAndAssemblyScope()
+    {
+        var yaml = RequireHead + """
+                bannedPackages:
+                  packages: ["FluentValidation", "Microsoft.EntityFrameworkCore*"]
+                  from: { assemblies: ["Shop.Domain", "Shop.Application"] }
+                exceptions:
+                  - assemblies: ["Shop.Legacy"]
+                    because: Removed next release.
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var rule = result.Value.Rules.Should().ContainSingle().Subject;
+        rule.Kind.Should().Be(RuleKind.BannedPackages);
+        rule.Packages.Should().Equal("FluentValidation", "Microsoft.EntityFrameworkCore*");
+        rule.From.Assemblies.Should().Equal("Shop.Domain", "Shop.Application");
+        rule.Exceptions.Should().ContainSingle().Which.Assemblies.Should().Equal("Shop.Legacy");
+    }
+
+    [Fact]
+    public void BannedPackages_NoFrom_CoversEveryProject()
+    {
+        var yaml = RequireHead + "    bannedPackages:\n      packages: [FluentValidation]\n";
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var rule = result.Value.Rules.Should().ContainSingle().Subject;
+        rule.From.Assemblies.Should().BeEmpty();
+        rule.From.Layers.Should().BeEmpty();
+        rule.From.Namespaces.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void BannedPackages_EmptyPackages_FailsWithLineAndColumn()
+    {
+        var yaml = RequireHead + "    bannedPackages:\n      packages: []\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(7, 7, "the bannedPackages of rule 'SH-001' needs at least one entry in 'packages'"));
+    }
+
+    [Fact]
+    public void BannedPackages_WithoutPackages_Fails()
+    {
+        var yaml = RequireHead + "    bannedPackages:\n      from: { assemblies: [Shop.Domain] }\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(7, 7, "the bannedPackages of rule 'SH-001' needs at least one entry in 'packages'"));
+    }
+
+    [Fact]
+    public void BannedPackages_FromWithNamespaces_FailsBecausePackageBelongsToProject()
+    {
+        var yaml = RequireHead + "    bannedPackages:\n      packages: [FluentValidation]\n      from: { namespaces: [\"Shop.**\"] }\n";
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(8, 15, "'namespaces' is not accepted in the from of rule 'SH-001'; a package belongs to a project, so 'from' selects projects by 'assemblies' only"));
+    }
+
+    [Fact]
+    public void BannedPackages_ExceptionWithTypes_Fails()
+    {
+        var yaml = RequireHead + """
+                bannedPackages:
+                  packages: [FluentValidation]
+                exceptions:
+                  - types: ["**.Legacy"]
+                    because: Old.
+            """;
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(9, 9, "'types' is not accepted in exceptions[0] of rule 'SH-001'; a package belongs to a project, so the exception of a bannedPackages rule names it by 'assemblies'"));
+    }
+
+    [Fact]
+    public void UniqueNames_Valid_ReadsForAndAgainst()
+    {
+        var yaml = RequireHead + """
+                uniqueNames:
+                  for: { layers: [Web] }
+                  against: { namespaces: ["**.Dtos"], types: ["**.*Dto"] }
+                exceptions:
+                  - types: ["**.Legacy"]
+                    because: Old.
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var rule = result.Value.Rules.Should().ContainSingle().Subject;
+        rule.Kind.Should().Be(RuleKind.UniqueNames);
+        rule.From.Layers.Should().Equal("Web");
+        rule.Against.Namespaces.Should().Equal("**.Dtos");
+        rule.Against.Types.Should().Equal("**.*Dto");
+        rule.Exceptions.Should().ContainSingle().Which.Types.Should().Equal("**.Legacy");
+    }
+
+    [Fact]
+    public void UniqueNames_EmptyFor_Fails()
+    {
+        var yaml = RequireHead + "    uniqueNames:\n      for: {}\n      against: { layers: [Application] }\n";
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(7, 12, "the for of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes'"));
+    }
+
+    [Fact]
+    public void UniqueNames_WithoutAgainst_Fails()
+    {
+        var yaml = RequireHead + "    uniqueNames:\n      for: { layers: [Web] }\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(7, 7, "the uniqueNames of rule 'SH-001' has no 'against'"));
+    }
+
+    [Fact]
+    public void UniqueNames_ExceptionWithAssemblies_Fails()
+    {
+        var yaml = RequireHead + """
+                uniqueNames:
+                  for: { layers: [Web] }
+                  against: { layers: [Application] }
+                exceptions:
+                  - assemblies: ["Shop.Web"]
+                    because: Old.
+            """;
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(10, 9, "'assemblies' is not accepted in exceptions[0] of rule 'SH-001'; an exception of a uniqueNames rule excuses a type's name, so it takes 'types' or 'namespaces'"));
+    }
+
+    [Fact]
+    public void Members_InToSelector_Reads()
+    {
+        var yaml = RequireHead + """
+                forbid:
+                  from: { layers: [Domain] }
+                  to: { members: ["System.Diagnostics.Process.Start", "System.Data.Common.DbCommand.Execute*"] }
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var rule = result.Value.Rules.Should().ContainSingle().Subject;
+        rule.To.Members.Should().Equal("System.Diagnostics.Process.Start", "System.Data.Common.DbCommand.Execute*");
+        rule.From.Members.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Members_InToSelector_CombinesWithNamespaces()
+    {
+        var yaml = RequireHead + """
+                allowOnly:
+                  from: { layers: [Infrastructure] }
+                  to: { namespaces: ["Microsoft.Data.**"], members: ["**.SqlCommand.*"] }
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var rule = result.Value.Rules.Should().ContainSingle().Subject;
+        rule.Kind.Should().Be(RuleKind.AllowOnly);
+        rule.To.Namespaces.Should().Equal("Microsoft.Data.**");
+        rule.To.Members.Should().Equal("**.SqlCommand.*");
+    }
+
+    [Fact]
+    public void Members_SingleSegmentPattern_FailsInPackTerms()
+    {
+        // A member name always has a type segment, so a one-segment pattern can never match; '**' alone still matches every member.
+        var yaml = RequireHead + """
+                forbid:
+                  from: { layers: [Domain] }
+                  to: { members: ["Start", "**", "*.Start", "*"] }
+            """;
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(8, 23, "'Start' in the to of rule 'SH-001' is not a valid pattern: a member pattern needs a type and a member, as 'Namespace.Type.Member'; start it with '**.' to match the member in any type"),
+            new PackProblem(8, 49, "'*' in the to of rule 'SH-001' is not a valid pattern: a member pattern needs a type and a member, as 'Namespace.Type.Member'; start it with '**.' to match the member in any type"));
+    }
+
+    [Fact]
+    public void Members_InFromSelector_FailsInPackTerms()
+    {
+        var yaml = RequireHead + """
+                forbid:
+                  from: { namespaces: ["Shop.**"], members: ["System.Console.WriteLine"] }
+                  to: { namespaces: ["System.Data.**"] }
+            """;
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(7, 40, "'members' is not accepted in the from of rule 'SH-001'; it names APIs and only the 'to' of a 'forbid' or 'allowOnly' rule takes it"));
+    }
+
+    [Fact]
+    public void Members_InRequireFor_Fails()
+    {
+        var yaml = RequireHead + "    require:\n      for: { members: [\"System.Console.WriteLine\"] }\n      layer: Domain\n";
+
+        Problems(yaml).Should().Contain(p => p.Line == 7 && p.Message.StartsWith("'members' is not accepted in the for of rule 'SH-001'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Members_OnLayerEntry_Fails()
+    {
+        var yaml = """
+            schema: 2
+            name: shop
+            layers:
+              - name: Domain
+                id: SH-DOMAIN
+                because: x
+                namespaces: ["**.Domain.**"]
+                members: ["System.Console.WriteLine"]
+            """;
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(8, 5, "'members' is not accepted in layer 'Domain'; it names APIs and only the 'to' of a 'forbid' or 'allowOnly' rule takes it"));
+    }
+
+    [Fact]
+    public void Members_MixedWithLayers_FailsLikeOtherKeys()
+    {
+        var yaml = RequireHead + """
+                forbid:
+                  from: { layers: [Domain] }
+                  to:
+                    layers: [Infrastructure]
+                    members: ["System.Console.WriteLine"]
+            """;
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(9, 9, "a target in rule 'SH-001' cannot mix 'layers' with 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes' or 'members'"));
+    }
+
+    [Fact]
+    public void RuleBody_TwoKinds_FailsListingFiveKeys()
+    {
+        var yaml = RequireHead + """
+                bannedPackages:
+                  packages: [FluentValidation]
+                uniqueNames:
+                  for: { layers: [Web] }
+                  against: { layers: [Application] }
+            """;
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(8, 5, "rule 'SH-001' must have exactly one of 'forbid', 'allowOnly', 'require', 'bannedPackages' or 'uniqueNames'"));
+    }
+
+    [Fact]
+    public void BannedPackages_FromWithLayers_Fails()
+    {
+        var yaml = RequireHead + "    bannedPackages:\n      packages: [FluentValidation]\n      from: { layers: [Domain] }\n";
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(8, 15, "'layers' is not accepted in the from of rule 'SH-001'; a package belongs to a project, so 'from' selects projects by 'assemblies' only"));
+    }
+
+    [Fact]
+    public void BannedPackages_ExceptionWithNamespaces_Fails()
+    {
+        var yaml = RequireHead + """
+                bannedPackages:
+                  packages: [FluentValidation]
+                exceptions:
+                  - namespaces: ["Shop.Legacy"]
+                    because: Old.
+            """;
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(9, 9, "'namespaces' is not accepted in exceptions[0] of rule 'SH-001'; a package belongs to a project, so the exception of a bannedPackages rule names it by 'assemblies'"));
+    }
+
+    [Fact]
+    public void BannedPackages_ExceptionWithOnlyBecause_NamesOnlyAssemblies()
+    {
+        var yaml = RequireHead + "    bannedPackages:\n      packages: [FluentValidation]\n    exceptions:\n      - because: Old.\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(9, 9, "exceptions[0] of rule 'SH-001' needs 'assemblies'"));
+    }
+
+    [Fact]
+    public void UniqueNames_EmptyAgainst_Fails()
+    {
+        var yaml = RequireHead + "    uniqueNames:\n      for: { layers: [Web] }\n      against: {}\n";
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(8, 16, "the against of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes'"));
+    }
+
+    [Fact]
+    public void UniqueNames_ExceptionWithNamespaces_Reads()
+    {
+        var yaml = RequireHead + """
+                uniqueNames:
+                  for: { layers: [Web] }
+                  against: { layers: [Application] }
+                exceptions:
+                  - namespaces: ["Shop.Web.Legacy"]
+                    because: Old.
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        result.Value.Rules.Should().ContainSingle().Which.Exceptions.Should().ContainSingle().Which.Namespaces.Should().Equal("Shop.Web.Legacy");
+    }
+
+    [Fact]
+    public void UniqueNames_ExceptionWithOnlyBecause_NamesNamespacesAndTypes()
+    {
+        var yaml = RequireHead + "    uniqueNames:\n      for: { layers: [Web] }\n      against: { layers: [Application] }\n    exceptions:\n      - because: Old.\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(10, 9, "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'types'"));
+    }
+
+    [Fact]
+    public void Layers_MixedWithTypes_NamesTheOtherKeys()
+    {
+        var yaml = RequireHead + "    require:\n      for: { layers: [Domain], types: [\"**.X\"] }\n      layer: Domain\n";
+
+        Problems(yaml).Should().ContainSingle().Which.Message.Should().Contain("cannot mix 'layers' with 'namespaces'");
     }
 
     private static IReadOnlyList<PackProblem> Problems(string yaml)

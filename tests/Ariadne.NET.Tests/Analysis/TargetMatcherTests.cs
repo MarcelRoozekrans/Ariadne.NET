@@ -43,6 +43,46 @@ public class TargetMatcherTests
     }
 
     [Fact]
+    public void MatchesMember_WildcardMemberSegment()
+    {
+        var compilation = TestCompilation.Create("""
+            namespace Shop.Data
+            {
+                public class DbCommand { public virtual int ExecuteReader() => 0; public int Other() => 0; }
+                public class SqlCommand : DbCommand { public override int ExecuteReader() => 0; }
+            }
+            namespace Shop.Web { public class Page { public int ExecuteScalar() => 0; } }
+            """);
+        var matcher = TargetMatcher.From(new TargetSelector { Members = ["Shop.Data.*.Execute*"] }, new LayerMap(Pack));
+
+        bool Matches(string type, string member) =>
+            matcher.MatchesMember(new MemberEdge(Find(compilation, "Shop.Data.SqlCommand"), Find(compilation, type).GetMembers(member)[0], default));
+
+        Matches("Shop.Data.DbCommand", "ExecuteReader").Should().BeTrue();
+        Matches("Shop.Data.SqlCommand", "ExecuteReader").Should().BeTrue();
+        Matches("Shop.Data.DbCommand", "Other").Should().BeFalse();
+        Matches("Shop.Web.Page", "ExecuteScalar").Should().BeFalse();
+        matcher.Matches(Find(compilation, "Shop.Data.SqlCommand")).Should().BeFalse();
+    }
+
+    [Fact]
+    public void NamespacesWithMembers_MatchesNoType()
+    {
+        var compilation = TestCompilation.Create(Source);
+        var matcher = TargetMatcher.From(new TargetSelector { Namespaces = ["Shop.**"], Members = ["Shop.Domain.Order.Total"] }, new LayerMap(Pack));
+
+        matcher.Matches(Find(compilation, "Shop.Domain.Order")).Should().BeFalse();
+    }
+
+    [Fact]
+    public void LayersMixedWithMembers_Throws()
+    {
+        var act = () => TargetMatcher.From(new TargetSelector { Layers = ["Domain"], Members = ["A.B.C"] }, new LayerMap(Pack));
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
     public void MixedTarget_Throws()
     {
         var act = () => TargetMatcher.From(new TargetSelector { Layers = ["Domain"], Namespaces = ["Shop"] }, new LayerMap(Pack));

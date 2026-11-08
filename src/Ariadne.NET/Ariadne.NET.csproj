@@ -13,6 +13,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Ariadne.NET.Tests" />
+    <!-- The solution validator runs the bannedPackages coverage check before validating, to report it as an error. -->
+    <InternalsVisibleTo Include="Ariadne.NET.Workspaces" />
   </ItemGroup>
 
   <ItemGroup>

@@ -6,11 +6,28 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace Ariadne.NET.Analysis;
 
-/// <summary>Binds the type names in hand-written syntax trees and records an edge from the enclosing type to each referenced type.</summary>
+/// <summary>
+/// Binds the type names in hand-written syntax trees and records an edge from the enclosing type to each referenced type, and
+/// a member edge for each member use whose name passes the <see cref="MemberNameFilter"/>.
+/// </summary>
 internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
 {
     private readonly CancellationToken _cancellationToken;
+    private readonly MemberNameFilter _filter;
+
+    /// <summary>Whether a constructor call could match, so an object creation is bound for its constructor at all.</summary>
+    private readonly bool _constructorsCouldMatch;
+
+    /// <summary>Whether an indexer use could match, so an element access is bound for its indexer at all.</summary>
+    private readonly bool _indexersCouldMatch;
     private readonly Dictionary<INamedTypeSymbol, bool> _checkedTypes = new(SymbolEqualityComparer.Default);
+
+    /// <summary>
+    /// The types whose implicit constructor's base call is recorded already. A partial class has one implicit constructor, recorded
+    /// at its first walked declaration: a declaration in a generated tree is never walked, so the first declaring reference may
+    /// not be. Trees are walked in compilation order, so the choice is deterministic. Created only when a constructor could match.
+    /// </summary>
+    private HashSet<INamedTypeSymbol>? _implicitCallsRecorded;
     private SemanticModel? _model;
     private INamedTypeSymbol? _programType;
 
@@ -21,10 +38,21 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     /// <summary>The current edge source, or null outside a type or inside a type that is not checked.</summary>
     private INamedTypeSymbol? _source;
 
-    public TypeReferenceWalker(CancellationToken cancellationToken) => _cancellationToken = cancellationToken;
+    public TypeReferenceWalker(MemberNameFilter filter, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+
+        _filter = filter;
+        _constructorsCouldMatch = filter.CouldMatch(MemberNames.ConstructorName);
+        _indexersCouldMatch = filter.CouldMatchIndexer;
+        _cancellationToken = cancellationToken;
+    }
 
     /// <summary>The edges found so far; a set, so a repeated edge at one location is kept once.</summary>
     public HashSet<TypeEdge> Edges { get; } = [];
+
+    /// <summary>The member uses found so far whose name passed the filter; a set, so a repeated use at one location is kept once.</summary>
+    public HashSet<MemberEdge> MemberEdges { get; } = [];
 
     /// <summary>Each checked type, with the location of its first declaration seen.</summary>
     public Dictionary<INamedTypeSymbol, SourceLocation> SourceTypes { get; } = new(SymbolEqualityComparer.Default);
@@ -46,6 +74,7 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     public override void VisitClassDeclaration(ClassDeclarationSyntax node)
     {
         var previous = EnterType(node, node.Identifier);
+        AddImplicitBaseConstructorCalls(node);
         base.VisitClassDeclaration(node);
         _source = previous;
     }
@@ -67,6 +96,7 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     public override void VisitRecordDeclaration(RecordDeclarationSyntax node)
     {
         var previous = EnterType(node, node.Identifier);
+        AddImplicitBaseConstructorCalls(node);
         base.VisitRecordDeclaration(node);
         _source = previous;
     }
@@ -111,7 +141,11 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
             return;
         }
 
-        var symbol = Resolve(Model.GetSymbolInfo(node, _cancellationToken));
+        var info = Model.GetSymbolInfo(node, _cancellationToken);
+        var symbol = Resolve(info);
+
+        // Before the type edge, which a member of a written type such as 'Make' in 'Store.Make()' does not give.
+        AddMemberUses(info, node, node.Span);
 
         // 'nint' and 'nuint' are keywords that parse as identifiers; like 'var' and like 'int', they give no edge.
         if (symbol is INamedTypeSymbol { IsNativeIntegerType: true } && node.Identifier.ValueText is "nint" or "nuint")
@@ -138,7 +172,9 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     {
         if (_source is not null)
         {
-            AddEdge(Model.GetSymbolInfo(node, _cancellationToken), node.Identifier.Span);
+            var info = Model.GetSymbolInfo(node, _cancellationToken);
+            AddEdge(NormalizeSymbol(Resolve(info)), node.Identifier.Span);
+            AddMemberUses(info, node, node.Identifier.Span);
         }
 
         base.VisitGenericName(node);
@@ -148,10 +184,158 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     {
         if (_source is not null)
         {
-            AddEdge(Model.GetSymbolInfo(node, _cancellationToken), node.NewKeyword.Span);
+            var info = Model.GetSymbolInfo(node, _cancellationToken);
+            AddEdge(NormalizeSymbol(Resolve(info)), node.NewKeyword.Span);
+            AddMemberUses(info, node, node.NewKeyword.Span);
         }
 
         base.VisitImplicitObjectCreationExpression(node);
+    }
+
+    public override void VisitObjectCreationExpression(ObjectCreationExpressionSyntax node)
+    {
+        // The written type name gives the type edge; the constructor is bound only when a constructor pattern could match.
+        if (_source is not null && _constructorsCouldMatch)
+        {
+            AddMemberUses(Model.GetSymbolInfo(node, _cancellationToken), node, node.NewKeyword.Span);
+        }
+
+        base.VisitObjectCreationExpression(node);
+    }
+
+    public override void VisitConstructorInitializer(ConstructorInitializerSyntax node)
+    {
+        if (_source is not null && _constructorsCouldMatch)
+        {
+            AddMemberUses(Model.GetSymbolInfo(node, _cancellationToken), node, node.ThisOrBaseKeyword.Span);
+        }
+
+        base.VisitConstructorInitializer(node);
+    }
+
+    public override void VisitPrimaryConstructorBaseType(PrimaryConstructorBaseTypeSyntax node)
+    {
+        if (_source is not null && _constructorsCouldMatch)
+        {
+            AddMemberUses(Model.GetSymbolInfo(node, _cancellationToken), node, node.Type.Span);
+        }
+
+        base.VisitPrimaryConstructorBaseType(node);
+    }
+
+    /// <summary>
+    /// Records the base constructor call that C# inserts when a class or record constructor names no base arguments: an implicit
+    /// constructor, a declared one without a <c>: base(...)</c> or <c>: this(...)</c> initializer, and a primary constructor
+    /// whose base type has no argument list. The call goes to the base constructor that takes no arguments, the parameterless
+    /// one or else one whose parameters are all optional or <c>params</c>. It is located at the constructor that makes it: the
+    /// identifier of a declared constructor, or the type's identifier for an implicit or primary constructor, which for a partial
+    /// class is its first walked declaration. A struct has no base constructor call, a static constructor calls none, and a call
+    /// to <see cref="object"/> is not recorded.
+    /// </summary>
+    private void AddImplicitBaseConstructorCalls(TypeDeclarationSyntax node)
+    {
+        if (_source is not { TypeKind: TypeKind.Class, IsStatic: false } type
+            || !_constructorsCouldMatch
+            || type.BaseType is not { SpecialType: not SpecialType.System_Object, TypeKind: not TypeKind.Error } baseType
+            || ParameterlessConstructorOf(baseType) is not { } baseConstructor)
+        {
+            return;
+        }
+
+        if (node.ParameterList is not null)
+        {
+            if (!HasBaseArguments(node))
+            {
+                AddMemberUse(baseConstructor, node, node.Identifier.Span);
+            }
+
+            return;
+        }
+
+        foreach (var member in node.Members)
+        {
+            if (member is ConstructorDeclarationSyntax { Initializer: null } constructor
+                && !constructor.Modifiers.Any(SyntaxKind.StaticKeyword))
+            {
+                AddMemberUse(baseConstructor, constructor, constructor.Identifier.Span);
+            }
+        }
+
+        if (HasImplicitConstructor(type) && (_implicitCallsRecorded ??= new(SymbolEqualityComparer.Default)).Add(type))
+        {
+            AddMemberUse(baseConstructor, node, node.Identifier.Span);
+        }
+    }
+
+    private static bool HasBaseArguments(TypeDeclarationSyntax node)
+    {
+        if (node.BaseList is { } baseList)
+        {
+            foreach (var baseType in baseList.Types)
+            {
+                if (baseType is PrimaryConstructorBaseTypeSyntax)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // The default constructor C# declares for a class without constructors; a record's copy constructor takes an argument.
+    private static bool HasImplicitConstructor(INamedTypeSymbol type)
+    {
+        foreach (var constructor in type.InstanceConstructors)
+        {
+            if (constructor is { IsImplicitlyDeclared: true, Parameters.Length: 0 })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // The constructor a call without arguments binds to: the parameterless one, or else one whose parameters all have defaults or are params.
+    private static IMethodSymbol? ParameterlessConstructorOf(INamedTypeSymbol type)
+    {
+        IMethodSymbol? fallback = null;
+        foreach (var constructor in type.InstanceConstructors)
+        {
+            if (constructor.Parameters.IsEmpty)
+            {
+                return constructor;
+            }
+
+            if (fallback is null && constructor.Parameters.All(p => p.IsOptional || p.IsParams))
+            {
+                fallback = constructor;
+            }
+        }
+
+        return fallback;
+    }
+
+    // An array element access binds to no member, so only an indexer gives a member edge.
+    public override void VisitElementAccessExpression(ElementAccessExpressionSyntax node)
+    {
+        if (_source is not null && _indexersCouldMatch)
+        {
+            AddMemberUses(Model.GetSymbolInfo(node, _cancellationToken), node, node.ArgumentList.Span);
+        }
+
+        base.VisitElementAccessExpression(node);
+    }
+
+    public override void VisitElementBindingExpression(ElementBindingExpressionSyntax node)
+    {
+        if (_source is not null && _indexersCouldMatch)
+        {
+            AddMemberUses(Model.GetSymbolInfo(node, _cancellationToken), node, node.ArgumentList.Span);
+        }
+
+        base.VisitElementBindingExpression(node);
     }
 
     private SemanticModel Model => _model ?? throw new InvalidOperationException("The walker is not walking a tree.");
@@ -315,7 +499,66 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     private static ISymbol? Resolve(SymbolInfo info) =>
         info.Symbol ?? (info.CandidateSymbols.Length > 0 ? info.CandidateSymbols[0] : null);
 
-    private void AddEdge(SymbolInfo info, TextSpan span) => AddEdge(NormalizeSymbol(Resolve(info)), span);
+    /// <summary>
+    /// Records the member use of the bound symbol or, when binding found no single symbol (a call with a dynamic argument, an
+    /// ambiguity), of every candidate: the edge set de-duplicates, and the candidates share a simple name. With an empty filter
+    /// it returns at once, so a pack without <c>members</c> patterns pays nothing here.
+    /// </summary>
+    private void AddMemberUses(SymbolInfo info, SyntaxNode node, TextSpan span)
+    {
+        if (_filter.IsEmpty)
+        {
+            return;
+        }
+
+        if (info.Symbol is { } symbol)
+        {
+            AddMemberUse(symbol, node, span);
+            return;
+        }
+
+        foreach (var candidate in info.CandidateSymbols)
+        {
+            AddMemberUse(candidate, node, span);
+        }
+    }
+
+    /// <summary>Records a member edge when the symbol is a member whose simple name passes the filter, and the name is not inside a <c>nameof</c>.</summary>
+    /// <remarks>
+    /// A name that binds to a constructor is an attribute name, and an attribute constructor is not a use. An indexer skips the
+    /// name filter: C# matches an indexer to the interface indexer it implements by signature, not by name, so an indexer
+    /// named <c>Chars</c> can implement one named <c>Item</c>, and only its chain shows that name. Element accesses are bound
+    /// whenever the filter is not empty, so this adds no binding.
+    /// </remarks>
+    private void AddMemberUse(ISymbol symbol, SyntaxNode node, TextSpan span)
+    {
+        if (_source is null
+            || (node is SimpleNameSyntax && symbol is IMethodSymbol { MethodKind: MethodKind.Constructor })
+            || MemberNames.UsedMember(symbol) is not { } member
+            || (member is not IPropertySymbol { IsIndexer: true } && !_filter.CouldMatch(MemberNames.SimpleNameOf(member)))
+            || IsInsideNameOf(node))
+        {
+            return;
+        }
+
+        MemberEdges.Add(new MemberEdge(_source, member, ToLocation(span)));
+    }
+
+    /// <summary>True when the node is part of the argument of a <c>nameof</c>, which names a member without using it.</summary>
+    private bool IsInsideNameOf(SyntaxNode node)
+    {
+        for (var current = node.Parent; current is ExpressionSyntax or ArgumentSyntax or ArgumentListSyntax; current = current.Parent)
+        {
+            if (current is InvocationExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.ValueText: "nameof" } name } invocation
+                && invocation.ArgumentList.Span.Contains(node.Span)
+                && Model.GetSymbolInfo(name, _cancellationToken).Symbol is null)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private void AddEdge(INamedTypeSymbol? target, TextSpan span)
     {

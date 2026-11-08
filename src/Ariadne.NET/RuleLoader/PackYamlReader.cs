@@ -34,7 +34,7 @@ internal static class PackYamlReader
     private static readonly string[] RetargetKeys = ["name", "namespaces", "assemblies"];
 
     private static readonly string[] RuleKeys =
-        ["id", "because", "description", "forbid", "allowOnly", "require", "exceptions", "locked"];
+        ["id", "because", "description", "forbid", "allowOnly", "require", "bannedPackages", "uniqueNames", "exceptions", "locked"];
 
     private static readonly string[] AmendmentKeys = ["id", "exceptions"];
 
@@ -43,14 +43,26 @@ internal static class PackYamlReader
     private static readonly string[] TargetKeys =
         ["layers", "namespaces", "assemblies", "types", "baseTypes", "interfaces", "attributes"];
 
+    // Members name APIs, so only the 'to' of forbid and allowOnly takes them.
+    private static readonly string[] ToKeys = [.. TargetKeys, "members"];
+
+    private static readonly string[] BannedPackagesKeys = ["packages", "from"];
+
+    private static readonly string[] UniqueNamesKeys = ["for", "against"];
+
     private static readonly string[] RequireKeys = ["for", "layer", "kind", "accessibility", "implements"];
 
     // What a type must implement is matched by name only: its namespace, assembly or full name.
     private static readonly string[] ImplementsKeys = ["namespaces", "assemblies", "types"];
 
-    private static readonly string[] OtherSelectorKeys = ["namespaces", "assemblies", "types", "baseTypes", "interfaces", "attributes"];
+    private static readonly string[] OtherSelectorKeys = ["namespaces", "assemblies", "types", "baseTypes", "interfaces", "attributes", "members"];
 
     private static readonly string[] ExceptionKeys = ["namespaces", "assemblies", "types", "because"];
+
+    private const string RuleBodyKeys = "'forbid', 'allowOnly', 'require', 'bannedPackages' or 'uniqueNames'";
+
+    private readonly record struct RuleBody(
+        RuleKind Kind, TargetSelector From, TargetSelector To, RuleRequirement? Require, List<string> Packages, TargetSelector Against);
 
     private static readonly string[] RoleKeys =
     [
@@ -318,7 +330,10 @@ internal static class PackYamlReader
             var before = _problems.Count;
             var fields = Fields(map, RuleKeys, where);
             var id = RequiredString(fields, "id", where, map);
-            var exceptions = ReadExceptions(fields, where);
+            var exceptionKind = fields.ContainsKey("bannedPackages") ? RuleKind.BannedPackages
+                : fields.ContainsKey("uniqueNames") ? RuleKind.UniqueNames
+                : RuleKind.Forbid;
+            var exceptions = ReadExceptions(fields, where, exceptionKind);
 
             if (fields.ContainsKey("exceptions") && OnlyKeys(fields, AmendmentKeys))
             {
@@ -351,37 +366,116 @@ internal static class PackYamlReader
                     From = read.From,
                     To = read.To,
                     Require = read.Require,
+                    Packages = read.Packages,
+                    Against = read.Against,
                     Exceptions = exceptions,
                     Locked = locked ?? false,
                 });
             }
         }
 
-        // Exactly one of forbid, allowOnly or require.
-        private (RuleKind Kind, TargetSelector From, TargetSelector To, RuleRequirement? Require)? ReadRuleBody(
-            Dictionary<string, Field> fields, YamlMappingNode map, string where)
+        // Exactly one of forbid, allowOnly, require, bannedPackages or uniqueNames.
+        private RuleBody? ReadRuleBody(Dictionary<string, Field> fields, YamlMappingNode map, string where)
         {
             var hasForbid = fields.TryGetValue("forbid", out var forbid);
             var hasAllowOnly = fields.TryGetValue("allowOnly", out var allowOnly);
             var hasRequire = fields.TryGetValue("require", out var require);
-            var count = (hasForbid ? 1 : 0) + (hasAllowOnly ? 1 : 0) + (hasRequire ? 1 : 0);
+            var hasBanned = fields.TryGetValue("bannedPackages", out var banned);
+            var hasUnique = fields.TryGetValue("uniqueNames", out var unique);
+            var count = (hasForbid ? 1 : 0) + (hasAllowOnly ? 1 : 0) + (hasRequire ? 1 : 0) + (hasBanned ? 1 : 0) + (hasUnique ? 1 : 0);
             if (count != 1)
             {
-                YamlNode at = count == 0 ? map : Latest(hasForbid ? forbid.Key : null, hasAllowOnly ? allowOnly.Key : null, hasRequire ? require.Key : null);
-                Add(at, $"{where} must have exactly one of 'forbid', 'allowOnly' or 'require'");
+                YamlNode at = count == 0
+                    ? map
+                    : Latest(hasForbid ? forbid.Key : null, hasAllowOnly ? allowOnly.Key : null, hasRequire ? require.Key : null, hasBanned ? banned.Key : null, hasUnique ? unique.Key : null);
+                Add(at, $"{where} must have exactly one of {RuleBodyKeys}");
                 return null;
             }
 
             if (hasRequire)
             {
                 return ReadRequire(in require, where) is { } required
-                    ? (RuleKind.Require, required.For, new TargetSelector(), required.Require)
+                    ? new RuleBody(RuleKind.Require, required.For, new TargetSelector(), required.Require, [], new TargetSelector())
+                    : null;
+            }
+
+            if (hasBanned)
+            {
+                return ReadBannedPackages(in banned, where) is { } bannedRule
+                    ? new RuleBody(RuleKind.BannedPackages, bannedRule.From, new TargetSelector(), null, bannedRule.Packages, new TargetSelector())
+                    : null;
+            }
+
+            if (hasUnique)
+            {
+                return ReadUniqueNames(in unique, where) is { } uniqueRule
+                    ? new RuleBody(RuleKind.UniqueNames, uniqueRule.For, new TargetSelector(), null, [], uniqueRule.Against)
                     : null;
             }
 
             return (hasForbid ? ReadKind(in forbid, where) : ReadKind(in allowOnly, where)) is { } pair
-                ? (hasForbid ? RuleKind.Forbid : RuleKind.AllowOnly, pair.From, pair.To, null)
+                ? new RuleBody(hasForbid ? RuleKind.Forbid : RuleKind.AllowOnly, pair.From, pair.To, null, [], new TargetSelector())
                 : null;
+        }
+
+        private (List<string> Packages, TargetSelector From)? ReadBannedPackages(in Field field, string ruleWhere)
+        {
+            if (field.Value is not YamlMappingNode map)
+            {
+                Add(field.Key, $"'bannedPackages' in {ruleWhere} must be a mapping");
+                return null;
+            }
+
+            var where = $"the bannedPackages of {ruleWhere}";
+            var before = _problems.Count;
+            var fields = Fields(map, BannedPackagesKeys, where);
+
+            // Package ids are ordinary dotted names; they match case-insensitively when a project's packages are checked.
+            var packages = PatternList(fields, "packages", where, Glob.Dotted);
+            if (packages is { Count: 0 } || (packages is null && !fields.ContainsKey("packages")))
+            {
+                Add(fields.TryGetValue("packages", out var packagesField) ? packagesField.Key : map, $"{where} needs at least one entry in 'packages'");
+            }
+
+            var from = new TargetSelector();
+            if (fields.TryGetValue("from", out var fromField))
+            {
+                if (fromField.Value is not YamlMappingNode fromMap)
+                {
+                    Add(fromField.Key, $"'from' in {where} must be a mapping");
+                }
+                else
+                {
+                    var fromWhere = $"the from of {ruleWhere}";
+                    var fromFields = Fields(fromMap, ToKeys, fromWhere);
+                    foreach (var (key, entry) in fromFields)
+                    {
+                        if (!string.Equals(key, "assemblies", StringComparison.Ordinal))
+                        {
+                            Add(entry.Key, $"'{key}' is not accepted in {fromWhere}; a package belongs to a project, so 'from' selects projects by 'assemblies' only");
+                        }
+                    }
+
+                    from = new TargetSelector { Assemblies = PatternList(fromFields, "assemblies", fromWhere, Glob.Flat) ?? [] };
+                }
+            }
+
+            return _problems.Count == before && packages is not null ? (packages, from) : null;
+        }
+
+        private (TargetSelector For, TargetSelector Against)? ReadUniqueNames(in Field field, string ruleWhere)
+        {
+            if (field.Value is not YamlMappingNode map)
+            {
+                Add(field.Key, $"'uniqueNames' in {ruleWhere} must be a mapping");
+                return null;
+            }
+
+            var where = $"the uniqueNames of {ruleWhere}";
+            var fields = Fields(map, UniqueNamesKeys, where);
+            var subject = ReadTarget(fields, "for", where, ruleWhere, map);
+            var against = ReadTarget(fields, "against", where, ruleWhere, map);
+            return subject is not null && against is not null ? (subject, against) : null;
         }
 
         private (TargetSelector For, RuleRequirement Require)? ReadRequire(in Field field, string ruleWhere)
@@ -498,7 +592,7 @@ internal static class PackYamlReader
                 return null;
             }
 
-            return ReadSelector(map, $"the {key} of {ruleWhere}", ruleWhere, TargetKeys);
+            return ReadSelector(map, $"the {key} of {ruleWhere}", ruleWhere, string.Equals(key, "to", StringComparison.Ordinal) ? ToKeys : TargetKeys);
         }
 
         // One selector mapping. Only the given keys may appear; 'layers' stands alone, as it cannot mix with code patterns.
@@ -514,6 +608,7 @@ internal static class PackYamlReader
                 {
                     "layers" => StringList(fields, "layers", where),
                     "assemblies" => PatternList(fields, "assemblies", where, Glob.Flat),
+                    "members" => PatternList(fields, "members", where, MemberPattern),
                     _ => PatternList(fields, keys[i], where, Glob.Dotted),
                 };
                 selectors[i] = (keys[i], lists[i]);
@@ -521,7 +616,8 @@ internal static class PackYamlReader
 
             if (fields.TryGetValue("layers", out var layersField) && OtherSelectorKeys.Any(fields.ContainsKey))
             {
-                Add(layersField.Key, $"a target in {ruleWhere} cannot mix 'layers' with 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces' or 'attributes'");
+                var others = keys.Where(static k => !string.Equals(k, "layers", StringComparison.Ordinal)).ToArray();
+                Add(layersField.Key, $"a target in {ruleWhere} cannot mix 'layers' with {JoinOr(others)}");
             }
             else if (NoneSelected(fields, selectors))
             {
@@ -538,6 +634,7 @@ internal static class PackYamlReader
                     BaseTypes = ListFor(lists, keys, "baseTypes"),
                     Interfaces = ListFor(lists, keys, "interfaces"),
                     Attributes = ListFor(lists, keys, "attributes"),
+                    Members = ListFor(lists, keys, "members"),
                 }
                 : null;
         }
@@ -548,7 +645,7 @@ internal static class PackYamlReader
             return at < 0 ? [] : lists[at] ?? [];
         }
 
-        private List<RuleException> ReadExceptions(Dictionary<string, Field> ruleFields, string ruleWhere)
+        private List<RuleException> ReadExceptions(Dictionary<string, Field> ruleFields, string ruleWhere, RuleKind kind)
         {
             var exceptions = new List<RuleException>();
             var items = Items(ruleFields, "exceptions", ruleWhere);
@@ -567,9 +664,11 @@ internal static class PackYamlReader
                 var assemblies = PatternList(fields, "assemblies", where, Glob.Flat);
                 var types = PatternList(fields, "types", where, Glob.Dotted);
                 var because = RequiredString(fields, "because", where, map);
-                if (NoneSelected(fields, [("namespaces", namespaces), ("assemblies", assemblies), ("types", types)]))
+                var misplaced = RejectMisplaced(fields, where, kind);
+                if (!misplaced && NoneSelected(fields, [("namespaces", namespaces), ("assemblies", assemblies), ("types", types)]))
                 {
-                    Add(map, $"{where} needs at least one of 'namespaces', 'assemblies', 'types'");
+                    var allowed = ExceptionKeyRules.Allowed(kind);
+                    Add(map, allowed.Length == 1 ? $"{where} needs '{allowed[0]}'" : $"{where} needs at least one of {JoinList(allowed)}");
                 }
 
                 if (_problems.Count == before && because is not null)
@@ -586,6 +685,29 @@ internal static class PackYamlReader
 
             return exceptions;
         }
+
+        // The keys the rule kind does not take are reported at the key itself.
+        private bool RejectMisplaced(Dictionary<string, Field> fields, string where, RuleKind kind)
+        {
+            var found = false;
+            foreach (var (key, field) in fields)
+            {
+                if (ExceptionKeyRules.Rejection(kind, key) is { } reason)
+                {
+                    Add(field.Key, $"'{key}' is not accepted in {where}; {reason}");
+                    found = true;
+                }
+            }
+
+            return found;
+        }
+
+        private static string JoinList(string[] keys) => string.Join(", ", keys.Select(static k => $"'{k}'"));
+
+        private static string JoinOr(IReadOnlyList<string> keys) =>
+            keys.Count == 1
+                ? $"'{keys[0]}'"
+                : $"{string.Join(", ", keys.Take(keys.Count - 1).Select(static k => $"'{k}'"))} or '{keys[^1]}'";
 
         private void ReadRole(YamlNode node, int index, List<ComponentRoleDefinition> roles)
         {
@@ -687,6 +809,10 @@ internal static class PackYamlReader
                 if (Array.IndexOf(allowed, key) >= 0)
                 {
                     fields.TryAdd(key, new Field(scalar, value));
+                }
+                else if (string.Equals(key, "members", StringComparison.Ordinal))
+                {
+                    Add(scalar, $"'members' is not accepted in {where}; it names APIs and only the 'to' of a 'forbid' or 'allowOnly' rule takes it");
                 }
                 else if (isPack && string.Equals(key, CodeFeatureRulesKey, StringComparison.Ordinal))
                 {
@@ -849,6 +975,13 @@ internal static class PackYamlReader
 
             return values;
         }
+
+        // A member name always has a type segment before the member, so a one-segment pattern could never match. A pattern
+        // that starts with '**' can still span both segments. The reason does not quote the pattern: the problem line does.
+        private static Result<Glob, string> MemberPattern(string pattern) =>
+            !pattern.Contains('.', StringComparison.Ordinal) && !pattern.StartsWith("**", StringComparison.Ordinal)
+                ? Result<Glob, string>.Failure("a member pattern needs a type and a member, as 'Namespace.Type.Member'; start it with '**.' to match the member in any type")
+                : Glob.Dotted(pattern);
 
         // The entries of a list-valued key; an absent key is an empty list.
         private IList<YamlNode> Items(Dictionary<string, Field> fields, string key, string where)

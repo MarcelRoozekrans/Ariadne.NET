@@ -19,7 +19,7 @@ public static class RuleTools
     }
 
     [McpServerTool(Name = "get_rules")]
-    [Description("Get the forbid, allowOnly and require rules of the resolved pack, each with its id, targets, requirement, exceptions and because.")]
+    [Description("Get the forbid, allowOnly, require, bannedPackages and uniqueNames rules of the resolved pack, each with its id, targets, requirement, packages, against selector, exceptions and because. A forbid or allowOnly target may select members.")]
     public static IList<RuleDefinition> GetRules(
         IRuleResolutionHelper helper,
         [Description("Template name. Optional - auto-detects from .architecture/rules.yaml.")]

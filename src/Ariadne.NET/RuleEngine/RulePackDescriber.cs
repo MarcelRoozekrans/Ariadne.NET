@@ -28,9 +28,17 @@ public static class RulePackDescriber
             RuleKind.Forbid => "forbid",
             RuleKind.AllowOnly => "allowOnly",
             RuleKind.Require => "require",
+            RuleKind.BannedPackages => "bannedPackages",
+            RuleKind.UniqueNames => "uniqueNames",
             _ => rule.Kind.ToString(),
         };
-        var target = rule.Kind == RuleKind.Require ? Describe(rule.Require) : Describe(rule.To);
+        var target = rule.Kind switch
+        {
+            RuleKind.Require => Describe(rule.Require),
+            RuleKind.BannedPackages => $"packages {string.Join(", ", rule.Packages)}",
+            RuleKind.UniqueNames => $"against {Describe(rule.Against)}",
+            _ => Describe(rule.To),
+        };
         var lines = new List<string> { $"{rule.Id} {kind} {Describe(rule.From)} -> {target}" };
         if (rule.Exceptions.Count > 0)
         {
@@ -52,7 +60,8 @@ public static class RulePackDescriber
             selector.Types,
             selector.BaseTypes,
             selector.Interfaces,
-            selector.Attributes);
+            selector.Attributes,
+            selector.Members);
     }
 
     /// <summary>The requirement members in the order layer, kind, accessibility, implements, joined by ", ", or <c>no requirement</c>.</summary>
@@ -94,7 +103,7 @@ public static class RulePackDescriber
         return string.Concat(char.ToLowerInvariant(name[0]).ToString(), name.AsSpan(1));
     }
 
-    // Kinds in the order layers, namespaces, assemblies, types, baseTypes, interfaces, attributes; kinds joined by "; ", values by ", ".
+    // Kinds in the order layers, namespaces, assemblies, types, baseTypes, interfaces, attributes, members; kinds joined by "; ", values by ", ".
     private static string Describe(
         IList<string> namespaces,
         IList<string> assemblies,
@@ -102,7 +111,8 @@ public static class RulePackDescriber
         IList<string>? types = null,
         IList<string>? baseTypes = null,
         IList<string>? interfaces = null,
-        IList<string>? attributes = null)
+        IList<string>? attributes = null,
+        IList<string>? members = null)
     {
         var parts = new List<string>();
         AddKind(parts, "layers", layers);
@@ -112,6 +122,7 @@ public static class RulePackDescriber
         AddKind(parts, "baseTypes", baseTypes);
         AddKind(parts, "interfaces", interfaces);
         AddKind(parts, "attributes", attributes);
+        AddKind(parts, "members", members);
         return parts.Count > 0 ? string.Join("; ", parts) : "no selectors";
     }
 

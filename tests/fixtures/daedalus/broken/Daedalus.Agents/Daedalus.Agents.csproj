@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="ZeroAlloc.Resilience" Version="3.4.0" />
     <ProjectReference Include="..\Rag.NET\Rag.NET.csproj" />
   </ItemGroup>
 

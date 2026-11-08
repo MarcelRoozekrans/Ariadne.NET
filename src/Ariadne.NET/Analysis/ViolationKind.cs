@@ -26,4 +26,13 @@ public enum ViolationKind
 
     /// <summary>A type a require rule selects is not in the layer the rule requires.</summary>
     WrongLayer = 8,
+
+    /// <summary>A project references a package that a bannedPackages rule bars it from.</summary>
+    BannedPackage = 9,
+
+    /// <summary>
+    /// A type keeps the simple name of another type that its uniqueNames rule sets it apart from. The target is the other
+    /// type's full name, without its assembly; when the two full names are equal, the message names both assemblies.
+    /// </summary>
+    NameCollision = 10,
 }

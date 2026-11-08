@@ -109,4 +109,25 @@ public class GlobTests
 
         (GC.GetAllocatedBytesForCurrentThread() - before).Should().Be(0);
     }
+
+    [Theory]
+    [InlineData("Newtonsoft.**", "NEWTONSOFT.Json.Bson", true)]
+    [InlineData("**.fluent*", "Shop.FLUENTValidation", true)]
+    [InlineData("fluentvalidation", "FluentValidation", true)]
+    [InlineData("fluentvalidation", "FluentValidations", false)]
+    public void DottedIgnoreCase_MatchesWhateverTheCase(string pattern, string name, bool expected)
+    {
+        var glob = Glob.Dotted(pattern, ignoreCase: true);
+
+        glob.IsSuccess.Should().BeTrue();
+        glob.Value.IsMatch(name).Should().Be(expected);
+    }
+
+    [Fact]
+    public void DottedAndFlat_StayCaseSensitive()
+    {
+        Glob.Dotted("fluentvalidation").Value.IsMatch("FluentValidation").Should().BeFalse();
+        Glob.Dotted("Shop.**").Value.IsMatch("shop.Domain").Should().BeFalse();
+        Glob.Flat("shop*").Value.IsMatch("Shop.Domain").Should().BeFalse();
+    }
 }
