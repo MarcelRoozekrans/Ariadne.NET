@@ -90,6 +90,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Goal:** Rule types for banned packages over the resolved package graph, member-level forbidden APIs per layer with the security worked example, and the same type name kept in two layers.
 **Surface:** Backend
 **HelpWanted:** no
+**Design:** `docs/superpowers/specs/2026-11-08-phase-2.4-banned-packages-forbidden-apis-name-collisions-design.md`
 **Plan:** _to be written_
 
 ### Phase 2.5: Vacuity detection [status: pending]
