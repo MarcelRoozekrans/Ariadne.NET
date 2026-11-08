@@ -142,3 +142,27 @@ I ran `tools/perf/Ariadne.NET.Perf` (5 runs) from each tree on the same solution
 The 2.3 tool checking the 2.4 solution allocates 563.5 MB, as much as the 2.4 tool does. The roughly 102 MB of growth, about 2.16 MB per type against 1.96 MB, therefore appears with the 2.3 code too. It comes from what the phase 2.4 solution contains: the added types are heavier to bind than the average 2.3 type. The time differences are within the noise of the shared VM.
 
 So no unconditional allocation was found in the type graph build or the validator. The member-edge work stays off for a pack without `members` patterns, as the attribution experiment above already showed (1.2% for the repo pack's one member rule).
+
+## After the final review fixes
+
+Measured on 2026-11-08 at `a77cfd5`, with the same command, VM and Release configuration. The load average was 0.8 before the run and 1.1 after it, much quieter than for the first 2.4 run. The final review fixes added one path that runs for this pack: the walker now records the base constructor call C# inserts into a constructor without base arguments, and the `System.Console.*` member rule turns it on, because its `*` member segment can match `new`.
+
+```
+run 1: load 3010 ms, check 1505.5 ms, check allocated 574,987,984 bytes
+run 2: load 2830 ms, check 1387.1 ms, check allocated 574,950,360 bytes
+run 3: load 3083 ms, check 1406.7 ms, check allocated 574,903,528 bytes
+run 4: load 2836 ms, check 1390.6 ms, check allocated 574,905,784 bytes
+run 5: load 2594 ms, check 1402.9 ms, check allocated 574,896,616 bytes
+projects 12, types 262, violations 0
+median (5 runs): load 2836 ms, check 1402.9 ms, check allocated 574,905,784 bytes
+```
+
+| Metric | Phase 2.4, first run | After the fixes | Change |
+| --- | --- | --- | --- |
+| Types checked | 261 | 262 | +1 |
+| Load time (median of 5) | 3534 ms | 2836 ms | -20% |
+| Check time (median of 5) | 1554.1 ms | 1402.9 ms | -10% |
+| Check allocations (median of 5) | 570,256,824 bytes | 574,905,784 bytes | +0.8% |
+| Allocations per type | about 2.185 MB | about 2.194 MB | +0.4% |
+
+Nothing changed beyond noise. Allocations per type grew 0.4%, which the added test types and the few extra member edges cover. The shorter load and check times come from the quieter VM, not from the code.
