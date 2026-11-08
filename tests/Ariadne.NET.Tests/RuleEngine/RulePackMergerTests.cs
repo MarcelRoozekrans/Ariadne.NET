@@ -160,6 +160,51 @@ public class RulePackMergerTests
     }
 
     [Fact]
+    public void Amendment_KeepsPackagesAndAgainst()
+    {
+        var banned = new RuleDefinition
+        {
+            Id = "B1",
+            Because = "because",
+            Kind = RuleKind.BannedPackages,
+            From = new TargetSelector { Assemblies = ["Shop.Domain"] },
+            Packages = ["FluentValidation"],
+        };
+        var unique = new RuleDefinition
+        {
+            Id = "U1",
+            Because = "because",
+            Kind = RuleKind.UniqueNames,
+            From = new TargetSelector { Layers = ["Web"] },
+            Against = new TargetSelector { Layers = ["Application"] },
+        };
+
+        var result = _merger.Merge(
+        [
+            new RulePack { Name = "parent", Rules = [banned, unique] },
+            new RulePack
+            {
+                Name = "child",
+                RuleAmendments =
+                [
+                    new RuleAmendment { Id = "B1", Exceptions = [Exception("two")] },
+                    new RuleAmendment { Id = "U1", Exceptions = [Exception("two")] },
+                ],
+            },
+        ]);
+
+        result.IsSuccess.Should().BeTrue();
+        var mergedBanned = result.Value.Rules[0];
+        mergedBanned.Kind.Should().Be(RuleKind.BannedPackages);
+        mergedBanned.Packages.Should().Equal("FluentValidation");
+        mergedBanned.Exceptions.Should().ContainSingle();
+        var mergedUnique = result.Value.Rules[1];
+        mergedUnique.Kind.Should().Be(RuleKind.UniqueNames);
+        mergedUnique.Against.Layers.Should().Equal("Application");
+        mergedUnique.Exceptions.Should().ContainSingle();
+    }
+
+    [Fact]
     public void AmendmentOfLockedRule_Fails()
     {
         var result = _merger.Merge(

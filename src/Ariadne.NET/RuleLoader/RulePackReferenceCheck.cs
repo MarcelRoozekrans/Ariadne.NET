@@ -103,6 +103,7 @@ internal static class RulePackReferenceCheck
         {
             CheckTargetLayers(rule.Id, rule.From, layerNames, failures);
             CheckTargetLayers(rule.Id, rule.To, layerNames, failures);
+            CheckTargetLayers(rule.Id, rule.Against, layerNames, failures);
 
             if (rule.Require?.Layer is { } required && !Contains(layerNames, required))
             {
