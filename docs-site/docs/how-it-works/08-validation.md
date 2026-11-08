@@ -103,7 +103,7 @@ An element that selects no type in the projects loaded cannot fail, so it is a v
 - A role is vacuous when no type in its layer matches it.
 - A rule or role whose subject resolves only through layers already reported as vacuous gets no second violation.
 - `allowEmpty: true` on a rule or a role accepts the empty selection. A layer has no opt-out; retarget it in the pack that extends the base pack. The built-in packs set `allowEmpty` on every role.
-- Vacuity is relative to the projects loaded. A run on a single `.csproj` reports layers that live in other projects as vacuous.
+- Vacuity is relative to the projects loaded. A run on a single `.csproj` reports as vacuous the layers whose types the loaded projects neither declare nor reference; a layer in another project counts as covered when a loaded project references its types. A layer of only generated types is vacuous.
 
 See [Rule Schema](03-rule-schema.md#rules-that-select-nothing).
 
@@ -113,12 +113,12 @@ See [Rule Schema](03-rule-schema.md#rules-that-select-nothing).
 ArchitectureReport
   ├── IsValid: bool                          (true when there are no violations)
   ├── Violations: IReadOnlyList<ArchitectureViolation>
-  │     ├── RuleId: string                   (a layer id, a rule id, ROLE-<Name>, CODE-001 or CODE-002)
+  │     ├── RuleId: string                   (a layer id, a rule id, ROLE-<Name>, CODE-001 or CODE-002; for a vacuous role, the bare role name)
   │     ├── Kind: ViolationKind              (DependencyNotAllowed, ForbiddenDependency,
   │     │                                     DependencyNotPermitted, LayerOverlap, TypeKindMismatch,
   │     │                                     AccessibilityMismatch, MissingInterface, WrongLayer,
-  │     │                                     VacuousRule, VacuousLayer)
-  │     ├── SourceType: string               (fully qualified name)
+  │     │                                     BannedPackage, NameCollision, VacuousRule, VacuousLayer)
+  │     ├── SourceType: string               (fully qualified name; for a vacuous violation the layer name, rule id or role name)
   │     ├── Target: string?                  (the type depended on, absent for role, require and overlap checks)
   │     ├── Location: SourceLocation?        (file path, line, column; the first reference)
   │     ├── ReferenceCount: int

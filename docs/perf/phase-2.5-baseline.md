@@ -58,4 +58,4 @@ To separate the pass from the growth of the solution, I built the commit before 
 | `9ee6b09`, before the default changed | 325 | 1796.3 ms | 741,315,176 bytes |
 | Phase 2.5 head | 326 | 1829.5 ms | 758,533,984 bytes |
 
-The head allocates 17.2 MB, or 2.3%, more than the commit before it, for one more type. That is the cost of the vacuity pass, which re-runs the layer and selector matching over the source types and edges of every graph, plus the role matches kept for it. The time difference of 33 ms (1.8%) is within the noise of this VM. This is within the noise that the earlier phases accepted, and the pass runs once per validation next to a load of 3 seconds.
+The head allocates 17.2 MB, or 2.3%, more than the commit before it, for one more type. That is the cost of the vacuity pass, which re-runs the layer and selector matching over the source types and edges of every graph. The time difference of 33 ms (1.8%) is within the noise of this VM. This is within the noise that the earlier phases accepted, and the pass runs once per validation next to a load of 3 seconds.
