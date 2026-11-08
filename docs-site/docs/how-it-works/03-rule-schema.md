@@ -163,9 +163,9 @@ A rule is an entry in `rules:`. It has exactly one of `forbid`, `allowOnly`, `re
 
 A **target** is either `layers: [...]` or a [selector](#selectors) made of `namespaces`, `assemblies`, `types`, `baseTypes`, `interfaces` and `attributes`. Mixing `layers` with selector kinds in one target is a load error, and a target must select something.
 
-An exception takes `namespaces`, `assemblies` and `types` (at least one) and a required `because`. Exceptions exempt the source type, the same way for `forbid` and `allowOnly`.
+An exception takes `namespaces`, `assemblies` and `types` (at least one) and a required `because`; on a `bannedPackages` rule only `assemblies`, and on a `uniqueNames` rule only `namespaces` and `types`. Exceptions exempt the source type, the same way for `forbid` and `allowOnly`.
 
-Both kinds of rule apply regardless of layers: a `forbid` between two types of the same layer still fires. As with layers, the engine reports one violation per rule, source type and target type, located at the first reference, with the number of references. Each carries the rule's `id` and `because`.
+Rules apply regardless of layers: a `forbid` between two types of the same layer still fires. As with layers, the engine reports one violation per rule, source type and target type, located at the first reference, with the number of references. Each carries the rule's `id` and `because`.
 
 ```yaml
 rules:
