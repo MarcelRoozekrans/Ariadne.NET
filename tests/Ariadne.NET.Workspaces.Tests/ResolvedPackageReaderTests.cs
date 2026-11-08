@@ -93,6 +93,25 @@ public sealed class ResolvedPackageReaderTests : IDisposable
     }
 
     [Fact]
+    public void NoFramework_RuntimeIdentifierEntriesOfOneFramework_AreOneFramework()
+    {
+        var targets = """ "net10.0": { "P/1.0.0": { "type": "package" } }, "net10.0/linux-x64": { "P/1.0.0": { "type": "package" }, "Q/1.0.0": { "type": "package" } } """;
+
+        var packages = Read(Assets(targets, """ "net10.0": [ "P >= 1.0.0" ] """), null);
+
+        packages.Select(p => p.Id).Should().Equal("P");
+    }
+
+    [Fact]
+    public void NoFramework_TwoFrameworks_AreUnknown()
+    {
+        var targets = """ "net9.0": { "P/1.0.0": { "type": "package" } }, "net10.0": { "P/1.0.0": { "type": "package" } } """;
+        var path = Write(Assets(targets, """ "net9.0": [ "P >= 1.0.0" ], "net10.0": [ "P >= 1.0.0" ] """));
+
+        ResolvedPackageReader.TryRead(path, null, out _).Should().BeFalse();
+    }
+
+    [Fact]
     public void MalformedJson_Throws()
     {
         var path = Write("""{ "targets": { "net10.0": """);

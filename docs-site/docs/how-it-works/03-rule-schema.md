@@ -61,7 +61,7 @@ Every mapping in a pack has a closed set of keys. An unknown key, a missing requ
 | `author` | no | Pack author or maintainer, default `""`. |
 | `extends` | no | Parent pack references: `builtin://name` or `import://name`. See [`extends`](#extends). |
 | `layers` | no | List of layers. |
-| `rules` | no | List of `forbid` and `allowOnly` rules. |
+| `rules` | no | List of `forbid`, `allowOnly`, `require`, `bannedPackages` and `uniqueNames` rules. |
 | `componentRoles` | no | List of component roles, used for code generation and role checks. |
 | `namingConventions` | no | Templates for namespaces and file paths. |
 
@@ -146,7 +146,7 @@ The C# model is `LayerDefinition`:
 
 ## Rules
 
-A rule is an entry in `rules:`. It has exactly one of `forbid`, `allowOnly` or `require`.
+A rule is an entry in `rules:`. It has exactly one of `forbid`, `allowOnly`, `require`, `bannedPackages` or `uniqueNames`.
 
 | Key | Required | Meaning |
 |-----|----------|---------|
@@ -156,7 +156,9 @@ A rule is an entry in `rules:`. It has exactly one of `forbid`, `allowOnly` or `
 | `forbid` | one of | `{ from: <target>, to: <target> }`: no type in `from` may depend on a type in `to`. Reported as `ForbiddenDependency`. |
 | `allowOnly` | one of | `{ from: <target>, to: <target> }`: a type in `to` may be depended on only by types in `from`, or by types in `to` itself. Any other source is reported as `DependencyNotPermitted`. |
 | `require` | one of | `{ for: <selector>, layer, kind, accessibility, implements }`: every type that `for` selects must satisfy the requirement. At least one of `layer`, `kind`, `accessibility` and `implements` is needed. See [Require rules](#require-rules). |
-| `exceptions` | no | List of selectors, each with a required `because`. A source type that an exception matches is exempt from the rule. |
+| `bannedPackages` | one of | `{ packages: [...], from: { assemblies: [...] } }`: no project in `from` may resolve a package that `packages` matches. Reported as `BannedPackage`. See [Banned packages](#banned-packages). |
+| `uniqueNames` | one of | `{ for: <target>, against: <target> }`: no type in `for` may share a simple name with a type in `against`. Reported as `NameCollision`. See [Unique names](#unique-names). |
+| `exceptions` | no | List of selectors, each with a required `because`. A source type that an exception matches is exempt from the rule. On a `bannedPackages` rule an exception takes `assemblies` only, and on a `uniqueNames` rule `namespaces` and `types` only. |
 | `locked` | no, default `false` | A child pack cannot add exceptions to this rule. |
 
 A **target** is either `layers: [...]` or a [selector](#selectors) made of `namespaces`, `assemblies`, `types`, `baseTypes`, `interfaces` and `attributes`. Mixing `layers` with selector kinds in one target is a load error, and a target must select something.
@@ -179,7 +181,7 @@ rules:
         because: DI registration wires the interface to its implementation.
 ```
 
-The C# model is `RuleDefinition`, with `Id`, `Because`, `Description`, `Kind` (`RuleKind.Forbid`, `RuleKind.AllowOnly` or `RuleKind.Require`), `From` and `To` (`TargetSelector`), `Require` (`RuleRequirement?`, with `Layer`, `Kind`, `Accessibility` and `Implements`), `Exceptions` (`IList<RuleException>`) and `Locked`. For a `require` rule `From` holds the `for` selector.
+The C# model is `RuleDefinition`, with `Id`, `Because`, `Description`, `Kind` (`RuleKind.Forbid`, `RuleKind.AllowOnly`, `RuleKind.Require`, `RuleKind.BannedPackages` or `RuleKind.UniqueNames`), `From` and `To` (`TargetSelector`), `Require` (`RuleRequirement?`, with `Layer`, `Kind`, `Accessibility` and `Implements`), `Packages` (`IList<string>`), `Against` (`TargetSelector`), `Exceptions` (`IList<RuleException>`) and `Locked`. For a `require` or `uniqueNames` rule `From` holds the `for` selector, and for a `bannedPackages` rule it holds `from`.
 
 ### Require rules
 
@@ -214,9 +216,54 @@ rules:
 
 A `require` rule yields one violation per selected type and failed requirement, with the rule's `id` and `because`. Exceptions exempt a type, and a rule with no match checks nothing.
 
+### Banned packages
+
+A `bannedPackages` rule bans packages from the resolved package graph of a project. `packages` is a required, non-empty list of package-id patterns, and `from` optionally limits the rule to projects by `assemblies`; any other key in `from` is a load error, because a package belongs to a project and not to a type.
+
+```yaml
+rules:
+  - id: SHOP-NO-NEWTONSOFT-JSON
+    because: JSON goes through System.Text.Json.
+    bannedPackages:
+      packages: ["Newtonsoft.Json", "FluentValidation*"]
+      from: { assemblies: ["Shop.Domain", "Shop.Application"] }
+```
+
+Package ids match case-insensitively, since NuGet ids do, with the `*` rules of `types`. Transitive packages count, including a package that arrives through a referenced project, and the violation names the path from the direct reference. A violation is one per project and package, with `SourceType` the project name and `Target` the package id. The packages come from `obj/project.assets.json`, so the project must be restored. When a covering rule meets a project whose packages are unknown, the run fails and does not report a clean result.
+
+### Unique names
+
+A `uniqueNames` rule keeps a type from reusing the name of another type. `for` and `against` are both required and take every selector key. A type in `for` that has the same simple name as a type in `against` is one violation, located at the `for` type, with the other type as `Target`.
+
+```yaml
+rules:
+  - id: SHOP-WEB-OWN-NAMES
+    because: Web maps to its own view models and never copies an application DTO.
+    uniqueNames:
+      for: { layers: [Web] }
+      against: { namespaces: ["Shop.Application.**.Dtos"] }
+```
+
+The check is one-way: it reports the `for` type only. It compares the simple name case-sensitively, ignores the namespace and counts generic arity, so `Result` and `Result<T>` differ. A nested type uses its own name, a type in both selections never collides with itself, and the types of all projects of the run are compared.
+
+### Members
+
+`members` is a selector key on the `to` side of `forbid` and `allowOnly`. It names APIs at member level: methods, constructors, properties, fields and events. The loader rejects it on `from`, on layers and on exceptions.
+
+```yaml
+rules:
+  - id: SHOP-SQL-ONLY-IN-INFRASTRUCTURE
+    because: Raw SQL stays behind the repositories.
+    allowOnly:
+      from: { layers: [Infrastructure] }
+      to: { members: ["System.Data.Common.DbCommand.Execute*", "Microsoft.Data.SqlClient.SqlCommand.new"] }
+```
+
+A pattern is `Namespace.Type.Member` with the glob rules of `types`: the segments before the last name the type, the last segment names the member. `new` names a constructor, nested types are written with dots, and generic types match without type arguments. A use matches when the used member, or a member it overrides or implements, matches a pattern, so calling `SqlCommand.ExecuteReader()` matches `DbCommand.ExecuteReader`. The walk goes upwards only. Calls, constructor calls, property and field reads and writes, event subscriptions and method groups count as uses; declaring a member does not. A `to` selector with `members` is checked on member uses only, and its other keys test the used member's declaring type. Under `allowOnly` the declaring type and the types nested in it are exempt. Violations are `ForbiddenDependency` and `DependencyNotPermitted`, with the used member as `Target`.
+
 ## Selectors
 
-A selector has up to seven lists: `layers`, `namespaces`, `assemblies`, `types`, and the three code-feature keys below. Values within one list are alternatives: any may match. When a selector has more than one list, a type must match each list it has. So `{ assemblies: [Daedalus.Agents], namespaces: ["**.Api.**"] }` means the Api namespaces inside the Agents assembly. A selector with no values is a load error.
+A selector has up to eight lists: `layers`, `namespaces`, `assemblies`, `types`, the three code-feature keys below and `members` (see [Members](#members)). Values within one list are alternatives: any may match. When a selector has more than one list, a type must match each list it has. So `{ assemblies: [Daedalus.Agents], namespaces: ["**.Api.**"] }` means the Api namespaces inside the Agents assembly. A selector with no values is a load error.
 
 Matching is ordinal and case-sensitive, like C# names.
 
@@ -232,7 +279,7 @@ The three keys work in the `for` of a `require` rule and in the targets of `forb
 
 An empty pattern, or one with an empty segment such as `Shop..Domain`, is a load error.
 
-`TargetSelector` has `Layers`, `Namespaces`, `Assemblies`, `Types`, `BaseTypes`, `Interfaces` and `Attributes`. `RuleException` has `Namespaces`, `Assemblies`, `Types` and a required `Because`.
+`TargetSelector` has `Layers`, `Namespaces`, `Assemblies`, `Types`, `BaseTypes`, `Interfaces`, `Attributes` and `Members`. `RuleException` has `Namespaces`, `Assemblies`, `Types` and a required `Because`.
 
 ## `extends`
 

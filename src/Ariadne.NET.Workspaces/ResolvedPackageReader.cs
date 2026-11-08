@@ -177,7 +177,7 @@ internal static class ResolvedPackageReader
             || (char.IsAsciiDigit(name[targetFramework.Length]) && targetFramework.Contains('-', StringComparison.Ordinal)));
 
     // The framework's entry: by full name, then by the name before a runtime identifier suffix (net10.0/linux-x64), then a name that
-    // extends the framework with a platform (net10.0-windows7.0). Without a framework, the file's only entry. Null when none fits, so
+    // extends the framework with a platform (net10.0-windows7.0). Without a framework, the file's only framework, by its plain entry before any runtime identifier one. Null when none fits, so
     // a file restored for another framework is unknown and not taken for this one.
     private static JsonElement? Select(JsonElement entries, string? targetFramework)
     {
@@ -187,15 +187,27 @@ internal static class ResolvedPackageReader
         }
 
         JsonProperty? only = null;
-        var count = 0;
+        string? onlyBase = null;
+        var distinct = 0;
         JsonProperty? byBase = null;
         JsonProperty? byPlatform = null;
         foreach (var entry in entries.EnumerateObject())
         {
-            count++;
-            only ??= entry;
             if (targetFramework is null)
             {
+                // A runtime identifier restore (PublishAot) lists net10.0 and net10.0/linux-x64: one framework, whose plain entry wins.
+                var entryBase = entry.Name.Contains('/', StringComparison.Ordinal) ? entry.Name[..entry.Name.IndexOf('/', StringComparison.Ordinal)] : entry.Name;
+                if (!string.Equals(entryBase, onlyBase, StringComparison.OrdinalIgnoreCase))
+                {
+                    distinct++;
+                    onlyBase = entryBase;
+                    only = entry;
+                }
+                else if (string.Equals(entry.Name, entryBase, StringComparison.Ordinal))
+                {
+                    only = entry;
+                }
+
                 continue;
             }
 
@@ -218,7 +230,7 @@ internal static class ResolvedPackageReader
 
         if (targetFramework is null)
         {
-            return count == 1 ? only?.Value : null;
+            return distinct == 1 ? only?.Value : null;
         }
 
         return (byBase ?? byPlatform)?.Value;

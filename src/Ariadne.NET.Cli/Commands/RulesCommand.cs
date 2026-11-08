@@ -64,9 +64,17 @@ public static class RulesCommand
             RuleKind.Forbid => "forbid",
             RuleKind.AllowOnly => "allowOnly",
             RuleKind.Require => "require",
+            RuleKind.BannedPackages => "bannedPackages",
+            RuleKind.UniqueNames => "uniqueNames",
             _ => rule.Kind.ToString(),
         };
-        var target = rule.Kind == RuleKind.Require ? Describe(rule.Require) : Describe(rule.To);
+        var target = rule.Kind switch
+        {
+            RuleKind.Require => Describe(rule.Require),
+            RuleKind.BannedPackages => $"packages {string.Join(", ", rule.Packages)}",
+            RuleKind.UniqueNames => $"against {Describe(rule.Against)}",
+            _ => Describe(rule.To),
+        };
         Console.WriteLine($"  {rule.Id} {kind} {Describe(rule.From)} -> {target}");
         if (rule.Exceptions.Count > 0)
         {
@@ -84,7 +92,8 @@ public static class RulesCommand
             selector.Types,
             selector.BaseTypes,
             selector.Interfaces,
-            selector.Attributes);
+            selector.Attributes,
+            selector.Members);
 
     // The enum name with a lower-case first letter is the spelling a pack uses: class, recordStruct.
     private static string YamlSpelling(CSharpTypeKind kind)
@@ -125,7 +134,7 @@ public static class RulesCommand
         return parts.Count > 0 ? string.Join(", ", parts) : "no requirement";
     }
 
-    // Kinds in the order layers, namespaces, assemblies, types, baseTypes, interfaces, attributes; kinds joined by "; ", values by ", ".
+    // Kinds in the order layers, namespaces, assemblies, types, baseTypes, interfaces, attributes, members; kinds joined by "; ", values by ", ".
     private static string Describe(
         IList<string> namespaces,
         IList<string> assemblies,
@@ -133,7 +142,8 @@ public static class RulesCommand
         IList<string>? types = null,
         IList<string>? baseTypes = null,
         IList<string>? interfaces = null,
-        IList<string>? attributes = null)
+        IList<string>? attributes = null,
+        IList<string>? members = null)
     {
         var parts = new List<string>();
         AddKind(parts, "layers", layers);
@@ -143,6 +153,7 @@ public static class RulesCommand
         AddKind(parts, "baseTypes", baseTypes);
         AddKind(parts, "interfaces", interfaces);
         AddKind(parts, "attributes", attributes);
+        AddKind(parts, "members", members);
         return parts.Count > 0 ? string.Join("; ", parts) : "no selectors";
     }
 

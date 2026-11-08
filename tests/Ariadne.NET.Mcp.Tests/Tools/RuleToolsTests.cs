@@ -85,19 +85,58 @@ public class RuleToolsTests
     }
 
     [Fact]
+    public void GetRules_ListsNewKinds()
+    {
+        var banned = new RuleDefinition
+        {
+            Id = "SHOP-NO-NEWTONSOFT",
+            Because = "JSON goes through System.Text.Json.",
+            Kind = RuleKind.BannedPackages,
+            From = new TargetSelector { Assemblies = ["Shop.*"] },
+            Packages = ["Newtonsoft.Json"],
+        };
+        var unique = new RuleDefinition
+        {
+            Id = "SHOP-UNIQUE",
+            Because = "Web keeps its own names.",
+            Kind = RuleKind.UniqueNames,
+            From = new TargetSelector { Layers = ["Web"] },
+            Against = new TargetSelector { Layers = ["Domain"] },
+        };
+        var members = new RuleDefinition
+        {
+            Id = "SHOP-NO-CONSOLE",
+            Because = "No console in the domain.",
+            Kind = RuleKind.Forbid,
+            From = new TargetSelector { Layers = ["Domain"] },
+            To = new TargetSelector { Members = ["System.Console.*"] },
+        };
+        var pack = new RulePack { Name = "shop", Rules = [banned, unique, members] };
+
+        var result = RuleTools.GetRules(new FixedHelper(pack), template: null);
+
+        result.Select(r => r.Kind).Should().Equal(RuleKind.BannedPackages, RuleKind.UniqueNames, RuleKind.Forbid);
+        result[0].Packages.Should().Equal("Newtonsoft.Json");
+        result[1].Against.Layers.Should().Equal("Domain");
+        result[2].To.Members.Should().Equal("System.Console.*");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("\"Packages\":[\"Newtonsoft.Json\"]").And.Contain("\"Members\":[\"System.Console.*\"]");
+    }
+
+    [Fact]
     public void GetRules_BuiltinWithoutRules_ReturnsEmpty()
     {
         RuleTools.GetRules(_helper, "clean-architecture").Should().BeEmpty();
     }
 
     [Fact]
-    public void GetRules_IsDescribedAsTheForbidAllowOnlyAndRequireRules()
+    public void GetRules_IsDescribedAsEveryRuleKind()
     {
         var attribute = typeof(RuleTools).GetMethod(nameof(RuleTools.GetRules))!
             .GetCustomAttribute<DescriptionAttribute>()!;
 
         attribute.Description.Should().Be(
-            "Get the forbid, allowOnly and require rules of the resolved pack, each with its id, targets, requirement, exceptions and because.");
+            "Get the forbid, allowOnly, require, bannedPackages and uniqueNames rules of the resolved pack, each with its id, targets, requirement, packages, against selector, exceptions and because. A forbid or allowOnly target may select members.");
     }
 
     private sealed class FixedHelper(RulePack pack) : IRuleResolutionHelper

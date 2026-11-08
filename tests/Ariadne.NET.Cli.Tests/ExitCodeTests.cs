@@ -335,6 +335,46 @@ public sealed class ExitCodeTests : IDisposable
     }
 
     [Fact]
+    public void RulesCommand_ListsBannedPackagesAndUniqueNames()
+    {
+        WriteRules("""
+            schema: 2
+            name: shop
+            extends:
+              - builtin://clean-architecture
+            rules:
+              - id: SH-020
+                because: JSON goes through System.Text.Json.
+                bannedPackages:
+                  packages: [Newtonsoft.Json, "Serilog.*"]
+                  from: { assemblies: ["Shop.*"] }
+              - id: SH-021
+                because: Host types keep their own names.
+                uniqueNames:
+                  for: { namespaces: ["**.Web.**"] }
+                  against: { layers: [Domain] }
+              - id: SH-022
+                because: The domain never writes to the console.
+                forbid:
+                  from: { layers: [Domain] }
+                  to: { members: ["System.Console.*"] }
+            """);
+
+        var (exitCode, stdout) = RunCapturingStdout("rules");
+
+        exitCode.Should().Be(ExitCodes.Success);
+        var lines = stdout.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        var rules = lines.SkipWhile(l => !string.Equals(l, "Rules:", StringComparison.Ordinal)).Skip(1).TakeWhile(l => l.StartsWith("  ", StringComparison.Ordinal)).ToArray();
+        rules.Should().Equal(
+            "  SH-020 bannedPackages assemblies Shop.* -> packages Newtonsoft.Json, Serilog.*",
+            "    JSON goes through System.Text.Json.",
+            "  SH-021 uniqueNames namespaces **.Web.** -> against layers Domain",
+            "    Host types keep their own names.",
+            "  SH-022 forbid layers Domain -> members System.Console.*",
+            "    The domain never writes to the console.");
+    }
+
+    [Fact]
     public void Rules_PrintsARequireRuleWithItsRequirements()
     {
         WriteRules("""
