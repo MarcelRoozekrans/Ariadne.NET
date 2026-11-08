@@ -11,4 +11,10 @@ public enum RuleKind
 
     /// <summary>Code matching From must satisfy the <see cref="RuleDefinition.Require"/> requirement.</summary>
     Require = 3,
+
+    /// <summary>No project in From may reference a package matching <see cref="RuleDefinition.Packages"/>.</summary>
+    BannedPackages = 4,
+
+    /// <summary>Types matching From must not share a simple name with types matching <see cref="RuleDefinition.Against"/>.</summary>
+    UniqueNames = 5,
 }

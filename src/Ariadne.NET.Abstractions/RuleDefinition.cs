@@ -13,6 +13,8 @@ public sealed class RuleDefinition
     [NotNull] public required TargetSelector From { get; init; }
     [NotNull] public TargetSelector To { get; init; } = new TargetSelector();
     public RuleRequirement? Require { get; init; }
+    [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> Packages { get; init; } = [];
+    [NotNull] public TargetSelector Against { get; init; } = new TargetSelector();
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<RuleException> Exceptions { get; init; } = [];
     public bool Locked { get; init; }
 

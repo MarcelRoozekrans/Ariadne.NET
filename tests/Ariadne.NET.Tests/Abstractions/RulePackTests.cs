@@ -172,13 +172,53 @@ public class RulePackTests
         requirement.Implements.Should().BeNull();
     }
 
+    [Fact]
+    public void Members_NullEntry_FailsValidation()
+    {
+        var selector = new TargetSelector { Members = ["Foo", null!] };
+
+        new TargetSelectorValidator().Validate(selector).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Packages_NullEntry_FailsValidation()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "R1",
+            Because = "no banned packages",
+            Kind = RuleKind.BannedPackages,
+            From = new TargetSelector(),
+            Packages = ["Foo.*", null!],
+        };
+
+        RuleValidator().Validate(rule).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void RuleKind_NewValues_AreFourAndFive()
+    {
+        ((int)RuleKind.BannedPackages).Should().Be(4);
+        ((int)RuleKind.UniqueNames).Should().Be(5);
+    }
+
+    [Fact]
+    public void Against_Default_IsEmptySelector()
+    {
+        var rule = new RuleDefinition { Id = "R1", Because = "b", Kind = RuleKind.UniqueNames, From = new TargetSelector() };
+
+        rule.Against.Layers.Should().BeEmpty();
+        rule.Against.Members.Should().BeEmpty();
+        rule.Packages.Should().BeEmpty();
+    }
+
     private static RuleDefinitionValidator RuleValidator() =>
-        new(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleRequirementValidator(new TargetSelectorValidator()), new RuleExceptionValidator());
+        new(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleRequirementValidator(new TargetSelectorValidator()), new TargetSelectorValidator(), new RuleExceptionValidator());
 
     private static RulePackValidator PackValidator() => new(
         new LayerDefinitionValidator(),
         new ComponentRoleDefinitionValidator(),
-        new RuleDefinitionValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleRequirementValidator(new TargetSelectorValidator()), new RuleExceptionValidator()),
+        new RuleDefinitionValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleRequirementValidator(new TargetSelectorValidator()), new TargetSelectorValidator(), new RuleExceptionValidator()),
         new LayerRetargetValidator(),
         new RuleAmendmentValidator(new RuleExceptionValidator()),
         new NamingConventionsValidator());
