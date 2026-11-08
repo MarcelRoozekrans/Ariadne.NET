@@ -33,4 +33,32 @@ public sealed class DogfoodTests
         result.Value.Violations.Should().BeEmpty(
             string.Join(Environment.NewLine, result.Value.Violations.Select(v => $"{v.RuleId} {v.SourceType} -> {v.Target}")));
     }
+
+    [Fact]
+    public async Task Repo_passes_its_own_pack_without_vacuous_violations()
+    {
+        // The pack's layers and rules must each select a type of this solution; allowEmpty is never the answer here.
+        var root = AppContext.BaseDirectory;
+        while (root is not null && !File.Exists(Path.Combine(root, "src", "Ariadne.NET.slnx")))
+        {
+            root = Path.GetDirectoryName(root);
+        }
+
+        root.Should().NotBeNull("the repository root must be reachable from the test output directory");
+
+        var loader = new YamlRulePackLoader();
+        var loaded = loader.LoadFromFile(Path.Combine(root!, ".architecture", "rules.yaml"));
+        loaded.IsSuccess.Should().BeTrue(loaded.IsFailure ? $"{loaded.Error.Message} {loaded.Error.Detail}" : "");
+        var resolved = new RulePackResolver(new BuiltinPackRegistry(loader), loader, new RulePackMerger()).Resolve(loaded.Value);
+        resolved.IsSuccess.Should().BeTrue(resolved.IsFailure ? $"{resolved.Error.Message} {resolved.Error.Detail}" : "");
+
+        var validator = new SolutionValidator(new SolutionLoader(), new ArchitectureValidator());
+        var result = await validator.ValidateAsync(resolved.Value, Path.Combine(root!, "src", "Ariadne.NET.slnx"));
+
+        result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.ToString() : null);
+        result.Value.Violations
+            .Where(v => v.Kind is ViolationKind.VacuousLayer or ViolationKind.VacuousRule)
+            .Select(v => $"{v.Kind} {v.RuleId}: {v.Message}")
+            .Should().BeEmpty();
+    }
 }
