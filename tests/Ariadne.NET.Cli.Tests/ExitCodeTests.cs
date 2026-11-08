@@ -77,8 +77,7 @@ public sealed class ExitCodeTests : IDisposable
     [Fact]
     public void Validate_CleanFixture_ShouldReturnSuccess()
     {
-        WriteLayerRules("Domain", "WebApi");
-        var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("clean", "Shop.slnx"));
+        var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("fourlayer", "Shop.csproj"));
 
         exitCode.Should().Be(ExitCodes.Success);
         stdout.Should().Contain("Result: PASS - No violations found.");
@@ -212,9 +211,8 @@ public sealed class ExitCodeTests : IDisposable
         written.Should().StartWith("schema: 2");
         written.Should().Contain("- builtin://clean-architecture").And.Contain("- builtin://cqrs");
 
-        // The pack covers four layers and no fixture has types in all of them, so a validate run would fail on a layer that
-        // covers no type. That the pack loads and resolves is checked with the rules command.
-        Run("rules").Should().Be(ExitCodes.Success);
+        // The fourlayer fixture has a type in each of the four layers of clean-architecture.
+        Run("validate", FixtureProjects.Path("fourlayer", "Shop.csproj")).Should().Be(ExitCodes.Success);
     }
 
     [Theory]

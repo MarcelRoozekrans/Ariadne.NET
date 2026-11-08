@@ -538,6 +538,7 @@ public class ArchitectureValidatorTests
 
         var violation = report.Violations.Should().ContainSingle().Subject;
         violation.Kind.Should().Be(ViolationKind.VacuousLayer);
+        violation.RuleId.Should().Be("V-GHOST");
         violation.SourceType.Should().Be("Ghost");
         violation.Location.Should().BeNull();
     }
@@ -617,6 +618,7 @@ public class ArchitectureValidatorTests
 
         var violation = report.Violations.Should().ContainSingle().Subject;
         violation.Kind.Should().Be(ViolationKind.VacuousLayer);
+        violation.RuleId.Should().Be("V-GHOST");
         violation.SourceType.Should().Be("Ghost");
     }
 
@@ -651,6 +653,26 @@ public class ArchitectureValidatorTests
 
         forward.Violations.Should().ContainSingle().Which.Kind.Should().Be(ViolationKind.VacuousLayer);
         backward.Violations.Select(v => (v.Kind, v.RuleId, v.Message)).Should().Equal(forward.Violations.Select(v => (v.Kind, v.RuleId, v.Message)));
+    }
+
+    [Fact]
+    public void Role_matching_no_type_reports_one_vacuous_rule_named_after_the_role_unless_allow_empty()
+    {
+        RulePack PackWithRole(bool allowEmpty) => new()
+        {
+            Name = "test",
+            Layers = [VLayer("Web", "Shop.Web.**")],
+            ComponentRoles = [new ComponentRoleDefinition { Name = "Controller", Layer = "Web", TypeKind = CSharpTypeKind.Class, AllowEmpty = allowEmpty }],
+        };
+
+        var report = _validator.Validate(PackWithRole(false), TestCompilation.Create(ShopWeb));
+
+        var violation = report.Violations.Should().ContainSingle().Subject;
+        violation.Kind.Should().Be(ViolationKind.VacuousRule);
+        violation.RuleId.Should().Be("Controller");
+        violation.Location.Should().BeNull();
+
+        _validator.Validate(PackWithRole(true), TestCompilation.Create(ShopWeb)).Violations.Should().BeEmpty();
     }
 
     [Fact]
