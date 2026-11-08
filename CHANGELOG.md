@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.6.0](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.5.0...v0.6.0) (2026-11-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* a rule, role or layer that selects no type is now an error, set allowEmpty true on a rule or role that may be empty
+
+### Features
+
+* a rule, role or layer that selects no type is now an error, set allowEmpty true on a rule or role that may be empty ([98ed64f](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/98ed64f251d45dcbde569b9fed721fcd1e8ddf95))
+* add allowEmpty to rules and component roles ([98ed64f](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/98ed64f251d45dcbde569b9fed721fcd1e8ddf95))
+* add the VacuousRule and VacuousLayer violation kinds and the vacuity pass ([98ed64f](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/98ed64f251d45dcbde569b9fed721fcd1e8ddf95))
+* show vacuity violations and allowEmpty in CLI, MCP and hooks ([98ed64f](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/98ed64f251d45dcbde569b9fed721fcd1e8ddf95))
+
 ## [0.5.0](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.4.1...v0.5.0) (2026-11-08)
 
 
