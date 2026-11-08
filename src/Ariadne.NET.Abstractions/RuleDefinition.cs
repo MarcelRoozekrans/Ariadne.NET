@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using ZeroAlloc.Validation;
 
 namespace Ariadne.NET.Abstractions;
@@ -21,7 +22,7 @@ public sealed class RuleDefinition
     /// <summary>
     /// When <see langword="true"/>, the rule is allowed to match nothing without being reported as vacuous.
     /// </summary>
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool AllowEmpty { get; init; }
 
     internal bool HasNoNullEntries<T>(IList<T>? items) => NullEntries.None(items);
