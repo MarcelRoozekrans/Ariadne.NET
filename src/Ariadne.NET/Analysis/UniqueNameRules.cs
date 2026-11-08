@@ -1,0 +1,133 @@
+using System.Globalization;
+using System.Runtime.InteropServices;
+using Ariadne.NET.Abstractions;
+using Microsoft.CodeAnalysis;
+
+namespace Ariadne.NET.Analysis;
+
+/// <summary>The <c>uniqueNames</c> rules of a pack, evaluated over the source types of every project of a run.</summary>
+internal static class UniqueNameRules
+{
+    /// <summary>
+    /// Returns one violation per selected <c>for</c> type and colliding <c>against</c> type, located at the <c>for</c> type.
+    /// Two types collide when their simple names are equal, compared case-sensitively with the generic arity and without the
+    /// namespace; a nested type uses its own name. A type in both selections never collides with itself. A type that several
+    /// graphs hold, as a project does for each of its target frameworks, counts once.
+    /// </summary>
+    public static IReadOnlyList<ArchitectureViolation> Check(LayerMap layers, RulePack pack, IReadOnlyList<TypeGraph> graphs)
+    {
+        ArgumentNullException.ThrowIfNull(layers);
+        ArgumentNullException.ThrowIfNull(pack);
+        ArgumentNullException.ThrowIfNull(graphs);
+
+        var violations = new List<ArchitectureViolation>();
+        foreach (var rule in pack.Rules)
+        {
+            if (rule.Kind == RuleKind.UniqueNames)
+            {
+                CheckRule(rule, layers, graphs, violations);
+            }
+        }
+
+        return violations;
+    }
+
+    private static void CheckRule(RuleDefinition rule, LayerMap layers, IReadOnlyList<TypeGraph> graphs, List<ArchitectureViolation> violations)
+    {
+        var from = TargetMatcher.From(rule.From, layers);
+        var against = TargetMatcher.From(rule.Against, layers);
+        var exceptions = new TypeSelector[rule.Exceptions.Count];
+        for (var i = 0; i < exceptions.Length; i++)
+        {
+            var exception = rule.Exceptions[i];
+            exceptions[i] = TypeSelector.From(exception.Namespaces, exception.Assemblies, exception.Types);
+        }
+
+        var (againstByName, forTypes) = Collect(from, against, exceptions, layers, graphs);
+
+        foreach (ref readonly var forType in CollectionsMarshal.AsSpan(forTypes))
+        {
+            if (!againstByName.TryGetValue(forType.Name, out var colliding))
+            {
+                continue;
+            }
+
+            foreach (ref readonly var other in CollectionsMarshal.AsSpan(colliding))
+            {
+                if (string.Equals(other, forType.Display, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                violations.Add(new ArchitectureViolation
+                {
+                    RuleId = rule.Id,
+                    Kind = ViolationKind.NameCollision,
+                    SourceType = forType.Display,
+                    Target = other,
+                    Location = forType.Location,
+                    Because = rule.Because,
+                    Message = string.Create(
+                        CultureInfo.InvariantCulture,
+                        $"Type '{forType.Display}' is selected by rule '{rule.Id}' and shares its name with '{other}'"),
+                });
+            }
+        }
+    }
+
+    private static (Dictionary<string, List<string>> AgainstByName, List<ForType> ForTypes) Collect(
+        TargetMatcher from, TargetMatcher against, TypeSelector[] exceptions, LayerMap layers, IReadOnlyList<TypeGraph> graphs)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var againstByName = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        var forTypes = new List<ForType>();
+        foreach (var graph in graphs)
+        {
+            foreach (var type in graph.SourceTypes)
+            {
+                var display = type.ToDisplayString();
+                if (!seen.Add(display))
+                {
+                    continue;
+                }
+
+                var name = NameOf(type);
+                if (against.Matches(type))
+                {
+                    if (!againstByName.TryGetValue(name, out var list))
+                    {
+                        againstByName.Add(name, list = []);
+                    }
+
+                    list.Add(display);
+                }
+
+                if (from.Matches(type) && !IsExcepted(exceptions, type, layers.Names))
+                {
+                    forTypes.Add(new ForType(name, display, graph.SourceTypeLocations[type]));
+                }
+            }
+        }
+
+        return (againstByName, forTypes);
+    }
+
+    // Case-sensitive and without the namespace; the arity keeps Result and Result<T> apart.
+    private static string NameOf(INamedTypeSymbol type) =>
+        type.Arity == 0 ? type.Name : string.Create(CultureInfo.InvariantCulture, $"{type.Name}`{type.Arity}");
+
+    private static bool IsExcepted(TypeSelector[] exceptions, INamedTypeSymbol type, TypeNames names)
+    {
+        foreach (var exception in exceptions)
+        {
+            if (exception.Matches(type, names))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private readonly record struct ForType(string Name, string Display, SourceLocation Location);
+}

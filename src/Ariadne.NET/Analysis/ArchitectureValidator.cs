@@ -50,6 +50,10 @@ public sealed class ArchitectureValidator : IArchitectureValidator
 
         AddMissingInterfaceViolations(entries, resolvedPack);
 
+        // Name collisions span projects, and a type seen in several target frameworks counts once, so they are found
+        // once over all graphs and not merged per project.
+        var nameCollisions = UniqueNameRules.Check(layers, resolvedPack, GraphsOf(entries));
+
         var ordered = GroupByProject(entries);
         var allViolations = new List<ArchitectureViolation>();
         var checkedProjects = new List<CheckedProject>(ordered.Count);
@@ -61,6 +65,7 @@ public sealed class ArchitectureValidator : IArchitectureValidator
             typesChecked += group.TypesChecked;
         }
 
+        allViolations.AddRange(nameCollisions);
         KeepOneOverlapPerType(allViolations);
         allViolations.Sort(CompareViolations);
         return new ArchitectureReport
@@ -69,6 +74,17 @@ public sealed class ArchitectureValidator : IArchitectureValidator
             Projects = checkedProjects,
             TypesChecked = typesChecked,
         };
+    }
+
+    private static List<TypeGraph> GraphsOf(List<Entry> entries)
+    {
+        var graphs = new List<TypeGraph>(entries.Count);
+        foreach (ref readonly var entry in CollectionsMarshal.AsSpan(entries))
+        {
+            graphs.Add(entry.Graph);
+        }
+
+        return graphs;
     }
 
     // The entries of each project, in the order the projects first appear.
