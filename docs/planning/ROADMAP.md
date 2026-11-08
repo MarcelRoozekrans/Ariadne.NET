@@ -98,7 +98,8 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Goal:** A rule or layer selector that matches no type fails with its own violation kind, unless the rule opts out with `allowEmpty: true`.
 **Surface:** Backend
 **HelpWanted:** no
-**Plan:** _to be written_
+**Design:** `docs/superpowers/specs/2026-11-08-phase-2.5-vacuity-detection-design.md`
+**Plan:** `docs/superpowers/plans/2026-11-08-phase-2.5-vacuity-detection.md`
 
 ### Phase 2.6: Pack reference and JSON Schema [status: pending]
 **Goal:** Document every v2 rule type on the docs site, publish a JSON Schema for editor validation, and delete the drifted `docs/how-it-works/` copy.
