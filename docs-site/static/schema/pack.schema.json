@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://marcelroozekrans.github.io/Ariadne.NET/schema/pack.schema.json",
+  "title": "Ariadne.NET rule pack, schema 2",
+  "description": "A rule pack for Ariadne.NET. The loader is the authority: this schema checks shape only, not cross-references such as layer names or duplicate ids.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "name"],
+  "properties": {
+    "schema": { "const": 2, "description": "Must be the integer 2." },
+    "name": { "type": "string", "description": "Pack name." },
+    "version": { "type": "string", "description": "The pack author's own version, default \"1.0.0\". Unrelated to schema." },
+    "author": { "type": "string", "description": "Pack author or maintainer, default \"\"." },
+    "extends": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Parent pack references: builtin://name or import://name."
+    },
+    "layers": { "type": "array", "items": { "$ref": "#/$defs/layer" }, "description": "List of layers." },
+    "rules": { "type": "array", "items": { "type": "object" }, "description": "List of forbid, allowOnly, require, bannedPackages and uniqueNames rules." },
+    "componentRoles": { "type": "array", "items": { "$ref": "#/$defs/role" }, "description": "List of component roles, used for code generation and role checks." },
+    "namingConventions": { "$ref": "#/$defs/namingConventions" }
+  },
+  "$defs": {
+    "stringList": { "type": "array", "items": { "type": "string" } },
+    "layer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "description": "A layer says which types it covers and which other layers those types may depend on. In a child pack an entry with only name, namespaces and assemblies retargets an inherited layer.",
+      "properties": {
+        "name": { "type": "string", "description": "Unique in the merged pack. Referenced by allowedDependencies, rule targets and roles." },
+        "id": { "type": "string", "description": "The rule id that layer-dependency violations carry. Unique across all layer and rule ids in the merged pack." },
+        "because": { "type": "string", "description": "Why the layer may depend only on what it lists. Repeated on every violation." },
+        "description": { "type": "string", "description": "Free text." },
+        "namespaces": { "$ref": "#/$defs/stringList", "description": "Namespace globs the layer covers." },
+        "assemblies": { "$ref": "#/$defs/stringList", "description": "Assembly name globs the layer covers." },
+        "allowedDependencies": { "$ref": "#/$defs/stringList", "description": "Names of the layers this layer may depend on. Default empty." }
+      }
+    },
+    "role": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "layer": { "type": "string" },
+        "typeKind": { "enum": ["Class", "Interface", "Record", "Struct", "RecordStruct"] },
+        "requiresInterface": { "type": "boolean" },
+        "interfaceRole": { "type": "string" },
+        "accessibility": { "type": "string" },
+        "description": { "type": "string" },
+        "alternativeNames": { "$ref": "#/$defs/stringList" },
+        "allowEmpty": { "type": "boolean", "description": "Accept a role that matches no type." }
+      }
+    },
+    "namingConventions": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Templates for namespaces and file paths.",
+      "properties": {
+        "namespace": { "type": "string" },
+        "filePath": { "type": "string" }
+      }
+    }
+  }
+}
