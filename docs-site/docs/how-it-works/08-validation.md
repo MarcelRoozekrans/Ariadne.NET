@@ -105,7 +105,7 @@ An element that selects no type in the projects loaded cannot fail, so it is a v
 - `allowEmpty: true` on a rule or a role accepts the empty selection. A layer has no opt-out; retarget it in the pack that extends the base pack. The built-in packs set `allowEmpty` on every role.
 - Vacuity is relative to the projects loaded. A run on a single `.csproj` reports as vacuous the layers whose types the loaded projects neither declare nor reference; a layer in another project counts as covered when a loaded project references its types. A layer of only generated types is vacuous.
 
-See [Rule Schema](03-rule-schema.md#rules-that-select-nothing).
+See [Rule Types](rule-types.md#rules-that-select-nothing).
 
 ### The report
 

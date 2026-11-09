@@ -1,0 +1,7 @@
+schema: 2
+name: x
+rules:
+  - id: X-R1
+    exceptions:
+      - types: [A.B]
+        because: x

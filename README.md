@@ -209,7 +209,7 @@ namingConventions:
   filePath: "src/{SolutionName}.{Feature}.{Layer}/{ComponentName}.cs"
 ```
 
-The `rules` entry above is an example of a `forbid` rule; the built-in clean-architecture pack defines none yet. `allowOnly` rules, selectors and `extends` are described in the [rule schema](https://marcelroozekrans.github.io/Ariadne.NET/how-it-works/rule-schema). A pack from release 0.3.0 or earlier needs the edits in [Migrating from v1](https://marcelroozekrans.github.io/Ariadne.NET/how-it-works/rule-schema#migrating-from-v1).
+The `rules` entry above is an example of a `forbid` rule; the built-in clean-architecture pack defines none yet. `allowOnly` rules, selectors and `extends` are described in the [rule schema](https://marcelroozekrans.github.io/Ariadne.NET/how-it-works/rule-schema) and [rule types](https://marcelroozekrans.github.io/Ariadne.NET/how-it-works/rule-types) pages. A pack from release 0.3.0 or earlier needs the edits in [Migrating from v1](https://marcelroozekrans.github.io/Ariadne.NET/how-it-works/rule-schema#migrating-from-v1).
 
 ### 2. Built-in Templates
 
