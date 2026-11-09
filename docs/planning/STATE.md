@@ -1,6 +1,6 @@
 # Session State
 
-**Last session:** 2026-11-08 (phases 2.4 and 2.5 merged as #51 and #53; phase 5.6 merged)
+**Last session:** 2026-11-09 (phase 2.6 built on branch `phase-2-6-pack-reference`, no PR yet)
 **Repository:** `MarcelRoozekrans/Ariadne.NET`, public since 2026-11-03. The old private repository `MarcelRoozekrans/architecture-governance-engine` is frozen. Local clones: remote `ariadne` is the new repository, `origin` the old one; push with `git push ariadne HEAD:<branch>`, never to `origin`.
 
 ## Current Position
@@ -28,6 +28,7 @@
   - Leftover branches deleted on `ariadne` 2026-11-08 with the owner's go-ahead: `docs/phase-2.4-design`, `docs/agent-hooks-design`, `feat/phase-5.6-agent-hooks` and the merged 2.4 feature branch. The local 2.4 feature branch remains because another worktree has it checked out.
   - Not covered by a CLI or MCP level test: the stale-assets error (shared `SolutionValidator` is tested).
 - **Phase 2.5 — Vacuity detection:** [status: complete 2026-11-08]. Merged as #53 (98ed64f) on 2026-11-08 from `feat/phase-2.5-vacuity-detection`; CI was green after one fix to the packed-consumer check. Release 0.5.0 was released by the owner (#52). Release-please PR #54 (0.6.0) lists the `feat!` and the three features and is not merged. Design `docs/superpowers/specs/2026-11-08-phase-2.5-vacuity-detection-design.md`, plan `docs/superpowers/plans/2026-11-08-phase-2.5-vacuity-detection.md`, all boxes ticked except the PR-time note in Task 6. A rule, component role or layer that selects no type fails with `VacuousRule` (11) or `VacuousLayer` (12), unless a rule or role sets `allowEmpty: true`; subject side only; built-in packs set `allowEmpty` on every role. The default change is breaking: commit 35ae809 is `feat!` with two BREAKING CHANGE footers. The PR body carried a `BEGIN_COMMIT_OVERRIDE` block and #54 shows the four entries. Perf: `docs/perf/phase-2.5-baseline.md`, about +2.3% allocations from the pass. Deferred minors: the `VacuousRule` message cell in `03-rule-schema.md` is awkwardly split and the column header says "Message starts with"; `forbid` has no exact-message test; the layer anchor test reads `Namespaces[0]` only.
+- **Phase 2.6 — Pack reference and JSON Schema:** [status: complete 2026-11-09], on branch `phase-2-6-pack-reference` (pushed to `ariadne`); no PR opened, the owner has not asked. Design `docs/superpowers/specs/2026-11-09-phase-2.6-pack-reference-and-json-schema-design.md`, plan `docs/superpowers/plans/2026-11-09-phase-2.6-pack-reference-and-json-schema.md`, all boxes ticked. Adds `docs-site/static/schema/pack.schema.json` (hand-written, draft 2020-12), conformance tests in `tests/Ariadne.NET.Tests/PackSchema` (shipped packs, an invalid corpus, `KnownGaps` for cross-references and `ShapeGaps` for what JSON Schema cannot express), the `rule-types` and `editor-support` docs pages, and deletes `docs/how-it-works/`. Owner decisions 2026-11-09: hand-written schema plus conformance tests; pack reference only. Follow-ups: issue #57 (`docs/features.md` is an old copy); the docs build only warns on broken links (`onBrokenLinks: 'warn'`), switching to `throw` is site-wide; the test YAML converter ignores non-scalar keys and later documents. The earlier guess that other docs-site pages are stale was checked and not found.
 - Issues filed from 2.2: #36 (child packs: amending `allowedDependencies`, locked rules sidestepped by retargeting, empty retargets) and #37 (child-layer error wording, duplicate roles, pack file size limit). #32 stays the module-isolation item.
 
 Phase 2.2 decisions by the owner, 2026-11-05:
@@ -63,12 +64,11 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 
 - Open Renovate and Dependabot PRs, among them majors for YamlDotNet 18 (#20), MSBuild 18 (#28) and ModelContextProtocol 2 (#14). Phase 2.2 pins YamlDotNet at 16.3.0; phase 2.2 has landed, so #20 can be reviewed.
 - ZeroAlloc-Net/ZeroAlloc.TestHelpers#106: once fixed, switch the allocation tests from `GC.GetAllocatedBytesForCurrentThread` back to `AllocationGate`.
-- The old `docs/how-it-works/*` copy still describes removed features; Phase 2.6 deletes it.
 - Deferred minors from the reviews: the Daedalus fixture never exercises the Agents layer's `allowedDependencies`; `Owned<T>` and the reader have no further known gaps.
 - **Parked, approved 2026-11-06:** phase 5.7 Guidance delivery, designed in `docs/superpowers/specs/2026-11-06-agent-guidance-hooks-design.md` (stage B). Owner decisions: one tool with a separate `Ariadne.NET.Guidance` package; Ariadne owns structure and delivery while AI.Sentinel owns tool-call enforcement. It takes over the pack attachments that 5.6 left out.
 
 ## Recommended Next Step
 
-Phases 2.1 to 2.5 are merged. Release-please PR #54 (0.6.0) waits for the owner; do not merge it unless asked. The next phase is 2.6 pack reference and JSON Schema: run `start-next-phase`, which routes to brainstorming because there is no design spec; branch from `ariadne/main`. The owner decisions of 2026-11-08 on #50 and the three 5.6 points are recorded above and still need scheduling into a phase or a fix PR.
+Phases 2.1 to 2.6 are built; 2.6 waits for a PR on `phase-2-6-pack-reference`. That completes Milestone 2's phases, so the next step is `audit-milestone` once 2.6 is merged. Separately, per the owner on 2026-11-09: issue #50 gets its own fix PR, and the three 5.6 follow-ups get one hooks fix PR. Neither is started.
 
 Commit rules: conventional commits; no `Co-Authored-By` trailer or session link; no nested parentheses in commit bodies; keep every footer line under 100 characters, because commitlint rejects longer ones; breaking commits carry `!` and a `BREAKING CHANGE` footer. Shared VM: one build or test at a time, no local AOT publish.

@@ -102,12 +102,13 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Plan:** `docs/superpowers/plans/2026-11-08-phase-2.5-vacuity-detection.md`
 **Completed:** 2026-11-08
 
-### Phase 2.6: Pack reference and JSON Schema [status: pending]
+### Phase 2.6: Pack reference and JSON Schema [status: complete]
 **Goal:** Document every v2 rule type on the docs site, publish a JSON Schema for editor validation, and delete the drifted `docs/how-it-works/` copy.
 **Surface:** Docs
 **HelpWanted:** no
 **Design:** `docs/superpowers/specs/2026-11-09-phase-2.6-pack-reference-and-json-schema-design.md`
 **Plan:** `docs/superpowers/plans/2026-11-09-phase-2.6-pack-reference-and-json-schema.md`
+**Completed:** 2026-11-09
 
 ## Milestone 3: Fail the build [status: pending]
 **Goal:** Any .NET solution can enforce its Ariadne packs in tests and CI.
