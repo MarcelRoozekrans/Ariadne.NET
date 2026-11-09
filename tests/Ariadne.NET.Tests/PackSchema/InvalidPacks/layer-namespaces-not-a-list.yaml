@@ -1,0 +1,12 @@
+schema: 2
+name: x
+layers:
+  - name: Domain
+    id: X-L-DOMAIN
+    because: core
+    namespaces: nope
+  - name: Web
+    id: X-L-WEB
+    because: edge
+    namespaces: ["**.Web.**"]
+    allowedDependencies: [Domain]

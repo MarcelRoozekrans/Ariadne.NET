@@ -48,6 +48,9 @@ public class PackSchemaHarnessTests
     public void Schema_rejects_missing_schema_key() => AssertBoth("name: x\n", accepted: false);
 
     [Fact]
+    public void Schema_accepts_quoted_schema_2_like_the_loader() => AssertBoth("schema: \"2\"\nname: x\n", accepted: true);
+
+    [Fact]
     public void Schema_rejects_schema_1() => AssertBoth("schema: 1\nname: x\n", accepted: false);
 
     [Fact]

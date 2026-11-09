@@ -11,8 +11,11 @@
   ],
   "properties": {
     "schema": {
-      "const": 2,
-      "description": "Must be the integer 2."
+      "enum": [
+        2,
+        "2"
+      ],
+      "description": "Must be the integer 2. The loader also reads a quoted \"2\"."
     },
     "name": {
       "type": "string",

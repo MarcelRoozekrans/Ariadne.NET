@@ -50,6 +50,13 @@ internal static partial class PackSchemaHarness
 
     public static bool LoaderAccepts(string yaml) => new YamlRulePackLoader().LoadFromString(yaml).IsSuccess;
 
+    /// <summary>True when the pack loads and also passes the cross-reference check the resolver runs on a merged pack.</summary>
+    public static bool ReferencesResolve(string yaml)
+    {
+        var loaded = new YamlRulePackLoader().LoadFromString(yaml);
+        return loaded.IsSuccess && RulePackReferenceCheck.Check(loaded.Value).IsSuccess;
+    }
+
     private static JsonNode? Convert(YamlNode node) => node switch
     {
         YamlMappingNode map => ToObject(map),
