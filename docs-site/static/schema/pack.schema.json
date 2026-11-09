@@ -5,53 +5,141 @@
   "description": "A rule pack for Ariadne.NET. The loader is the authority: this schema checks shape only, not cross-references such as layer names or duplicate ids.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "name"],
+  "required": [
+    "schema",
+    "name"
+  ],
   "properties": {
-    "schema": { "const": 2, "description": "Must be the integer 2." },
-    "name": { "type": "string", "description": "Pack name." },
-    "version": { "type": "string", "description": "The pack author's own version, default \"1.0.0\". Unrelated to schema." },
-    "author": { "type": "string", "description": "Pack author or maintainer, default \"\"." },
+    "schema": {
+      "const": 2,
+      "description": "Must be the integer 2."
+    },
+    "name": {
+      "type": "string",
+      "description": "Pack name."
+    },
+    "version": {
+      "type": "string",
+      "description": "The pack author's own version, default \"1.0.0\". Unrelated to schema."
+    },
+    "author": {
+      "type": "string",
+      "description": "Pack author or maintainer, default \"\"."
+    },
     "extends": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "description": "Parent pack references: builtin://name or import://name."
     },
-    "layers": { "type": "array", "items": { "$ref": "#/$defs/layer" }, "description": "List of layers." },
-    "rules": { "type": "array", "items": { "type": "object" }, "description": "List of forbid, allowOnly, require, bannedPackages and uniqueNames rules." },
-    "componentRoles": { "type": "array", "items": { "$ref": "#/$defs/role" }, "description": "List of component roles, used for code generation and role checks." },
-    "namingConventions": { "$ref": "#/$defs/namingConventions" }
+    "layers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/layer"
+      },
+      "description": "List of layers."
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/rule"
+      },
+      "description": "List of forbid, allowOnly, require, bannedPackages and uniqueNames rules. In a child pack an entry with only id and exceptions adds exceptions to an inherited rule."
+    },
+    "componentRoles": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/role"
+      },
+      "description": "List of component roles, used for code generation and role checks."
+    },
+    "namingConventions": {
+      "$ref": "#/$defs/namingConventions"
+    }
   },
   "$defs": {
-    "stringList": { "type": "array", "items": { "type": "string" } },
+    "stringList": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "layer": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "description": "A layer says which types it covers and which other layers those types may depend on. In a child pack an entry with only name, namespaces and assemblies retargets an inherited layer.",
       "properties": {
-        "name": { "type": "string", "description": "Unique in the merged pack. Referenced by allowedDependencies, rule targets and roles." },
-        "id": { "type": "string", "description": "The rule id that layer-dependency violations carry. Unique across all layer and rule ids in the merged pack." },
-        "because": { "type": "string", "description": "Why the layer may depend only on what it lists. Repeated on every violation." },
-        "description": { "type": "string", "description": "Free text." },
-        "namespaces": { "$ref": "#/$defs/stringList", "description": "Namespace globs the layer covers." },
-        "assemblies": { "$ref": "#/$defs/stringList", "description": "Assembly name globs the layer covers." },
-        "allowedDependencies": { "$ref": "#/$defs/stringList", "description": "Names of the layers this layer may depend on. Default empty." }
+        "name": {
+          "type": "string",
+          "description": "Unique in the merged pack. Referenced by allowedDependencies, rule targets and roles."
+        },
+        "id": {
+          "type": "string",
+          "description": "The rule id that layer-dependency violations carry. Unique across all layer and rule ids in the merged pack."
+        },
+        "because": {
+          "type": "string",
+          "description": "Why the layer may depend only on what it lists. Repeated on every violation."
+        },
+        "description": {
+          "type": "string",
+          "description": "Free text."
+        },
+        "namespaces": {
+          "$ref": "#/$defs/stringList",
+          "description": "Namespace globs the layer covers."
+        },
+        "assemblies": {
+          "$ref": "#/$defs/stringList",
+          "description": "Assembly name globs the layer covers."
+        },
+        "allowedDependencies": {
+          "$ref": "#/$defs/stringList",
+          "description": "Names of the layers this layer may depend on. Default empty."
+        }
       }
     },
     "role": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "properties": {
-        "name": { "type": "string" },
-        "layer": { "type": "string" },
-        "typeKind": { "enum": ["Class", "Interface", "Record", "Struct", "RecordStruct"] },
-        "requiresInterface": { "type": "boolean" },
-        "interfaceRole": { "type": "string" },
-        "accessibility": { "type": "string" },
-        "description": { "type": "string" },
-        "alternativeNames": { "$ref": "#/$defs/stringList" },
-        "allowEmpty": { "type": "boolean", "description": "Accept a role that matches no type." }
+        "name": {
+          "type": "string"
+        },
+        "layer": {
+          "type": "string"
+        },
+        "typeKind": {
+          "type": "string",
+          "pattern": "^([Cc][Ll][Aa][Ss][Ss]|[Ii][Nn][Tt][Ee][Rr][Ff][Aa][Cc][Ee]|[Rr][Ee][Cc][Oo][Rr][Dd]|[Ss][Tt][Rr][Uu][Cc][Tt]|[Rr][Ee][Cc][Oo][Rr][Dd][Ss][Tt][Rr][Uu][Cc][Tt])$",
+          "description": "Class, Interface, Record, Struct or RecordStruct, in any letter case."
+        },
+        "requiresInterface": {
+          "type": "boolean"
+        },
+        "interfaceRole": {
+          "type": "string"
+        },
+        "accessibility": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "alternativeNames": {
+          "$ref": "#/$defs/stringList"
+        },
+        "allowEmpty": {
+          "type": "boolean",
+          "description": "Accept a role that matches no type."
+        }
       }
     },
     "namingConventions": {
@@ -59,9 +147,392 @@
       "additionalProperties": false,
       "description": "Templates for namespaces and file paths.",
       "properties": {
-        "namespace": { "type": "string" },
-        "filePath": { "type": "string" }
+        "namespace": {
+          "type": "string"
+        },
+        "filePath": {
+          "type": "string"
+        }
       }
+    },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Selects types by layer names, or by any mix of namespace, assembly, type, base type, interface and attribute patterns. layers cannot be combined with the other keys.",
+      "properties": {
+        "layers": {
+          "$ref": "#/$defs/stringList"
+        },
+        "namespaces": {
+          "$ref": "#/$defs/stringList"
+        },
+        "assemblies": {
+          "$ref": "#/$defs/stringList"
+        },
+        "types": {
+          "$ref": "#/$defs/stringList"
+        },
+        "baseTypes": {
+          "$ref": "#/$defs/stringList"
+        },
+        "interfaces": {
+          "$ref": "#/$defs/stringList"
+        },
+        "attributes": {
+          "$ref": "#/$defs/stringList"
+        }
+      },
+      "not": {
+        "required": [
+          "layers"
+        ],
+        "anyOf": [
+          {
+            "required": [
+              "namespaces"
+            ]
+          },
+          {
+            "required": [
+              "assemblies"
+            ]
+          },
+          {
+            "required": [
+              "types"
+            ]
+          },
+          {
+            "required": [
+              "baseTypes"
+            ]
+          },
+          {
+            "required": [
+              "interfaces"
+            ]
+          },
+          {
+            "required": [
+              "attributes"
+            ]
+          }
+        ]
+      }
+    },
+    "toSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Like selector, plus members: member names the rule targets (forbid and allowOnly only). layers cannot be combined with the other keys.",
+      "properties": {
+        "layers": {
+          "$ref": "#/$defs/stringList"
+        },
+        "namespaces": {
+          "$ref": "#/$defs/stringList"
+        },
+        "assemblies": {
+          "$ref": "#/$defs/stringList"
+        },
+        "types": {
+          "$ref": "#/$defs/stringList"
+        },
+        "baseTypes": {
+          "$ref": "#/$defs/stringList"
+        },
+        "interfaces": {
+          "$ref": "#/$defs/stringList"
+        },
+        "attributes": {
+          "$ref": "#/$defs/stringList"
+        },
+        "members": {
+          "$ref": "#/$defs/stringList"
+        }
+      },
+      "not": {
+        "required": [
+          "layers"
+        ],
+        "anyOf": [
+          {
+            "required": [
+              "namespaces"
+            ]
+          },
+          {
+            "required": [
+              "assemblies"
+            ]
+          },
+          {
+            "required": [
+              "types"
+            ]
+          },
+          {
+            "required": [
+              "baseTypes"
+            ]
+          },
+          {
+            "required": [
+              "interfaces"
+            ]
+          },
+          {
+            "required": [
+              "attributes"
+            ]
+          },
+          {
+            "required": [
+              "members"
+            ]
+          }
+        ]
+      }
+    },
+    "exception": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A place where the rule does not apply.",
+      "properties": {
+        "namespaces": {
+          "$ref": "#/$defs/stringList"
+        },
+        "assemblies": {
+          "$ref": "#/$defs/stringList"
+        },
+        "types": {
+          "$ref": "#/$defs/stringList"
+        },
+        "because": {
+          "type": "string",
+          "description": "Why the exception exists."
+        }
+      }
+    },
+    "kindBody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from",
+        "to"
+      ],
+      "properties": {
+        "from": {
+          "$ref": "#/$defs/selector"
+        },
+        "to": {
+          "$ref": "#/$defs/toSelector"
+        }
+      }
+    },
+    "requireBody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "for"
+      ],
+      "description": "Types selected by for must satisfy at least one of layer, kind, accessibility and implements.",
+      "properties": {
+        "for": {
+          "$ref": "#/$defs/selector"
+        },
+        "layer": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "pattern": "^([Cc][Ll][Aa][Ss][Ss]|[Ii][Nn][Tt][Ee][Rr][Ff][Aa][Cc][Ee]|[Rr][Ee][Cc][Oo][Rr][Dd]|[Ss][Tt][Rr][Uu][Cc][Tt]|[Rr][Ee][Cc][Oo][Rr][Dd][Ss][Tt][Rr][Uu][Cc][Tt])$",
+          "description": "Class, Interface, Record, Struct or RecordStruct, in any letter case."
+        },
+        "accessibility": {
+          "type": "string",
+          "description": "public or internal."
+        },
+        "implements": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "namespaces": {
+              "$ref": "#/$defs/stringList"
+            },
+            "assemblies": {
+              "$ref": "#/$defs/stringList"
+            },
+            "types": {
+              "$ref": "#/$defs/stringList"
+            }
+          }
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "layer"
+          ]
+        },
+        {
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "required": [
+            "accessibility"
+          ]
+        },
+        {
+          "required": [
+            "implements"
+          ]
+        }
+      ]
+    },
+    "bannedPackagesBody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packages"
+      ],
+      "properties": {
+        "packages": {
+          "$ref": "#/$defs/stringList"
+        },
+        "from": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "assemblies": {
+              "$ref": "#/$defs/stringList"
+            }
+          },
+          "description": "Projects the ban applies to; without it the ban applies to every project."
+        }
+      }
+    },
+    "uniqueNamesBody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "for"
+      ],
+      "properties": {
+        "for": {
+          "$ref": "#/$defs/selector"
+        },
+        "against": {
+          "$ref": "#/$defs/selector"
+        }
+      }
+    },
+    "rule": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ruleAmendment"
+        },
+        {
+          "$ref": "#/$defs/fullRule"
+        }
+      ]
+    },
+    "ruleAmendment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "exceptions"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "exceptions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/exception"
+          }
+        }
+      }
+    },
+    "fullRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "because"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Rule id carried by every violation. Unique across the merged pack."
+        },
+        "because": {
+          "type": "string",
+          "description": "Why the rule exists. Repeated on every violation."
+        },
+        "description": {
+          "type": "string"
+        },
+        "exceptions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/exception"
+          }
+        },
+        "locked": {
+          "type": "boolean",
+          "description": "Child packs may not add exceptions to a locked rule."
+        },
+        "allowEmpty": {
+          "type": "boolean",
+          "description": "Accept a rule whose subject selects no type."
+        },
+        "forbid": {
+          "$ref": "#/$defs/kindBody"
+        },
+        "allowOnly": {
+          "$ref": "#/$defs/kindBody"
+        },
+        "require": {
+          "$ref": "#/$defs/requireBody"
+        },
+        "bannedPackages": {
+          "$ref": "#/$defs/bannedPackagesBody"
+        },
+        "uniqueNames": {
+          "$ref": "#/$defs/uniqueNamesBody"
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "forbid"
+          ]
+        },
+        {
+          "required": [
+            "allowOnly"
+          ]
+        },
+        {
+          "required": [
+            "require"
+          ]
+        },
+        {
+          "required": [
+            "bannedPackages"
+          ]
+        },
+        {
+          "required": [
+            "uniqueNames"
+          ]
+        }
+      ]
     }
   }
 }
