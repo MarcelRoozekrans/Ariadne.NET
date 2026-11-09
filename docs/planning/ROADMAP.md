@@ -106,7 +106,8 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Goal:** Document every v2 rule type on the docs site, publish a JSON Schema for editor validation, and delete the drifted `docs/how-it-works/` copy.
 **Surface:** Docs
 **HelpWanted:** no
-**Plan:** _to be written_
+**Design:** `docs/superpowers/specs/2026-11-09-phase-2.6-pack-reference-and-json-schema-design.md`
+**Plan:** `docs/superpowers/plans/2026-11-09-phase-2.6-pack-reference-and-json-schema.md`
 
 ## Milestone 3: Fail the build [status: pending]
 **Goal:** Any .NET solution can enforce its Ariadne packs in tests and CI.
