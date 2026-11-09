@@ -42,6 +42,11 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 - Module isolation is out of scope, tracked in #32.
 - `Linter`, CLI `lint` and MCP `lint_source` are deleted.
 
+## Scheduling (owner, 2026-11-09)
+
+- Issue #50 (public coverage check API instead of `InternalsVisibleTo`): its own fix PR, before further 2.6 build work. Not yet implemented.
+- The three 5.6 follow-ups (`stop_hook_active` keeps the edit list, `init` preserves a custom hook `timeout`, SIGTERM during `stop` exits 0): one hooks fix PR. Not yet implemented.
+
 ## Open Decisions
 
 - #36: may a child pack amend an inherited layer's `allowedDependencies`; should retargeting respect `locked`; should an empty retarget be rejected? Matters for the M4 Daedalus pack.
