@@ -24,19 +24,19 @@ name: shop
 
 ## Use it for every pack in a folder
 
-In VS Code, map the schema to the pack files in the workspace settings:
+In VS Code, map the schema to your pack file in the workspace settings. Do not map `.architecture/*.yaml`: the imports file `.architecture/imports.yaml` lives in the same folder and is not a pack.
 
 ```json
 {
   "yaml.schemas": {
-    "https://marcelroozekrans.github.io/Ariadne.NET/schema/pack.schema.json": ".architecture/*.yaml"
+    "https://marcelroozekrans.github.io/Ariadne.NET/schema/pack.schema.json": ".architecture/rules.yaml"
   }
 }
 ```
 
 ## What the schema checks
 
-The schema checks the shape of a pack, like the loader does: every mapping has a closed set of keys, values have the right type, a rule has an `id`, a `because` and exactly one rule type, and `layers` is not mixed with other selector keys. It follows the [rule schema](03-rule-schema.md) and [rule types](rule-types.md) pages.
+The schema checks the shape of a pack, like the loader does: every mapping has a closed set of keys, required keys are present, lists that need an entry are not empty, values have the right type, a rule has an `id`, a `because` and exactly one rule type, `layers` is not mixed with other selector keys, and `schema` is `2`. Plain numbers and booleans count as text where the loader reads text, so `version: 1.0` is fine. It follows the [rule schema](03-rule-schema.md) and [rule types](rule-types.md) pages.
 
 ## What the schema cannot check
 
@@ -46,5 +46,8 @@ Some errors depend on other parts of the pack, or on the packs it extends, and J
 - A layer or rule `id` that appears twice in the merged pack.
 - A child pack that changes what it may not, or adds exceptions to a locked rule.
 - A pack that needs `extends` to supply the layers its roles name.
+- A rule entry with only `id` and `exceptions`, or a layer entry that only retargets, in a pack without `extends`.
+- A malformed glob or member pattern, such as a member pattern without a dot.
+- `schema: 2.0` or `schema: 02`: an editor reads these as the number 2, and the loader accepts only `2`.
 
-A pack the schema accepts can therefore still fail to resolve, but a pack the schema rejects for its shape does not load either. Tests in the repository keep the two in agreement: every built-in pack validates against the schema, and each invalid pack in a test corpus is rejected by both.
+A pack the schema rejects does not load either, except in the corner cases above, so an error in the editor is a real error. A pack the schema accepts can still fail to load or resolve. Tests in the repository keep the two in agreement on the cases they list: every built-in pack validates against the schema, each invalid pack in a test corpus is rejected by both, and the cases above are pinned as known gaps.

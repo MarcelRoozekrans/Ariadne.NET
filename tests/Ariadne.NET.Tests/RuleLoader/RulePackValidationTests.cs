@@ -198,7 +198,8 @@ public class RulePackValidationTests
                          && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
                          // Deliberately broken packs: PackSchema.InvalidCorpusTests asserts that they fail to load or resolve.
                          && !f.Contains($"{Path.DirectorySeparatorChar}InvalidPacks{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
-                         && !f.Contains($"{Path.DirectorySeparatorChar}KnownGaps{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+                         && !f.Contains($"{Path.DirectorySeparatorChar}KnownGaps{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                         && !f.Contains($"{Path.DirectorySeparatorChar}ShapeGaps{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
                      .Order(StringComparer.Ordinal))
         {
             data.Add(file);

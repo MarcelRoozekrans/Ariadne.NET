@@ -39,6 +39,34 @@ public class PackSchemaHarnessTests
         json["empty"].Should().BeOfType<JsonObject>();
     }
 
+    [Theory]
+    [InlineData("version: 2")]
+    [InlineData("version: 1.0")]
+    [InlineData("version: true")]
+    [InlineData("author: 2024")]
+    public void Schema_accepts_plain_numbers_and_booleans_where_the_loader_reads_text(string line) =>
+        AssertBoth(Minimal + line + "\n", accepted: true);
+
+    [Theory]
+    [InlineData("allowEmpty: True")]
+    public void Converter_types_yaml_1_2_booleans_like_the_editor(string line)
+    {
+        PackSchemaHarness.YamlToJson(line + "\n")["allowEmpty"]!.GetValueKind().Should().Be(System.Text.Json.JsonValueKind.True);
+    }
+
+    [Theory]
+    [InlineData("~")]
+    [InlineData("null")]
+    [InlineData("Null")]
+    public void Converter_types_yaml_null_like_the_editor(string value)
+    {
+        PackSchemaHarness.YamlToJson("name: " + value + "\n")["name"].Should().BeNull();
+    }
+
+    [Fact]
+    public void Converter_types_floats_as_numbers() =>
+        PackSchemaHarness.YamlToJson("version: 1.0\n")["version"]!.GetValueKind().Should().Be(System.Text.Json.JsonValueKind.Number);
+
     private const string Minimal = "schema: 2\nname: x\n";
 
     [Fact]

@@ -76,6 +76,7 @@ internal static partial class PackSchemaHarness
         return obj;
     }
 
+    // Plain scalars are typed like YAML 1.2 core schema resolvers do, which is what a YAML language server sees.
     private static JsonNode? ToScalar(YamlScalarNode scalar)
     {
         var text = scalar.Value ?? string.Empty;
@@ -84,19 +85,34 @@ internal static partial class PackSchemaHarness
             return JsonValue.Create(text);
         }
 
-        if (IntegerPattern().IsMatch(text))
+        switch (text)
         {
-            return JsonValue.Create(long.Parse(text, CultureInfo.InvariantCulture));
+            case "" or "~" or "null" or "Null" or "NULL":
+                return null;
+            case "true" or "True" or "TRUE":
+                return JsonValue.Create(true);
+            case "false" or "False" or "FALSE":
+                return JsonValue.Create(false);
         }
 
-        return text switch
+        if (IntegerPattern().IsMatch(text))
         {
-            "true" => JsonValue.Create(true),
-            "false" => JsonValue.Create(false),
-            _ => JsonValue.Create(text),
-        };
+            return long.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var whole)
+                ? JsonValue.Create(whole)
+                : JsonValue.Create(text);
+        }
+
+        if (FloatPattern().IsMatch(text))
+        {
+            return JsonValue.Create(double.Parse(text, CultureInfo.InvariantCulture));
+        }
+
+        return JsonValue.Create(text);
     }
 
-    [GeneratedRegex("^-?\\d+$", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
+    [GeneratedRegex("^[-+]?\\d+$", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
     private static partial Regex IntegerPattern();
+
+    [GeneratedRegex("^[-+]?(\\.\\d+|\\d+(\\.\\d*)?)([eE][-+]?\\d+)?$", RegexOptions.ExplicitCapture, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex FloatPattern();
 }

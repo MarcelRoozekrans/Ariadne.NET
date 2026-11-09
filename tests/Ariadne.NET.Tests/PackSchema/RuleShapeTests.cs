@@ -26,6 +26,7 @@ public class RuleShapeTests
     {
         var yaml = "schema: 2\nname: x\nextends: [builtin://clean-architecture]\nrules:\n  - id: CA-X\n    exceptions:\n      - types: [A.B]\n        because: legacy\n";
 
+        PackSchemaHarness.LoaderAccepts(yaml).Should().BeTrue();
         PackSchemaHarness.SchemaErrors(yaml).Should().BeEmpty();
     }
 }

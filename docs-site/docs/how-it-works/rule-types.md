@@ -46,6 +46,29 @@ rules:
 
 The C# model is `RuleDefinition`, with `Id`, `Because`, `Description`, `Kind` (`RuleKind.Forbid`, `RuleKind.AllowOnly`, `RuleKind.Require`, `RuleKind.BannedPackages` or `RuleKind.UniqueNames`), `From` and `To` (`TargetSelector`), `Require` (`RuleRequirement?`, with `Layer`, `Kind`, `Accessibility` and `Implements`), `Packages` (`IList<string>`), `Against` (`TargetSelector`), `Exceptions` (`IList<RuleException>`), `Locked` and `AllowEmpty`. For a `require` or `uniqueNames` rule `From` holds the `for` selector, and for a `bannedPackages` rule it holds `from`.
 
+### Forbid and allowOnly
+
+Both rules constrain dependencies and take `from` and `to`, both required. `from` is a [selector](03-rule-schema.md#selectors) or `layers: [...]`; `to` takes the same keys plus [`members`](#members).
+
+- `forbid` reports `ForbiddenDependency` for each dependency from a type in `from` to a type in `to`.
+- `allowOnly` says a type in `to` may be depended on only by types in `from`, or by types in `to` itself. Any other source is reported as `DependencyNotPermitted`.
+
+```yaml
+rules:
+  - id: SHOP-NO-EFCORE-IN-DOMAIN
+    because: Persistence belongs to Infrastructure.
+    forbid:
+      from: { layers: [Domain] }
+      to: { namespaces: ["Microsoft.EntityFrameworkCore.**"] }
+  - id: SHOP-REPOSITORIES-ONLY-IN-INFRASTRUCTURE
+    because: Callers use the interfaces.
+    allowOnly:
+      from: { layers: [Infrastructure] }
+      to: { types: ["Shop.Infrastructure.Persistence.*Repository"] }
+```
+
+The engine reports one violation per rule, source type and target type, located at the first reference, with the number of references. Exceptions exempt the source type. Rules apply regardless of layers, so a `forbid` between two types of the same layer still fires.
+
 ### Require rules
 
 A `forbid` or `allowOnly` rule constrains dependencies. A `require` rule constrains where a type lives and what shape it has. `for` is a [selector](03-rule-schema.md#selectors) and the other keys describe what each selected type must be:
@@ -85,10 +108,11 @@ A rule, a component role or a layer that selects no type cannot fail, so a clean
 
 | Kind | Reported for | Message |
 |------|--------------|---------|
-| `VacuousRule` | a `forbid`, `allowOnly` or `uniqueNames`/`require` rule whose subject selects no type | `Rule '<id>' selects no type: its 'from' selector matches nothing`, with `'for' selector` for `require` and `uniqueNames` |
-| `VacuousRule` | a `bannedPackages` rule whose `from.assemblies` matches no loaded project | `Rule '<id>' selects no type: its 'from.assemblies' matches none of the` projects |
-| `VacuousRule` | a component role that matches no type in its layer | `Role '<Name>' matches no type` |
-| `VacuousLayer` | a layer that covers no type | `Layer '<Name>' covers no type` |
+| `VacuousRule` | a `forbid` or `allowOnly` rule whose `from` selects no type | `Rule '<id>' selects no type: its 'from' selector matches nothing in the <n> project(s) loaded.` |
+| `VacuousRule` | a `require` or `uniqueNames` rule whose `for` selects no type | `Rule '<id>' selects no type: its 'for' selector matches nothing in the <n> project(s) loaded.` |
+| `VacuousRule` | a `bannedPackages` rule whose `from.assemblies` matches no loaded project | `Rule '<id>' selects no type: its 'from.assemblies' matches none of the <n> project(s) loaded.` |
+| `VacuousRule` | a component role that matches no type in its layer | `Role '<Name>' matches no type in layer '<Layer>' in the <n> project(s) loaded.` |
+| `VacuousLayer` | a layer that covers no type | `Layer '<Name>' covers no type in the <n> project(s) loaded.` |
 
 Only the subject side is checked: the `from` of `forbid`, `allowOnly`, `require` and `uniqueNames` (for the last two, the `for` selector). The `to`, `against` and `members` sides and the `exceptions` are never checked, since a rule about something that does not exist yet is still sound. A `bannedPackages` rule is vacuous only when it has a non-empty `from.assemblies` that matches no loaded project; without `from` it applies to every project. A rule or role whose subject resolves only through layers that are already reported as vacuous gets no second violation, because fixing the layer fixes it.
 

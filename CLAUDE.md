@@ -80,7 +80,7 @@ Expected failures are values, not exceptions. The loader, resolver, registry, `T
 
 ## Docs
 
-The Docusaurus site builds from `docs-site/docs/`, the source of the user-facing docs (`docs/features.md` is an older copy that is no longer updated); `docs/` otherwise holds design and plan documents, perf notes and planning state. A change to the pack format also changes `docs-site/static/schema/pack.schema.json`; the tests in `tests/Ariadne.NET.Tests/PackSchema` fail when the schema and the loader disagree.
+The Docusaurus site builds from `docs-site/docs/`, the source of the user-facing docs (`docs/features.md` is an older copy that is no longer updated); `docs/` otherwise holds design and plan documents, perf notes and planning state. A change to the pack format also changes `docs-site/static/schema/pack.schema.json`; the tests in `tests/Ariadne.NET.Tests/PackSchema` fail when the schema and the loader disagree on a listed case; add a case there for every new key or rule.
 
 ## Releases
 

@@ -8,6 +8,8 @@ public class InvalidCorpusTests
 
     public static TheoryData<string> KnownGaps() => Files("KnownGaps");
 
+    public static TheoryData<string> ShapeGaps() => Files("ShapeGaps");
+
     private static TheoryData<string> Files(string folder)
     {
         var root = PackSchemaHarness.RepoRoot();
@@ -40,5 +42,15 @@ public class InvalidCorpusTests
         PackSchemaHarness.LoaderAccepts(yaml).Should().BeTrue($"{relativePath} is well formed, so the loader reads it");
         PackSchemaHarness.ReferencesResolve(yaml).Should().BeFalse($"the reference check must reject {relativePath}");
         PackSchemaHarness.SchemaErrors(yaml).Should().BeEmpty($"{relativePath} is a cross-reference the schema cannot see");
+    }
+
+    [Theory]
+    [MemberData(nameof(ShapeGaps))]
+    public void Shape_gap_is_accepted_by_schema_and_rejected_by_loader(string relativePath)
+    {
+        var yaml = File.ReadAllText(Path.Combine(PackSchemaHarness.RepoRoot(), relativePath));
+
+        PackSchemaHarness.LoaderAccepts(yaml).Should().BeFalse($"the loader must reject {relativePath}");
+        PackSchemaHarness.SchemaErrors(yaml).Should().BeEmpty($"{relativePath} is a rule JSON Schema cannot express");
     }
 }
