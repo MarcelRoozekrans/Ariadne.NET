@@ -94,12 +94,13 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Plan:** `docs/superpowers/plans/2026-11-08-phase-2.4-banned-packages-forbidden-apis-name-collisions.md`
 **Completed:** 2026-11-08
 
-### Phase 2.5: Vacuity detection [status: pending]
+### Phase 2.5: Vacuity detection [status: complete]
 **Goal:** A rule or layer selector that matches no type fails with its own violation kind, unless the rule opts out with `allowEmpty: true`.
 **Surface:** Backend
 **HelpWanted:** no
 **Design:** `docs/superpowers/specs/2026-11-08-phase-2.5-vacuity-detection-design.md`
 **Plan:** `docs/superpowers/plans/2026-11-08-phase-2.5-vacuity-detection.md`
+**Completed:** 2026-11-08
 
 ### Phase 2.6: Pack reference and JSON Schema [status: pending]
 **Goal:** Document every v2 rule type on the docs site, publish a JSON Schema for editor validation, and delete the drifted `docs/how-it-works/` copy.
