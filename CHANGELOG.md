@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.6.0...v0.6.1) (2026-11-09)
+
+
+### Features
+
+* publish a JSON Schema and a rule type reference for packs ([#58](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/58)) ([024682e](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/024682e41f4adb2b2dff3d7973841ae791da07ec))
+
 ## [0.6.0](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.5.0...v0.6.0) (2026-11-08)
 
 
