@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.7.0](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.6.1...v0.7.0) (2026-11-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* add FindPackageCoverageGap to IArchitectureValidator, so custom implementations must add it
+
+### Features
+
+* add FindPackageCoverageGap to IArchitectureValidator, so custom implementations must add it ([09d30b5](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/09d30b5b99c67dde3c9ced7e77954d77f5c3599e))
+
+
+### Documentation
+
+* show SQL, crypto and HTTP confined to Infrastructure ([#60](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/60)) ([25b27d6](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/25b27d61c6a85e92264a1d74625648946e5e4781))
+
 ## [0.6.1](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.6.0...v0.6.1) (2026-11-09)
 
 
