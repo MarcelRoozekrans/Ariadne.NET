@@ -142,7 +142,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Goal:** Ship the CLI as the `ariadne` dotnet tool.
 **Surface:** Infra
 **HelpWanted:** no
-**Plan:** _to be written_
+**Plan:** `docs/superpowers/plans/2026-11-10-phase-3.3-dotnet-tool.md`
 
 ### Phase 3.4: CI examples [status: pending]
 **Goal:** GitHub Actions examples that fail a build on a violation.
@@ -194,7 +194,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Goal:** Publish the MCP server as a dotnet tool and npx package, like roslyn-codelens.
 **Surface:** Infra
 **HelpWanted:** no
-**Plan:** _to be written_
+**Plan:** `docs/superpowers/plans/2026-11-10-phase-3.3-dotnet-tool.md`
 
 ### Phase 5.2: Agent-facing tools [status: pending]
 **Goal:** "Where does this go", and violations explained with the rule's reason.
