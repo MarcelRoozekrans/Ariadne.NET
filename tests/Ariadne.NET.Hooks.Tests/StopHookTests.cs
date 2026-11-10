@@ -283,6 +283,31 @@ public class StopHookTests
         warn.ToString().Should().BeEmpty();
     }
 
+    [Theory]
+    [InlineData("imports.yaml")]
+    [InlineData("imports.yml")]
+    public async Task A_folder_holding_only_the_sync_manifest_has_no_packs_and_is_silent(string manifest)
+    {
+        using var project = new TempProject();
+        project.WriteImports("shared", "1.0.0");
+        if (!string.Equals(manifest, "imports.yaml", StringComparison.Ordinal))
+        {
+            File.Move(Path.Combine(project.Root, ".architecture", "imports.yaml"), Path.Combine(project.Root, ".architecture", manifest));
+        }
+
+        File.WriteAllText(Path.Combine(project.Root, "Shop.slnx"), "<Solution />");
+        using var session = new TestSession();
+        EditedFiles.Record(session.Id, "/x/A.cs");
+        var validator = new FakeValidator(Report(Violation()));
+        using var warn = new StringWriter();
+
+        var json = await RunAsync(Create(validator), project.Root, session.Id, warn: warn).ConfigureAwait(true);
+
+        json.Should().BeNull();
+        validator.Calls.Should().Be(0);
+        warn.ToString().Should().BeEmpty();
+    }
+
     [Fact]
     public async Task An_edit_list_that_cannot_be_read_warns_once_and_stays_fail_open()
     {

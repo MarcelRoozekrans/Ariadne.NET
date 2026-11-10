@@ -93,14 +93,26 @@ public sealed class StopHook(IPackSetValidator validator, Func<string, string?>?
         var folder = Path.Combine(root, ".architecture");
         try
         {
-            return Directory.Exists(folder) && Directory.EnumerateFiles(folder).Any(f =>
-                string.Equals(Path.GetExtension(f), ".yaml", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(Path.GetExtension(f), ".yml", StringComparison.OrdinalIgnoreCase));
+            return Directory.Exists(folder) && Directory.EnumerateFiles(folder).Any(IsPackFile);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             return true;
         }
+    }
+
+    // Mirrors PackDiscovery in Ariadne.NET.Workspaces, which is internal: a pack is a .yaml or .yml file in the folder,
+    // except imports.yaml and imports.yml, the 'ariadne sync' manifest.
+    private static bool IsPackFile(string file)
+    {
+        if (string.Equals(Path.GetFileNameWithoutExtension(file), "imports", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var extension = Path.GetExtension(file);
+        return string.Equals(extension, ".yaml", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, ".yml", StringComparison.OrdinalIgnoreCase);
     }
 
     // Only what this run read: an edit recorded while the check ran stays for the next one.
