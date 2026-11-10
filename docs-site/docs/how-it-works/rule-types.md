@@ -203,4 +203,4 @@ rules:
       to: { namespaces: ["System.Net.Http"] }
 ```
 
-SQL uses `members` because the same assembly also holds types that are fine everywhere, such as `DbConnection` as a parameter type; the other two ban a whole namespace, which is the shorter form. A rule that selects nothing fails with `VacuousRule`, so a solution that never touches cryptography sets `allowEmpty: true` on that rule.
+The SQL rule names the members that run a command with `members`; the other two name a whole namespace. A rule that selects nothing fails with `VacuousRule`, so a solution that never touches cryptography sets `allowEmpty: true` on that rule.
