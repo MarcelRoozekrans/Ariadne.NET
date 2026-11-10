@@ -40,6 +40,17 @@ public sealed class SolutionValidatorTests
     }
 
     [Fact]
+    public async Task Validator_Broken_NamesThePackOnEveryViolation()
+    {
+        var pack = TestPacks.Named("shop-rules", "Domain", "Infrastructure");
+
+        var result = await _validator.ValidateAsync(pack, FixtureProjects.Path("broken", "Shop.slnx"));
+
+        result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.ToString() : null);
+        result.Value.Violations.Should().NotBeEmpty().And.OnlyContain(v => v.Pack == "shop-rules");
+    }
+
+    [Fact]
     public async Task Validator_BrokenSlnfWithoutDomain_IsValid()
     {
         var report = await ValidateWithLayersAsync(["Infrastructure"], "broken", "Shop.Infrastructure-only.slnf");

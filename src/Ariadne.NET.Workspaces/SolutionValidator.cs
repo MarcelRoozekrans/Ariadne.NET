@@ -47,7 +47,8 @@ public sealed class SolutionValidator : ISolutionValidator
         }
 
         var report = _validator.Validate(resolvedPack, solution.Projects, cancellationToken);
-        return Result<ArchitectureReport, AriadneError>.Success(report with { SkippedProjects = solution.SkippedProjects });
+        var named = report.Violations.Select(violation => violation with { Pack = resolvedPack.Name }).ToList();
+        return Result<ArchitectureReport, AriadneError>.Success(report with { Violations = named, SkippedProjects = solution.SkippedProjects });
     }
 
     private static AriadneError UnknownPackages(PackageCoverageGap uncovered) =>
