@@ -16,7 +16,7 @@ public static class ValidateCommand
             DefaultValueFactory = _ => ".",
         };
 
-        var command = new Command("validate", "Validate a solution or project against architecture rules")
+        var command = new Command("validate", "Validate a solution or project against every pack under .architecture/")
         {
             pathArgument,
         };
@@ -24,14 +24,8 @@ public static class ValidateCommand
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var path = parseResult.GetValue(pathArgument)!;
-            var resolved = RulesCommand.ResolveRulesFromFile(provider);
-            if (resolved.IsFailure)
-            {
-                return ErrorOutput.Report(resolved.Error);
-            }
-
-            var validator = provider.GetRequiredService<ISolutionValidator>();
-            var result = await validator.ValidateAsync(resolved.Value, path, cancellationToken).ConfigureAwait(false);
+            var validator = provider.GetRequiredService<IPackSetValidator>();
+            var result = await validator.ValidateAsync(path, cancellationToken).ConfigureAwait(false);
             if (result.IsFailure)
             {
                 return ErrorOutput.Report(result.Error);
