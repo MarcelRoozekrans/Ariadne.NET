@@ -1,11 +1,11 @@
 # Session State
 
-**Last session:** 2026-11-09 (phase 2.6 built on branch `phase-2-6-pack-reference`, no PR yet)
+**Last session:** 2026-11-10 (Milestone 2 audited and completed)
 **Repository:** `MarcelRoozekrans/Ariadne.NET`, public since 2026-11-03. The old private repository `MarcelRoozekrans/architecture-governance-engine` is frozen. Local clones: remote `ariadne` is the new repository, `origin` the old one; push with `git push ariadne HEAD:<branch>`, never to `origin`.
 
 ## Current Position
 
-- **Milestone:** 2 — Rule engine v2 [active since 2026-11-04]
+- **Milestone:** 2 — Rule engine v2 [complete 2026-11-10]. Audit `docs/superpowers/reviews/2026-11-10-milestone-2-audit.md`: first run failed on the SQL, crypto and HTTP example, PR #60 closed it, second run passed. Released as 0.7.0 (release-please PR #61), which includes the #50 fix (PR #62).
 - **Phase 2.1 — Semantic dependency analysis:** complete, released as 0.2.0.
 - **Phase 2.2 — Rule schema v2:** [status: complete 2026-11-05]. PR #35 merged as f1d8a14; 0.3.0 released via release-please PR #38, which lists all four breaking changes. Completion merged as #39.
   - Design: `docs/superpowers/specs/2026-11-05-phase-2.2-rule-schema-v2-design.md`
@@ -24,11 +24,11 @@
   - Owner decision 2026-11-08: fix SIGTERM during `stop` exiting 143 by exiting 0, so the fail-open rule holds. Not yet implemented.
 - **Phase 2.4 — Banned packages, forbidden APIs and name collisions:** [status: complete 2026-11-08], merged as #51 on 2026-11-08 from `feat/phase-2.4-banned-packages-forbidden-apis-name-collisions`; CI was green after one fix to the Hooks stop test count. Released as 0.5.0 through #52. Design `docs/superpowers/specs/2026-11-08-phase-2.4-banned-packages-forbidden-apis-name-collisions-design.md`, plan `docs/superpowers/plans/2026-11-08-phase-2.4-banned-packages-forbidden-apis-name-collisions.md`, all boxes ticked. Adds `bannedPackages` (package graph from `project.assets.json`, transitive and through project references, unknown data is an error for a covering rule), `members` on the `to` selector of `forbid` and `allowOnly` (override and implement matching, initializers, implicit base constructor call, indexers by metadata name) and `uniqueNames`. Perf: `docs/perf/phase-2.4-baseline.md`; the walker and validator are within 0.1% of the 2.3 head, the extra cost per type is the larger solution. Stated limits are in the design and on the docs-site rule-schema page.
   - Done: the PR carried a `BEGIN_COMMIT_OVERRIDE` block and release-please PR #52 shows the `RuleDefinitionValidator` constructor break under BREAKING CHANGES.
-  - Issue #50: the new `InternalsVisibleTo Ariadne.NET.Workspaces` couples the two packages' versions. Owner decision 2026-11-08: replace it with a public coverage check API. Not yet implemented.
+  - Issue #50: the new `InternalsVisibleTo Ariadne.NET.Workspaces` couples the two packages' versions. Owner decision 2026-11-08: replace it with a public coverage check API. Done in #62, released in 0.7.0.
   - Leftover branches deleted on `ariadne` 2026-11-08 with the owner's go-ahead: `docs/phase-2.4-design`, `docs/agent-hooks-design`, `feat/phase-5.6-agent-hooks` and the merged 2.4 feature branch. The local 2.4 feature branch remains because another worktree has it checked out.
   - Not covered by a CLI or MCP level test: the stale-assets error (shared `SolutionValidator` is tested).
 - **Phase 2.5 — Vacuity detection:** [status: complete 2026-11-08]. Merged as #53 (98ed64f) on 2026-11-08 from `feat/phase-2.5-vacuity-detection`; CI was green after one fix to the packed-consumer check. Release 0.5.0 was released by the owner (#52). Release-please PR #54 (0.6.0) lists the `feat!` and the three features and is not merged. Design `docs/superpowers/specs/2026-11-08-phase-2.5-vacuity-detection-design.md`, plan `docs/superpowers/plans/2026-11-08-phase-2.5-vacuity-detection.md`, all boxes ticked except the PR-time note in Task 6. A rule, component role or layer that selects no type fails with `VacuousRule` (11) or `VacuousLayer` (12), unless a rule or role sets `allowEmpty: true`; subject side only; built-in packs set `allowEmpty` on every role. The default change is breaking: commit 35ae809 is `feat!` with two BREAKING CHANGE footers. The PR body carried a `BEGIN_COMMIT_OVERRIDE` block and #54 shows the four entries. Perf: `docs/perf/phase-2.5-baseline.md`, about +2.3% allocations from the pass. Deferred minors: the `VacuousRule` message cell in `03-rule-schema.md` is awkwardly split and the column header says "Message starts with"; `forbid` has no exact-message test; the layer anchor test reads `Namespaces[0]` only.
-- **Phase 2.6 — Pack reference and JSON Schema:** [status: complete 2026-11-09], on branch `phase-2-6-pack-reference` (pushed to `ariadne`); no PR opened, the owner has not asked. Design `docs/superpowers/specs/2026-11-09-phase-2.6-pack-reference-and-json-schema-design.md`, plan `docs/superpowers/plans/2026-11-09-phase-2.6-pack-reference-and-json-schema.md`, all boxes ticked. Adds `docs-site/static/schema/pack.schema.json` (hand-written, draft 2020-12), conformance tests in `tests/Ariadne.NET.Tests/PackSchema` (shipped packs, an invalid corpus, `KnownGaps` for cross-references and `ShapeGaps` for what JSON Schema cannot express), the `rule-types` and `editor-support` docs pages, and deletes `docs/how-it-works/`. Owner decisions 2026-11-09: hand-written schema plus conformance tests; pack reference only. Follow-ups: issue #57 (`docs/features.md` is an old copy); the docs build only warns on broken links (`onBrokenLinks: 'warn'`), switching to `throw` is site-wide; the test YAML converter ignores non-scalar keys and later documents. The earlier guess that other docs-site pages are stale was checked and not found.
+- **Phase 2.6 — Pack reference and JSON Schema:** [status: complete 2026-11-09], merged as #58 on 2026-11-09 from `phase-2-6-pack-reference`; CI was green. Release-please PR #59 (0.6.1) lists it under Features and is not merged. Design `docs/superpowers/specs/2026-11-09-phase-2.6-pack-reference-and-json-schema-design.md`, plan `docs/superpowers/plans/2026-11-09-phase-2.6-pack-reference-and-json-schema.md`, all boxes ticked. Adds `docs-site/static/schema/pack.schema.json` (hand-written, draft 2020-12), conformance tests in `tests/Ariadne.NET.Tests/PackSchema` (shipped packs, an invalid corpus, `KnownGaps` for cross-references and `ShapeGaps` for what JSON Schema cannot express), the `rule-types` and `editor-support` docs pages, and deletes `docs/how-it-works/`. Owner decisions 2026-11-09: hand-written schema plus conformance tests; pack reference only. Follow-ups: issue #57 (`docs/features.md` is an old copy); the docs build only warns on broken links (`onBrokenLinks: 'warn'`), switching to `throw` is site-wide; the test YAML converter ignores non-scalar keys and later documents. The earlier guess that other docs-site pages are stale was checked and not found.
 - Issues filed from 2.2: #36 (child packs: amending `allowedDependencies`, locked rules sidestepped by retargeting, empty retargets) and #37 (child-layer error wording, duplicate roles, pack file size limit). #32 stays the module-isolation item.
 
 Phase 2.2 decisions by the owner, 2026-11-05:
@@ -45,7 +45,7 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 
 ## Scheduling (owner, 2026-11-09)
 
-- Issue #50 (public coverage check API instead of `InternalsVisibleTo`): its own fix PR, before further 2.6 build work. Not yet implemented.
+- Issue #50: done, merged as #62 and released in 0.7.0.
 - The three 5.6 follow-ups (`stop_hook_active` keeps the edit list, `init` preserves a custom hook `timeout`, SIGTERM during `stop` exits 0): one hooks fix PR. Not yet implemented.
 
 ## Open Decisions
@@ -69,6 +69,6 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 
 ## Recommended Next Step
 
-Phases 2.1 to 2.6 are built; 2.6 waits for a PR on `phase-2-6-pack-reference`. That completes Milestone 2's phases, so the next step is `audit-milestone` once 2.6 is merged. Separately, per the owner on 2026-11-09: issue #50 gets its own fix PR, and the three 5.6 follow-ups get one hooks fix PR. Neither is started.
+Milestone 2 is complete. Per the owner on 2026-11-09 the hooks fix PR with the three 5.6 follow-ups comes next, then `new-milestone` for Milestone 3. Do not merge release-please or Renovate PRs unless asked.
 
 Commit rules: conventional commits; no `Co-Authored-By` trailer or session link; no nested parentheses in commit bodies; keep every footer line under 100 characters, because commitlint rejects longer ones; breaking commits carry `!` and a `BREAKING CHANGE` footer. Shared VM: one build or test at a time, no local AOT publish.
