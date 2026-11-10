@@ -119,7 +119,7 @@ public sealed class ExitCodeTests : IDisposable
         var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("multitarget", "Multi.csproj"));
 
         exitCode.Should().Be(ExitCodes.Violations);
-        stdout.Should().MatchRegex(@"(?m)^  \[DependencyNotAllowed\] Domain/Order\.cs:\d+ \(net10\.0\)\r?$");
+        stdout.Should().MatchRegex(@"(?m)^  \[DependencyNotAllowed\] Domain/Order\.cs:\d+ \(net10\.0\) pack clean-architecture\+shop\r?$");
     }
 
     [Fact]

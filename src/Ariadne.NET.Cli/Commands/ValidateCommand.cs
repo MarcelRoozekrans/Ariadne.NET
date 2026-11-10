@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Ariadne.NET.Analysis;
+using Ariadne.NET.Reports;
 using Ariadne.NET.Workspaces;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -50,32 +51,7 @@ public static class ValidateCommand
 
     internal static int Print(TextWriter output, ArchitectureReport report, string root)
     {
-        output.WriteLine($"Checked {report.TypesChecked} types in {report.Projects.Count} projects");
-        foreach (var skipped in report.SkippedProjects)
-        {
-            output.WriteLine($"Skipped {skipped.Name}: {skipped.Reason}");
-        }
-
-        if (report.IsValid)
-        {
-            output.WriteLine("Result: PASS - No violations found.");
-            return ExitCodes.Success;
-        }
-
-        output.WriteLine($"Result: FAIL - {report.Violations.Count} violation(s) found.");
-        output.WriteLine();
-        foreach (var violation in report.Violations)
-        {
-            var where = violation.Location is { } location
-                ? $"{Path.GetRelativePath(root, location.FilePath).Replace('\\', '/')}:{location.Line}"
-                : violation.SourceType;
-            var frameworks = violation.TargetFrameworks.Count > 0
-                ? $" ({string.Join(", ", violation.TargetFrameworks)})"
-                : string.Empty;
-            output.WriteLine($"  [{violation.Kind}] {where}{frameworks}");
-            output.WriteLine($"    {violation.Message}");
-        }
-
-        return ExitCodes.Violations;
+        TextReportWriter.Write(output, report, root);
+        return report.IsValid ? ExitCodes.Success : ExitCodes.Violations;
     }
 }
