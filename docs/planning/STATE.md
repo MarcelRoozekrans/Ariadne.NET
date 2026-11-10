@@ -5,7 +5,7 @@
 
 ## Current Position
 
-- **Milestone 3 — Fail the build:** [active, started 2026-11-10]. Design approved by the owner, `docs/superpowers/specs/2026-11-10-milestone-3-design.md`, with a builder check done and the calls listed in it. MILESTONE.md and the ROADMAP block are written. Phases 3.1 testing package, 3.2 JSON and SARIF, 3.3 dotnet tool, 3.4 CI examples, all pending, none designed or planned yet. Owner request 2026-11-10: groom the whole milestone, then run it unattended. Branch `chore/milestone-3-start` (pushed to `ariadne`, no PR opened) holds the milestone start commit; the groom commits go on it. `main` requires a PR, so the groomed plans must reach `main` before `ready-check` can queue an unattended run; opening that PR is the owner's call.
+- **Milestone 3 — Fail the build:** [active, started 2026-11-10]. Design approved by the owner, `docs/superpowers/specs/2026-11-10-milestone-3-design.md`, with a builder check done and the calls listed in it. MILESTONE.md and the ROADMAP block are written. Phases 3.1 testing package, 3.2 JSON and SARIF, 3.3 dotnet tool, 3.4 CI examples, all pending and groomed 2026-11-10: approved designs and plans in `docs/superpowers/`, guard checks in the 3.1 to 3.3 plans. The 3.1 design corrects the milestone design: `extends` accepts no sibling pack file, so there is no base-pack case. Owner request 2026-11-10: groom the whole milestone, then run it unattended. Branch `chore/milestone-3-start` (pushed to `ariadne`, no PR opened) holds the milestone start commit; the groom commits go on it. `main` requires a PR, so the groomed plans must reach `main` before `ready-check` can queue an unattended run; opening that PR is the owner's call.
 - **Hooks fix branch:** `fix/hooks-follow-ups` is pushed, no PR yet. Its commits edit STATE.md too, so expect a small merge conflict in the 5.6 follow-up lines.
 
 - **Milestone:** 2 — Rule engine v2 [complete 2026-11-10]. Audit `docs/superpowers/reviews/2026-11-10-milestone-2-audit.md`: first run failed on the SQL, crypto and HTTP example, PR #60 closed it, second run passed. Released as 0.7.0 (release-please PR #61), which includes the #50 fix (PR #62).
@@ -51,10 +51,6 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 - Issue #50: done, merged as #62 and released in 0.7.0.
 - The three 5.6 follow-ups (`stop_hook_active` keeps the edit list, `init` preserves a custom hook `timeout`, SIGTERM during `stop` exits 0): one hooks fix PR. Not yet implemented.
 
-## Grooming
-
-Grooming: milestone 3, next phase 3.1
-
 ## Open Decisions
 
 - #36: may a child pack amend an inherited layer's `allowedDependencies`; should retargeting respect `locked`; should an empty retarget be rejected? Matters for the M4 Daedalus pack.
@@ -76,6 +72,6 @@ Grooming: milestone 3, next phase 3.1
 
 ## Recommended Next Step
 
-Run `groom-milestone` for Milestone 3, resuming at step 3 (no phase has a design or plan yet; step 2 will ask for build and test commands, which CONVENTIONS.md already has). Use the approved milestone design as input and carry its calls into each phase design; 3.2 builds on 3.1's pack-named violation, 3.3 on 3.2's CLI flags, 3.4 on 3.2 and 3.3, so each needs a `**Builds on:**` line and a guard check in the earlier plan. Then `ready-check` for the unattended run. Do not merge release-please or Renovate PRs unless asked.
+The groomed plans must reach `main` (it requires a PR; the owner opens it) before `ready-check` can queue an unattended run of phases 3.1 to 3.4 in order. Then run `ready-check`, or `start-next-phase` to build attended. Do not merge release-please or Renovate PRs unless asked.
 
 Commit rules: conventional commits; no `Co-Authored-By` trailer or session link; no nested parentheses in commit bodies; keep every footer line under 100 characters, because commitlint rejects longer ones; breaking commits carry `!` and a `BREAKING CHANGE` footer. Shared VM: one build or test at a time, no local AOT publish.
