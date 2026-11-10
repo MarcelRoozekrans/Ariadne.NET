@@ -7,7 +7,6 @@ namespace Ariadne.NET.Tests.Examples;
 public class GithubActionsExamplesTests
 {
     private const string ToolInstall = "dotnet tool install --global Ariadne.NET.Cli";
-    private const string ValidateFlags = "--format sarif --output";
 
     private static string ExamplesFolder() =>
         Path.Combine(PackSchemaHarness.RepoRoot(), "examples", "github-actions");
@@ -34,7 +33,7 @@ public class GithubActionsExamplesTests
     }
 
     [Fact]
-    public void Tool_example_installs_the_tool_validates_with_sarif_and_uploads_always()
+    public void Tool_example_installs_the_tool_validates_with_sarif_and_uploads_when_the_report_exists()
     {
         var root = Load(Path.Combine(ExamplesFolder(), "ariadne-tool.yml"));
         var steps = Steps(root);
@@ -42,11 +41,11 @@ public class GithubActionsExamplesTests
         Runs(steps).Should().Contain(ToolInstall);
 
         var validate = steps.Single(s => Run(s).Contains("ariadne validate", StringComparison.Ordinal));
-        Run(validate).Should().Contain(ValidateFlags);
+        Run(validate).Should().Contain("--format sarif --output");
         Scalar(validate, "if").Should().BeNull("the validate step is the one that fails the job");
 
         var upload = steps.Single(s => (Scalar(s, "uses") ?? "").StartsWith("github/codeql-action/upload-sarif@", StringComparison.Ordinal));
-        Scalar(upload, "if").Should().Be("always()");
+        Scalar(upload, "if").Should().Contain("!cancelled()").And.Contain("hashFiles('ariadne.sarif')");
         steps.IndexOf(upload).Should().BeGreaterThan(steps.IndexOf(validate));
 
         var permissions = (YamlMappingNode)Get(root, "permissions")!;
@@ -74,9 +73,24 @@ public class GithubActionsExamplesTests
         Runs(steps).Should().Contain(r => r.StartsWith("dotnet test", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [MemberData(nameof(ExampleFiles))]
+    public void Docs_page_contains_each_example_verbatim(string file)
+    {
+        var example = Normalise(File.ReadAllText(Path.Combine(ExamplesFolder(), file)));
+        var docs = Normalise(File.ReadAllText(Path.Combine(PackSchemaHarness.RepoRoot(), "docs-site", "docs", "ci-github-actions.md")));
+
+        docs.Should().Contain(example.TrimEnd('\n'), $"the docs page must show {file} exactly");
+    }
+
     [Fact]
     public void Proof_job_in_ci_runs_the_validate_command_line_of_the_examples()
     {
+        var exampleValidate = Run(Steps(Load(Path.Combine(ExamplesFolder(), "ariadne-tool.yml")))
+            .First(s => Run(s).Contains("ariadne validate", StringComparison.Ordinal)));
+        var exampleFlags = FlagsWithoutOutputValue(exampleValidate, "ariadne validate");
+        exampleFlags.Should().Contain("--format sarif --output");
+
         var root = Load(Path.Combine(PackSchemaHarness.RepoRoot(), ".github", "workflows", "ci.yml"));
         var jobs = (YamlMappingNode)Get(root, "jobs")!;
         var job = (YamlMappingNode)Get(jobs, "fail-the-build")!;
@@ -85,7 +99,24 @@ public class GithubActionsExamplesTests
         var validates = steps.Where(s => Run(s).Contains("ariadne\" validate", StringComparison.Ordinal)).ToList();
 
         validates.Should().NotBeEmpty();
-        validates.Should().OnlyContain(s => Run(s).Contains(ValidateFlags, StringComparison.Ordinal));
+        validates.Select(v => FlagsWithoutOutputValue(Run(v), "ariadne\" validate"))
+            .Should().OnlyContain(flags => flags == exampleFlags);
+    }
+
+    private static string Normalise(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    // The flags after the solution path, without the value of the final --output.
+    private static string FlagsWithoutOutputValue(string runText, string marker)
+    {
+        var line = runText.Split('\n').First(l => l.Contains(marker, StringComparison.Ordinal));
+        var tokens = line[(line.IndexOf(marker, StringComparison.Ordinal) + marker.Length)..]
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var flagsStart = Array.FindIndex(tokens, t => t.StartsWith("--", StringComparison.Ordinal));
+        var flags = tokens[flagsStart..];
+        var output = Array.LastIndexOf(flags, "--output");
+
+        output.Should().BeGreaterThanOrEqualTo(0);
+        return string.Join(' ', flags[..(output + 1)].Concat(flags[(output + 2)..]));
     }
 
     private static YamlMappingNode Load(string path)
