@@ -70,7 +70,7 @@ ariadne validate /path/to/MyApp.csproj
 ```
 
 - Argument: `path` (default: `"."`), a `.sln`, `.slnx`, `.slnf` or `.csproj` file, or a directory that holds exactly one of them
-- Finds the pack set: every `.yaml` or `.yml` directly in the `.architecture` folder (not `imports.yaml` or `imports.yml`, the `ariadne sync` manifest), looked up from the solution's folder upward, not the working directory's `rules.yaml`. Each pack is loaded, resolved and checked on its own, and a load error is prefixed with the file name. A pack meant to be imported must be a `builtin://` or `import://` reference, because every file in the folder is checked as a pack
+- Finds the pack set: every `.yaml` or `.yml` directly in the `.architecture` folder (not `imports.yaml` or `imports.yml`, the `ariadne sync` manifest), looked up from the solution's folder upward, not the working directory's `rules.yaml`. Each pack is loaded, resolved and checked on its own, and an error that does not already name the file is prefixed with `In pack file '<name>': `. A pack meant to be imported must be a `builtin://` or `import://` reference, because every file in the folder is checked as a pack
 - Loads the projects once with `IPackSetValidator` and checks each one against every pack; Ariadne never restores, so run `dotnet restore` first
 - Prints the number of types and projects checked, a `Skipped` line for each skipped project, and each violation as `[Kind] file:line pack <name>` followed by its message and, when the rule has a `because`, a `Rule <id>: <because>` line; a violation found in only some target frameworks lists them after the location, as in `[Kind] file:line (net10.0)`
 - Exit codes: 0 no violations, 1 violations, 2 error. A cancelled run prints `Cancelled.`

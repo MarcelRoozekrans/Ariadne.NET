@@ -688,7 +688,7 @@ public sealed class ExitCodeTests : IDisposable
         }
 
         var lines = error.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
-        lines[0].Should().Be("Error: rules.yaml: Built-in pack 'nope' not found.");
+        lines[0].Should().Be("Error: In pack file 'rules.yaml': Built-in pack 'nope' not found.");
         lines[1].Should().StartWith("Available packs: ");
     }
 
@@ -710,7 +710,7 @@ public sealed class ExitCodeTests : IDisposable
         }
 
         var lines = error.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
-        lines[0].Should().StartWith("Error: rules.yaml: Rule pack file '").And.EndWith("rules.yaml' has 1 problem(s).");
+        lines[0].Should().StartWith("Error: Rule pack file '").And.EndWith("rules.yaml' has 1 problem(s).");
         lines[1].Should().Contain("rules.yaml:4:1: ");
         error.ToString().Should().NotContain(" at ", "an expected failure prints no stack trace");
     }
@@ -737,7 +737,7 @@ public sealed class ExitCodeTests : IDisposable
 
         var lines = error.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
         lines.Should().HaveCount(2, "an expected failure prints the message and the OS reason, not a stack trace");
-        lines[0].Should().StartWith("Error: rules.yaml: Rule pack file '").And.EndWith("rules.yaml' could not be read.");
+        lines[0].Should().StartWith("Error: Rule pack file '").And.EndWith("rules.yaml' could not be read.");
     }
 
     [Fact]

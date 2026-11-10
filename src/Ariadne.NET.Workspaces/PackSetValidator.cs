@@ -91,7 +91,7 @@ public sealed class PackSetValidator : IPackSetValidator
             {
                 // A pack inside a found .architecture folder that cannot be loaded or resolved is a broken pack, never a missing
                 // one: NotFound from the pack set only means discovery found nothing or the path does not exist.
-                return Failure(resolved.Error with { Code = AriadneErrorCode.Invalid, Message = $"{fileName}: {resolved.Error.Message}" });
+                return Failure(resolved.Error with { Code = AriadneErrorCode.Invalid, Message = Named(fileName, resolved.Error.Message) });
             }
 
             var pack = resolved.Value;
@@ -108,6 +108,10 @@ public sealed class PackSetValidator : IPackSetValidator
 
         return Result<IReadOnlyList<RulePack>, AriadneError>.Success(packs);
     }
+
+    // Loader messages for a bad file already name it; the others (an unknown extends target, say) do not.
+    private static string Named(string fileName, string message) =>
+        message.Contains(fileName, StringComparison.OrdinalIgnoreCase) ? message : $"In pack file '{fileName}': {message}";
 
     private static Result<IReadOnlyList<RulePack>, AriadneError> Failure(AriadneError error) =>
         Result<IReadOnlyList<RulePack>, AriadneError>.Failure(error);

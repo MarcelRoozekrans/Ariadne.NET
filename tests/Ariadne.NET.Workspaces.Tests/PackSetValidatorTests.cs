@@ -68,7 +68,19 @@ public sealed class PackSetValidatorTests : IDisposable
 
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
-        result.Error.Message.Should().Contain("rules.yaml").And.Contain("nope");
+        result.Error.Message.Should().StartWith("In pack file 'rules.yaml': ").And.Contain("nope");
+    }
+
+    [Fact]
+    public async Task MalformedPack_NamesTheFileOnce()
+    {
+        var root = Workspace(("rules.yaml", "schema: 2\nname: x\nlayers: [unclosed"));
+
+        var result = await Create(new CountingLoader()).ValidateAsync(root);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().StartWith("Rule pack file '").And.NotStartWith("rules.yaml:").And.NotContain("In pack file");
     }
 
     [Fact]
@@ -96,14 +108,14 @@ public sealed class PackSetValidatorTests : IDisposable
     }
 
     [Fact]
-    public async Task UnloadablePack_FailsWithTheFileNameFirst()
+    public async Task UnloadablePack_FailsNamingTheFile()
     {
         var root = Workspace(("a-clean.yaml", Pack("clean-pack")), ("b-bad.yaml", "schema: 2\nnope: true\n"));
 
         var result = await Create(new CountingLoader()).ValidateAsync(root);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().StartWith("b-bad.yaml: ");
+        result.Error.Message.Should().Contain("b-bad.yaml");
     }
 
     [Fact]
