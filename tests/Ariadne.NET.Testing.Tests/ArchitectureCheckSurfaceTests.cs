@@ -1,4 +1,5 @@
 using Ariadne.NET.Analysis;
+using Ariadne.NET.Reports;
 using FluentAssertions;
 
 namespace Ariadne.NET.Testing.Tests;
@@ -14,5 +15,17 @@ public sealed class ArchitectureCheckSurfaceTests
         Func<string?, ArchitectureReport> run = ArchitectureCheck.Run;
 
         run.Method.GetParameters().Should().ContainSingle();
+    }
+
+    [Fact]
+    public void ArchitectureCheck_report_members_have_the_documented_signatures()
+    {
+        Action<ArchitectureReport, ReportFormat, string> write = ArchitectureCheck.WriteReport;
+        Action<string?, string, ReportFormat> assertValid = ArchitectureCheck.AssertValid;
+        Func<string?, string, ReportFormat, CancellationToken, Task> assertValidAsync = ArchitectureCheck.AssertValidAsync;
+
+        write.Method.GetParameters().Should().HaveCount(3);
+        assertValid.Method.GetParameters().Should().HaveCount(3);
+        assertValidAsync.Method.GetParameters().Should().HaveCount(4);
     }
 }

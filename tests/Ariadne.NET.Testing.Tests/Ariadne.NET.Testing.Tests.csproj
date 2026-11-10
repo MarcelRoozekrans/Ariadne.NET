@@ -10,6 +10,7 @@
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="FluentAssertions" Version="8.11.0" />
+    <PackageReference Include="JsonSchema.Net" Version="9.6.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1" />
@@ -31,6 +32,8 @@
   <ItemGroup>
     <Compile Include="..\Shared\FixtureProjects.cs" Link="Shared\FixtureProjects.cs" />
     <Compile Include="..\Shared\StrayFiles.cs" Link="Shared\StrayFiles.cs" />
+    <Compile Include="..\Ariadne.NET.Tests\Reports\SarifSchema.cs" Link="Reports\SarifSchema.cs" />
+    <None Include="..\Ariadne.NET.Tests\Reports\sarif-schema-2.1.0.json" Link="Reports\sarif-schema-2.1.0.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
