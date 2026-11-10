@@ -30,6 +30,7 @@
 
   <ItemGroup>
     <Compile Include="..\Shared\FixtureProjects.cs" Link="Shared\FixtureProjects.cs" />
+    <Compile Include="..\Shared\StrayFiles.cs" Link="Shared\StrayFiles.cs" />
   </ItemGroup>
 
 </Project>

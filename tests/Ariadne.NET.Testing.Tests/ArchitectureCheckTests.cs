@@ -96,6 +96,7 @@ public sealed class ArchitectureCheckTests : IDisposable
     {
         var solution = Path.Combine(_temp, "Shop.slnx");
         File.WriteAllText(solution, "<Solution />");
+        StrayFiles.AssertNoArchitectureFolderAbove(_temp);
 
         var act = () => ArchitectureCheck.Run(solution);
 
@@ -116,6 +117,7 @@ public sealed class ArchitectureCheckTests : IDisposable
     public async Task NoPath_NoSolutionAboveTheStartFolder_ThrowsCheckException()
     {
         var start = Directory.CreateDirectory(Path.Combine(_temp, "bin", "Debug")).FullName;
+        StrayFiles.AssertNoSolutionAbove(start);
 
         var act = () => ArchitectureCheck.RunFromAsync(null, start, CancellationToken.None);
 

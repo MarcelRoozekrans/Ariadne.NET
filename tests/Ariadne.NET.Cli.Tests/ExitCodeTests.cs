@@ -115,6 +115,7 @@ public sealed class ExitCodeTests : IDisposable
         try
         {
             CopyDirectory(FixtureProjects.Path("clean"), copy);
+            StrayFiles.AssertNoArchitectureFolderAbove(copy);
             var (exitCode, stderr) = RunCapturingStderr("validate", Path.Combine(copy, "Shop.slnx"));
 
             exitCode.Should().Be(ExitCodes.Error);

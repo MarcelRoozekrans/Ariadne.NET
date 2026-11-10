@@ -1,4 +1,5 @@
 using Ariadne.NET.Abstractions;
+using Ariadne.NET.Tests.Shared;
 using FluentAssertions;
 
 namespace Ariadne.NET.Workspaces.Tests;
@@ -108,13 +109,7 @@ public sealed class PackDiscoveryTests : IDisposable
     public void NoArchitectureFolder_IsNotFound()
     {
         var solution = Touch("Shop.slnx");
-        for (var dir = new DirectoryInfo(_root); dir is not null; dir = dir.Parent)
-        {
-            if (Directory.Exists(Path.Combine(dir.FullName, ".architecture")))
-            {
-                return; // the machine has an .architecture folder above the temp folder, so this case cannot be set up here
-            }
-        }
+        StrayFiles.AssertNoArchitectureFolderAbove(_root);
 
         var result = PackDiscovery.Find(solution);
 

@@ -1,4 +1,5 @@
 using Ariadne.NET.Abstractions;
+using Ariadne.NET.Tests.Shared;
 using FluentAssertions;
 
 namespace Ariadne.NET.Testing.Tests;
@@ -38,6 +39,7 @@ public sealed class SolutionLocatorTests : IDisposable
     public void Find_NoSolutionAnywhereAbove_IsNotFound()
     {
         var start = Directory.CreateDirectory(Path.Combine(_temp, "a", "b")).FullName;
+        StrayFiles.AssertNoSolutionAbove(start);
 
         var result = SolutionLocator.Find(start);
 
