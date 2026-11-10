@@ -1,0 +1,26 @@
+schema: 2
+name: broken-pack
+version: "1.0.0"
+author: fixture
+
+layers:
+  - name: Domain
+    id: SHOP-LAYER-DOMAIN
+    because: The domain holds business rules only.
+    assemblies: ["Shop.Domain"]
+    allowedDependencies:
+      - Infrastructure
+  - name: Infrastructure
+    id: SHOP-LAYER-INFRASTRUCTURE
+    because: Infrastructure stands alone.
+    assemblies: ["Shop.Infrastructure"]
+    allowedDependencies: []
+
+rules:
+  - id: SHOP-DOMAIN-NO-INFRASTRUCTURE
+    because: The domain must not depend on infrastructure, so storage can change without touching business rules.
+    forbid:
+      from:
+        layers: [Domain]
+      to:
+        layers: [Infrastructure]

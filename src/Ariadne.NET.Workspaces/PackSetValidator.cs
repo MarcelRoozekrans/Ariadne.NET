@@ -1,0 +1,106 @@
+using Ariadne.NET.Abstractions;
+using Ariadne.NET.Analysis;
+using ZeroAlloc.Results;
+
+namespace Ariadne.NET.Workspaces;
+
+/// <summary>Validates a solution against every pack file under <c>.architecture</c>, loading the solution once.</summary>
+public sealed class PackSetValidator : IPackSetValidator
+{
+    private readonly ISolutionLoader _loader;
+    private readonly IArchitectureValidator _validator;
+    private readonly IRulePackLoader _packLoader;
+    private readonly IRulePackResolver _resolver;
+
+    /// <summary>Creates the validator.</summary>
+    /// <param name="loader">Loads the solution.</param>
+    /// <param name="validator">Checks the loaded projects.</param>
+    /// <param name="packLoader">Reads each pack file.</param>
+    /// <param name="resolver">Resolves each pack's <c>extends</c> references.</param>
+    public PackSetValidator(ISolutionLoader loader, IArchitectureValidator validator, IRulePackLoader packLoader, IRulePackResolver resolver)
+    {
+        ArgumentNullException.ThrowIfNull(loader);
+        ArgumentNullException.ThrowIfNull(validator);
+        ArgumentNullException.ThrowIfNull(packLoader);
+        ArgumentNullException.ThrowIfNull(resolver);
+
+        _loader = loader;
+        _validator = validator;
+        _packLoader = packLoader;
+        _resolver = resolver;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<ArchitectureReport, AriadneError>> ValidateAsync(string path, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+
+        var discovered = PackDiscovery.Find(path);
+        if (discovered.IsFailure)
+        {
+            return Result<ArchitectureReport, AriadneError>.Failure(discovered.Error);
+        }
+
+        var packs = ResolveAll(discovered.Value);
+        if (packs.IsFailure)
+        {
+            return Result<ArchitectureReport, AriadneError>.Failure(packs.Error);
+        }
+
+        var loaded = await _loader.LoadAsync(path, cancellationToken).ConfigureAwait(false);
+        if (loaded.IsFailure)
+        {
+            return Result<ArchitectureReport, AriadneError>.Failure(loaded.Error);
+        }
+
+        using var solution = loaded.Value;
+
+        ArchitectureReport? merged = null;
+        var violations = new List<ArchitectureViolation>();
+        foreach (var pack in packs.Value)
+        {
+            var checkedPack = SolutionValidator.Check(_validator, solution, pack, cancellationToken);
+            if (checkedPack.IsFailure)
+            {
+                return checkedPack;
+            }
+
+            merged ??= checkedPack.Value;
+            violations.AddRange(checkedPack.Value.Violations);
+        }
+
+        return Result<ArchitectureReport, AriadneError>.Success(merged! with { Violations = violations });
+    }
+
+    private Result<IReadOnlyList<RulePack>, AriadneError> ResolveAll(DiscoveredPacks discovered)
+    {
+        var packs = new List<RulePack>();
+        var fileByName = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var file in discovered.Files)
+        {
+            var fileName = Path.GetFileName(file);
+            var loaded = _packLoader.LoadFromFile(file);
+            var resolved = loaded.IsSuccess ? _resolver.Resolve(loaded.Value, discovered.ProjectRoot) : loaded;
+            if (resolved.IsFailure)
+            {
+                return Failure(resolved.Error with { Message = $"{fileName}: {resolved.Error.Message}" });
+            }
+
+            var pack = resolved.Value;
+            if (fileByName.TryGetValue(pack.Name, out var first))
+            {
+                return Failure(new AriadneError(
+                    AriadneErrorCode.Invalid,
+                    $"Pack files '{first}' and '{fileName}' both declare the pack name '{pack.Name}'; give each pack its own name."));
+            }
+
+            fileByName[pack.Name] = fileName;
+            packs.Add(pack);
+        }
+
+        return Result<IReadOnlyList<RulePack>, AriadneError>.Success(packs);
+    }
+
+    private static Result<IReadOnlyList<RulePack>, AriadneError> Failure(AriadneError error) =>
+        Result<IReadOnlyList<RulePack>, AriadneError>.Failure(error);
+}
