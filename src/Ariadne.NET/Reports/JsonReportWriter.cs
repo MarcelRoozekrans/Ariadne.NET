@@ -45,17 +45,7 @@ public static class JsonReportWriter
         violation.Message,
         violation.Because,
         violation.Target,
-        violation.Location is { } location ? new JsonLocation(RelativePath(root, location.FilePath), location.Line, location.Column) : null,
+        violation.Location is { } location ? new JsonLocation(ReportPaths.Relative(root, location.FilePath), location.Line, location.Column) : null,
         violation.ReferenceCount,
         violation.TargetFrameworks);
-
-    private static string RelativePath(string root, string filePath)
-    {
-        var relative = Path.GetRelativePath(root, filePath);
-        var outside = Path.IsPathRooted(relative)
-            || relative.Equals("..", StringComparison.Ordinal)
-            || relative.StartsWith("../", StringComparison.Ordinal)
-            || relative.StartsWith("..\\", StringComparison.Ordinal);
-        return (outside ? filePath : relative).Replace('\\', '/');
-    }
 }
