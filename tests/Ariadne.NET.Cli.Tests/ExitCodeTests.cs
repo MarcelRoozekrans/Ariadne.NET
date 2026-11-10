@@ -362,6 +362,30 @@ public sealed class ExitCodeTests : IDisposable
     }
 
     [Fact]
+    public void Validate_FormatTextWithOutput_WritesTheTextToTheFileAndNothingToStdout()
+    {
+        var output = Path.Combine(_tempDir, "reports", "out.txt");
+
+        var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("twopacks", "Shop.slnx"), "--format", "text", "--output", output);
+
+        exitCode.Should().Be(ExitCodes.Violations);
+        stdout.Should().BeEmpty();
+        File.ReadAllText(output).Should().Contain("Checked ").And.Contain("Result: FAIL");
+    }
+
+    [Fact]
+    public void Validate_FormatJson_ReportsTheEngineVersion()
+    {
+        var (_, stdout, _, _) = RunWithBinaryStdout("validate", FixtureProjects.Path("twopacks", "Shop.slnx"), "--format", "json");
+
+        using var document = System.Text.Json.JsonDocument.Parse(stdout);
+        var version = document.RootElement.GetProperty("tool").GetProperty("version").GetString()!;
+        var engine = System.Reflection.CustomAttributeExtensions
+            .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(Ariadne.NET.Reports.ReportRoot).Assembly)!.InformationalVersion;
+        version.Should().Be(engine.Split('+')[0]);
+    }
+
+    [Fact]
     public void Validate_FormatJson_LeavesOnlyJsonOnStdoutAndTheSummaryOnStderr()
     {
         var (exitCode, stdout, stderr, consoleOut) = RunWithBinaryStdout("validate", FixtureProjects.Path("twopacks", "Shop.slnx"), "--format", "json");

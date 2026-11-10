@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.Reflection;
+using System.Text;
 using Ariadne.NET.Abstractions;
 using Ariadne.NET.Analysis;
 using Ariadne.NET.Reports;
@@ -142,7 +143,7 @@ public static class ValidateCommand
         try
         {
             using var stream = CreateFile(path);
-            using var writer = new StreamWriter(stream, new System.Text.UTF8Encoding(false));
+            using var writer = new StreamWriter(stream, new UTF8Encoding(false));
             write(writer);
             return null;
         }
@@ -157,8 +158,10 @@ public static class ValidateCommand
 
     private static string ToolVersion()
     {
-        var version = typeof(ValidateCommand).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-            ?? typeof(ValidateCommand).Assembly.GetName().Version?.ToString()
+        // The engine's version, as ArchitectureCheck reports it, not the CLI's own.
+        var assembly = typeof(ReportRoot).Assembly;
+        var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+            ?? assembly.GetName().Version?.ToString()
             ?? "0.0.0";
         var plus = version.IndexOf('+', StringComparison.Ordinal);
         return plus >= 0 ? version[..plus] : version;
