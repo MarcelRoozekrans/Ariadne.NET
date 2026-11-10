@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 5
 title: CI on GitHub Actions
 ---
 
@@ -25,7 +25,7 @@ Ariadne never restores. The solution must compile, and the banned-packages rules
 
 ## Fail the build with the tool
 
-This workflow installs the `Ariadne.NET.Cli` dotnet tool (see [Install the tool](../getting-started.md#install-the-tool)), validates the solution and uploads the SARIF report.
+This workflow installs the `Ariadne.NET.Cli` dotnet tool (see [Install the tool](getting-started.md#install-the-tool)), validates the solution and uploads the SARIF report.
 
 ```yaml
 # Fails the build when the solution breaks its architecture rules, using the
