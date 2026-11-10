@@ -97,7 +97,7 @@ internal static class BannedPackageRules
         /// </summary>
         /// <param name="projects">The projects of the run.</param>
         /// <returns>The rule and the project, or null.</returns>
-        internal UncoveredProject? FindUncoveredProject(IReadOnlyList<AnalyzedProject> projects)
+        internal PackageCoverageGap? FindUncoveredProject(IReadOnlyList<AnalyzedProject> projects)
         {
             ArgumentNullException.ThrowIfNull(projects);
 
@@ -107,7 +107,7 @@ internal static class BannedPackageRules
                 {
                     if (project is { Packages: null } && rule.Covers(AssemblyOf(project)))
                     {
-                        return new UncoveredProject(rule.Rule.Id, project.Name);
+                        return new PackageCoverageGap(rule.Rule.Id, project.Name);
                     }
                 }
             }
@@ -115,11 +115,6 @@ internal static class BannedPackageRules
             return null;
         }
     }
-
-    /// <summary>A project that a bannedPackages rule covers while its packages are not known.</summary>
-    /// <param name="RuleId">The id of the rule that covers the project.</param>
-    /// <param name="ProjectName">The name of the project.</param>
-    internal readonly record struct UncoveredProject(string RuleId, string ProjectName);
 
     internal sealed record CompiledRule(RuleDefinition Rule, Glob[] Packages, Glob[] FromAssemblies, Glob[][] ExceptionAssemblies)
     {

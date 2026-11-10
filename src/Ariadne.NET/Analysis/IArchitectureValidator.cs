@@ -37,6 +37,16 @@ public interface IArchitectureValidator
     /// </exception>
     ArchitectureReport Validate(RulePack resolvedPack, IReadOnlyList<AnalyzedProject> projects, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Finds the first project that a <c>bannedPackages</c> rule covers while its <see cref="AnalyzedProject.Packages"/> is null.
+    /// <see cref="Validate(RulePack, IReadOnlyList{AnalyzedProject}, CancellationToken)"/> throws on such a project; a caller that
+    /// loads projects from disk calls this first, to report a missing or stale assets file in its own terms.
+    /// </summary>
+    /// <param name="resolvedPack">The resolved rule pack.</param>
+    /// <param name="projects">The projects of the run.</param>
+    /// <returns>The first rule and project, in rule then project order, or null when every covered project has its packages.</returns>
+    PackageCoverageGap? FindPackageCoverageGap(RulePack resolvedPack, IReadOnlyList<AnalyzedProject> projects);
+
     /// <summary>Checks one compilation as a project named after its assembly, without a target framework.</summary>
     /// <remarks>
     /// A compilation carries no package list, so a pack with a <c>bannedPackages</c> rule that covers the compilation's assembly

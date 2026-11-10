@@ -41,7 +41,7 @@ public sealed class SolutionValidator : ISolutionValidator
 
         // A project without a package list has a missing, stale or unmatched assets file: the user fixes that by restoring,
         // so it is reported as an error here instead of reaching the validator, which throws on it.
-        if (BannedPackageRules.Compile(resolvedPack).FindUncoveredProject(solution.Projects) is { } uncovered)
+        if (_validator.FindPackageCoverageGap(resolvedPack, solution.Projects) is { } uncovered)
         {
             return Result<ArchitectureReport, AriadneError>.Failure(UnknownPackages(uncovered));
         }
@@ -50,7 +50,7 @@ public sealed class SolutionValidator : ISolutionValidator
         return Result<ArchitectureReport, AriadneError>.Success(report with { SkippedProjects = solution.SkippedProjects });
     }
 
-    private static AriadneError UnknownPackages(BannedPackageRules.UncoveredProject uncovered) =>
+    private static AriadneError UnknownPackages(PackageCoverageGap uncovered) =>
         new(
             AriadneErrorCode.Invalid,
             $"Rule '{uncovered.RuleId}' bans packages, but project '{uncovered.ProjectName}' has no usable package list: its obj/project.assets.json is missing, stale or does not match its target framework. Run 'dotnet restore' and validate again.");

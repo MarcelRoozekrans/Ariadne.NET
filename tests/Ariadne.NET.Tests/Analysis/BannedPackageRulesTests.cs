@@ -142,6 +142,37 @@ public class BannedPackageRulesTests
     }
 
     [Fact]
+    public void FindPackageCoverageGap_NamesTheRuleAndTheFirstCoveredProjectWithoutPackages()
+    {
+        var compilation = TestCompilation.Create("namespace Shop { public class A { } }");
+
+        var gap = new ArchitectureValidator().FindPackageCoverageGap(Pack,
+        [
+            new AnalyzedProject("Shop.Domain", null, compilation.WithAssemblyName("Shop.Domain")) { Packages = [] },
+            new AnalyzedProject("Shop.Web", null, compilation.WithAssemblyName("Shop.Web")),
+        ]);
+
+        gap.Should().Be(new PackageCoverageGap("TEST-BANNED", "Shop.Web"));
+    }
+
+    [Fact]
+    public void FindPackageCoverageGap_NullWhenEveryCoveredProjectHasPackages()
+    {
+        var pack = PackWith(["FluentValidation"], new TargetSelector { Assemblies = ["Shop.Domain"] });
+        var compilation = TestCompilation.Create("namespace Shop { public class A { } }");
+        var validator = new ArchitectureValidator();
+
+        // Shop.Web has no package list but the rule does not cover it.
+        var gap = validator.FindPackageCoverageGap(pack,
+        [
+            new AnalyzedProject("Shop.Web", null, compilation.WithAssemblyName("Shop.Web")),
+            new AnalyzedProject("Shop.Domain", null, compilation.WithAssemblyName("Shop.Domain")) { Packages = [] },
+        ]);
+
+        gap.Should().BeNull();
+    }
+
+    [Fact]
     public void PackagesNullInUncoveredProject_DoesNotThrow()
     {
         var pack = PackWith(["FluentValidation"], new TargetSelector { Assemblies = ["Shop.Domain"] });
