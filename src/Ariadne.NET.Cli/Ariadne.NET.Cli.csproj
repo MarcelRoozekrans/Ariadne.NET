@@ -19,6 +19,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>ariadne</ToolCommandName>
+    <PackageId>Ariadne.NET.Cli</PackageId>
   </PropertyGroup>
 
   <ItemGroup>
