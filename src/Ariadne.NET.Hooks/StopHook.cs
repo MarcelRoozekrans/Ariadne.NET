@@ -43,6 +43,12 @@ public sealed class StopHook(IPackSetValidator validator, Func<string, string?>?
         }
 
         var root = ProjectRoot.Resolve(input.Cwd, getEnvironmentVariable);
+        if (!HasPackFile(root))
+        {
+            // No packs to check against: skip silently, as a missing rules file always did.
+            return null;
+        }
+
         var solution = SolutionDiscovery.Find(root);
         if (solution is null)
         {
@@ -80,6 +86,21 @@ public sealed class StopHook(IPackSetValidator validator, Func<string, string?>?
         }
 
         return null;
+    }
+
+    private static bool HasPackFile(string root)
+    {
+        var folder = Path.Combine(root, ".architecture");
+        try
+        {
+            return Directory.Exists(folder) && Directory.EnumerateFiles(folder).Any(f =>
+                string.Equals(Path.GetExtension(f), ".yaml", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(Path.GetExtension(f), ".yml", StringComparison.OrdinalIgnoreCase));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return true;
+        }
     }
 
     // Only what this run read: an edit recorded while the check ran stays for the next one.

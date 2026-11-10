@@ -119,6 +119,16 @@ public class ValidationToolsTests
         await act.Should().ThrowAsync<McpException>().WithMessage("A pack is bad.*");
     }
 
+    [Fact]
+    public async Task ValidateSource_WithoutTemplate_MissingPath_IsStillToolError()
+    {
+        var missing = Path.Combine(Path.GetTempPath(), $"ariadne-missing-{Guid.NewGuid():N}", "Nope.slnx");
+
+        var act = () => ValidationTools.ValidateSource(_helper, _validator, _packSet, missing);
+
+        await act.Should().ThrowAsync<McpException>().WithMessage("Path '*' does not exist.*");
+    }
+
     private sealed class FixedPackSet(Result<ArchitectureReport, AriadneError> result) : IPackSetValidator
     {
         public Task<Result<ArchitectureReport, AriadneError>> ValidateAsync(string path, CancellationToken cancellationToken = default) => Task.FromResult(result);

@@ -55,6 +55,7 @@ public class StopHookTests
     {
         var project = new TempProject();
         File.WriteAllText(Path.Combine(project.Root, "Shop.slnx"), "");
+        project.WriteRules();
         return project;
     }
 
@@ -197,9 +198,27 @@ public class StopHookTests
     }
 
     [Fact]
+    public async Task No_packs_and_no_solution_is_silent_and_keeps_the_list()
+    {
+        using var project = new TempProject();
+        using var session = new TestSession();
+        EditedFiles.Record(session.Id, "/x/A.cs");
+        var validator = new FakeValidator(Report(Violation()));
+        using var warn = new StringWriter();
+
+        var json = await RunAsync(Create(validator), project.Root, session.Id, warn: warn).ConfigureAwait(true);
+
+        json.Should().BeNull();
+        validator.Calls.Should().Be(0);
+        warn.ToString().Should().BeEmpty();
+        EditedFiles.Read(session.Id).Should().Equal("/x/A.cs");
+    }
+
+    [Fact]
     public async Task No_solution_warns_once_and_keeps_the_list()
     {
         using var project = new TempProject();
+        project.WriteRules();
         using var session = new TestSession();
         EditedFiles.Record(session.Id, "/x/A.cs");
         var validator = new FakeValidator(Report(Violation()));
