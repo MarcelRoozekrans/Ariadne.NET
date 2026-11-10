@@ -65,7 +65,7 @@ The synchronous methods block on the async check, so they also work in test fram
 
 ## Which packs are checked
 
-Every `.yaml` or `.yml` file directly in the `.architecture` folder is a pack, and each one is checked on its own. The folder is the nearest one found by walking up from the solution's folder. Files are checked in file name order, and subfolders such as `.architecture/.cache` are not scanned. The violations of all packs come back in one report, and each violation names its pack.
+Every `.yaml` or `.yml` file directly in the `.architecture` folder is a pack, except `imports.yaml` and `imports.yml`, the manifest `ariadne sync` reads, and each one is checked on its own. The folder is the nearest one found by walking up from the solution's folder. Files are checked in file name order, and subfolders such as `.architecture/.cache` are not scanned. The violations of all packs come back in one report, and each violation names its pack.
 
 `ariadne validate`, the Claude Code stop hook and the MCP `validate_source` tool (when no `template` is given) check the same set, so a test and the command line agree.
 

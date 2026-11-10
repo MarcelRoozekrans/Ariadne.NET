@@ -26,7 +26,8 @@ def informational(version: str) -> bytes:
 def write_package(directory: pathlib.Path, package_id: str, version: str, *,
                   dll_version: str | None = None, nuspec_version: str | None = None,
                   dependencies: tuple[str, ...] | None = None,
-                  abstractions_version: str | None = None, ariadne_version: str | None = None, workspaces_version: str | None = None,
+                  abstractions_version: str | None = None, ariadne_version: str | None = None,
+                  workspaces_version: str | None = None,
                   with_symbols: bool = True) -> None:
     # The SDK writes a project reference as a plain version, so that is what the fake nuspecs carry. Each package lists
     # its direct dependencies only: Workspaces reaches Abstractions through Ariadne.NET, and Testing reaches Ariadne.NET

@@ -19,7 +19,7 @@ dotnet add package Microsoft.Extensions.DependencyInjection
 Add one more reference to `MyApp.csproj`. `dotnet add package` cannot set `ExcludeAssets`, so edit the file:
 
 ```xml
-<PackageReference Include="Microsoft.Build.Framework" Version="17.11.48" ExcludeAssets="runtime" />
+<PackageReference Include="Microsoft.Build.Framework" Version="17.14.28" ExcludeAssets="runtime" />
 ```
 
 Ariadne.NET.Workspaces loads projects with MSBuild from the installed .NET SDK, and it needs this reference to keep the MSBuild assemblies out of your output. Without it the build fails with `MSBL001`.

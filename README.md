@@ -335,7 +335,7 @@ Result: FAIL - 1 violation(s) found.
     Layer 'Domain' is not allowed to depend on 'Infrastructure': Shop.Domain.Order references Shop.Infrastructure.SqlStore 3 times
 ```
 
-`validate` checks every `.yaml` or `.yml` directly in the `.architecture` folder, found from the solution's folder upward. Over MCP, use the `validate_source` tool, which takes a `path` and an optional `template` and returns the report. To run the check from a unit test, add `Ariadne.NET.Testing` and call `ArchitectureCheck.AssertValid()`.
+`validate` checks every `.yaml` or `.yml` directly in the `.architecture` folder (not `imports.yaml` or `imports.yml`, the `ariadne sync` manifest), found from the solution's folder upward. Over MCP, use the `validate_source` tool, which takes a `path` and an optional `template` and returns the report. To run the check from a unit test, add `Ariadne.NET.Testing` and call `ArchitectureCheck.AssertValid()`.
 
 What counts as a dependency:
 - Base types, interfaces, attributes, member signatures, generic arguments and types used in method bodies.

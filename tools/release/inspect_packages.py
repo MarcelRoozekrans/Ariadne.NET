@@ -4,14 +4,15 @@ Usage: python3 tools/release/inspect_packages.py <directory> <version>
 
 A NuGet version can be unlisted but never deleted, so ci.yml runs this in pack-validate on every push and again in
 publish-nuget just before the push. It fails when the directory does not hold exactly Ariadne.NET,
-Ariadne.NET.Abstractions, Ariadne.NET.Workspaces and Ariadne.NET.Testing at the release version, each with its .snupkg symbol package;
-when a DLL under lib/ was built without -p:AriadneRelease=true, which Directory.Build.props versions <release>-local
-and which is compiled into the DLL; when Ariadne.NET.Abstractions depends on anything but ZeroAlloc.Results and
-ZeroAlloc.Validation; when Ariadne.NET depends on Ariadne.NET.Abstractions at a different version, or when Ariadne.NET or
-Ariadne.NET.Abstractions depends on any MSBuild package, since only Ariadne.NET.Workspaces and Ariadne.NET.Testing may
-reference MSBuild; when Ariadne.NET.Workspaces depends on Ariadne.NET at a different version; when
-Ariadne.NET.Testing depends on Ariadne.NET.Workspaces at a different version; or when a package lists an Ariadne dependency it does not declare. Other third-party
-dependencies are not checked. Prints one ::error:: line per problem, which GitHub Actions shows as an annotation.
+Ariadne.NET.Abstractions, Ariadne.NET.Workspaces and Ariadne.NET.Testing at the release version, each with its
+.snupkg symbol package; when a DLL under lib/ was built without -p:AriadneRelease=true, which Directory.Build.props
+versions <release>-local and which is compiled into the DLL; when Ariadne.NET.Abstractions depends on anything but
+ZeroAlloc.Results and ZeroAlloc.Validation; when Ariadne.NET depends on Ariadne.NET.Abstractions at a different
+version, or when Ariadne.NET or Ariadne.NET.Abstractions depends on any MSBuild package, since only
+Ariadne.NET.Workspaces and Ariadne.NET.Testing may reference MSBuild; when Ariadne.NET.Workspaces depends on
+Ariadne.NET at a different version; when Ariadne.NET.Testing depends on Ariadne.NET.Workspaces at a different
+version; or when a package lists an Ariadne dependency it does not declare. Other third-party dependencies are not
+checked. Prints one ::error:: line per problem, which GitHub Actions shows as an annotation.
 Standard library only.
 """
 import pathlib

@@ -178,7 +178,8 @@ jobs:
       # Builds and runs the getting-started sample, tools/release/consumer/Program.cs, against the packages in the local
       # feed. nuget.config maps Ariadne.NET* to the local feed only, so the restore cannot fall back to a published
       # package. The sample references Ariadne.NET.Workspaces, which brings Ariadne.NET and then
-      # Ariadne.NET.Abstractions in as dependencies: this proves those three packages restore from the feed. Ariadne.NET.Testing is packed and inspected but is not restored here.
+      # Ariadne.NET.Abstractions in as dependencies: this proves those three packages restore from the feed.
+      # Ariadne.NET.Testing is packed and inspected but is not restored here.
       # Microsoft.Extensions.DependencyInjection comes from nuget.org: Ariadne.NET depends only on the DI abstractions,
       # and the sample needs a container to resolve the services from. Microsoft.Build.Framework comes from nuget.org
       # too: Workspaces keeps its own copy out of the output because MSBuildLocator loads the SDK's, and that exclusion
