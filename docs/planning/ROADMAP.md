@@ -111,13 +111,19 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Plan:** `docs/superpowers/plans/2026-11-09-phase-2.6-pack-reference-and-json-schema.md`
 **Completed:** 2026-11-09
 
-## Milestone 3: Fail the build [status: pending]
+## Milestone 3: Fail the build [status: active]
 **Goal:** Any .NET solution can enforce its Ariadne packs in tests and CI.
+**Started:** 2026-11-10
+**Design:** `docs/superpowers/specs/2026-11-10-milestone-3-design.md`
 **Definition of Done:**
-- [ ] One test call checks all packs against a solution
-- [ ] CLI and testing package emit JSON and SARIF
-- [ ] `ariadne` is installable as a dotnet tool
-- [ ] A GitHub Actions example fails a build on a violation
+- [ ] All planned phases complete
+- [ ] All tests passing
+- [ ] One call in a test (plus the package's documented MSBuild reference line, if it cannot ship it) checks every pack under `.architecture/` against a solution and fails with the rule id, pack name and `because` of each violation; a fixture with two packs, one clean and one broken, proves it
+- [ ] `ariadne validate`, the stop hook and MCP validation check the same packs and name the pack per violation
+- [ ] CLI and testing package emit JSON and SARIF 2.1.0; a test validates the SARIF against the published schema
+- [ ] `ariadne` installs with `dotnet tool install` from the packed local feed in CI, and `publish-nuget` includes the package
+- [ ] A GitHub Actions example fails a build on a violation, and a job in this repo's CI proves the failing exit code on a broken fixture
+- [ ] The docs site documents the testing package, the report formats, the tool and the CI examples
 
 ### Phase 3.1: Ariadne.NET.Testing [status: pending]
 **Goal:** One call in a test checks all packs against the solution.
