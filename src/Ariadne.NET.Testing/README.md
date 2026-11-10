@@ -57,10 +57,10 @@ var report = ArchitectureCheck.Run();
 report.Violations.Should().BeEmpty();
 ```
 
-A relative `solutionPath` starts at the test runner's current directory, usually `bin/<configuration>/<framework>` of the test project, not the source file's folder. Without a path the search for a solution starts at `AppContext.BaseDirectory`, the same folder, and walks up. To name a solution explicitly, build the path from that folder:
+A relative `solutionPath` starts at the test runner's current directory, usually `bin/<configuration>/<framework>` of the test project, not the source file's folder. Without a path the search for a solution starts at `AppContext.BaseDirectory`, the same folder, and walks up. To name a solution explicitly, build the path from that folder. For a test project at `repo/tests/MyApp.Tests`, the output folder `bin/Debug/net10.0` is five levels below the repo root; the number of `..` segments depends on where the test project sits:
 
 ```csharp
-var solution = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../src/MyApp.slnx"));
+var solution = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../src/MyApp.slnx"));
 var report = ArchitectureCheck.Run(solution);
 ```
 
