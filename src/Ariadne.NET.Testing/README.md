@@ -53,8 +53,15 @@ public class ArchitectureTests
 `AssertValid` and `AssertValidAsync` take an optional `solutionPath`: a `.sln`, `.slnx`, `.slnf` or `.csproj` file, or a folder that holds exactly one of them. `Run` and `RunAsync` return the `ArchitectureReport` instead of throwing on violations, for a test that wants to assert on it:
 
 ```csharp
-var report = ArchitectureCheck.Run("../../src/MyApp.slnx");
+var report = ArchitectureCheck.Run();
 report.Violations.Should().BeEmpty();
+```
+
+A relative `solutionPath` starts at the test runner's current directory, usually `bin/<configuration>/<framework>` of the test project, not the source file's folder. Without a path the search for a solution starts at `AppContext.BaseDirectory`, the same folder, and walks up. To name a solution explicitly, build the path from that folder:
+
+```csharp
+var solution = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../src/MyApp.slnx"));
+var report = ArchitectureCheck.Run(solution);
 ```
 
 The synchronous methods block on the async check, so they also work in test frameworks without async support.

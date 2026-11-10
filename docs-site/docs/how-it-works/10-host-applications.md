@@ -117,7 +117,7 @@ ariadne hook stop
 |-------|--------------|
 | `session-start` | Adds the resolved layers, the rules with their `because`, the component roles, the naming conventions and the versions of the cached rule packs to the session. It warns when an import is missing from the cache or no longer satisfies its version range. The text is capped at 10,000 characters; when it does not fit, whole roles, rules and layers are dropped from the end, then the naming line, then the warnings, and a final `Truncated` line says how many lines went. Without a rules file it tells the agent to run `ariadne init`. |
 | `pre-tool-use` | Answers only `ask`, and only for a new `.cs` file whose assembly and namespace no layer selects. The namespace is read from the content that is written, with the folder as the fallback. It also records every `.cs` file that `Write`, `Edit` and `MultiEdit` touch, for `stop`. |
-| `stop` | Once per turn, when the agent edited `.cs` files, validates the solution found from the working directory against every pack in the `.architecture` folder above it, and feeds at most 20 violations back through `additionalContext`, each with its message and, when it has one, its rule id and `because`. The text is capped at 10,000 characters too, and a final line says how many violations were left out. It prints nothing when the solution is clean, when `stop_hook_active` is set, and when no `.cs` file was edited. |
+| `stop` | Once per turn, when the agent edited `.cs` files, validates the solution found from the working directory against every pack in the `.architecture` folder above it, and feeds at most 20 violations back through `additionalContext`, each with its message and, when it has one, its rule id and `because` and the `Pack:` line naming the pack that raised it. The text is capped at 10,000 characters too, and a final line says how many violations were left out. It prints nothing when the solution is clean, when `stop_hook_active` is set, and when no `.cs` file was edited. |
 
 The stale-cache check is offline. It compares the version ranges in `.architecture/imports.yaml` with `resolvedTag` in `.architecture/.cache/git/<name>/.git-info.json` and never touches the network. Run `ariadne sync` to refresh the cache.
 
@@ -218,7 +218,7 @@ flowchart TD
 |-------------|---------|-------------|
 | `ariadne://packs/{name}` | Raw YAML string | Full content of a built-in pack |
 
-The other tools auto-detect `.architecture/rules.yaml` in the working directory. `validate_source` without a `template` checks every `.yaml` or `.yml` directly in the `.architecture` folder (not `imports.yaml` or `imports.yml`, the `ariadne sync` manifest), found from the solution's folder upward, and falls back to `clean-architecture` when no folder is found; its violations name their pack. The `template` parameter overrides auto-detection and checks that one pack.
+The other tools auto-detect `.architecture/rules.yaml` in the working directory. `validate_source` without a `template` checks every `.yaml` or `.yml` directly in the `.architecture` folder (not `imports.yaml` or `imports.yml`, the `ariadne sync` manifest), found from the solution's folder upward, and, when no `.architecture` folder is found, falls back to the `rules.yaml` in the working directory's `.architecture` folder, else to `clean-architecture`; its violations name their pack. The `template` parameter overrides auto-detection and checks that one pack.
 
 ---
 
