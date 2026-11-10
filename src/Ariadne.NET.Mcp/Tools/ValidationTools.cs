@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using Ariadne.NET.Abstractions;
 using Ariadne.NET.Analysis;
 using Ariadne.NET.Workspaces;
 using ModelContextProtocol.Server;
@@ -13,12 +14,22 @@ public static class ValidationTools
     public static async Task<ArchitectureReport> ValidateSource(
         IRuleResolutionHelper helper,
         ISolutionValidator validator,
+        IPackSetValidator packSetValidator,
         [Description("Path to a .sln, .slnx, .slnf or .csproj, or a directory holding exactly one.")]
         string path,
-        [Description("Template name. Optional - auto-detects from .architecture/rules.yaml.")]
+        [Description("Template name. Optional. Without it every pack file in the nearest .architecture folder is checked; with no such folder the rules.yaml in the current directory or the clean-architecture default applies.")]
         string? template = null,
         CancellationToken cancellationToken = default)
     {
+        if (template is null)
+        {
+            var set = await packSetValidator.ValidateAsync(path, cancellationToken).ConfigureAwait(false);
+            if (set.IsSuccess || set.Error.Code != AriadneErrorCode.NotFound)
+            {
+                return ToolError.ValueOrToolError(set);
+            }
+        }
+
         var resolved = ToolError.ValueOrToolError(helper.Resolve(template));
         var result = await validator.ValidateAsync(resolved, path, cancellationToken).ConfigureAwait(false);
         return ToolError.ValueOrToolError(result);
