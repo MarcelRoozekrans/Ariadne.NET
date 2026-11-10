@@ -179,3 +179,28 @@ Constructor calls include `new T(...)`, target-typed `new(...)`, the `: base(...
 
 What is not a use: an attribute constructor (the attribute class is still a type reference); the calls the compiler inserts for `foreach`, `using`, collection initializers, operators and conversions, deconstruction and LINQ query syntax; a `nameof`; and a member that satisfies an interface member only through a derived class (`class C : B, IFoo`, where `B.Foo` implements `IFoo.Foo`, called as `c.Foo()`). Operators are never named by a use, so an operator name such as `op_Addition` in a pattern matches nothing.
 
+
+### Keeping sensitive APIs in Infrastructure
+
+Three `allowOnly` rules confine the APIs a team usually wants behind one layer: SQL, cryptography and HTTP. Each says that only the Infrastructure layer may use the target, and every other layer that does fails with `DependencyNotPermitted` and the rule's `because`.
+
+```yaml
+rules:
+  - id: SHOP-SQL-ONLY-IN-INFRASTRUCTURE
+    because: Raw SQL stays behind the repositories.
+    allowOnly:
+      from: { layers: [Infrastructure] }
+      to: { members: ["System.Data.Common.DbCommand.Execute*", "Microsoft.Data.SqlClient.SqlCommand.new"] }
+  - id: SHOP-CRYPTO-ONLY-IN-INFRASTRUCTURE
+    because: Key handling and hashing live in one audited place.
+    allowOnly:
+      from: { layers: [Infrastructure] }
+      to: { namespaces: ["System.Security.Cryptography"] }
+  - id: SHOP-HTTP-ONLY-IN-INFRASTRUCTURE
+    because: Outbound calls go through gateways, so timeouts and retries are set once.
+    allowOnly:
+      from: { layers: [Infrastructure] }
+      to: { namespaces: ["System.Net.Http"] }
+```
+
+SQL uses `members` because the same assembly also holds types that are fine everywhere, such as `DbConnection` as a parameter type; the other two ban a whole namespace, which is the shorter form. A rule that selects nothing fails with `VacuousRule`, so a solution that never touches cryptography sets `allowEmpty: true` on that rule.
