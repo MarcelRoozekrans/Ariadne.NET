@@ -557,7 +557,7 @@ jobs:
   # still say -local. RELEASING.md has the procedure.
   publish-nuget:
     if: github.event_name == 'workflow_dispatch' && inputs.publish_to_nuget && startsWith(github.ref, 'refs/tags/v')
-    needs: [ build, aot-smoke, pack-validate ]
+    needs: [ build, aot-smoke, pack-validate, fail-the-build ]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
