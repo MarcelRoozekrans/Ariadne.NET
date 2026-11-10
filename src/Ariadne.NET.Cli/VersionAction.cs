@@ -7,6 +7,9 @@ namespace Ariadne.NET.Cli;
 /// <summary>Prints the CLI's informational version without the build metadata after a plus sign, then exits 0.</summary>
 internal sealed class VersionAction : SynchronousCommandLineAction
 {
+    // Like the built-in version action, so that a stray token after --version does not hide the version.
+    public override bool ClearsParseErrors => true;
+
     public override int Invoke(ParseResult parseResult)
     {
         var assembly = typeof(VersionAction).Assembly;

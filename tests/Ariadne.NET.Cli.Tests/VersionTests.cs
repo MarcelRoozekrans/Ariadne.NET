@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.RegularExpressions;
 using Ariadne.NET.Abstractions;
 using Ariadne.NET.Cli;
 using FluentAssertions;
@@ -8,12 +9,14 @@ namespace Ariadne.NET.Cli.Tests;
 
 public sealed class VersionTests
 {
-    [Fact]
-    public async Task Version_prints_the_informational_version_without_build_metadata()
+    [Theory]
+    [InlineData("--version")]
+    [InlineData("--version", "not-a-command")]
+    public async Task Version_prints_the_informational_version_without_build_metadata(params string[] args)
     {
         var informational = typeof(CliRootCommand).Assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
-        var expected = informational.Split('+')[0];
+        var expected = Regex.Match(informational, "^[^+]*", RegexOptions.None, TimeSpan.FromSeconds(5)).Value;
 
         var services = new ServiceCollection();
         services.AddAriadneNETServices();
@@ -25,7 +28,7 @@ public sealed class VersionTests
         int exitCode;
         try
         {
-            exitCode = await CliRootCommand.InvokeAsync(provider, ["--version"]).ConfigureAwait(true);
+            exitCode = await CliRootCommand.InvokeAsync(provider, args).ConfigureAwait(true);
         }
         finally
         {
@@ -33,6 +36,6 @@ public sealed class VersionTests
         }
 
         exitCode.Should().Be(0);
-        writer.ToString().Should().Be(expected + Environment.NewLine);
+        writer.ToString().Should().NotContain("+").And.Be(expected + Environment.NewLine);
     }
 }
