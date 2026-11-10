@@ -21,6 +21,15 @@ public sealed class ArchitectureValidator : IArchitectureValidator
     public ArchitectureReport Validate(RulePack resolvedPack, IReadOnlyList<AnalyzedProject> projects, CancellationToken cancellationToken = default) =>
         Validate(resolvedPack, projects, nameof(projects), cancellationToken);
 
+    /// <inheritdoc />
+    public PackageCoverageGap? FindPackageCoverageGap(RulePack resolvedPack, IReadOnlyList<AnalyzedProject> projects)
+    {
+        ArgumentNullException.ThrowIfNull(resolvedPack);
+        ArgumentNullException.ThrowIfNull(projects);
+
+        return BannedPackageRules.Compile(resolvedPack).FindUncoveredProject(projects);
+    }
+
     // paramName is the argument the caller passed, so a guard failure names a parameter of the overload that was called.
     private ArchitectureReport Validate(RulePack resolvedPack, IReadOnlyList<AnalyzedProject> projects, string paramName, CancellationToken cancellationToken)
     {
