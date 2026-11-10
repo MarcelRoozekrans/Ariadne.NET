@@ -171,15 +171,7 @@ The same rule id from two packs gives two rules, because a pack can reuse an id 
 
 ### Upload to GitHub code scanning
 
-```yaml
-- run: ariadne validate --format sarif --output ariadne.sarif
-  continue-on-error: true
-- uses: github/codeql-action/upload-sarif@v3
-  with:
-    sarif_file: ariadne.sarif
-```
-
-`continue-on-error` lets the upload run when the command exits 1. The job needs the `security-events: write` permission. CI examples follow in a later release.
+`github/codeql-action/upload-sarif` reads a SARIF file, and the job needs the `security-events: write` permission. A complete workflow, with the restore step, the exit codes and the code scanning limits, is on [CI on GitHub Actions](../ci-github-actions.md).
 
 ## From code
 
