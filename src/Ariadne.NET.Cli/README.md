@@ -33,9 +33,11 @@ ariadne validate src/MyApp.slnx --format sarif --output artifacts/architecture.s
 |---|---|
 | 0 | The check ran and found no violations. |
 | 1 | The check ran and found violations. |
-| 2 | The command could not run: bad input, missing files, an invalid pack, a solution that failed to load. |
+| 2 | The command could not run: an invalid pack, missing files, a solution that failed to load, a report that could not be written. |
 
 A CI step can fail on 1 and 2 alike, or tell a broken rule apart from a broken setup.
+
+An unknown option or argument currently exits 1, the same code as violations; see [issue #70](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/70).
 
 ## Other commands
 
