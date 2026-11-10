@@ -148,7 +148,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Goal:** GitHub Actions examples that fail a build on a violation.
 **Surface:** Docs
 **HelpWanted:** no
-**Plan:** _to be written_
+**Plan:** `docs/superpowers/plans/2026-11-10-phase-3.4-ci-examples.md`
 
 ## Milestone 4: Daedalus parity [status: pending]
 **Goal:** Ariadne proves it can replace Daedalus's ArchUnitNET architecture tests.
@@ -179,7 +179,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Goal:** Document moving from ArchUnitNET to Ariadne.
 **Surface:** Docs
 **HelpWanted:** no
-**Plan:** _to be written_
+**Plan:** `docs/superpowers/plans/2026-11-10-phase-3.4-ci-examples.md`
 
 ## Milestone 5: Agent surfaces [status: pending]
 **Goal:** Agents in the family runtime and in editors use Ariadne while writing code.
@@ -218,7 +218,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Goal:** A superpowers-extensions plugin that teaches agents when to call Ariadne.
 **Surface:** Docs
 **HelpWanted:** no
-**Plan:** _to be written_
+**Plan:** `docs/superpowers/plans/2026-11-10-phase-3.4-ci-examples.md`
 
 ### Phase 5.6: Agent hooks [status: complete 2026-11-08]
 **Goal:** `ariadne hook` gives a Claude Code agent the resolved structural rules at session start and the validator's violations, with each rule's reason, at the end of a turn.
@@ -261,7 +261,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Goal:** Family cross-links and a pack catalogue.
 **Surface:** Docs
 **HelpWanted:** no
-**Plan:** _to be written_
+**Plan:** `docs/superpowers/plans/2026-11-10-phase-3.4-ci-examples.md`
 
 ### Phase 6.4: ISO/IEC 25010 maintainability pack [status: pending]
 **Goal:** A built-in pack whose rules for modularity, coupling, cycles and layering each name the ISO/IEC 25010 maintainability sub-characteristic they protect, so a report reads against the standard. Structure only: complexity metrics stay with roslyn-codelens.
