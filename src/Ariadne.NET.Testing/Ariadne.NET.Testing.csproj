@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>Ariadne.NET.Testing</PackageId>
+    <Description>Checks a .NET solution against its Ariadne.NET architecture rule packs from a unit test, with one call that works in any test framework.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ariadne.NET.Testing.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ariadne.NET.Workspaces\Ariadne.NET.Workspaces.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      The out-of-process build host, the BuildHost-netcore and BuildHost-net472 folders, ships as contentFiles of
+      Microsoft.CodeAnalysis.Workspaces.MSBuild. They reach a consumer only through a direct dependency with
+      include="All": through the dependency on Ariadne.NET.Workspaces they stop one level short, and the first load
+      fails with "The build host could not be found". PrivateAssets="none" lists the package in this package's nuspec
+      with include="All".
+    -->
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.9.0" PrivateAssets="none" />
+    <!-- MSBuildLocator loads Microsoft.Build.Framework from the .NET SDK, so the copy must stay out of the output. -->
+    <PackageReference Include="Microsoft.Build.Framework" Version="17.14.28" ExcludeAssets="runtime" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="buildTransitive/Ariadne.NET.Testing.targets" Pack="true" PackagePath="buildTransitive/" />
+  </ItemGroup>
+
+</Project>

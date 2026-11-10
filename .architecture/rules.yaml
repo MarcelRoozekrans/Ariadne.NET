@@ -20,8 +20,8 @@ layers:
   - name: Host
     id: ARIADNE-LAYER-HOST
     because: The CLI and MCP servers are thin wrappers that compose the core and the workspace loader.
-    description: "CLI and MCP hosts"
-    assemblies: ["Ariadne.NET.Cli", "Ariadne.NET.Hooks", "Ariadne.NET.Mcp", "Ariadne.NET.Mcp.Http"]
+    description: "CLI and MCP hosts, and the testing package"
+    assemblies: ["Ariadne.NET.Cli", "Ariadne.NET.Hooks", "Ariadne.NET.Mcp", "Ariadne.NET.Mcp.Http", "Ariadne.NET.Testing"]
     allowedDependencies:
       - Core
       - Workspaces
