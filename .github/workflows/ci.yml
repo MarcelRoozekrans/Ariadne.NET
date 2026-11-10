@@ -149,6 +149,14 @@ jobs:
       - name: Pack the release build
         run: dotnet pack src/Ariadne.NET.slnx -c Release -p:AriadneRelease=true -o artifacts/packages
 
+      # The fail-the-build job installs the tool from these exact packages.
+      - name: Upload the packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: packages
+          path: artifacts/packages
+          retention-days: 1
+
       - name: Test the inspection script
         run: python3 -m unittest discover -s tools/release -p "test_inspect_packages.py"
 
@@ -420,6 +428,100 @@ jobs:
           set -e
 
           exit "$failed"
+
+  # Proves what the example workflows in examples/github-actions claim: the packed ariadne tool exits 1 on the broken
+  # fixture, writes a SARIF report whose first result is an error with a rule id, and exits 0 on the clean fixture. The
+  # validate command line is the one the examples use, ariadne validate with --format sarif --output. The tool is
+  # installed with --tool-path from the packages pack-validate uploaded, through a nuget.config whose source mapping
+  # sends Ariadne.NET* to that folder only, so a released copy of the same version can never be tested instead. Exit
+  # code exactly 1 is required, so a crash, which exits 2, fails the job. The clean folder holds a .sln and a .slnx, so
+  # both fixtures are named by their .slnx file. Ariadne never restores, so each is restored first.
+  fail-the-build:
+    needs: pack-validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Read the release version
+        shell: bash
+        run: |
+          version=$(jq -r '."." // empty' .release-please-manifest.json)
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::.release-please-manifest.json gives '$version', not a version."
+            exit 1
+          fi
+          echo "PACKAGE_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Download the packages
+        uses: actions/download-artifact@v7
+        with:
+          name: packages
+          path: ${{ runner.temp }}/packages
+
+      - name: Install the tool and restore the fixtures
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/tool-nuget.config" <<EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="local" value="$RUNNER_TEMP/packages" />
+              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+            </packageSources>
+            <packageSourceMapping>
+              <packageSource key="local"><package pattern="Ariadne.NET*" /></packageSource>
+              <packageSource key="nuget.org"><package pattern="*" /></packageSource>
+            </packageSourceMapping>
+          </configuration>
+          EOF
+          dotnet tool install Ariadne.NET.Cli --tool-path "$RUNNER_TEMP/tool" --configfile "$RUNNER_TEMP/tool-nuget.config" --version "$PACKAGE_VERSION"
+          dotnet restore tests/fixtures/broken/Shop.slnx
+          dotnet restore tests/fixtures/clean/Shop.slnx
+
+      - name: The broken fixture fails the build
+        shell: bash
+        run: |
+          set +e
+          "$RUNNER_TEMP/tool/ariadne" validate tests/fixtures/broken/Shop.slnx --format sarif --output "$RUNNER_TEMP/ariadne.sarif"
+          code=$?
+          set -e
+          if [ "$code" -ne 1 ]; then
+            echo "::error::validate on the broken fixture exited $code; expected exactly 1. 0 means the violation was missed; 2 means ariadne could not run."
+            exit 1
+          fi
+          if ! python3 - "$RUNNER_TEMP/ariadne.sarif" <<'PY'
+          import json, os, sys
+          path = sys.argv[1]
+          assert os.path.isfile(path), "no SARIF file at " + path
+          with open(path, encoding="utf-8") as f:
+              results = json.load(f)["runs"][0]["results"]
+          assert results, "runs[0].results is empty"
+          assert results[0].get("ruleId"), "the first result has no ruleId"
+          assert results[0].get("level") == "error", "the first result level is " + str(results[0].get("level"))
+          PY
+          then
+            echo "::error::The SARIF report is missing or its first result is not an error with a ruleId."
+            exit 1
+          fi
+
+      - name: The clean fixture passes the build
+        shell: bash
+        run: |
+          set +e
+          "$RUNNER_TEMP/tool/ariadne" validate tests/fixtures/clean/Shop.slnx --format sarif --output "$RUNNER_TEMP/ariadne-clean.sarif"
+          code=$?
+          set -e
+          if [ "$code" -ne 0 ]; then
+            echo "::error::validate on the clean fixture exited $code; expected 0."
+            exit 1
+          fi
 
   # Lints the commit messages a pull request adds against .commitlintrc.yml. release-please builds the changelog and the
   # next version from these messages, and silently drops a commit it cannot parse, so a bad message is caught here,

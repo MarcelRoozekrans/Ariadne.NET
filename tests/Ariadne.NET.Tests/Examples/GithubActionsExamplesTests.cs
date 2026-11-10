@@ -74,6 +74,20 @@ public class GithubActionsExamplesTests
         Runs(steps).Should().Contain(r => r.StartsWith("dotnet test", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void Proof_job_in_ci_runs_the_validate_command_line_of_the_examples()
+    {
+        var root = Load(Path.Combine(PackSchemaHarness.RepoRoot(), ".github", "workflows", "ci.yml"));
+        var jobs = (YamlMappingNode)Get(root, "jobs")!;
+        var job = (YamlMappingNode)Get(jobs, "fail-the-build")!;
+        var steps = ((YamlSequenceNode)Get(job, "steps")!).Children.Cast<YamlMappingNode>().ToList();
+
+        var validates = steps.Where(s => Run(s).Contains("ariadne\" validate", StringComparison.Ordinal)).ToList();
+
+        validates.Should().NotBeEmpty();
+        validates.Should().OnlyContain(s => Run(s).Contains(ValidateFlags, StringComparison.Ordinal));
+    }
+
     private static YamlMappingNode Load(string path)
     {
         var stream = new YamlStream();
