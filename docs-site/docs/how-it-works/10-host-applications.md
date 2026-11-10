@@ -14,7 +14,7 @@ Built with **System.CommandLine 3.0** (uses `Command`, `RootCommand`, `Option<T>
 
 ### `init` — Initialize architecture rules
 
-> Until the `ariadne` dotnet tool ships, run these commands as `dotnet run --project src/Ariadne.NET.Cli -- <command>`.
+> These commands assume the installed `ariadne` tool; see [Install the tool](../getting-started.md#install-the-tool). From a clone of the repository, run them as `dotnet run --project src/Ariadne.NET.Cli -- <command>`.
 
 ```bash
 ariadne init --template clean-architecture
@@ -128,7 +128,7 @@ Limits to know about:
 
 - A project that no layer selects, such as tests, samples and tools, makes the new-file check ask on every new file there.
 - `stop` loads the whole solution, so it takes seconds; see `docs/perf/phase-5.6-hooks.md` for numbers.
-- The `ariadne` command must be on `PATH`. It is not a dotnet tool until phase 3.3. To try a hook from a checkout, run `dotnet run --project src/Ariadne.NET.Cli -- hook session-start`, or run the built dll with `dotnet <path to Ariadne.NET.Cli.dll> hook session-start`.
+- The `ariadne` command must be on `PATH`. [Install the tool](../getting-started.md#install-the-tool) with `dotnet tool install --global Ariadne.NET.Cli`. To try a hook from a checkout instead, run `dotnet run --project src/Ariadne.NET.Cli -- hook session-start`, or run the built dll with `dotnet <path to Ariadne.NET.Cli.dll> hook session-start`.
 
 Ariadne's hooks run beside AI.Sentinel's hook. Ariadne owns the structure rules and getting them to the agent; AI.Sentinel owns tool-call enforcement. Claude Code runs the matching hooks in parallel and resolves `PreToolUse` decisions as deny, then defer, then ask, then allow, so Ariadne's `ask` never overrides a deny from AI.Sentinel.
 

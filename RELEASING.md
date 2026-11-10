@@ -8,17 +8,19 @@ Releases are cut by release-please and published to nuget.org by `ci.yml`. Nothi
 2. Merging that PR tags `vX.Y.Z` and creates the GitHub release.
 3. `release-please.yml` then dispatches `ci.yml` on the tag with `publish_to_nuget=true`.
 4. On that run, the jobs `publish-nuget` needs, `build`, `aot-smoke` and `pack-validate`, run on the tagged commit. `publish-nuget` starts only after they pass.
-5. `publish-nuget` refuses a prerelease, or a tag that is not the manifest's version. It then packs with `-p:AriadneRelease=true`, inspects the packages, pushes the four `.nupkg` files, `Ariadne.NET`, `Ariadne.NET.Abstractions`, `Ariadne.NET.Workspaces` and `Ariadne.NET.Testing`, to nuget.org, and attaches them and their `.snupkg` files to the GitHub release. nuget.org takes each `.snupkg` with the same push as its `.nupkg`.
+5. `publish-nuget` refuses a prerelease, or a tag that is not the manifest's version. It then packs with `-p:AriadneRelease=true`, inspects the packages, pushes the five `.nupkg` files, `Ariadne.NET`, `Ariadne.NET.Abstractions`, `Ariadne.NET.Workspaces`, `Ariadne.NET.Testing` and `Ariadne.NET.Cli`, to nuget.org, and attaches them and their `.snupkg` files to the GitHub release. nuget.org takes each `.snupkg` with the same push as its `.nupkg`.
 6. The same job then attaches a CycloneDX SBOM, a `.cdx.json` file, to the GitHub release.
 
 Every push and pull request also runs `pack-validate`. It packs the same way, inspects the packages, and rehearses the push against a local feed. It then restores a consumer that references `Ariadne.NET.Workspaces` from that feed and runs it twice: a clean project must exit 0, and a fixture with a forbidden dependency must exit 1.
+
+The step "Install the tool from the local feed and run it" then installs `Ariadne.NET.Cli` from the same feed with `dotnet tool install --tool-path`, never globally and only from the local feed, and runs the installed `ariadne`. `ariadne --version` must print exactly the release version. `ariadne validate --format json` on `tests/fixtures/twopacks` must exit 1 and print JSON with `"schema": 1` that names the broken pack. `ariadne validate` on a clean copy of `tests/fixtures/clean` must exit 0. `ariadne hook session-start`, fed a real session-start input with the working directory at the repository root, must exit 0, write nothing to stderr and print JSON on stdout that does not contain "could not load". Every failed check is reported and the step fails at the end.
 
 ## Before the first release: settings on nuget.org and GitHub
 
 - **Release bot App:** the release bot GitHub App is installed on `MarcelRoozekrans/Ariadne.NET`.
 - **`RELEASE_BOT_CLIENT_ID` and `RELEASE_BOT_PRIVATE_KEY`:** in the GitHub repository, add the variable `RELEASE_BOT_CLIENT_ID` and the secret `RELEASE_BOT_PRIVATE_KEY` from the App. `release-please.yml` mints its token from them.
 - **`NUGET_USER`:** add a variable named `NUGET_USER` holding the nuget.org user name that owns the policy.
-- **Trusted Publishing:** on nuget.org, a Trusted Publishing policy exists for the repository `MarcelRoozekrans/Ariadne.NET` and the workflow file `ci.yml` (done 2026-10-31). It must be allowed to push new packages as well as new versions, since all four ids are new on nuget.org.
+- **Trusted Publishing:** on nuget.org, a Trusted Publishing policy exists for the repository `MarcelRoozekrans/Ariadne.NET` and the workflow file `ci.yml` (done 2026-10-31). It must be allowed to push new packages as well as new versions, since `Ariadne.NET.Testing` and `Ariadne.NET.Cli` are new ids on nuget.org; `Ariadne.NET`, `Ariadne.NET.Abstractions` and `Ariadne.NET.Workspaces` were released through v0.7.0. The policy must allow the two new ids before the first release that contains them. The owner checks this on nuget.org first; if the policy refuses a new id, the push fails after the earlier packages have already arrived.
 - **Reserve the id prefix:** reserve the `Ariadne.NET` id prefix on nuget.org. Anyone can take an id until it is published.
 - **Codecov:** add the repository on codecov, so the coverage upload from `build` is accepted.
 - **CodeQL:** keep the default setup off. CodeQL runs in `baseline-checks.yml` through the ci-baseline v1 reusable workflow, and with default setup on, GitHub refuses that workflow's SARIF upload.

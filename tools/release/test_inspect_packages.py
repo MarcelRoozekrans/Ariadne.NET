@@ -14,6 +14,18 @@ ARIADNE = "Ariadne.NET"
 ABSTRACTIONS = "Ariadne.NET.Abstractions"
 WORKSPACES = "Ariadne.NET.Workspaces"
 TESTING = "Ariadne.NET.Testing"
+CLI = "Ariadne.NET.Cli"
+RELEASE_PACKAGES = (ABSTRACTIONS, ARIADNE, WORKSPACES, TESTING, CLI)
+TOOL = "tools/net10.0/any/"
+# What a real pack of the tool bundles from the MSBuild side: MSBuildLocator at the top and in both build host folders.
+TOOL_MSBUILD_FILES = (
+    f"{TOOL}Microsoft.Build.Locator.dll",
+    f"{TOOL}Microsoft.CodeAnalysis.Workspaces.MSBuild.dll",
+    f"{TOOL}BuildHost-netcore/Microsoft.Build.Locator.dll",
+    f"{TOOL}BuildHost-netcore/Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.dll",
+    f"{TOOL}BuildHost-net472/Microsoft.Build.Locator.dll",
+    f"{TOOL}BuildHost-net472/Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.exe",
+)
 ABSTRACTIONS_DEPENDENCIES = ("ZeroAlloc.Results", "ZeroAlloc.Validation")
 
 
@@ -57,6 +69,43 @@ def write_package(directory: pathlib.Path, package_id: str, version: str, *,
             archive.writestr(f"lib/net10.0/{package_id}.pdb", b"pdb")
 
 
+def tool_settings(command: str = "ariadne", entry_point: str = f"{CLI}.dll", runner: str = "dotnet") -> str:
+    return (f'\ufeff<?xml version="1.0" encoding="utf-8"?><DotNetCliTool Version="1"><Commands>'
+            f'<Command Name="{command}" EntryPoint="{entry_point}" Runner="{runner}" />'
+            f'</Commands></DotNetCliTool>')
+
+
+def write_tool(directory: pathlib.Path, version: str, *,
+               dll_version: str | None = None, engine_dll_version: str | None = None,
+               nuspec_version: str | None = None, dependencies: tuple[str, ...] = (),
+               package_type: str | None = "DotnetTool", settings: str | None = None,
+               extra_files: tuple[str, ...] = (), with_symbols: bool = True) -> None:
+    # A tool bundles everything under tools/<framework>/any/, so its nuspec lists no dependencies and has no lib/.
+    elements = "".join(f'<dependency id="{dependency}" version="{version}" />' for dependency in dependencies)
+    dependency_group = f"<dependencies><group targetFramework=\"net10.0\">{elements}</group></dependencies>" if elements else ""
+    package_types = f'<packageTypes><packageType name="{package_type}" /></packageTypes>' if package_type else ""
+    nuspec = (f'<?xml version="1.0" encoding="utf-8"?><package><metadata><id>{CLI}</id>'
+              f'<version>{nuspec_version or version}</version>{package_types}{dependency_group}'
+              f'</metadata></package>')
+
+    def dll(informational_version: str) -> bytes:
+        return b"MZ fake " + b"\x01\x00\x070.0.0.0\x00\x00" + informational(informational_version)
+
+    with zipfile.ZipFile(directory / f"{CLI}.{version}.nupkg", "w") as archive:
+        archive.writestr(f"{CLI}.nuspec", nuspec)
+        archive.writestr(f"{TOOL}DotnetToolSettings.xml", settings if settings is not None else tool_settings())
+        archive.writestr(f"{TOOL}{CLI}.dll", dll(dll_version or (version + "+abc1234")))
+        for bundled in (ARIADNE, ABSTRACTIONS, WORKSPACES, "Ariadne.NET.Hooks"):
+            archive.writestr(f"{TOOL}{bundled}.dll", dll(engine_dll_version or (version + "+abc1234")))
+        # Third-party DLLs carry their own versions, which the check must leave alone.
+        archive.writestr(f"{TOOL}YamlDotNet.dll", dll("16.3.0+deadbeef"))
+        for name in (*TOOL_MSBUILD_FILES, *extra_files):
+            archive.writestr(name, b"MZ")
+    if with_symbols:
+        with zipfile.ZipFile(directory / f"{CLI}.{version}.snupkg", "w") as archive:
+            archive.writestr(f"{TOOL}{CLI}.pdb", b"pdb")
+
+
 class InspectPackagesTests(unittest.TestCase):
     def setUp(self) -> None:
         self._temp = tempfile.TemporaryDirectory()
@@ -66,19 +115,150 @@ class InspectPackagesTests(unittest.TestCase):
         self._temp.cleanup()
 
     def write_all(self, version: str = VERSION, **overrides: dict) -> None:
-        for package_id in inspect_packages.PACKAGES:
-            write_package(self.directory, package_id, version, **overrides.get(package_id, {}))
+        for package_id in RELEASE_PACKAGES:
+            if package_id == CLI:
+                write_tool(self.directory, version, **overrides.get(package_id, {}))
+            else:
+                write_package(self.directory, package_id, version, **overrides.get(package_id, {}))
 
-    def test_accepts_the_four_release_packages(self) -> None:
+    def test_accepts_the_five_release_packages(self) -> None:
         self.write_all()
         self.assertEqual([], inspect_packages.problems(self.directory, VERSION))
 
-    def test_rejects_a_fifth_package(self) -> None:
+    def test_rejects_a_sixth_package(self) -> None:
         self.write_all()
         write_package(self.directory, "Ariadne.NET.Other", VERSION)
         errors = inspect_packages.problems(self.directory, VERSION)
-        self.assertTrue(any("exactly the four release packages" in error and "Ariadne.NET.Other.0.1.0.nupkg" in error
+        self.assertTrue(any("exactly the five release packages" in error and "Ariadne.NET.Other.0.1.0.nupkg" in error
                             for error in errors), errors)
+
+    def test_rejects_a_missing_tool_package(self) -> None:
+        self.write_all()
+        (self.directory / f"{CLI}.{VERSION}.nupkg").unlink()
+        errors = inspect_packages.problems(self.directory, VERSION)
+        self.assertTrue(any(f"{CLI}.0.1.0.nupkg" in error and "missing" in error for error in errors), errors)
+
+    def test_rejects_a_tool_that_is_not_a_dotnet_tool_package(self) -> None:
+        for package_type in (None, "Dependency"):
+            with self.subTest(package_type):
+                self.write_all(**{CLI: {"package_type": package_type}})
+                errors = inspect_packages.problems(self.directory, VERSION)
+                self.assertTrue(any(CLI in error and "DotnetTool" in error for error in errors), errors)
+
+    def test_rejects_a_tool_without_its_settings(self) -> None:
+        self.write_all()
+        path = self.directory / f"{CLI}.{VERSION}.nupkg"
+        with zipfile.ZipFile(path) as source:
+            entries = {name: source.read(name) for name in source.namelist()
+                       if not name.endswith("DotnetToolSettings.xml")}
+        with zipfile.ZipFile(path, "w") as archive:
+            for name, content in entries.items():
+                archive.writestr(name, content)
+        errors = inspect_packages.problems(self.directory, VERSION)
+        self.assertTrue(any(CLI in error and f"{TOOL}DotnetToolSettings.xml" in error and "missing" in error
+                            for error in errors), errors)
+
+    def test_rejects_a_tool_with_another_command_name(self) -> None:
+        self.write_all(**{CLI: {"settings": tool_settings(command="ariadne-cli")}})
+        errors = inspect_packages.problems(self.directory, VERSION)
+        self.assertTrue(any(CLI in error and "ariadne-cli" in error and "expected ariadne" in error
+                            for error in errors), errors)
+
+    def test_rejects_a_tool_whose_entry_point_is_not_bundled(self) -> None:
+        self.write_all(**{CLI: {"settings": tool_settings(entry_point="ariadne.dll")}})
+        errors = inspect_packages.problems(self.directory, VERSION)
+        self.assertTrue(any(CLI in error and "ariadne.dll" in error for error in errors), errors)
+
+    def test_rejects_a_tool_with_another_runner(self) -> None:
+        self.write_all(**{CLI: {"settings": tool_settings(runner="executable")}})
+        errors = inspect_packages.problems(self.directory, VERSION)
+        self.assertTrue(any(CLI in error and "executable" in error and "expected dotnet" in error
+                            for error in errors), errors)
+
+    def test_rejects_a_tool_with_an_ariadne_dependency(self) -> None:
+        for dependency in (ARIADNE, WORKSPACES):
+            with self.subTest(dependency):
+                self.write_all(**{CLI: {"dependencies": (dependency,)}})
+                errors = inspect_packages.problems(self.directory, VERSION)
+                self.assertTrue(any(f"{CLI} depends on {dependency}" in error for error in errors), errors)
+
+    def test_rejects_a_tool_depending_on_msbuild_packages(self) -> None:
+        self.write_all(**{CLI: {"dependencies": ("Microsoft.Build.Locator",)}})
+        errors = inspect_packages.problems(self.directory, VERSION)
+        self.assertTrue(any(f"{CLI} depends on Microsoft.Build.Locator" in error and "MSBuild" in error
+                            for error in errors), errors)
+
+    def test_rejects_a_tool_bundling_msbuild_assemblies(self) -> None:
+        for bundled in (f"{TOOL}Microsoft.Build.dll", f"{TOOL}Microsoft.Build.Framework.dll",
+                        f"{TOOL}Microsoft.Build.Tasks.Core.dll", f"{TOOL}BuildHost-netcore/Microsoft.Build.dll",
+                        f"{TOOL}BuildHost-net472/Microsoft.Build.Framework.dll", f"{TOOL}de/Microsoft.Build.resources.dll"):
+            with self.subTest(bundled):
+                self.write_all(**{CLI: {"extra_files": (bundled,)}})
+                errors = inspect_packages.problems(self.directory, VERSION)
+                self.assertTrue(any(CLI in error and bundled in error and "MSBuild" in error for error in errors), errors)
+
+    def test_accepts_msbuild_locator_in_the_tool_and_its_build_hosts(self) -> None:
+        # write_tool already bundles the files a real pack has; this pins that they pass.
+        self.write_all()
+        with zipfile.ZipFile(self.directory / f"{CLI}.{VERSION}.nupkg") as archive:
+            names = set(archive.namelist())
+        self.assertTrue(set(TOOL_MSBUILD_FILES) <= names)
+        self.assertEqual([], inspect_packages.problems(self.directory, VERSION))
+
+    def test_rejects_a_tool_built_without_the_release_switch(self) -> None:
+        self.write_all(**{CLI: {"dll_version": "0.1.0-local+abc"}})
+        errors = inspect_packages.problems(self.directory, VERSION)
+        self.assertTrue(any(CLI in error and f"{TOOL}{CLI}.dll says 0.1.0-local+abc, expected 0.1.0" in error
+                            and "AriadneRelease" in error for error in errors), errors)
+
+    def test_rejects_a_tool_bundling_an_engine_at_another_version(self) -> None:
+        self.write_all(**{CLI: {"engine_dll_version": "0.0.9+abc"}})
+        errors = inspect_packages.problems(self.directory, VERSION)
+        self.assertTrue(any(CLI in error and f"{TOOL}{WORKSPACES}.dll says 0.0.9+abc" in error for error in errors), errors)
+
+    def test_rejects_a_tool_without_its_main_dll(self) -> None:
+        self.write_all()
+        path = self.directory / f"{CLI}.{VERSION}.nupkg"
+        with zipfile.ZipFile(path) as source:
+            entries = {name: source.read(name) for name in source.namelist() if name != f"{TOOL}{CLI}.dll"}
+        with zipfile.ZipFile(path, "w") as archive:
+            for name, content in entries.items():
+                archive.writestr(name, content)
+        errors = inspect_packages.problems(self.directory, VERSION)
+        self.assertTrue(any(CLI in error and f"{TOOL}{CLI}.dll" in error and "missing" in error for error in errors),
+                        errors)
+
+    def test_rejects_a_tool_without_a_bundled_ariadne_assembly(self) -> None:
+        for bundled in (ARIADNE, ABSTRACTIONS, WORKSPACES, "Ariadne.NET.Hooks"):
+            with self.subTest(bundled):
+                self.write_all()
+                path = self.directory / f"{CLI}.{VERSION}.nupkg"
+                with zipfile.ZipFile(path) as source:
+                    entries = {name: source.read(name) for name in source.namelist()
+                               if name != f"{TOOL}{bundled}.dll"}
+                with zipfile.ZipFile(path, "w") as archive:
+                    for name, content in entries.items():
+                        archive.writestr(name, content)
+                errors = inspect_packages.problems(self.directory, VERSION)
+                self.assertTrue(any(CLI in error and f"{TOOL}{bundled}.dll is missing" in error for error in errors),
+                                errors)
+
+    def test_rejects_a_tool_at_another_nuspec_version(self) -> None:
+        self.write_all(**{CLI: {"nuspec_version": "0.1.1"}})
+        errors = inspect_packages.problems(self.directory, VERSION)
+        self.assertTrue(any(CLI in error and "nuspec version is 0.1.1" in error for error in errors), errors)
+
+    def test_rejects_a_tool_without_symbols(self) -> None:
+        self.write_all(**{CLI: {"with_symbols": False}})
+        errors = inspect_packages.problems(self.directory, VERSION)
+        self.assertTrue(any(CLI in error and f"{CLI}.0.1.0.snupkg is missing" in error for error in errors), errors)
+
+    def test_rejects_a_tool_symbol_package_without_the_pdb(self) -> None:
+        self.write_all()
+        with zipfile.ZipFile(self.directory / f"{CLI}.{VERSION}.snupkg", "w") as archive:
+            archive.writestr(f"{TOOL}{ARIADNE}.pdb", b"pdb")
+        errors = inspect_packages.problems(self.directory, VERSION)
+        self.assertTrue(any(CLI in error and f"has no {CLI}.pdb" in error for error in errors), errors)
 
     def test_rejects_a_missing_testing_package(self) -> None:
         self.write_all()

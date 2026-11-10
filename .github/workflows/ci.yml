@@ -120,7 +120,7 @@ jobs:
             exit "$status"
           fi
 
-  # Packs the four release packages exactly as publish-nuget does, inspects them, and rehearses the push against a local
+  # Packs the five release packages exactly as publish-nuget does, inspects them, and rehearses the push against a local
   # folder feed, on every push and pull request, so the release path is exercised long before release day. A folder
   # feed silently drops .snupkg files, so symbol packages are checked by the inspection, not by the push.
   pack-validate:
@@ -178,7 +178,7 @@ jobs:
       # Builds and runs the getting-started sample, tools/release/consumer/Program.cs, against the packages in the local
       # feed. nuget.config maps Ariadne.NET* to the local feed only, so the restore cannot fall back to a published
       # package. The sample references Ariadne.NET.Workspaces, which brings Ariadne.NET and then
-      # Ariadne.NET.Abstractions in as dependencies: this proves those three packages restore from the feed.
+      # Ariadne.NET.Abstractions in as dependencies: this proves those three of the five packages restore from the feed.
       # The next step restores Ariadne.NET.Testing the same way.
       # Microsoft.Extensions.DependencyInjection comes from nuget.org: Ariadne.NET depends only on the DI abstractions,
       # and the sample needs a container to resolve the services from. Microsoft.Build.Framework comes from nuget.org
@@ -331,6 +331,119 @@ jobs:
             exit 1
           fi
 
+      # Installs the ariadne dotnet tool from the packed local feed into a temp folder and runs it, which proves the
+      # packed tool starts, loads a solution with MSBuild and reports. The tool is installed with --tool-path, never
+      # globally, with a dedicated nuget.config whose source mapping sends Ariadne.NET* to the local feed only, so the
+      # install cannot resolve the same version from nuget.org once Ariadne.NET.Cli is published and test the released
+      # tool instead of the packed one. It runs four checks: --version prints exactly the release version; validate on tests/fixtures/twopacks
+      # with --format json exits exactly 1 (a broken pack in a pack set), prints JSON with schema 1 on stdout and names
+      # the broken pack; validate on a clean copy of tests/fixtures/clean exits 0; and the session-start hook, fed a
+      # real session-start input with cwd at this repository, exits 0, writes nothing to stderr and prints JSON that
+      # reports no rules load error. The clean fixture has no .architecture folder and ariadne would find this repository's own
+      # pack above it, so the step copies the two projects and the solution to RUNNER_TEMP and writes a pack there that
+      # the Shop solution satisfies. Fixtures are restored first with a normal dotnet restore, because ariadne never
+      # restores. Every failed check is reported and the step fails at the end.
+      - name: Install the tool from the local feed and run it
+        shell: bash
+        run: |
+          dotnet restore tests/fixtures/twopacks/Shop.slnx
+          clean="$RUNNER_TEMP/clean-fixture"
+          mkdir -p "$clean/.architecture"
+          cp -r tests/fixtures/clean/Shop.Domain tests/fixtures/clean/Shop.WebApi tests/fixtures/clean/Shop.slnx "$clean/"
+          rm -rf "$clean"/Shop.*/bin "$clean"/Shop.*/obj
+          cat > "$clean/.architecture/shop.yaml" <<EOF
+          schema: 2
+          name: shop
+          version: "1.0.0"
+          author: ci
+
+          layers:
+            - name: Domain
+              id: SHOP-LAYER-DOMAIN
+              because: The domain holds business rules only.
+              assemblies: ["Shop.Domain"]
+              allowedDependencies: []
+            - name: WebApi
+              id: SHOP-LAYER-WEBAPI
+              because: The web API serves the domain.
+              assemblies: ["Shop.WebApi"]
+              allowedDependencies: [Domain]
+          EOF
+          dotnet restore "$clean/Shop.slnx"
+          cat > "$RUNNER_TEMP/tool-nuget.config" <<EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="local" value="$RUNNER_TEMP/local-feed" />
+              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+            </packageSources>
+            <packageSourceMapping>
+              <packageSource key="local"><package pattern="Ariadne.NET*" /></packageSource>
+              <packageSource key="nuget.org"><package pattern="*" /></packageSource>
+            </packageSourceMapping>
+          </configuration>
+          EOF
+          dotnet tool install Ariadne.NET.Cli --tool-path "$RUNNER_TEMP/tool" --configfile "$RUNNER_TEMP/tool-nuget.config" --version "$PACKAGE_VERSION"
+          ariadne="$RUNNER_TEMP/tool/ariadne"
+          failed=0
+
+          set +e
+          version=$("$ariadne" --version)
+          code=$?
+          if [ "$code" -ne 0 ] || [ "$version" != "$PACKAGE_VERSION" ]; then
+            echo "::error::ariadne --version gave '$version' with exit $code; expected exactly '$PACKAGE_VERSION' with exit 0."
+            failed=1
+          fi
+
+          json=$("$ariadne" validate tests/fixtures/twopacks/Shop.slnx --format json)
+          code=$?
+          echo "$json"
+          if [ "$code" -ne 1 ]; then
+            echo "::error::validate on the twopacks fixture exited $code; expected exactly 1, one violation from the broken pack."
+            failed=1
+          fi
+          if ! python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["schema"]==1' <<< "$json"; then
+            echo "::error::The twopacks output is not JSON with schema 1."
+            failed=1
+          fi
+          if ! grep -q "broken-pack" <<< "$json"; then
+            echo "::error::The twopacks output does not name broken-pack."
+            failed=1
+          fi
+
+          output=$("$ariadne" validate "$clean/Shop.slnx")
+          code=$?
+          echo "$output"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::validate on the clean copy exited $code; expected 0."
+            failed=1
+          fi
+
+          hook_input=$(python3 -c 'import json,os; print(json.dumps({"session_id": "ci", "hook_event_name": "SessionStart", "source": "startup", "cwd": os.getcwd()}))')
+          hook_out=$("$ariadne" hook session-start <<< "$hook_input" 2> "$RUNNER_TEMP/hook-stderr.txt")
+          code=$?
+          hook_err=$(cat "$RUNNER_TEMP/hook-stderr.txt")
+          if [ "$code" -ne 0 ]; then
+            echo "::error::ariadne hook session-start exited $code; a hook must exit 0."
+            failed=1
+          fi
+          if [ -n "$hook_err" ]; then
+            echo "::error::ariadne hook session-start wrote to stderr: $hook_err"
+            failed=1
+          fi
+          if ! python3 -c 'import json,sys; json.load(sys.stdin)' <<< "$hook_out"; then
+            echo "::error::ariadne hook session-start did not print valid JSON: $hook_out"
+            failed=1
+          fi
+          if grep -q "could not load" <<< "$hook_out"; then
+            echo "::error::ariadne hook session-start could not load this repository's rules: $hook_out"
+            failed=1
+          fi
+          set -e
+
+          exit "$failed"
+
   # Lints the commit messages a pull request adds against .commitlintrc.yml. release-please builds the changelog and the
   # next version from these messages, and silently drops a commit it cannot parse, so a bad message is caught here,
   # before the merge. Pull-request events only: a push to main is a merge of commits this job already linted.
@@ -426,7 +539,7 @@ jobs:
             skip_duplicate="--skip-duplicate"
           fi
           if ! dotnet nuget push "artifacts/packages/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" $skip_duplicate; then
-            echo "::error::nuget.org refused the push; its reason is on the error line above. A 409 can mean the version already exists or that the package ID is reserved by another owner; see RELEASING.md before re-running."
+            echo "::error::nuget.org refused the push; its reason is on the error line above. A 409 can mean the version already exists or that the package ID is reserved by another owner. The Trusted Publishing policy must allow all five packages, including any new package id; see RELEASING.md before re-running."
             exit 1
           fi
 

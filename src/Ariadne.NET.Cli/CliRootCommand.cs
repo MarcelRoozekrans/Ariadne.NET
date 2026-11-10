@@ -12,6 +12,17 @@ public static class CliRootCommand
     {
         var rootCommand = new RootCommand("Ariadne.NET CLI");
 
+        // The built-in option reads the entry assembly and prints the full informational version, build metadata included.
+        for (var i = rootCommand.Options.Count - 1; i >= 0; i--)
+        {
+            if (rootCommand.Options[i] is VersionOption)
+            {
+                rootCommand.Options.RemoveAt(i);
+            }
+        }
+
+        rootCommand.Options.Add(new Option<bool>("--version") { Description = "Show version information", Arity = ArgumentArity.Zero, Action = new VersionAction() });
+
         rootCommand.Subcommands.Add(InitCommand.Create(provider));
         rootCommand.Subcommands.Add(RulesCommand.Create(provider));
         rootCommand.Subcommands.Add(RolesCommand.Create(provider));
