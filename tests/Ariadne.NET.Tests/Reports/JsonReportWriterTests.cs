@@ -141,6 +141,48 @@ public class JsonReportWriterTests
         path.Should().Be(outside.Replace('\\', '/'));
     }
 
+    private static ArchitectureReport WithFile(string filePath) => new()
+    {
+        Violations =
+        [
+            new ArchitectureViolation
+            {
+                RuleId = "r",
+                Kind = ViolationKind.ForbiddenDependency,
+                SourceType = "T",
+                Message = "m",
+                Location = new SourceLocation(filePath, 1, 1),
+            },
+        ],
+        Projects = [],
+        TypesChecked = 1,
+    };
+
+    private static string LocationPath(byte[] json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        return doc.RootElement.GetProperty("violations")[0].GetProperty("location").GetProperty("path").GetString()!;
+    }
+
+    [Fact]
+    public void Write_SiblingFolderSharingRootPrefix_KeepsPathAsGiven()
+    {
+        var parent = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "ariadne-json-x"));
+        var root = Path.Combine(parent, "repo");
+        var file = Path.Combine(parent, "repo2", "A.cs");
+
+        LocationPath(Render(WithFile(file), root)).Should().Be(file.Replace('\\', '/'));
+    }
+
+    [Fact]
+    public void Write_RootWithTrailingSeparator_StillRelative()
+    {
+        var root = Root + Path.DirectorySeparatorChar;
+        var file = Path.Combine(Root, "src", "A.cs");
+
+        LocationPath(Render(WithFile(file), root)).Should().Be("src/A.cs");
+    }
+
     [Fact]
     public void Write_NullArguments_Throw()
     {
