@@ -70,7 +70,8 @@ ariadne validate /path/to/MyApp.csproj
 ```
 
 - Argument: `path` (default: `"."`), a `.sln`, `.slnx`, `.slnf` or `.csproj` file, or a directory that holds exactly one of them
-- Loads the projects with `ISolutionValidator` and checks each one against the rules; Ariadne never restores, so run `dotnet restore` first
+- Finds the pack set: every `.yaml` or `.yml` directly in the `.architecture` folder, looked up from the solution's folder upward, not the working directory's `rules.yaml`. Each pack is loaded, resolved and checked on its own, and a load error is prefixed with the file name. A pack meant to be imported must be a `builtin://` or `import://` reference, because every file in the folder is checked as a pack
+- Loads the projects once with `IPackSetValidator` and checks each one against every pack; Ariadne never restores, so run `dotnet restore` first
 - Prints the number of types and projects checked, a `Skipped` line for each skipped project, and each violation as `[Kind] file:line pack <name>` followed by its message and, when the rule has a `because`, a `Rule <id>: <because>` line; a violation found in only some target frameworks lists them after the location, as in `[Kind] file:line (net10.0)`
 - Exit codes: 0 no violations, 1 violations, 2 error. A cancelled run prints `Cancelled.`
 
@@ -116,7 +117,7 @@ ariadne hook stop
 |-------|--------------|
 | `session-start` | Adds the resolved layers, the rules with their `because`, the component roles, the naming conventions and the versions of the cached rule packs to the session. It warns when an import is missing from the cache or no longer satisfies its version range. The text is capped at 10,000 characters; when it does not fit, whole roles, rules and layers are dropped from the end, then the naming line, then the warnings, and a final `Truncated` line says how many lines went. Without a rules file it tells the agent to run `ariadne init`. |
 | `pre-tool-use` | Answers only `ask`, and only for a new `.cs` file whose assembly and namespace no layer selects. The namespace is read from the content that is written, with the folder as the fallback. It also records every `.cs` file that `Write`, `Edit` and `MultiEdit` touch, for `stop`. |
-| `stop` | Once per turn, when the agent edited `.cs` files, validates the solution found from the working directory and feeds at most 20 violations back through `additionalContext`, each with its message and, when it has one, its rule id and `because`. The text is capped at 10,000 characters too, and a final line says how many violations were left out. It prints nothing when the solution is clean, when `stop_hook_active` is set, and when no `.cs` file was edited. |
+| `stop` | Once per turn, when the agent edited `.cs` files, validates the solution found from the working directory against every pack in the `.architecture` folder above it, and feeds at most 20 violations back through `additionalContext`, each with its message and, when it has one, its rule id and `because`. The text is capped at 10,000 characters too, and a final line says how many violations were left out. It prints nothing when the solution is clean, when `stop_hook_active` is set, and when no `.cs` file was edited. |
 
 The stale-cache check is offline. It compares the version ranges in `.architecture/imports.yaml` with `resolvedTag` in `.architecture/.cache/git/<name>/.git-info.json` and never touches the network. Run `ariadne sync` to refresh the cache.
 
@@ -155,7 +156,7 @@ Ariadne's hooks run beside AI.Sentinel's hook. Ariadne owns the structure rules 
 
 ### Rules file resolution
 
-All commands that need rules use `RulesCommand.ResolveRulesFromFile()`:
+`rules`, `roles` and the other commands that need one pack use `RulesCommand.ResolveRulesFromFile()`. `validate` does not: it checks every pack in the `.architecture` folder, found from the solution's folder upward.
 
 1. Look for `.architecture/rules.yaml` in the current directory
 2. If not found, throw `FileNotFoundException` with helpful message
@@ -217,7 +218,7 @@ flowchart TD
 |-------------|---------|-------------|
 | `ariadne://packs/{name}` | Raw YAML string | Full content of a built-in pack |
 
-All tools auto-detect `.architecture/rules.yaml` in the working directory. The `template` parameter overrides auto-detection.
+The other tools auto-detect `.architecture/rules.yaml` in the working directory. `validate_source` without a `template` checks every `.yaml` or `.yml` directly in the `.architecture` folder, found from the solution's folder upward, and falls back to `clean-architecture` when no folder is found; its violations name their pack. The `template` parameter overrides auto-detection and checks that one pack.
 
 ---
 
