@@ -60,6 +60,18 @@ public sealed class PackSetValidatorTests : IDisposable
     }
 
     [Fact]
+    public async Task PackExtendingAnUnknownBuiltin_IsInvalid_NotNotFound()
+    {
+        var root = Workspace(("rules.yaml", Pack("broken") + "extends:\n  - builtin://nope\n"));
+
+        var result = await Create(new CountingLoader()).ValidateAsync(root);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().Contain("rules.yaml").And.Contain("nope");
+    }
+
+    [Fact]
     public async Task DuplicatePackName_IsInvalid_AndNamesBothFiles()
     {
         var root = Workspace(("one.yaml", Pack("same")), ("two.yaml", Pack("same")));

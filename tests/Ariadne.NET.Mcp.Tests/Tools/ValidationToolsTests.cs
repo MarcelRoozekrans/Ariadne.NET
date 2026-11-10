@@ -129,6 +129,29 @@ public class ValidationToolsTests
         await act.Should().ThrowAsync<McpException>().WithMessage("Path '*' does not exist.*");
     }
 
+    [Fact]
+    public async Task ValidateSource_WithoutTemplate_PackExtendingAnUnknownBuiltin_IsToolError_NotAFallback()
+    {
+        var temp = Directory.CreateTempSubdirectory("ariadne-mcp-badpack-").FullName;
+        try
+        {
+            var architecture = Directory.CreateDirectory(Path.Combine(temp, ".architecture")).FullName;
+            File.WriteAllText(
+                Path.Combine(architecture, "rules.yaml"),
+                "schema: 2\nname: broken\nversion: \"1.0.0\"\nauthor: test\nextends:\n  - builtin://nope\n");
+            var solution = Path.Combine(temp, "Shop.slnx");
+            File.WriteAllText(solution, "<Solution />");
+
+            var act = () => ValidationTools.ValidateSource(_helper, _validator, _packSet, solution);
+
+            await act.Should().ThrowAsync<McpException>().WithMessage("*nope*");
+        }
+        finally
+        {
+            Directory.Delete(temp, recursive: true);
+        }
+    }
+
     private sealed class FixedPackSet(Result<ArchitectureReport, AriadneError> result) : IPackSetValidator
     {
         public Task<Result<ArchitectureReport, AriadneError>> ValidateAsync(string path, CancellationToken cancellationToken = default) => Task.FromResult(result);

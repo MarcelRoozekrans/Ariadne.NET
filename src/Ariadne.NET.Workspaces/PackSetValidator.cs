@@ -89,7 +89,9 @@ public sealed class PackSetValidator : IPackSetValidator
             var resolved = loaded.IsSuccess ? _resolver.Resolve(loaded.Value, discovered.ProjectRoot) : loaded;
             if (resolved.IsFailure)
             {
-                return Failure(resolved.Error with { Message = $"{fileName}: {resolved.Error.Message}" });
+                // A pack inside a found .architecture folder that cannot be loaded or resolved is a broken pack, never a missing
+                // one: NotFound from the pack set only means discovery found nothing or the path does not exist.
+                return Failure(resolved.Error with { Code = AriadneErrorCode.Invalid, Message = $"{fileName}: {resolved.Error.Message}" });
             }
 
             var pack = resolved.Value;
