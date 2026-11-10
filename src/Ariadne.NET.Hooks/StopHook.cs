@@ -22,8 +22,8 @@ public sealed class StopHook(IProjectRules rules, ISolutionValidator validator, 
 
         if (input.StopHookActive)
         {
-            // The agent already got feedback this turn; do not loop.
-            ForgetAll(input.SessionId, warn);
+            // The agent already got feedback this turn; do not loop. The edit list stays, so edits made while fixing
+            // are checked when the next turn ends.
             return null;
         }
 
@@ -95,18 +95,6 @@ public sealed class StopHook(IProjectRules rules, ISolutionValidator validator, 
         try
         {
             EditedFiles.Remove(seen);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
-        {
-            warn.WriteLine($"ariadne: could not clear the edited files: {TextLimit.Shorten(e.Message)}");
-        }
-    }
-
-    private static void ForgetAll(string sessionId, TextWriter warn)
-    {
-        try
-        {
-            EditedFiles.Clear(sessionId);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
         {

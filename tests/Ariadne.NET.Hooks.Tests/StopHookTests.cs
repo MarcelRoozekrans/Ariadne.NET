@@ -178,7 +178,7 @@ public class StopHookTests
     }
 
     [Fact]
-    public async Task An_active_stop_hook_stays_silent_and_clears_the_list()
+    public async Task An_active_stop_hook_stays_silent_and_keeps_the_list()
     {
         using var project = ProjectWithSolution();
         using var session = new TestSession();
@@ -189,7 +189,7 @@ public class StopHookTests
 
         json.Should().BeNull();
         validator.Calls.Should().Be(0);
-        EditedFiles.Read(session.Id).Should().BeEmpty();
+        EditedFiles.Read(session.Id).Should().Equal("/x/A.cs");
     }
 
     [Fact]
@@ -428,36 +428,6 @@ public class StopHookTests
         }
 
         json.Should().Contain("SHOP-RULE");
-        warn.ToString().Should().Contain("could not clear the edited files");
-    }
-
-    [UnixFact]
-    [UnsupportedOSPlatform("windows")]
-    public async Task A_second_stop_that_cannot_clear_the_edits_warns_and_stays_silent()
-    {
-        if (!CanBlockDeletes)
-        {
-            return;
-        }
-
-        using var project = ProjectWithSolution();
-        using var session = new TestSession();
-        EditedFiles.Record(session.Id, "/x/A.cs");
-        using var warn = new StringWriter();
-        var validator = new FakeValidator(Report(Violation()));
-        string? json;
-        BlockDeletes(session.Id);
-        try
-        {
-            json = await RunAsync(Create(validator), project.Root, session.Id, active: true, warn: warn).ConfigureAwait(true);
-        }
-        finally
-        {
-            AllowDeletes(session.Id);
-        }
-
-        json.Should().BeNull();
-        validator.Calls.Should().Be(0);
         warn.ToString().Should().Contain("could not clear the edited files");
     }
 }
