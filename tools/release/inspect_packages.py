@@ -52,6 +52,8 @@ TOOL = "Ariadne.NET.Cli"
 TOOL_COMMAND = "ariadne"
 TOOL_RUNNER = "dotnet"
 TOOL_FOLDER = "tools/net10.0/any/"
+# The tool's own assembly and the Ariadne assemblies its project references bring in, which a real pack bundles.
+TOOL_BUNDLED = ("Ariadne.NET.Cli", "Ariadne.NET", "Ariadne.NET.Abstractions", "Ariadne.NET.Workspaces", "Ariadne.NET.Hooks")
 # MSBuildLocator loads MSBuild from the .NET SDK, so the tool must not bundle a copy of any Microsoft.Build assembly,
 # satellite resources included. A real pack holds only Microsoft.Build.Locator.dll, at the top of the tools folder and
 # in the BuildHost-netcore and BuildHost-net472 folders that Microsoft.CodeAnalysis.Workspaces.MSBuild ships, where
@@ -97,6 +99,9 @@ def _symbol_problems(directory: pathlib.Path, package: str, version: str) -> lis
 
 
 def _is_bundled_ariadne_dll(name: str) -> bool:
+    # Every Ariadne assembly in the tool comes from the same pack, so the prefix match takes all of them, Ariadne.NET.dll
+    # and Ariadne.NET.Abstractions.dll included, for the version check. Only the top of the tools folder counts: the
+    # culture and BuildHost folders hold no Ariadne assembly.
     file = name.removeprefix(TOOL_FOLDER)
     return name.startswith(TOOL_FOLDER) and "/" not in file and file.startswith("Ariadne.NET") and file.endswith(".dll")
 
@@ -107,8 +112,9 @@ def _tool_problems(nuspec: str, names: list[str], settings: bytes | None) -> lis
     if "DotnetTool" not in package_types:
         errors.append(f"{TOOL}: nuspec package type is {', '.join(package_types) or 'missing'}, expected DotnetTool")
 
-    if f"{TOOL_FOLDER}{TOOL}.dll" not in names:
-        errors.append(f"{TOOL}: {TOOL_FOLDER}{TOOL}.dll is missing")
+    for bundled in TOOL_BUNDLED:
+        if f"{TOOL_FOLDER}{bundled}.dll" not in names:
+            errors.append(f"{TOOL}: {TOOL_FOLDER}{bundled}.dll is missing")
 
     if settings is None:
         errors.append(f"{TOOL}: {TOOL_FOLDER}DotnetToolSettings.xml is missing")

@@ -228,6 +228,21 @@ class InspectPackagesTests(unittest.TestCase):
         self.assertTrue(any(CLI in error and f"{TOOL}{CLI}.dll" in error and "missing" in error for error in errors),
                         errors)
 
+    def test_rejects_a_tool_without_a_bundled_ariadne_assembly(self) -> None:
+        for bundled in (ARIADNE, ABSTRACTIONS, WORKSPACES, "Ariadne.NET.Hooks"):
+            with self.subTest(bundled):
+                self.write_all()
+                path = self.directory / f"{CLI}.{VERSION}.nupkg"
+                with zipfile.ZipFile(path) as source:
+                    entries = {name: source.read(name) for name in source.namelist()
+                               if name != f"{TOOL}{bundled}.dll"}
+                with zipfile.ZipFile(path, "w") as archive:
+                    for name, content in entries.items():
+                        archive.writestr(name, content)
+                errors = inspect_packages.problems(self.directory, VERSION)
+                self.assertTrue(any(CLI in error and f"{TOOL}{bundled}.dll is missing" in error for error in errors),
+                                errors)
+
     def test_rejects_a_tool_at_another_nuspec_version(self) -> None:
         self.write_all(**{CLI: {"nuspec_version": "0.1.1"}})
         errors = inspect_packages.problems(self.directory, VERSION)
