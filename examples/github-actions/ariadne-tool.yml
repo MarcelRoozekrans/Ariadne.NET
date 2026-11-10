@@ -1,0 +1,45 @@
+# Fails the build when the solution breaks its architecture rules, using the
+# Ariadne.NET.Cli dotnet tool, and shows each violation in code scanning.
+#
+# Copy this file to .github/workflows/ and replace MySolution.slnx below with
+# your own .sln, .slnx, .slnf or .csproj.
+name: Architecture
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+  # Needed by the upload step.
+  security-events: write
+
+jobs:
+  ariadne:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      # Restore first: the banned-packages rules read obj/project.assets.json.
+      - name: Restore
+        run: dotnet restore MySolution.slnx
+
+      - name: Install Ariadne
+        run: dotnet tool install --global Ariadne.NET.Cli
+
+      # This step fails the job: exit code 1 on violations, 2 when Ariadne
+      # cannot run at all.
+      - name: Validate the architecture
+        run: ariadne validate MySolution.slnx --format sarif --output ariadne.sarif
+
+      # Runs after a failed validation too, so the violations reach code
+      # scanning. Code scanning must be available for the repository: private
+      # repositories need GitHub Advanced Security.
+      - name: Upload the SARIF report
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ariadne.sarif

@@ -1,0 +1,28 @@
+# Fails the build when the solution breaks its architecture rules, as a test.
+#
+# The test project references the Ariadne.NET.Testing package and calls
+# ArchitectureCheck.AssertValid() in a test. A violation is a failing test, so
+# dotnet test fails the job.
+#
+# Copy this file to .github/workflows/ and replace MySolution.slnx below with
+# your own solution.
+name: Architecture tests
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Test
+        run: dotnet test MySolution.slnx
