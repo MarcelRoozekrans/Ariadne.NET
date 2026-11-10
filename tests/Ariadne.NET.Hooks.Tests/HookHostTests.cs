@@ -119,6 +119,35 @@ public class HookHostTests
     }
 
     [Fact]
+    public async Task A_hook_that_ignores_cancellation_still_exits_0_once_cancelled()
+    {
+        // SIGTERM cancels the token, but a console read or a solution load does not observe it; the host must not wait for them.
+        using var cts = new CancellationTokenSource();
+        var never = new TaskCompletionSource<string?>();
+        var hook = new BlockingHook("stop", never.Task, cts.Cancel);
+
+        var run = RunAsync([hook], "stop", ValidInput, cts.Token);
+        var finished = await Task.WhenAny(run, Task.Delay(TimeSpan.FromSeconds(10)));
+
+        finished.Should().BeSameAs(run);
+        var (exit, output, err) = await run;
+        exit.Should().Be(0);
+        output.Should().BeEmpty();
+        err.Should().StartWith("ariadne hook: stop: cancelled");
+    }
+
+    private sealed class BlockingHook(string eventName, Task<string?> result, Action onStart) : IHook
+    {
+        public string Event { get; } = eventName;
+
+        public Task<string?> RunAsync(HookInput input, TextWriter warn, CancellationToken cancellationToken)
+        {
+            onStart();
+            return result;
+        }
+    }
+
+    [Fact]
     public async Task A_hook_that_throws_cancellation_fails_open_as_cancelled()
     {
         var hook = new FakeHook("stop", _ => throw new OperationCanceledException());

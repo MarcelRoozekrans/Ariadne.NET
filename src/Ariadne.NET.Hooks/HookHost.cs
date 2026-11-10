@@ -22,16 +22,9 @@ public sealed class HookHost(IEnumerable<IHook> hooks)
                 ?? throw new InvalidOperationException("unknown event");
             cancellationToken.ThrowIfCancellationRequested();
 
-            var text = await stdin.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
-            var input = HookInput.TryParse(text)
-                ?? throw new InvalidOperationException("stdin is not a hook input with a session_id");
-
-            var output = await hook.RunAsync(input, stderr, cancellationToken).ConfigureAwait(false);
-            if (!string.IsNullOrEmpty(output))
-            {
-                await stdout.WriteAsync(output).ConfigureAwait(false);
-                await stdout.FlushAsync(cancellationToken).ConfigureAwait(false);
-            }
+            // A console read and a solution load do not observe the token, so on SIGTERM the work is abandoned instead of awaited:
+            // the host then returns 0 at once, rather than the runtime ending the process with 143 after its grace period.
+            await ExecuteAsync(hook, stdin, stdout, stderr, cancellationToken).WaitAsync(cancellationToken).ConfigureAwait(false);
         }
 #pragma warning disable CA1031 // A hook must never fail the agent: every exception becomes a stderr line.
         catch (Exception ex)
@@ -48,6 +41,20 @@ public sealed class HookHost(IEnumerable<IHook> hooks)
         }
 
         return 0;
+    }
+
+    private static async Task ExecuteAsync(IHook hook, TextReader stdin, TextWriter stdout, TextWriter stderr, CancellationToken cancellationToken)
+    {
+        var text = await stdin.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+        var input = HookInput.TryParse(text)
+            ?? throw new InvalidOperationException("stdin is not a hook input with a session_id");
+
+        var output = await hook.RunAsync(input, stderr, cancellationToken).ConfigureAwait(false);
+        if (!string.IsNullOrEmpty(output))
+        {
+            await stdout.WriteAsync(output).ConfigureAwait(false);
+            await stdout.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private static string Describe(Exception ex) =>
