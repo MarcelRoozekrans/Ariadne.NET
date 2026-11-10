@@ -136,7 +136,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Goal:** Machine-readable reports from the CLI and the testing package.
 **Surface:** Backend
 **HelpWanted:** no
-**Plan:** _to be written_
+**Plan:** `docs/superpowers/plans/2026-11-10-phase-3.2-json-and-sarif-reports.md`
 
 ### Phase 3.3: dotnet tool [status: pending]
 **Goal:** Ship the CLI as the `ariadne` dotnet tool.
