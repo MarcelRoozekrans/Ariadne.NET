@@ -37,7 +37,7 @@ public sealed class PackSetValidatorTests : IDisposable
     [Fact]
     public async Task CleanPackAlone_Passes()
     {
-        var root = Workspace(("a-clean.yaml", Pack("clean-pack")));
+        var root = Workspace(("a-clean.yaml", File.ReadAllText(FixtureProjects.Path("twopacks", ".architecture", "a-clean.yaml"))));
 
         var result = await Create(new CountingLoader()).ValidateAsync(root);
 
@@ -69,6 +69,18 @@ public sealed class PackSetValidatorTests : IDisposable
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
         result.Error.Message.Should().Contain("one.yaml").And.Contain("two.yaml").And.Contain("same").And.EndWith(".");
+    }
+
+    [Fact]
+    public async Task DuplicatePackName_DifferingOnlyInCase_IsInvalid()
+    {
+        var root = Workspace(("one.yaml", Pack("Shop")), ("two.yaml", Pack("shop")));
+
+        var result = await Create(new CountingLoader()).ValidateAsync(root);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().Contain("one.yaml").And.Contain("two.yaml");
     }
 
     [Fact]

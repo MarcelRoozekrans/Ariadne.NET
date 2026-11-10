@@ -69,13 +69,19 @@ public sealed class PackSetValidator : IPackSetValidator
             violations.AddRange(checkedPack.Value.Violations);
         }
 
-        return Result<ArchitectureReport, AriadneError>.Success(merged! with { Violations = violations });
+        if (merged is null)
+        {
+            return Result<ArchitectureReport, AriadneError>.Failure(
+                new AriadneError(AriadneErrorCode.NotFound, "No rule pack was found to check the solution against."));
+        }
+
+        return Result<ArchitectureReport, AriadneError>.Success(merged with { Violations = violations });
     }
 
     private Result<IReadOnlyList<RulePack>, AriadneError> ResolveAll(DiscoveredPacks discovered)
     {
         var packs = new List<RulePack>();
-        var fileByName = new Dictionary<string, string>(StringComparer.Ordinal);
+        var fileByName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var file in discovered.Files)
         {
             var fileName = Path.GetFileName(file);
