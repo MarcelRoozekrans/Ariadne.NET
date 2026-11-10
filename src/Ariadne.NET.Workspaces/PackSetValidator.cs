@@ -5,7 +5,7 @@ using ZeroAlloc.Results;
 namespace Ariadne.NET.Workspaces;
 
 /// <summary>Validates a solution against every pack file under <c>.architecture</c>, loading the solution once.</summary>
-public sealed class PackSetValidator : IPackSetValidator
+internal sealed class PackSetValidator : IPackSetValidator
 {
     private readonly ISolutionLoader _loader;
     private readonly IArchitectureValidator _validator;
