@@ -34,6 +34,19 @@ internal static class StrayFiles
         }
     }
 
+    /// <summary>Throws, naming the stray entry, when an ancestor of <paramref name="folder"/> holds a <c>.git</c> file or folder.</summary>
+    internal static void AssertNoGitAbove(string folder)
+    {
+        foreach (var dir in Ancestors(folder))
+        {
+            var stray = Path.Combine(dir, ".git");
+            if (Directory.Exists(stray) || File.Exists(stray))
+            {
+                throw new InvalidOperationException($"Test precondition failed: '{stray}' sits above the temp folder '{folder}', so a search upward would find it. Remove it to run this test.");
+            }
+        }
+    }
+
     private static IEnumerable<string> Ancestors(string folder)
     {
         for (var dir = new DirectoryInfo(folder); dir is not null; dir = dir.Parent)

@@ -337,6 +337,121 @@ public sealed class ExitCodeTests : IDisposable
         writer.ToString().Split(Environment.NewLine).Should().Contain("  [TypeKindMismatch] Shop.Domain.Order (net8.0, net9.0)");
     }
 
+    // JSON and SARIF go to the standard output as bytes, not through Console.Out, so a test swaps the stream.
+    private (int ExitCode, byte[] Stdout, string Stderr, string ConsoleOut) RunWithBinaryStdout(params string[] args)
+    {
+        var originalError = Console.Error;
+        var originalOut = Console.Out;
+        using var error = new StringWriter();
+        using var console = new StringWriter();
+        using var stream = new MemoryStream();
+        Console.SetError(error);
+        Console.SetOut(console);
+        ValidateCommand.OpenStandardOutput = () => stream;
+        try
+        {
+            var exitCode = Run(args);
+            return (exitCode, stream.ToArray(), error.ToString(), console.ToString());
+        }
+        finally
+        {
+            ValidateCommand.OpenStandardOutput = Console.OpenStandardOutput;
+            Console.SetError(originalError);
+            Console.SetOut(originalOut);
+        }
+    }
+
+    [Fact]
+    public void Validate_FormatTextWithOutput_WritesTheTextToTheFileAndNothingToStdout()
+    {
+        var output = Path.Combine(_tempDir, "reports", "out.txt");
+
+        var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("twopacks", "Shop.slnx"), "--format", "text", "--output", output);
+
+        exitCode.Should().Be(ExitCodes.Violations);
+        stdout.Should().BeEmpty();
+        File.ReadAllText(output).Should().Contain("Checked ").And.Contain("Result: FAIL");
+    }
+
+    [Fact]
+    public void Validate_FormatJson_ReportsTheEngineVersion()
+    {
+        var (_, stdout, _, _) = RunWithBinaryStdout("validate", FixtureProjects.Path("twopacks", "Shop.slnx"), "--format", "json");
+
+        using var document = System.Text.Json.JsonDocument.Parse(stdout);
+        var version = document.RootElement.GetProperty("tool").GetProperty("version").GetString()!;
+        var engine = System.Reflection.CustomAttributeExtensions
+            .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(Ariadne.NET.Reports.ReportRoot).Assembly)!.InformationalVersion;
+        version.Should().Be(engine.Split('+')[0]);
+    }
+
+    [Fact]
+    public void Validate_FormatJson_LeavesOnlyJsonOnStdoutAndTheSummaryOnStderr()
+    {
+        var (exitCode, stdout, stderr, consoleOut) = RunWithBinaryStdout("validate", FixtureProjects.Path("twopacks", "Shop.slnx"), "--format", "json");
+
+        exitCode.Should().Be(ExitCodes.Violations);
+        stdout.Take(3).Should().NotEqual(new byte[] { 0xEF, 0xBB, 0xBF });
+        using var document = System.Text.Json.JsonDocument.Parse(stdout);
+        document.RootElement.GetProperty("schema").GetInt32().Should().Be(1);
+        document.RootElement.GetProperty("violations").GetArrayLength().Should().BeGreaterThan(0);
+        consoleOut.Should().BeEmpty();
+        stderr.Should().Contain("Checked ").And.Contain("Result: FAIL");
+    }
+
+    [Fact]
+    public void Validate_FormatSarifWithOutput_WritesTheFileAndKeepsTheTextOnStdout()
+    {
+        var output = Path.Combine(_tempDir, "reports", "nested", "out.sarif");
+
+        var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("twopacks", "Shop.slnx"), "--format", "sarif", "--output", output);
+
+        exitCode.Should().Be(ExitCodes.Violations);
+        File.Exists(output).Should().BeTrue();
+        using var document = System.Text.Json.JsonDocument.Parse(File.ReadAllBytes(output));
+        document.RootElement.GetProperty("version").GetString().Should().Be("2.1.0");
+        stdout.Should().Contain("Checked ").And.Contain("Result: FAIL");
+    }
+
+    [Fact]
+    public void Validate_UnknownFormat_IsAUsageError()
+    {
+        var (exitCode, stderr) = RunCapturingStderr("validate", FixtureProjects.Path("twopacks", "Shop.slnx"), "--format", "yaml");
+
+        exitCode.Should().NotBe(ExitCodes.Success);
+        stderr.Should().Contain("yaml");
+    }
+
+    [Fact]
+    public void Validate_FormatJsonOnACleanSolution_ReturnsSuccess()
+    {
+        var (exitCode, stdout, _, _) = RunWithBinaryStdout("validate", CopiedFixture("fourlayer", "Shop.csproj"), "--format", "json");
+
+        exitCode.Should().Be(ExitCodes.Success);
+        using var document = System.Text.Json.JsonDocument.Parse(stdout);
+        document.RootElement.GetProperty("violations").GetArrayLength().Should().Be(0);
+    }
+
+    [Fact]
+    public void Validate_OutputPathWhoseParentIsAFile_ReturnsErrorWithAnErrorLine()
+    {
+        var blocker = Path.Combine(_tempDir, "blocker");
+        File.WriteAllText(blocker, "x");
+
+        var (exitCode, stderr) = RunCapturingStderr("validate", FixtureProjects.Path("twopacks", "Shop.slnx"), "--format", "json", "--output", Path.Combine(blocker, "out.json"));
+
+        exitCode.Should().Be(ExitCodes.Error);
+        stderr.Should().Contain("Error: ").And.Contain("could not be written.");
+    }
+
+    [Fact]
+    public void Validate_Help_ShowsFormatAndOutput()
+    {
+        var (_, stdout) = RunCapturingStdout("validate", "--help");
+
+        stdout.Should().Contain("--format").And.Contain("--output");
+    }
+
     [Fact]
     public void Validate_MissingPath_ShouldReturnError()
     {

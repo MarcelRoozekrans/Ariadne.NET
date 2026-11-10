@@ -1,3 +1,6 @@
+using System.Text.Json;
+using Ariadne.NET.Reports;
+using Ariadne.NET.Tests.Reports;
 using Ariadne.NET.Tests.Shared;
 using FluentAssertions;
 
@@ -151,6 +154,90 @@ public sealed class ArchitectureCheckTests : IDisposable
 
         report.Violations.Should().BeEmpty(string.Join(Environment.NewLine, report.Violations.Select(v => $"{v.RuleId} {v.SourceType} -> {v.Target}")));
         report.Projects.Select(p => p.Name).Should().Contain("Ariadne.NET.Testing");
+    }
+
+    [Fact]
+    public void WriteReport_Sarif_WritesAFileThatMatchesTheSchema_AndCreatesTheFolder()
+    {
+        var report = ArchitectureCheck.Run(FixtureProjects.Path("twopacks", "Shop.slnx"));
+        var path = Path.Combine(_temp, "out", "nested", "report.sarif");
+
+        ArchitectureCheck.WriteReport(report, ReportFormat.Sarif, path);
+
+        var text = File.ReadAllText(path);
+        SarifSchema.Validate(text).Should().BeEmpty();
+        text.Should().Contain("SHOP-DOMAIN-NO-INFRASTRUCTURE");
+    }
+
+    [Fact]
+    public void WriteReport_Json_OverwritesAnExistingFile()
+    {
+        var report = ArchitectureCheck.Run(CleanCopy());
+        var path = Path.Combine(_temp, "report.json");
+        File.WriteAllText(path, new string('x', 10_000));
+
+        ArchitectureCheck.WriteReport(report, ReportFormat.Json, path);
+
+        using var document = JsonDocument.Parse(File.ReadAllBytes(path));
+        document.RootElement.GetProperty("schema").GetInt32().Should().Be(1);
+        document.RootElement.GetProperty("violations").GetArrayLength().Should().Be(0);
+    }
+
+    [Fact]
+    public void AssertValid_WithReportPath_TwoPacks_WritesTheFileThenThrows()
+    {
+        var path = Path.Combine(_temp, "twopacks.sarif");
+
+        var act = () => ArchitectureCheck.AssertValid(FixtureProjects.Path("twopacks", "Shop.slnx"), path, ReportFormat.Sarif);
+
+        act.Should().Throw<ArchitectureViolationException>();
+        SarifSchema.Validate(File.ReadAllText(path)).Should().BeEmpty();
+        File.ReadAllText(path).Should().Contain("SHOP-DOMAIN-NO-INFRASTRUCTURE").And.Contain("Shop.Domain/Order.cs");
+    }
+
+    [Fact]
+    public async Task AssertValidAsync_WithReportPath_TwoPacks_WritesTheFileThenThrows()
+    {
+        var path = Path.Combine(_temp, "twopacks.json");
+
+        var act = () => ArchitectureCheck.AssertValidAsync(FixtureProjects.Path("twopacks", "Shop.slnx"), path, ReportFormat.Json);
+
+        await act.Should().ThrowAsync<ArchitectureViolationException>();
+        File.ReadAllText(path).Should().Contain("SHOP-DOMAIN-NO-INFRASTRUCTURE");
+    }
+
+    [Fact]
+    public void AssertValid_WithReportPath_CheckCannotRun_WritesNoFile()
+    {
+        var path = Path.Combine(_temp, "never.sarif");
+
+        var act = () => ArchitectureCheck.AssertValid(Path.Combine(_temp, "Missing.slnx"), path, ReportFormat.Sarif);
+
+        act.Should().Throw<ArchitectureCheckException>();
+        File.Exists(path).Should().BeFalse();
+    }
+
+    [Fact]
+    public void WriteReport_UndefinedFormat_Throws()
+    {
+        var report = ArchitectureCheck.Run(FixtureProjects.Path("twopacks", "Shop.slnx"));
+        var path = Path.Combine(_temp, "undefined.out");
+
+        var act = () => ArchitectureCheck.WriteReport(report, (ReportFormat)99, path);
+
+        act.Should().Throw<ArgumentOutOfRangeException>();
+        File.Exists(path).Should().BeFalse();
+    }
+
+    [Fact]
+    public void AssertValid_WithReportPath_CleanSolution_WritesTheFileAndPasses()
+    {
+        var path = Path.Combine(_temp, "clean.sarif");
+
+        var act = () => ArchitectureCheck.AssertValid(CleanCopy(), path, ReportFormat.Sarif);
+
+        act.Should().NotThrow();
+        SarifSchema.Validate(File.ReadAllText(path)).Should().BeEmpty();
     }
 
     // Copies the restored clean fixture, obj folders included, next to a pack written for it.

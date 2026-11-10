@@ -20,7 +20,7 @@ To use the library from your own project, see [Getting started](getting-started.
 
 ### CLI
 
-> Until the `ariadne` dotnet tool ships, run these commands as `dotnet run --project src/Ariadne.NET.Cli -- <command>`.
+> These commands assume the installed `ariadne` tool; see [Install the tool](getting-started.md#install-the-tool). From a clone of the repository, run them as `dotnet run --project src/Ariadne.NET.Cli -- <command>`.
 
 ```bash
 # Initialize a project with clean architecture rules

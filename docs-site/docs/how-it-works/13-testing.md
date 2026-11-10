@@ -80,6 +80,25 @@ Every `.yaml` or `.yml` file directly in the `.architecture` folder is a pack, e
 
 A pack that another pack imports must be a `builtin://` or `import://` reference. `extends` cannot point at a file in `.architecture`, and every file in the folder is checked as a pack in its own right, so a base pack saved there would be checked as if it were a complete pack. Put a shared base in a git repository and bring it in with `import://` and `ariadne sync`.
 
+## Reports
+
+A test can leave a JSON or SARIF report behind, for CI to upload or archive. The formats are described in [Reports](14-reports.md).
+
+```csharp
+ArchitectureCheck.AssertValid(null, "artifacts/architecture.sarif", ReportFormat.Sarif);
+```
+
+`ReportFormat` is in `Ariadne.NET.Reports`. The report file is written before the exception is thrown, so a failing test still leaves its report. The file's folder is created when missing and an existing file is overwritten. A relative `reportPath` resolves against the current directory, usually `bin/<configuration>/<framework>` of the test project, like the relative `solutionPath` above; build an absolute path to write elsewhere. `AssertValidAsync` has the same overload with a `CancellationToken`.
+
+To write the report of a `Run` call, use `WriteReport`:
+
+```csharp
+var report = ArchitectureCheck.Run();
+ArchitectureCheck.WriteReport(report, ReportFormat.Json, "artifacts/architecture.json");
+```
+
+File paths in the report are relative to the repository root, the nearest ancestor with a `.git` entry. `AssertValid` uses the root of the solution it checked. A report does not record where its solution was, so `WriteReport` starts from `AppContext.BaseDirectory`, the test project's output folder; when the solution is outside the test project's repository, use the `AssertValid` overload with a report path. Both fall back to the starting folder when no ancestor has a `.git` entry.
+
 ## Failures
 
 The call throws one of two exceptions, and both derive from `ArchitectureCheckException`:
