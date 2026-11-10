@@ -98,7 +98,7 @@ A violation has these fields:
 | `message` | The violation message. |
 | `because` | The `because` of the layer or rule. |
 | `target` | The type or package that is referenced. Omitted when the violation has no target. |
-| `location` | `path`, `line` and `column` of the source type. Omitted when the type has no source file, as for a metadata type. |
+| `location` | `path`, `line` and `column` of the first offending reference. Omitted for violations of kind `VacuousRule` and `VacuousLayer` and for banned packages, which have no source position. |
 | `referenceCount` | How many references the violation stands for. |
 | `targetFrameworks` | The target frameworks the violation was found in. |
 
@@ -108,7 +108,7 @@ A report without violations still has every top-level field, with `"violations":
 
 ## SARIF report
 
-The SARIF log follows version 2.1.0 and sets `$schema` to `https://json.schemastore.org/sarif-2.1.0.json`. Code scanning services read it without further setup.
+The SARIF log follows version 2.1.0 and sets `$schema` to `https://json.schemastore.org/sarif-2.1.0.json`. Results with a file location show in GitHub code scanning. Violations without one (`VacuousRule`, `VacuousLayer` and `BannedPackage`) are in the SARIF file, but GitHub code scanning does not display them.
 
 The mapping:
 
@@ -120,7 +120,7 @@ The mapping:
 | A violation | One `result`. `ruleId` is the rule id, `ruleIndex` points into `driver.rules`, `level` is always `error`, `message.text` is the message. |
 | `pack` and `targetFrameworks` | `result.properties`. |
 | The location | `physicalLocation` with `artifactLocation` and a `region` holding `startLine` and `startColumn`. |
-| No location | A `logicalLocations` entry instead: `name` is the source type, `kind` is `type`. |
+| No location | A `logicalLocations` entry instead: `name` is the source, and `kind` is `type` unless the violation is a `VacuousRule`, `VacuousLayer` or `BannedPackage`, where it is left out. |
 | The root | `originalUriBaseIds` has `%SRCROOT%` set to the root as a `file://` uri. |
 
 The same rule id from two packs gives two rules, because a pack can reuse an id with different `because` text. Each file `uri` is relative to the root, percent-encoded per segment, with `uriBaseId` `%SRCROOT%`. A file outside the root gets the absolute `file://` uri and no `uriBaseId`.
@@ -179,7 +179,7 @@ The same rule id from two packs gives two rules, because a pack can reuse an id 
     sarif_file: ariadne.sarif
 ```
 
-`continue-on-error` lets the upload run when the command exits 1. The job needs the `security-events: write` permission. Full CI examples are a separate page.
+`continue-on-error` lets the upload run when the command exits 1. The job needs the `security-events: write` permission. CI examples follow in a later release.
 
 ## From code
 
