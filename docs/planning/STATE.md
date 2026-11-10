@@ -19,9 +19,9 @@
   - Native AOT for the `ariadne hook` entry point only if a later measurement shows it slow; process start is about 0.1 s today.
   - The `ariadne` command must be on `PATH`, which needs the dotnet tool of phase 3.3. The Milestone 5 hooks item stays unticked until then.
   - The flaky Hooks test was `EditedFilesTests.Concurrent_records_all_land`: an append race in `EditedFiles`, because .NET seeks to the end once at open, so parallel hook processes wrote at the same offset and lost or split records. Fixed in the final review wave: one small file per edit in a per-user, per-session folder, and `stop` removes only the records it read.
-  - Owner decision 2026-11-08: stop clearing the edit list on `stop_hook_active`, so edits made while fixing are checked in the next turn. Not yet implemented.
-  - Owner decision 2026-11-08: `init` preserves a custom hook `timeout` on an existing Ariadne entry in `.claude/settings.json` and only fills a missing one. Not yet implemented.
-  - Owner decision 2026-11-08: fix SIGTERM during `stop` exiting 143 by exiting 0, so the fail-open rule holds. Not yet implemented.
+  - Owner decision 2026-11-08: stop clearing the edit list on `stop_hook_active`, so edits made while fixing are checked in the next turn. Implemented on branch `fix/hooks-follow-ups`.
+  - Owner decision 2026-11-08: `init` preserves a custom hook `timeout` on an existing Ariadne entry in `.claude/settings.json` and only fills a missing or unusable one (a positive integer is kept). Implemented on branch `fix/hooks-follow-ups`.
+  - Owner decision 2026-11-08: fix SIGTERM during `stop` exiting 143 by exiting 0, so the fail-open rule holds. Implemented on branch `fix/hooks-follow-ups`: the console read and the solution load ignore the token, so `HookHost` now stops waiting when it is cancelled and returns 0 with one stderr line.
 - **Phase 2.4 — Banned packages, forbidden APIs and name collisions:** [status: complete 2026-11-08], merged as #51 on 2026-11-08 from `feat/phase-2.4-banned-packages-forbidden-apis-name-collisions`; CI was green after one fix to the Hooks stop test count. Released as 0.5.0 through #52. Design `docs/superpowers/specs/2026-11-08-phase-2.4-banned-packages-forbidden-apis-name-collisions-design.md`, plan `docs/superpowers/plans/2026-11-08-phase-2.4-banned-packages-forbidden-apis-name-collisions.md`, all boxes ticked. Adds `bannedPackages` (package graph from `project.assets.json`, transitive and through project references, unknown data is an error for a covering rule), `members` on the `to` selector of `forbid` and `allowOnly` (override and implement matching, initializers, implicit base constructor call, indexers by metadata name) and `uniqueNames`. Perf: `docs/perf/phase-2.4-baseline.md`; the walker and validator are within 0.1% of the 2.3 head, the extra cost per type is the larger solution. Stated limits are in the design and on the docs-site rule-schema page.
   - Done: the PR carried a `BEGIN_COMMIT_OVERRIDE` block and release-please PR #52 shows the `RuleDefinitionValidator` constructor break under BREAKING CHANGES.
   - Issue #50: the new `InternalsVisibleTo Ariadne.NET.Workspaces` couples the two packages' versions. Owner decision 2026-11-08: replace it with a public coverage check API. Done in #62, released in 0.7.0.
@@ -46,7 +46,7 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 ## Scheduling (owner, 2026-11-09)
 
 - Issue #50: done, merged as #62 and released in 0.7.0.
-- The three 5.6 follow-ups (`stop_hook_active` keeps the edit list, `init` preserves a custom hook `timeout`, SIGTERM during `stop` exits 0): one hooks fix PR. Not yet implemented.
+- The three 5.6 follow-ups (`stop_hook_active` keeps the edit list, `init` preserves a custom hook `timeout`, SIGTERM during `stop` exits 0): one hooks fix PR. Done on branch `fix/hooks-follow-ups` (three fix commits and a docs commit), pushed to `ariadne`, no PR opened yet; the owner decides when.
 
 ## Open Decisions
 
@@ -69,6 +69,6 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 
 ## Recommended Next Step
 
-Milestone 2 is complete. Per the owner on 2026-11-09 the hooks fix PR with the three 5.6 follow-ups comes next, then `new-milestone` for Milestone 3. Do not merge release-please or Renovate PRs unless asked.
+Milestone 2 is complete. The hooks fix branch `fix/hooks-follow-ups` is pushed and waits for the owner to ask for a PR. Then `new-milestone` for Milestone 3; ask the owner before starting it. Do not merge release-please or Renovate PRs unless asked.
 
 Commit rules: conventional commits; no `Co-Authored-By` trailer or session link; no nested parentheses in commit bodies; keep every footer line under 100 characters, because commitlint rejects longer ones; breaking commits carry `!` and a `BREAKING CHANGE` footer. Shared VM: one build or test at a time, no local AOT publish.
