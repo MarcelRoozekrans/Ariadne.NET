@@ -1,0 +1,16 @@
+schema: 2
+name: clean-fixture
+version: "1.0.0"
+author: fixture
+
+layers:
+  - name: Domain
+    id: SHOP-LAYER-DOMAIN
+    because: The domain holds business rules only.
+    assemblies: ["Shop.Domain"]
+    allowedDependencies: []
+  - name: WebApi
+    id: SHOP-LAYER-WEBAPI
+    because: The web API serves the domain.
+    assemblies: ["Shop.WebApi"]
+    allowedDependencies: [Domain]
