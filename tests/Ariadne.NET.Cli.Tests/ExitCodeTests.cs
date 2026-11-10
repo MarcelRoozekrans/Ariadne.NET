@@ -95,7 +95,8 @@ public sealed class ExitCodeTests : IDisposable
     [Fact]
     public void Validate_TwoPacksFixture_FindsThePacksFromTheSolutionNotTheWorkingDirectory()
     {
-        // The working directory holds its own rules.yaml; the solution's folder decides which packs apply.
+        // The working directory holds its own pack, named so that it cannot be mistaken for anything else.
+        WriteRules("schema: 2\nname: working-directory-only-pack\nextends:\n  - builtin://clean-architecture\n");
         var (fromTemp, tempOut) = RunCapturingStdout("validate", FixtureProjects.Path("twopacks", "Shop.slnx"));
 
         Directory.SetCurrentDirectory(FixtureProjects.Path("twopacks"));
@@ -103,8 +104,8 @@ public sealed class ExitCodeTests : IDisposable
 
         fromTemp.Should().Be(ExitCodes.Violations);
         fromFixture.Should().Be(ExitCodes.Violations);
-        tempOut.Should().Contain("broken-pack").And.NotContain("shop");
-        fixtureOut.Should().Contain("broken-pack");
+        tempOut.Should().Contain("broken-pack").And.NotContain("working-directory-only-pack");
+        fixtureOut.Should().Contain("broken-pack").And.NotContain("working-directory-only-pack");
     }
 
     [Fact]
@@ -117,7 +118,7 @@ public sealed class ExitCodeTests : IDisposable
             var (exitCode, stderr) = RunCapturingStderr("validate", Path.Combine(copy, "Shop.slnx"));
 
             exitCode.Should().Be(ExitCodes.Error);
-            stderr.Should().StartWith("Error: ").And.Contain(".architecture");
+            stderr.Should().StartWith($"Error: No '.architecture' folder was found in '{copy}' or any folder above it.");
         }
         finally
         {
