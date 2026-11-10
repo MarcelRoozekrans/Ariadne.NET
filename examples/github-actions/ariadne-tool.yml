@@ -39,7 +39,7 @@ jobs:
       # scanning. Code scanning must be available for the repository: private
       # repositories need GitHub Advanced Security.
       - name: Upload the SARIF report
-        if: always()
+        if: ${{ !cancelled() && hashFiles('ariadne.sarif') != '' }}
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: ariadne.sarif

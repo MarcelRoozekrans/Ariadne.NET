@@ -69,13 +69,13 @@ jobs:
       # scanning. Code scanning must be available for the repository: private
       # repositories need GitHub Advanced Security.
       - name: Upload the SARIF report
-        if: always()
+        if: ${{ !cancelled() && hashFiles('ariadne.sarif') != '' }}
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: ariadne.sarif
 ```
 
-The validate step is the one that fails the job. The upload step has `if: always()`, so it runs after a failed validation and the violations still reach code scanning. The step needs the `security-events: write` permission.
+The validate step is the one that fails the job. The upload step runs after a failed validation, so the violations still reach code scanning. It runs unless the job was cancelled and only when `ariadne.sarif` exists, so a run where Ariadne could not write a report (exit code 2) does not add a second, unrelated upload error. The step needs the `security-events: write` permission.
 
 ### Code scanning
 
