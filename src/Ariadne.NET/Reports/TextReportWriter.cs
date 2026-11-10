@@ -5,7 +5,10 @@ namespace Ariadne.NET.Reports;
 /// <summary>Writes an <see cref="ArchitectureReport"/> as the plain text the CLI prints.</summary>
 public static class TextReportWriter
 {
-    /// <summary>Writes the summary line, any skipped projects and the verdict, then one entry per violation.</summary>
+    /// <summary>
+    /// Writes the summary line, any skipped projects and the verdict, then one entry per violation: its kind, location and
+    /// pack, its message, and the rule id with the rule's <c>because</c> when it has one.
+    /// </summary>
     /// <param name="output">Where the text goes.</param>
     /// <param name="report">The report to write.</param>
     /// <param name="root">The directory violation file paths are made relative to.</param>
@@ -40,6 +43,10 @@ public static class TextReportWriter
             var pack = violation.Pack.Length > 0 ? $" pack {violation.Pack}" : string.Empty;
             output.WriteLine($"  [{violation.Kind}] {where}{frameworks}{pack}");
             output.WriteLine($"    {violation.Message}");
+            if (violation.Because.Length > 0)
+            {
+                output.WriteLine($"    Rule {violation.RuleId}: {violation.Because}");
+            }
         }
     }
 }

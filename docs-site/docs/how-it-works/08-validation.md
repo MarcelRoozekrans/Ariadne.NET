@@ -138,11 +138,12 @@ The CLI prints a report like this:
 Checked 2 types in 2 projects
 Result: FAIL - 1 violation(s) found.
 
-  [DependencyNotAllowed] Shop.Domain/Order.cs:7
+  [DependencyNotAllowed] Shop.Domain/Order.cs:7 pack shop
     Layer 'Domain' is not allowed to depend on 'Infrastructure': Shop.Domain.Order references Shop.Infrastructure.SqlStore 3 times
+    Rule SHOP-LAYER-DOMAIN: The domain holds business rules only.
 ```
 
-Paths in the report are absolute. The CLI shows them relative to the directory of the solution or project it loaded, and puts a non-empty `TargetFrameworks` list in parentheses after the location, as in `Shop.Domain/Order.cs:7 (net10.0)`.
+Paths in the report are absolute. The CLI shows them relative to the directory of the solution or project it loaded, and puts a non-empty `TargetFrameworks` list in parentheses after the location, as in `Shop.Domain/Order.cs:7 (net10.0)`. After the location comes the pack the violation came from, and under the message the rule id with its `because`, when the rule has one.
 
 ### Which projects are checked
 

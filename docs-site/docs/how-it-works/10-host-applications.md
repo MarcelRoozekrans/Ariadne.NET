@@ -71,15 +71,16 @@ ariadne validate /path/to/MyApp.csproj
 
 - Argument: `path` (default: `"."`), a `.sln`, `.slnx`, `.slnf` or `.csproj` file, or a directory that holds exactly one of them
 - Loads the projects with `ISolutionValidator` and checks each one against the rules; Ariadne never restores, so run `dotnet restore` first
-- Prints the number of types and projects checked, a `Skipped` line for each skipped project, and each violation as `[Kind] file:line` followed by its message; a violation found in only some target frameworks lists them after the location, as in `[Kind] file:line (net10.0)`
+- Prints the number of types and projects checked, a `Skipped` line for each skipped project, and each violation as `[Kind] file:line pack <name>` followed by its message and, when the rule has a `because`, a `Rule <id>: <because>` line; a violation found in only some target frameworks lists them after the location, as in `[Kind] file:line (net10.0)`
 - Exit codes: 0 no violations, 1 violations, 2 error. A cancelled run prints `Cancelled.`
 
 ```
 Checked 2 types in 2 projects
 Result: FAIL - 1 violation(s) found.
 
-  [DependencyNotAllowed] Shop.Domain/Order.cs:7
+  [DependencyNotAllowed] Shop.Domain/Order.cs:7 pack shop
     Layer 'Domain' is not allowed to depend on 'Infrastructure': Shop.Domain.Order references Shop.Infrastructure.SqlStore 3 times
+    Rule SHOP-LAYER-DOMAIN: The domain holds business rules only.
 ```
 
 File paths are shown relative to the directory of the solution or project.

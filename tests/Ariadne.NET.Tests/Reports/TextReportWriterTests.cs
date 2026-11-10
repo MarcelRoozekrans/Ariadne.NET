@@ -68,4 +68,23 @@ public class TextReportWriterTests
 
         text.Should().Contain("  [DependencyNotAllowed] Ns.A\n    msg\n").And.NotContain(" pack ");
     }
+
+    [Fact]
+    public void Write_ViolationWithBecause_ShowsRuleIdAndBecauseUnderTheMessage()
+    {
+        var violation = new ArchitectureViolation
+        {
+            RuleId = "SHOP-NO-INFRA",
+            Kind = ViolationKind.ForbiddenDependency,
+            SourceType = "Ns.A",
+            Message = "msg",
+            Pack = "shop-rules",
+            Because = "Storage can change without touching the domain.",
+        };
+
+        var text = Render(Report(violation), "/repo");
+
+        text.Should().EndWith(
+            "  [ForbiddenDependency] Ns.A pack shop-rules\n    msg\n    Rule SHOP-NO-INFRA: Storage can change without touching the domain.\n");
+    }
 }

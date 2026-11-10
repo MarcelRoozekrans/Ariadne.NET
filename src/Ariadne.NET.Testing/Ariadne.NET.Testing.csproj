@@ -18,6 +18,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.14" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!--
       The out-of-process build host, the BuildHost-netcore and BuildHost-net472 folders, ships as contentFiles of
       Microsoft.CodeAnalysis.Workspaces.MSBuild. They reach a consumer only through a direct dependency with
