@@ -24,6 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Shared\StrayFiles.cs" Link="Shared\StrayFiles.cs" />
     <Compile Include="..\Shared\UnixFactAttribute.cs" Link="Shared\UnixFactAttribute.cs" />
     <Compile Include="..\Shared\UnixNonRootFactAttribute.cs" Link="Shared\UnixNonRootFactAttribute.cs" />
   </ItemGroup>
