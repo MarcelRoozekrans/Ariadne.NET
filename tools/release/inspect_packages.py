@@ -4,13 +4,15 @@ Usage: python3 tools/release/inspect_packages.py <directory> <version>
 
 A NuGet version can be unlisted but never deleted, so ci.yml runs this in pack-validate on every push and again in
 publish-nuget just before the push. It fails when the directory does not hold exactly Ariadne.NET,
-Ariadne.NET.Abstractions and Ariadne.NET.Workspaces at the release version, each with its .snupkg symbol package;
-when a DLL under lib/ was built without -p:AriadneRelease=true, which Directory.Build.props versions <release>-local
-and which is compiled into the DLL; when Ariadne.NET.Abstractions depends on anything but ZeroAlloc.Results and
-ZeroAlloc.Validation; when Ariadne.NET depends on Ariadne.NET.Abstractions at a different version, or on any MSBuild
-package, since only Ariadne.NET.Workspaces may reference MSBuild; when Ariadne.NET.Workspaces depends on Ariadne.NET
-at a different version; or when a package lists an Ariadne dependency it does not declare. Other third-party
-dependencies are not checked. Prints one ::error:: line per problem, which GitHub Actions shows as an annotation.
+Ariadne.NET.Abstractions, Ariadne.NET.Workspaces and Ariadne.NET.Testing at the release version, each with its
+.snupkg symbol package; when a DLL under lib/ was built without -p:AriadneRelease=true, which Directory.Build.props
+versions <release>-local and which is compiled into the DLL; when Ariadne.NET.Abstractions depends on anything but
+ZeroAlloc.Results and ZeroAlloc.Validation; when Ariadne.NET depends on Ariadne.NET.Abstractions at a different
+version, or when Ariadne.NET or Ariadne.NET.Abstractions depends on any MSBuild package, since only
+Ariadne.NET.Workspaces and Ariadne.NET.Testing may reference MSBuild; when Ariadne.NET.Workspaces depends on
+Ariadne.NET at a different version; when Ariadne.NET.Testing depends on Ariadne.NET.Workspaces at a different
+version; or when a package lists an Ariadne dependency it does not declare. Other third-party dependencies are not
+checked. Prints one ::error:: line per problem, which GitHub Actions shows as an annotation.
 Standard library only.
 """
 import pathlib
@@ -24,15 +26,18 @@ PACKAGES: dict[str, tuple[str, ...]] = {
     "Ariadne.NET.Abstractions": (),
     # Abstractions reaches Workspaces only through Ariadne.NET, so it is not a direct dependency.
     "Ariadne.NET.Workspaces": ("Ariadne.NET",),
+    # Testing reaches the engine and Abstractions only through Workspaces.
+    "Ariadne.NET.Testing": ("Ariadne.NET.Workspaces",),
 }
 
 # Abstractions stays dependency-light so a rule-pack author can reference it without the engine: nothing else may creep in.
 ABSTRACTIONS = "Ariadne.NET.Abstractions"
 ABSTRACTIONS_DEPENDENCIES = {"ZeroAlloc.Results", "ZeroAlloc.Validation"}
 
-# Only Ariadne.NET.Workspaces may reference MSBuild: the engine must stay loadable without it, and the CLI and MCP
-# server must not carry Microsoft.Build assemblies. The name prefix Microsoft.Build covers Microsoft.Build.Locator too.
-ENGINE = "Ariadne.NET"
+# Only Ariadne.NET.Workspaces and Ariadne.NET.Testing may reference MSBuild: the engine must stay loadable without it,
+# and the CLI and MCP server must not carry Microsoft.Build assemblies. Testing loads solutions through Workspaces and
+# needs the MSBuild BuildHost folders. The name prefix Microsoft.Build covers Microsoft.Build.Locator too.
+MSBUILD_PACKAGES = {"Ariadne.NET.Workspaces", "Ariadne.NET.Testing"}
 MSBUILD_PREFIXES = ("Microsoft.Build", "Microsoft.CodeAnalysis.Workspaces.MSBuild")
 
 
@@ -122,10 +127,10 @@ def _package_problems(directory: pathlib.Path, package: str, version: str) -> li
         for dependency in sorted(found.keys() - ABSTRACTIONS_DEPENDENCIES):
             errors.append(f"{package} depends on {dependency}, which is not one of ZeroAlloc.Results and ZeroAlloc.Validation")
 
-    if package == ENGINE:
+    if package not in MSBUILD_PACKAGES:
         for dependency in sorted(found):
             if dependency.startswith(MSBUILD_PREFIXES):
-                errors.append(f"{package} depends on {dependency}; only Ariadne.NET.Workspaces may reference MSBuild")
+                errors.append(f"{package} depends on {dependency}; only Ariadne.NET.Workspaces and Ariadne.NET.Testing may reference MSBuild")
 
     # The SDK writes a project reference as the plain package version, so that is the one form accepted.
     for dependency in PACKAGES[package]:
@@ -147,7 +152,7 @@ def problems(directory: pathlib.Path, version: str) -> list[str]:
     if found != expected:
         missing = sorted(set(expected) - set(found))
         extra = sorted(set(found) - set(expected))
-        return [f"expected exactly the three release packages in {directory}; missing {missing}, unexpected {extra}"]
+        return [f"expected exactly the four release packages in {directory}; missing {missing}, unexpected {extra}"]
 
     errors: list[str] = []
     expected_symbols = {f"{package}.{version}.snupkg" for package in PACKAGES}

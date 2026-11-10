@@ -15,6 +15,7 @@ internal static class FixtureProjects
     [
         "clean/Shop.slnx",
         "broken/Shop.slnx",
+        "twopacks/Shop.slnx",
         "multitarget/Multi.csproj",
         "fourlayer/Shop.csproj",
         "compile-error/Broken.csproj",
@@ -105,8 +106,14 @@ internal static class FixtureProjects
             var folder = System.IO.Path.GetDirectoryName(targetPath)!;
             if (targetPath.EndsWith(".slnx", StringComparison.Ordinal))
             {
+                // Only folders that hold a project: a fixture may also carry an .architecture folder.
                 foreach (var project in Directory.EnumerateDirectories(folder))
                 {
+                    if (Directory.GetFiles(project, "*.csproj").Length == 0)
+                    {
+                        continue;
+                    }
+
                     yield return System.IO.Path.Combine(project, "obj", "project.assets.json");
                 }
             }

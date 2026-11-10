@@ -27,18 +27,13 @@ public class StopHookTests
     private static Result<ArchitectureReport, AriadneError> Report(params ArchitectureViolation[] violations) =>
         Result<ArchitectureReport, AriadneError>.Success(new ArchitectureReport { Violations = violations, Projects = [], TypesChecked = 1 });
 
-    private sealed class FakeRules(Result<RulePack, AriadneError> result) : IProjectRules
-    {
-        public Result<RulePack, AriadneError> Load(string root) => result;
-    }
-
-    private sealed class FakeValidator(Result<ArchitectureReport, AriadneError> result, Exception? throws = null) : ISolutionValidator
+    private sealed class FakeValidator(Result<ArchitectureReport, AriadneError> result, Exception? throws = null) : IPackSetValidator
     {
         public int Calls { get; private set; }
 
         public string? ValidatedPath { get; private set; }
 
-        public Task<Result<ArchitectureReport, AriadneError>> ValidateAsync(RulePack resolvedPack, string path, CancellationToken cancellationToken = default)
+        public Task<Result<ArchitectureReport, AriadneError>> ValidateAsync(string path, CancellationToken cancellationToken = default)
         {
             Calls++;
             ValidatedPath = path;
@@ -51,12 +46,7 @@ public class StopHookTests
         }
     }
 
-    private static Result<RulePack, AriadneError> Loaded() => Result<RulePack, AriadneError>.Success(Pack);
-
-    private static StopHook Create(FakeValidator validator) => Create(validator, Loaded());
-
-    private static StopHook Create(FakeValidator validator, Result<RulePack, AriadneError> rules) =>
-        new(new FakeRules(rules), validator, _ => null);
+    private static StopHook Create(FakeValidator validator) => new(validator, _ => null);
 
     private static Task<string?> RunAsync(StopHook hook, string root, string session, bool active = false, TextWriter? warn = null) =>
         hook.RunAsync(new HookInput { SessionId = session, Cwd = root, StopHookActive = active }, warn ?? TextWriter.Null, CancellationToken.None);
@@ -65,6 +55,7 @@ public class StopHookTests
     {
         var project = new TempProject();
         File.WriteAllText(Path.Combine(project.Root, "Shop.slnx"), "");
+        project.WriteRules();
         return project;
     }
 
@@ -207,9 +198,27 @@ public class StopHookTests
     }
 
     [Fact]
+    public async Task No_packs_and_no_solution_is_silent_and_keeps_the_list()
+    {
+        using var project = new TempProject();
+        using var session = new TestSession();
+        EditedFiles.Record(session.Id, "/x/A.cs");
+        var validator = new FakeValidator(Report(Violation()));
+        using var warn = new StringWriter();
+
+        var json = await RunAsync(Create(validator), project.Root, session.Id, warn: warn).ConfigureAwait(true);
+
+        json.Should().BeNull();
+        validator.Calls.Should().Be(0);
+        warn.ToString().Should().BeEmpty();
+        EditedFiles.Read(session.Id).Should().Equal("/x/A.cs");
+    }
+
+    [Fact]
     public async Task No_solution_warns_once_and_keeps_the_list()
     {
         using var project = new TempProject();
+        project.WriteRules();
         using var session = new TestSession();
         EditedFiles.Record(session.Id, "/x/A.cs");
         var validator = new FakeValidator(Report(Violation()));
@@ -242,34 +251,57 @@ public class StopHookTests
     }
 
     [Fact]
-    public async Task Invalid_rules_warn_once_and_keep_the_list()
+    public async Task Invalid_packs_warn_once_and_keep_the_list()
     {
         using var project = ProjectWithSolution();
         using var session = new TestSession();
         EditedFiles.Record(session.Id, "/x/A.cs");
-        var validator = new FakeValidator(Report(Violation()));
-        var rules = Result<RulePack, AriadneError>.Failure(new AriadneError(AriadneErrorCode.Invalid, "bad yaml"));
+        var validator = new FakeValidator(Result<ArchitectureReport, AriadneError>.Failure(new AriadneError(AriadneErrorCode.Invalid, "a-pack.yaml: bad yaml")));
         using var warn = new StringWriter();
 
-        var json = await RunAsync(Create(validator, rules), project.Root, session.Id, warn: warn).ConfigureAwait(true);
+        var json = await RunAsync(Create(validator), project.Root, session.Id, warn: warn).ConfigureAwait(true);
 
         json.Should().BeNull();
-        validator.Calls.Should().Be(0);
+        validator.Calls.Should().Be(1);
         warn.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries).Should().ContainSingle().Which.Should().Contain("bad yaml");
         EditedFiles.Read(session.Id).Should().Equal("/x/A.cs");
     }
 
     [Fact]
-    public async Task Missing_rules_are_silent_and_nothing_is_validated()
+    public async Task Missing_packs_are_silent_and_the_edits_are_kept()
     {
         using var project = ProjectWithSolution();
         using var session = new TestSession();
         EditedFiles.Record(session.Id, "/x/A.cs");
-        var validator = new FakeValidator(Report(Violation()));
-        var rules = Result<RulePack, AriadneError>.Failure(new AriadneError(AriadneErrorCode.NotFound, "none"));
+        var validator = new FakeValidator(Result<ArchitectureReport, AriadneError>.Failure(new AriadneError(AriadneErrorCode.NotFound, "none")));
         using var warn = new StringWriter();
 
-        var json = await RunAsync(Create(validator, rules), project.Root, session.Id, warn: warn).ConfigureAwait(true);
+        var json = await RunAsync(Create(validator), project.Root, session.Id, warn: warn).ConfigureAwait(true);
+
+        json.Should().BeNull();
+        validator.Calls.Should().Be(1);
+        warn.ToString().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("imports.yaml")]
+    [InlineData("imports.yml")]
+    public async Task A_folder_holding_only_the_sync_manifest_has_no_packs_and_is_silent(string manifest)
+    {
+        using var project = new TempProject();
+        project.WriteImports("shared", "1.0.0");
+        if (!string.Equals(manifest, "imports.yaml", StringComparison.Ordinal))
+        {
+            File.Move(Path.Combine(project.Root, ".architecture", "imports.yaml"), Path.Combine(project.Root, ".architecture", manifest));
+        }
+
+        File.WriteAllText(Path.Combine(project.Root, "Shop.slnx"), "<Solution />");
+        using var session = new TestSession();
+        EditedFiles.Record(session.Id, "/x/A.cs");
+        var validator = new FakeValidator(Report(Violation()));
+        using var warn = new StringWriter();
+
+        var json = await RunAsync(Create(validator), project.Root, session.Id, warn: warn).ConfigureAwait(true);
 
         json.Should().BeNull();
         validator.Calls.Should().Be(0);
@@ -362,17 +394,14 @@ public class StopHookTests
         FixtureProjects.EnsureRestored();
         var loader = new YamlRulePackLoader();
         var resolver = new RulePackResolver(new BuiltinPackRegistry(loader), loader, new RulePackMerger());
-        var rulesFile = FixtureProjects.Path("daedalus", "daedalus.rules.yaml");
-        var pack = resolver.Resolve(loader.LoadFromFile(rulesFile).Value, Path.GetDirectoryName(rulesFile)!);
-        pack.IsSuccess.Should().BeTrue(pack.IsFailure ? pack.Error.Message : null);
-        var hook = new StopHook(new FakeRules(pack), new SolutionValidator(new SolutionLoader(), new ArchitectureValidator()), _ => null);
+        var hook = new StopHook(new PackSetValidator(new SolutionLoader(), new ArchitectureValidator(), loader, resolver), _ => null);
         using var session = new TestSession();
         EditedFiles.Record(session.Id, "/x/A.cs");
 
-        // The hook walks up to the nearest .architecture/rules.yaml, which for the fixture folder is the repository's own.
-        // So the project root is a temp folder with a rules file and a solution that points at the fixture projects.
+        // The hook walks up to the nearest .architecture folder, which for the fixture folder is the repository's own.
+        // So the project root is a temp folder with the fixture's pack and a solution that points at the fixture projects.
         using var project = new TempProject();
-        project.WriteRules();
+        File.Copy(FixtureProjects.Path("daedalus", "daedalus.rules.yaml"), Path.Combine(project.Root, ".architecture", "daedalus.yaml"));
         var broken = FixtureProjects.Path("daedalus", "broken");
         var entries = Directory.GetFiles(broken, "*.csproj", SearchOption.AllDirectories)
             .Select(f => $"  <Project Path=\"{Path.GetRelativePath(project.Root, f).Replace('\\', '/')}\" />");
@@ -459,5 +488,27 @@ public class StopHookTests
         json.Should().BeNull();
         validator.Calls.Should().Be(0);
         warn.ToString().Should().Contain("could not clear the edited files");
+    }
+
+    [Fact]
+    public async Task On_twopacks_the_feedback_names_the_broken_pack()
+    {
+        FixtureProjects.EnsureRestored();
+        var loader = new YamlRulePackLoader();
+        var resolver = new RulePackResolver(new BuiltinPackRegistry(loader), loader, new RulePackMerger());
+        var twopacks = FixtureProjects.Path("twopacks");
+        var hook = new StopHook(new PackSetValidator(new SolutionLoader(), new ArchitectureValidator(), loader, resolver), name => string.Equals(name, "CLAUDE_PROJECT_DIR", StringComparison.Ordinal) ? twopacks : null);
+        using var session = new TestSession();
+        EditedFiles.Record(session.Id, "/x/A.cs");
+
+        // The project root is found through rules.yaml, which twopacks lacks, so the project dir comes from the environment.
+        using var outside = new TempProject();
+        using var warn = new StringWriter();
+        var json = await RunAsync(hook, outside.Root, session.Id, warn: warn).ConfigureAwait(true);
+
+        json.Should().NotBeNull(warn.ToString());
+        using var doc = JsonDocument.Parse(json!);
+        var text = doc.RootElement.GetProperty("hookSpecificOutput").GetProperty("additionalContext").GetString()!;
+        text.Should().Contain("broken-pack").And.Contain("SHOP-DOMAIN-NO-INFRASTRUCTURE").And.NotContain("clean-pack");
     }
 }

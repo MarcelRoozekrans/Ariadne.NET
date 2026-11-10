@@ -120,7 +120,7 @@ jobs:
             exit "$status"
           fi
 
-  # Packs the three release packages exactly as publish-nuget does, inspects them, and rehearses the push against a local
+  # Packs the four release packages exactly as publish-nuget does, inspects them, and rehearses the push against a local
   # folder feed, on every push and pull request, so the release path is exercised long before release day. A folder
   # feed silently drops .snupkg files, so symbol packages are checked by the inspection, not by the push.
   pack-validate:
@@ -178,7 +178,8 @@ jobs:
       # Builds and runs the getting-started sample, tools/release/consumer/Program.cs, against the packages in the local
       # feed. nuget.config maps Ariadne.NET* to the local feed only, so the restore cannot fall back to a published
       # package. The sample references Ariadne.NET.Workspaces, which brings Ariadne.NET and then
-      # Ariadne.NET.Abstractions in as dependencies: this proves all three packages restore from the feed.
+      # Ariadne.NET.Abstractions in as dependencies: this proves those three packages restore from the feed.
+      # The next step restores Ariadne.NET.Testing the same way.
       # Microsoft.Extensions.DependencyInjection comes from nuget.org: Ariadne.NET depends only on the DI abstractions,
       # and the sample needs a container to resolve the services from. Microsoft.Build.Framework comes from nuget.org
       # too: Workspaces keeps its own copy out of the output because MSBuildLocator loads the SDK's, and that exclusion
@@ -204,8 +205,8 @@ jobs:
           dotnet add "$app" package Microsoft.Extensions.DependencyInjection --version 10.0.14 --no-restore
           # dotnet add package cannot set ExcludeAssets, so add the reference and then rewrite it in place. The grep
           # fails the step if the rewrite did not match, rather than letting the build fail later with MSBL001.
-          dotnet add "$app" package Microsoft.Build.Framework --version 17.11.48 --no-restore
-          sed -i 's|<PackageReference Include="Microsoft.Build.Framework" Version="17.11.48" />|<PackageReference Include="Microsoft.Build.Framework" Version="17.11.48" ExcludeAssets="runtime" />|' "$app/consumer.csproj"
+          dotnet add "$app" package Microsoft.Build.Framework --version 17.14.28 --no-restore
+          sed -i 's|<PackageReference Include="Microsoft.Build.Framework" Version="17.14.28" />|<PackageReference Include="Microsoft.Build.Framework" Version="17.14.28" ExcludeAssets="runtime" />|' "$app/consumer.csproj"
           grep -q 'Include="Microsoft.Build.Framework".*ExcludeAssets="runtime"' "$app/consumer.csproj"
           cat > "$app/nuget.config" <<EOF
           <?xml version="1.0" encoding="utf-8"?>
@@ -249,6 +250,84 @@ jobs:
           fi
           if ! grep -q "DependencyNotAllowed" <<< "$output"; then
             echo "::error::Exit 1 without a DependencyNotAllowed violation in the output; the run failed for another reason."
+            exit 1
+          fi
+
+      # Builds and runs tools/release/testing-consumer/Program.cs, a console app that references only
+      # Ariadne.NET.Testing from the local feed and has no Microsoft.Build.Framework reference: the package must supply
+      # the MSBuild fix itself through buildTransitive, or the build fails with MSBL001. The program checks a fixture
+      # project written under RUNNER_TEMP against the pack in the fixture's own .architecture folder and must see the
+      # one violation the pack forbids, which also proves the BuildHost folders reached the output. The step then fails
+      # when any Microsoft.Build assembly other than Microsoft.Build.Locator.dll is in the output folder.
+      - name: Restore, build and run a consumer of Ariadne.NET.Testing from the local feed
+        shell: bash
+        run: |
+          app="$RUNNER_TEMP/testing-consumer"
+          dotnet new console -o "$app" --framework net10.0
+          cp tools/release/testing-consumer/Program.cs "$app/Program.cs"
+          dotnet add "$app" package Ariadne.NET.Testing --version "$PACKAGE_VERSION" --no-restore
+          cat > "$app/nuget.config" <<EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="local" value="$RUNNER_TEMP/local-feed" />
+              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+            </packageSources>
+            <packageSourceMapping>
+              <packageSource key="local"><package pattern="Ariadne.NET*" /></packageSource>
+              <packageSource key="nuget.org"><package pattern="*" /></packageSource>
+            </packageSourceMapping>
+          </configuration>
+          EOF
+          if grep -q "Microsoft.Build.Framework" "$app/testing-consumer.csproj"; then
+            echo "::error::The consumer must not reference Microsoft.Build.Framework."
+            exit 1
+          fi
+          dotnet build "$app" -c Release
+          fixture="$RUNNER_TEMP/testing-fixture"
+          mkdir -p "$fixture/.architecture" "$fixture/Domain" "$fixture/Infrastructure"
+          cat > "$fixture/Fixture.csproj" <<EOF
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net10.0</TargetFramework>
+              <Nullable>enable</Nullable>
+            </PropertyGroup>
+          </Project>
+          EOF
+          cat > "$fixture/.architecture/fixture.yaml" <<EOF
+          schema: 2
+          name: fixture
+          version: "1.0.0"
+          author: ci
+          layers:
+            - name: Domain
+              id: FIXTURE-LAYER-DOMAIN
+              because: The domain may use the infrastructure in this layer list.
+              namespaces: ["Shop.Domain"]
+              allowedDependencies: [Infrastructure]
+            - name: Infrastructure
+              id: FIXTURE-LAYER-INFRASTRUCTURE
+              because: Infrastructure stands alone.
+              namespaces: ["Shop.Infrastructure"]
+              allowedDependencies: []
+          rules:
+            - id: FIXTURE-DOMAIN-NO-INFRASTRUCTURE
+              because: The domain must not depend on infrastructure.
+              forbid:
+                from:
+                  layers: [Domain]
+                to:
+                  layers: [Infrastructure]
+          EOF
+          printf 'namespace Shop.Domain;\npublic class Order { public Shop.Infrastructure.Store? Store { get; init; } }\n' > "$fixture/Domain/Order.cs"
+          printf 'namespace Shop.Infrastructure;\npublic class Store { }\n' > "$fixture/Infrastructure/Store.cs"
+          dotnet restore "$fixture"
+          dotnet run --project "$app" --no-build -c Release -- "$fixture"
+          extra=$(find "$app/bin/Release" -name 'Microsoft.Build*.dll' ! -name 'Microsoft.Build.Locator.dll')
+          if [ -n "$extra" ]; then
+            echo "::error::Microsoft.Build assemblies other than Microsoft.Build.Locator.dll are in the consumer output:"
+            echo "$extra"
             exit 1
           fi
 

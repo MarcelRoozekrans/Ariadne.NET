@@ -45,4 +45,20 @@ public sealed class ValidateSourceResultTests : IAsyncLifetime
         var text = McpClientHarness.TextOf(result);
         text.Should().Contain("\"kind\":\"VacuousLayer\"", text);
     }
+
+    [Fact]
+    public async Task ValidateSource_WithoutTemplate_ChecksEveryPackAndNamesThePack()
+    {
+        FixtureProjects.EnsureRestored();
+        var arguments = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["path"] = FixtureProjects.Path("twopacks", "Shop.slnx"),
+        };
+
+        var result = await _harness.CallToolAsync("validate_source", arguments);
+
+        result.IsError.Should().NotBe(true);
+        var text = McpClientHarness.TextOf(result);
+        text.Should().Contain("broken-pack").And.Contain("SHOP-DOMAIN-NO-INFRASTRUCTURE");
+    }
 }

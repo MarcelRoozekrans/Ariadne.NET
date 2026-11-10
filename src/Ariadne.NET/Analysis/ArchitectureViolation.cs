@@ -15,6 +15,9 @@ public sealed record ArchitectureViolation
     /// <summary>A human-readable description of the violation.</summary>
     public required string Message { get; init; }
 
+    /// <summary>The name of the rule pack the broken rule came from, empty when unknown.</summary>
+    public string Pack { get; init; } = "";
+
     /// <summary>The rationale the rule gives, empty when it has none.</summary>
     public string Because { get; init; } = "";
 

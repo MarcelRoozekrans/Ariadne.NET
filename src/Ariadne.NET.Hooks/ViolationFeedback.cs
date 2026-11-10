@@ -62,6 +62,11 @@ public static class ViolationFeedback
             entry.Append("\n  Rule ").Append(One(violation.RuleId)).Append(": ").Append(One(violation.Because));
         }
 
+        if (violation.Pack.Length > 0)
+        {
+            entry.Append("\n  Pack: ").Append(One(violation.Pack));
+        }
+
         return entry.ToString();
     }
 }

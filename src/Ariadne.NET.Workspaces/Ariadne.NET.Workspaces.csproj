@@ -11,6 +11,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Ariadne.NET.Workspaces.Tests" />
+    <InternalsVisibleTo Include="Ariadne.NET.Mcp.Tests" />
+    <InternalsVisibleTo Include="Ariadne.NET.Hooks.Tests" />
   </ItemGroup>
 
   <ItemGroup>

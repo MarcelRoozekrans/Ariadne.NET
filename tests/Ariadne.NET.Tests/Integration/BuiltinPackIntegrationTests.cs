@@ -235,7 +235,7 @@ public class BuiltinPackIntegrationTests
             .Should().Equal(
                 ("Core", "Ariadne.NET.Abstractions,Ariadne.NET", ""),
                 ("Workspaces", "Ariadne.NET.Workspaces", "Core"),
-                ("Host", "Ariadne.NET.Cli,Ariadne.NET.Hooks,Ariadne.NET.Mcp,Ariadne.NET.Mcp.Http", "Core,Workspaces"),
+                ("Host", "Ariadne.NET.Cli,Ariadne.NET.Hooks,Ariadne.NET.Mcp,Ariadne.NET.Mcp.Http,Ariadne.NET.Testing", "Core,Workspaces"),
                 ("Tests", "*.Tests,Ariadne.NET.AotSmoke", "Core,Workspaces,Host"));
 
         var noHosts = loaded.Value.Rules.First(r => string.Equals(r.Id, "ARIADNE-CORE-NO-HOSTS", StringComparison.Ordinal));
