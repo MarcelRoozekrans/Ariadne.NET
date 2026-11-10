@@ -81,8 +81,10 @@ public static class ArchitectureCheck
     /// A report does not record where the solution was, so file paths in it are made relative to the repository root found from
     /// <see cref="AppContext.BaseDirectory"/>, the output folder of the test project: the nearest ancestor with a <c>.git</c>
     /// entry, else that folder itself. <see cref="AssertValid(string?, string, ReportFormat)"/> knows the solution it checked and
-    /// uses the repository root of that solution instead.
+    /// uses the repository root of that solution instead. Use that overload when the solution is outside the repository of the
+    /// test project.
     /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="format"/> is not a defined <see cref="ReportFormat"/>.</exception>
     public static void WriteReport(ArchitectureReport report, ReportFormat format, string path) =>
         WriteReport(report, format, path, ReportRoot.Find(AppContext.BaseDirectory));
 
@@ -93,13 +95,16 @@ public static class ArchitectureCheck
 
         var context = new ReportContext(root, ToolVersion());
         using var buffer = new MemoryStream();
-        if (format == ReportFormat.Json)
+        switch (format)
         {
-            JsonReportWriter.Write(buffer, report, context);
-        }
-        else
-        {
-            SarifReportWriter.Write(buffer, report, context);
+            case ReportFormat.Json:
+                JsonReportWriter.Write(buffer, report, context);
+                break;
+            case ReportFormat.Sarif:
+                SarifReportWriter.Write(buffer, report, context);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(format), format, "The report format is not defined.");
         }
 
         var full = Path.GetFullPath(path);

@@ -207,6 +207,29 @@ public sealed class ArchitectureCheckTests : IDisposable
     }
 
     [Fact]
+    public void AssertValid_WithReportPath_CheckCannotRun_WritesNoFile()
+    {
+        var path = Path.Combine(_temp, "never.sarif");
+
+        var act = () => ArchitectureCheck.AssertValid(Path.Combine(_temp, "Missing.slnx"), path, ReportFormat.Sarif);
+
+        act.Should().Throw<ArchitectureCheckException>();
+        File.Exists(path).Should().BeFalse();
+    }
+
+    [Fact]
+    public void WriteReport_UndefinedFormat_Throws()
+    {
+        var report = ArchitectureCheck.Run(FixtureProjects.Path("twopacks", "Shop.slnx"));
+        var path = Path.Combine(_temp, "undefined.out");
+
+        var act = () => ArchitectureCheck.WriteReport(report, (ReportFormat)99, path);
+
+        act.Should().Throw<ArgumentOutOfRangeException>();
+        File.Exists(path).Should().BeFalse();
+    }
+
+    [Fact]
     public void AssertValid_WithReportPath_CleanSolution_WritesTheFileAndPasses()
     {
         var path = Path.Combine(_temp, "clean.sarif");
