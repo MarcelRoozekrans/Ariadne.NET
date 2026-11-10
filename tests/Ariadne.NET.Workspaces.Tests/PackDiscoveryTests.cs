@@ -25,6 +25,33 @@ public sealed class PackDiscoveryTests : IDisposable
         result.Value.Files.Should().OnlyContain(f => Path.IsPathRooted(f));
     }
 
+    [Theory]
+    [InlineData("imports.yaml")]
+    [InlineData("imports.yml")]
+    [InlineData("Imports.YAML")]
+    public void SyncManifest_IsNotAPack(string manifest)
+    {
+        var solution = Touch("Shop.slnx");
+        Touch(".architecture/" + manifest);
+        Touch(".architecture/rules.yaml");
+
+        var result = PackDiscovery.Find(solution);
+
+        result.Value.Files.Select(Path.GetFileName).Should().Equal("rules.yaml");
+    }
+
+    [Fact]
+    public void FolderHoldingOnlyTheSyncManifest_IsNotFound()
+    {
+        var solution = Touch("Shop.slnx");
+        Touch(".architecture/imports.yaml");
+
+        var result = PackDiscovery.Find(solution);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.NotFound);
+    }
+
     [Fact]
     public void YmlIsAccepted_AndOtherExtensionsAreIgnored()
     {

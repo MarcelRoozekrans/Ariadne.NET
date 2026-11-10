@@ -56,6 +56,13 @@ internal static class PackDiscovery
 
     private static bool IsPackFile(string file)
     {
+        // imports.yaml is the 'ariadne sync' manifest, not a rule pack.
+        var name = Path.GetFileNameWithoutExtension(file);
+        if (string.Equals(name, "imports", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
         var extension = Path.GetExtension(file);
         return string.Equals(extension, ".yaml", StringComparison.OrdinalIgnoreCase)
             || string.Equals(extension, ".yml", StringComparison.OrdinalIgnoreCase);
