@@ -331,6 +331,88 @@ jobs:
             exit 1
           fi
 
+      # Installs the ariadne dotnet tool from the packed local feed into a temp folder and runs it, which proves the
+      # packed tool starts, loads a solution with MSBuild and reports. The tool is installed with --tool-path, never
+      # globally. It runs four checks: --version prints exactly the release version; validate on tests/fixtures/twopacks
+      # with --format json exits exactly 1 (a broken pack in a pack set), prints JSON with schema 1 on stdout and names
+      # the broken pack; validate on a clean copy of tests/fixtures/clean exits 0; and the session-start hook exits 0 on
+      # an empty JSON object. The clean fixture has no .architecture folder and ariadne would find this repository's own
+      # pack above it, so the step copies the two projects and the solution to RUNNER_TEMP and writes a pack there that
+      # the Shop solution satisfies. Fixtures are restored first with a normal dotnet restore, because ariadne never
+      # restores. Every failed check is reported and the step fails at the end.
+      - name: Install the tool from the local feed and run it
+        shell: bash
+        run: |
+          dotnet restore tests/fixtures/twopacks/Shop.slnx
+          clean="$RUNNER_TEMP/clean-fixture"
+          mkdir -p "$clean/.architecture"
+          cp -r tests/fixtures/clean/Shop.Domain tests/fixtures/clean/Shop.WebApi tests/fixtures/clean/Shop.slnx "$clean/"
+          rm -rf "$clean"/Shop.*/bin "$clean"/Shop.*/obj
+          cat > "$clean/.architecture/shop.yaml" <<EOF
+          schema: 2
+          name: shop
+          version: "1.0.0"
+          author: ci
+
+          layers:
+            - name: Domain
+              id: SHOP-LAYER-DOMAIN
+              because: The domain holds business rules only.
+              assemblies: ["Shop.Domain"]
+              allowedDependencies: []
+            - name: WebApi
+              id: SHOP-LAYER-WEBAPI
+              because: The web API serves the domain.
+              assemblies: ["Shop.WebApi"]
+              allowedDependencies: [Domain]
+          EOF
+          dotnet restore "$clean/Shop.slnx"
+          dotnet tool install Ariadne.NET.Cli --tool-path "$RUNNER_TEMP/tool" --add-source "$RUNNER_TEMP/local-feed" --version "$PACKAGE_VERSION"
+          ariadne="$RUNNER_TEMP/tool/ariadne"
+          failed=0
+
+          set +e
+          version=$("$ariadne" --version)
+          code=$?
+          if [ "$code" -ne 0 ] || [ "$version" != "$PACKAGE_VERSION" ]; then
+            echo "::error::ariadne --version gave '$version' with exit $code; expected exactly '$PACKAGE_VERSION' with exit 0."
+            failed=1
+          fi
+
+          json=$("$ariadne" validate tests/fixtures/twopacks/Shop.slnx --format json)
+          code=$?
+          echo "$json"
+          if [ "$code" -ne 1 ]; then
+            echo "::error::validate on the twopacks fixture exited $code; expected exactly 1, one violation from the broken pack."
+            failed=1
+          fi
+          if ! python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["schema"]==1' <<< "$json"; then
+            echo "::error::The twopacks output is not JSON with schema 1."
+            failed=1
+          fi
+          if ! grep -q "broken-pack" <<< "$json"; then
+            echo "::error::The twopacks output does not name broken-pack."
+            failed=1
+          fi
+
+          output=$("$ariadne" validate "$clean/Shop.slnx")
+          code=$?
+          echo "$output"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::validate on the clean copy exited $code; expected 0."
+            failed=1
+          fi
+
+          echo '{}' | "$ariadne" hook session-start
+          code=$?
+          if [ "$code" -ne 0 ]; then
+            echo "::error::ariadne hook session-start exited $code; a hook must exit 0."
+            failed=1
+          fi
+          set -e
+
+          exit "$failed"
+
   # Lints the commit messages a pull request adds against .commitlintrc.yml. release-please builds the changelog and the
   # next version from these messages, and silently drops a commit it cannot parse, so a bad message is caught here,
   # before the merge. Pull-request events only: a push to main is a merge of commits this job already linted.
