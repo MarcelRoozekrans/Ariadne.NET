@@ -147,6 +147,40 @@ public class SarifReportWriterTests
     }
 
     [Fact]
+    public void Write_RootWithHashAndPercent_EscapesThemInTheBaseUri()
+    {
+        var root = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "a#b%c d"));
+        using var doc = JsonDocument.Parse(Render(Empty(), root));
+
+        var uri = doc.RootElement.GetProperty("runs")[0].GetProperty("originalUriBaseIds").GetProperty("%SRCROOT%").GetProperty("uri").GetString()!;
+
+        uri.Should().EndWith("/a%23b%25c%20d/");
+    }
+
+    [Fact]
+    public void Write_PathOutsideRootWithHash_EscapesTheHash()
+    {
+        var outside = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "elsewhere#1", "X 100%.cs"));
+        var report = new ArchitectureReport { Violations = [Violation("r", "p", outside)], Projects = [], TypesChecked = 1 };
+        using var doc = JsonDocument.Parse(Render(report));
+
+        var uri = doc.RootElement.GetProperty("runs")[0].GetProperty("results")[0].GetProperty("locations")[0]
+            .GetProperty("physicalLocation").GetProperty("artifactLocation").GetProperty("uri").GetString()!;
+
+        uri.Should().StartWith("file:///").And.EndWith("/elsewhere%231/X%20100%25.cs");
+    }
+
+    [Fact]
+    public void Write_ViolationWithoutLocation_LeavesTheKindOffTheLogicalLocation()
+    {
+        using var doc = JsonDocument.Parse(Render(TwoPacks()));
+
+        var logical = doc.RootElement.GetProperty("runs")[0].GetProperty("results")[3].GetProperty("locations")[0].GetProperty("logicalLocations")[0];
+
+        logical.TryGetProperty("kind", out _).Should().BeFalse();
+    }
+
+    [Fact]
     public void Write_PathOutsideRoot_UsesAbsoluteFileUriWithoutBaseId()
     {
         var outside = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "elsewhere", "X.cs"));

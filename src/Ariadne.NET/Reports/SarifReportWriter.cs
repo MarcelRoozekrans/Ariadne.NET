@@ -72,12 +72,14 @@ public static class SarifReportWriter
     {
         if (violation.Location is not { } location)
         {
-            return new SarifLocation(null, [new SarifLogicalLocation(violation.SourceType, "type")]);
+            // A type for the kinds whose source is a type; a rule id, a layer name or a project name is not one.
+            var kind = violation.Kind is ViolationKind.VacuousRule or ViolationKind.VacuousLayer or ViolationKind.BannedPackage ? null : "type";
+            return new SarifLocation(null, [new SarifLogicalLocation(violation.SourceType, kind)]);
         }
 
         var uri = ReportPaths.TryRelative(root, location.FilePath, out var relative)
             ? new SarifArtifactLocation(string.Join('/', relative.Split('/').Select(Uri.EscapeDataString)), SrcRoot)
-            : new SarifArtifactLocation(new Uri(Path.GetFullPath(location.FilePath)).AbsoluteUri, null);
+            : new SarifArtifactLocation(ReportPaths.ToFileUri(Path.GetFullPath(location.FilePath)), null);
         return new SarifLocation(new SarifPhysicalLocation(uri, new SarifRegion(location.Line, location.Column)), null);
     }
 
@@ -89,6 +91,6 @@ public static class SarifReportWriter
             full += Path.DirectorySeparatorChar;
         }
 
-        return new Uri(full).AbsoluteUri;
+        return ReportPaths.ToFileUri(full);
     }
 }

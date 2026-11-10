@@ -8,6 +8,8 @@ internal static class SarifSchema
 {
     // The SARIF schema declares draft-04, which JsonSchema.Net does not ship. The schema uses no draft-04
     // only keywords, so it is evaluated as draft-07 registered under the draft-04 id: no network fetch.
+    // JsonSchema.Net does not assert the "format" keyword by default, so uri and date-time formats are not checked.
+    // The null! second argument of Dialect.With is the optional format registry; null keeps the one of Draft07.
     private static readonly Lazy<JsonSchema> Schema = new(() =>
     {
         var dialects = new DialectRegistry();
@@ -32,6 +34,5 @@ internal static class SarifSchema
             .SelectMany(static d => d.Errors!.Select(e => $"{d.InstanceLocation}: {e.Value}"))
             .ToList();
         return errors.Count > 0 ? errors : ["The document does not match the SARIF 2.1.0 schema."];
-
     }
 }
