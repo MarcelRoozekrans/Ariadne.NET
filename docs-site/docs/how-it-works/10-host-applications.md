@@ -14,7 +14,7 @@ Built with **System.CommandLine 3.0** (uses `Command`, `RootCommand`, `Option<T>
 
 ### `init` — Initialize architecture rules
 
-> Until the `ariadne` dotnet tool ships, run these commands as `dotnet run --project src/Ariadne.NET.Cli -- <command>`.
+> These commands assume the installed `ariadne` tool; see [Install the tool](../getting-started.md#install-the-tool). From a clone of the repository, run them as `dotnet run --project src/Ariadne.NET.Cli -- <command>`.
 
 ```bash
 ariadne init --template clean-architecture

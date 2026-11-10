@@ -431,7 +431,7 @@ The table below lists what is registered:
 | `ariadne validate [path]` | Validate a solution or project against every pack in the `.architecture` folder; `path` defaults to `.` |
 | `ariadne sync` | Sync rule packs from git repositories defined in imports.yaml |
 
-Exit codes: `0` success, `1` violations found, `2` error (missing files or directories, a solution that does not load, failed generation or sync). A usage error, such as an unknown `--format`, currently exits 1 as well (issue #70). CI pipelines can fail on any non-zero code, or treat `1` and `2` differently.
+Exit codes: `0` success, `1` violations found, `2` error (missing files or directories, a solution that does not load, failed generation or sync). A usage error, such as an unknown `--format`, currently exits 1 as well ([issue #70](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/70)). CI pipelines can fail on any non-zero code, or treat `1` and `2` differently.
 
 ## Building
 

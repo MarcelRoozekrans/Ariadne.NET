@@ -142,7 +142,7 @@ Each violation has a rule id: a layer id, a rule id, or `ROLE-<Name>`, `CODE-001
 
 Ariadne never restores, so run `dotnet restore` before you validate. The CLI exits 0 when clean, 1 on violations and 2 on an error.
 
-> Until the `ariadne` dotnet tool ships, run these commands as `dotnet run --project src/Ariadne.NET.Cli -- <command>`.
+> These commands assume the installed `ariadne` tool; see [Install the tool](getting-started.md#install-the-tool). From a clone of the repository, run them as `dotnet run --project src/Ariadne.NET.Cli -- <command>`.
 
 ```bash
 # CLI
