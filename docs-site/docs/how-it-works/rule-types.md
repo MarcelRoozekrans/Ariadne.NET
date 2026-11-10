@@ -195,12 +195,12 @@ rules:
     because: Key handling and hashing live in one audited place.
     allowOnly:
       from: { layers: [Infrastructure] }
-      to: { namespaces: ["System.Security.Cryptography"] }
+      to: { namespaces: ["System.Security.Cryptography.**"] }
   - id: SHOP-HTTP-ONLY-IN-INFRASTRUCTURE
     because: Outbound calls go through gateways, so timeouts and retries are set once.
     allowOnly:
       from: { layers: [Infrastructure] }
-      to: { namespaces: ["System.Net.Http"] }
+      to: { namespaces: ["System.Net.Http.**"] }
 ```
 
-The SQL rule names the members that run a command with `members`; the other two name a whole namespace. A rule that selects nothing fails with `VacuousRule`, so a solution that never touches cryptography sets `allowEmpty: true` on that rule.
+The SQL rule names the members that run a command with `members`; the other two name a whole namespace. They end in `.**` because a namespace pattern without it matches that namespace only, so `System.Net.Http` alone would let `System.Net.Http.Headers` escape the rule. A rule that selects nothing fails with `VacuousRule`, so a solution that never touches cryptography sets `allowEmpty: true` on that rule.

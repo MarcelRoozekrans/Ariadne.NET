@@ -54,7 +54,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 - [x] Every rule type in the design's Daedalus appendix is expressible in a v2 pack and enforced, shown by a fixture solution with a clean and a broken variant per rule type
 - [x] Dependency checks use the semantic type graph; `SourceValidator` is deleted and CLI `validate` and MCP `validate_source` use the new engine
 - [x] `Ariadne.NET.Workspaces` loads solutions through MSBuildWorkspace and is published beside the other two packages
-- [x] A rule or layer selector that matches no type fails, unless the rule sets `allowEmpty: true`
+- [x] A rule or layer selector that matches no type fails, unless the rule sets `allowEmpty: true` (subject selectors only: `from` and `for`)
 - [x] Packs can forbid namespaces, types and members per layer for security reasons, such as SQL, crypto or HTTP access outside Infrastructure
 - [x] The v2 loader rejects unknown keys and rules without a `because`
 - [x] Built-in packs and `.architecture/rules.yaml` are migrated to schema v2 and a JSON Schema is published

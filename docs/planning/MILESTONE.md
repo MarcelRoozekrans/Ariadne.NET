@@ -15,7 +15,7 @@ A v2 pack can state every rule in the roadmap design's Daedalus appendix, and th
 - [x] Every rule type in the roadmap design's Daedalus appendix is expressible in a v2 pack and enforced: the fixture solution holds one rule of each type, the clean variant passes and the broken variant fails with that rule's id and `because`
 - [x] Dependency checks run on the semantic type graph of a `Compilation`; `SourceValidator` is deleted and CLI `validate` and MCP `validate_source` use the new engine; issue #1 is closed
 - [x] `Ariadne.NET.Workspaces` loads a `.sln`, `.slnx` or `.csproj` through MSBuildWorkspace and is packed and published by CI beside the other two packages
-- [x] A rule or layer selector that matches no type fails, unless the rule sets `allowEmpty: true`
+- [x] A rule or layer selector that matches no type fails, unless the rule sets `allowEmpty: true` (subject selectors only: `from` and `for`)
 - [x] A pack can forbid namespaces, types and members per layer, and the pack reference shows SQL, crypto and HTTP access confined to Infrastructure as a worked example
 - [x] The v2 loader rejects unknown keys and rules without a `because`
 - [x] All 10 built-in packs and `.architecture/rules.yaml` are on schema v2, and this repo passes its own pack in CI
