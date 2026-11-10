@@ -129,7 +129,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Goal:** One call in a test checks all packs against the solution.
 **Surface:** Backend
 **HelpWanted:** no
-**Plan:** _to be written_
+**Plan:** `docs/superpowers/plans/2026-11-10-phase-3.1-ariadne-net-testing.md`
 
 ### Phase 3.2: JSON and SARIF reports [status: pending]
 **Note:** Use ZeroAlloc.Serialisation for the JSON and SARIF writers.
