@@ -6,6 +6,7 @@
 [![Ariadne.NET.Abstractions](https://img.shields.io/nuget/v/Ariadne.NET.Abstractions?label=Ariadne.NET.Abstractions)](https://www.nuget.org/packages/Ariadne.NET.Abstractions)
 [![Ariadne.NET.Workspaces](https://img.shields.io/nuget/v/Ariadne.NET.Workspaces?label=Ariadne.NET.Workspaces)](https://www.nuget.org/packages/Ariadne.NET.Workspaces)
 [![Ariadne.NET.Testing](https://img.shields.io/nuget/v/Ariadne.NET.Testing?label=Ariadne.NET.Testing)](https://www.nuget.org/packages/Ariadne.NET.Testing)
+[![Ariadne.NET.Cli](https://img.shields.io/nuget/v/Ariadne.NET.Cli?label=Ariadne.NET.Cli)](https://www.nuget.org/packages/Ariadne.NET.Cli)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://marcelroozekrans.github.io/Ariadne.NET/)
 
 A .NET library that enforces structural rules on AI-generated code. You describe an architecture in a declarative YAML rule pack: layers, allowed dependencies, component roles and naming. Ariadne.NET resolves the pack, generates correctly placed C# components, and checks existing solutions against it.
@@ -85,7 +86,7 @@ return report.IsValid ? 0 : 1;
 
 ## CLI and MCP server
 
-The CLI and the MCP server are not packaged yet. Run them from a clone of this repository.
+The CLI is a .NET tool. Install it with `dotnet tool install --global Ariadne.NET.Cli`, which gives you the `ariadne` command, and check the install with `ariadne --version`. It needs the .NET 10 SDK, because it locates MSBuild at run time. The MCP server is not packaged yet. Run it from a clone of this repository. The examples below use `dotnet run --project src/Ariadne.NET.Cli --` from a clone; with the tool installed, write `ariadne` instead.
 
 ### CLI
 
@@ -430,7 +431,7 @@ The table below lists what is registered:
 | `ariadne validate [path]` | Validate a solution or project against every pack in the `.architecture` folder; `path` defaults to `.` |
 | `ariadne sync` | Sync rule packs from git repositories defined in imports.yaml |
 
-Exit codes: `0` success, `1` violations found, `2` error (missing files or directories, a solution that does not load, failed generation or sync). CI pipelines can fail on any non-zero code, or treat `1` and `2` differently.
+Exit codes: `0` success, `1` violations found, `2` error (missing files or directories, a solution that does not load, failed generation or sync). A usage error, such as an unknown `--format`, currently exits 1 as well (issue #70). CI pipelines can fail on any non-zero code, or treat `1` and `2` differently.
 
 ## Building
 

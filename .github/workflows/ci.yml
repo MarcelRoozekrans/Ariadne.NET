@@ -120,7 +120,7 @@ jobs:
             exit "$status"
           fi
 
-  # Packs the four release packages exactly as publish-nuget does, inspects them, and rehearses the push against a local
+  # Packs the five release packages exactly as publish-nuget does, inspects them, and rehearses the push against a local
   # folder feed, on every push and pull request, so the release path is exercised long before release day. A folder
   # feed silently drops .snupkg files, so symbol packages are checked by the inspection, not by the push.
   pack-validate:
@@ -178,7 +178,7 @@ jobs:
       # Builds and runs the getting-started sample, tools/release/consumer/Program.cs, against the packages in the local
       # feed. nuget.config maps Ariadne.NET* to the local feed only, so the restore cannot fall back to a published
       # package. The sample references Ariadne.NET.Workspaces, which brings Ariadne.NET and then
-      # Ariadne.NET.Abstractions in as dependencies: this proves those three packages restore from the feed.
+      # Ariadne.NET.Abstractions in as dependencies: this proves those three of the five packages restore from the feed.
       # The next step restores Ariadne.NET.Testing the same way.
       # Microsoft.Extensions.DependencyInjection comes from nuget.org: Ariadne.NET depends only on the DI abstractions,
       # and the sample needs a container to resolve the services from. Microsoft.Build.Framework comes from nuget.org
@@ -508,7 +508,7 @@ jobs:
             skip_duplicate="--skip-duplicate"
           fi
           if ! dotnet nuget push "artifacts/packages/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" $skip_duplicate; then
-            echo "::error::nuget.org refused the push; its reason is on the error line above. A 409 can mean the version already exists or that the package ID is reserved by another owner; see RELEASING.md before re-running."
+            echo "::error::nuget.org refused the push; its reason is on the error line above. A 409 can mean the version already exists or that the package ID is reserved by another owner. The Trusted Publishing policy must allow all five packages, including the new ids Ariadne.NET.Testing and Ariadne.NET.Cli; see RELEASING.md before re-running."
             exit 1
           fi
 
