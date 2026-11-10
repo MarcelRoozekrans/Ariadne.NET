@@ -160,7 +160,13 @@ internal static class AgentSettings
                 {
                     existing["type"] = entry["type"]!.DeepClone();
                     existing["command"] = entry["command"]!.DeepClone();
-                    existing["timeout"] = entry["timeout"]!.DeepClone();
+
+                    // A timeout the user raised or lowered stays; only a missing or unusable one is filled in.
+                    if (!HasUsableTimeout(existing))
+                    {
+                        existing["timeout"] = entry["timeout"]!.DeepClone();
+                    }
+
                     placed = true;
                 }
                 else
@@ -184,6 +190,9 @@ internal static class AgentSettings
 
         return (placed, matchingEntries);
     }
+
+    private static bool HasUsableTimeout(JsonObject entry) =>
+        entry["timeout"] is JsonValue v && v.TryGetValue<int>(out var seconds) && seconds > 0;
 
     private static void AddEntry(JsonArray groups, JsonArray? matchingEntries, HookSpec spec, JsonObject entry)
     {

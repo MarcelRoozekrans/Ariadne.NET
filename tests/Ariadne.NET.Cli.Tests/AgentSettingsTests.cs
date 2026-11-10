@@ -94,8 +94,30 @@ public sealed class AgentSettingsTests
 
         var entry = OnlyEntry(Groups(root, "Stop"));
         ((string)entry["command"]!).Should().Be($"{Prefix} stop");
-        ((int)entry["timeout"]!).Should().Be(300);
+        ((int)entry["timeout"]!).Should().Be(5);
         ((int)entry["extra"]!).Should().Be(1);
+    }
+
+    [Fact]
+    public void Merge_preserves_a_custom_timeout_on_an_existing_entry()
+    {
+        var root = Parse(MergeOk(
+            """{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"ariadne hook stop","timeout":900}]}]}}"""));
+
+        ((int)OnlyEntry(Groups(root, "Stop"))["timeout"]!).Should().Be(900);
+    }
+
+    [Theory]
+    [InlineData("""{"type":"command","command":"ariadne hook stop"}""")]
+    [InlineData("""{"type":"command","command":"ariadne hook stop","timeout":null}""")]
+    [InlineData("""{"type":"command","command":"ariadne hook stop","timeout":"slow"}""")]
+    [InlineData("""{"type":"command","command":"ariadne hook stop","timeout":0}""")]
+    [InlineData("""{"type":"command","command":"ariadne hook stop","timeout":-5}""")]
+    public void Merge_fills_a_missing_or_unusable_timeout(string entryJson)
+    {
+        var root = Parse(MergeOk("{\"hooks\":{\"Stop\":[{\"hooks\":[" + entryJson + "]}]}}"));
+
+        ((int)OnlyEntry(Groups(root, "Stop"))["timeout"]!).Should().Be(300);
     }
 
     [Fact]
