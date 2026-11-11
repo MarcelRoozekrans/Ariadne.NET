@@ -1,11 +1,11 @@
 # Session State
 
-**Last session:** 2026-11-11 (Milestone 4 started as ArchUnitNET parity; grooming next)
+**Last session:** 2026-11-11 (Milestone 4 grooming: phase 4.1 groomed, 4.2 next)
 **Repository:** `MarcelRoozekrans/Ariadne.NET`, public since 2026-11-03. The old private repository `MarcelRoozekrans/architecture-governance-engine` is frozen. Local clones: remote `ariadne` is the new repository, `origin` the old one; push with `git push ariadne HEAD:<branch>`, never to `origin`.
 
 ## Current Position
 
-- **Milestone 4 — ArchUnitNET parity:** [active, started 2026-11-11] on branch `chore/milestone-4-start` (pushed, no PR yet). Renamed from "Daedalus parity" by the owner: parity with ArchUnitNET in general, proved side by side in this repo; Ariadne depends on nothing from Daedalus. Approved design `docs/superpowers/specs/2026-11-11-milestone-4-design.md`. Phases 4.1 to 4.5 all `pending`, none groomed yet. Owner decisions 2026-11-11: scope is type-level conditions plus slices, member level deferred to one issue; approach A, both tools run in one test; documented `Divergences` allowed, `KnownGaps` must be empty for in-scope kinds; the last phase, 4.5, switches Daedalus over in the Daedalus repo.
+- **Milestone 4 — ArchUnitNET parity:** [active, started 2026-11-11] on branch `chore/milestone-4-start` (pushed, no PR yet). Renamed from "Daedalus parity" by the owner: parity with ArchUnitNET in general, proved side by side in this repo; Ariadne depends on nothing from Daedalus. Approved design `docs/superpowers/specs/2026-11-11-milestone-4-design.md`. Phases 4.1 to 4.5 all `pending`. **4.1 groomed 2026-11-11:** design `docs/superpowers/specs/2026-11-11-phase-4.1-parity-catalogue-and-harness-design.md` (approved), plan `docs/superpowers/plans/2026-11-11-phase-4.1-parity-catalogue-and-harness.md` (9 tasks, approved). Owner decisions for 4.1: one fixture project per catalogue row with `Clean`/`Broken` namespaces, not one per variant; 4.1 builds the fixture and the ArchUnitNET side for every in-scope kind, so gaps are `KnownGaps` entries keyed by case id; `record` and enum/struct/value-type predicates join 4.2, class immutability is deferred with the member-level issue, PlantUML is out of scope. Inputs for later phases: ArchUnitNET 0.13.2 has no type-level `static`, so 4.2's `static` is `ariadne-only` with no harness case; 4.3 must make a slice violation's `SourceType` lie in a slice the pattern names, because slice cases compare slice names. 4.2 and 4.3 build on the names in Task 3's Interfaces block of the 4.1 plan (`ParityCase`, `ParityCases.All`, `KnownGap`, `KnownGaps.Entries`, `Projection`, the fixture layout and `PARITY-<KIND>` rule ids); each needs a `**Builds on:** Phase 4.1` line and a guard check appended to the 4.1 plan's `## Checks`. Owner decisions 2026-11-11: scope is type-level conditions plus slices, member level deferred to one issue; approach A, both tools run in one test; documented `Divergences` allowed, `KnownGaps` must be empty for in-scope kinds; the last phase, 4.5, switches Daedalus over in the Daedalus repo.
 - **Owner's instruction 2026-11-11:** groom the whole of Milestone 4, then execute it unattended.
 - **Milestone 3 — Fail the build:** [complete 2026-11-11]. Phases 3.1 to 3.4 built by an unattended run as stacked PRs #68, #72, #73 and #76, landed on `main` as #77, example fixes in #81. Released as 0.7.1. Audit PASS: `docs/superpowers/reviews/2026-11-11-milestone-3-audit.md`. Follow-ups #66, #67, #70, #71, #75. Next: `new-milestone` for Milestone 4, Daedalus parity.
 - **Hooks fix branch:** `fix/hooks-follow-ups` is pushed, no PR yet. Its commits edit STATE.md too, so expect a small merge conflict in the 5.6 follow-up lines.
@@ -74,11 +74,11 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 
 ## Grooming
 
-Grooming: milestone 4, next phase 4.1
+Grooming: milestone 4, next phase 4.2
 
 ## Recommended Next Step
 
-Run `groom-milestone` for Milestone 4 on branch `chore/milestone-4-start`, starting with phase 4.1, then 4.2 to 4.5 in order. Each phase gets a phase-scope brainstorm (approved design), a plan with `## Checks`, and `**Builds on:**` lines plus guard checks where a phase uses an earlier one. 4.2 and 4.3 build on 4.1's harness, and 4.4 on all three. Then:
+Continue `groom-milestone` for Milestone 4 on branch `chore/milestone-4-start`, with phase 4.2, then 4.3 to 4.5 in order. 4.1 is groomed. The main checkout at `/home/marcel/Projects/Prive/Ariadne.NET` has `chore/milestone-4-start` checked out and is behind origin; a session in a worktree works on a local branch from `origin/chore/milestone-4-start` and pushes with `git push origin HEAD:chore/milestone-4-start`. Each phase gets a phase-scope brainstorm (approved design), a plan with `## Checks`, and `**Builds on:**` lines plus guard checks where a phase uses an earlier one. 4.2 and 4.3 build on 4.1's harness, and 4.4 on all three. Then:
 
 - Phase 4.5 changes the Daedalus.NET repo, so an unattended run in this repo cannot build it. Groom its design and plan here, queue only 4.1 to 4.4 with `ready-check`, and build 4.5 later in a session on the Daedalus repo, after a release that contains what its pack needs.
 - The groomed plans must reach `main` before `ready-check` can queue the run. `main` requires a PR: open one from `chore/milestone-4-start` when the owner allows it, or ask the owner to merge.
