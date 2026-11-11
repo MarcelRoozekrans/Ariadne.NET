@@ -125,11 +125,12 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 - [ ] A GitHub Actions example fails a build on a violation, and a job in this repo's CI proves the failing exit code on a broken fixture
 - [ ] The docs site documents the testing package, the report formats, the tool and the CI examples
 
-### Phase 3.1: Ariadne.NET.Testing [status: pending]
+### Phase 3.1: Ariadne.NET.Testing [status: complete]
 **Goal:** One call in a test checks all packs against the solution.
 **Surface:** Backend
 **HelpWanted:** no
 **Plan:** `docs/superpowers/plans/2026-11-10-phase-3.1-ariadne-net-testing.md`
+**Completed:** 2026-11-11
 
 ### Phase 3.2: JSON and SARIF reports [status: pending]
 **Note:** Use ZeroAlloc.Serialisation for the JSON and SARIF writers.
