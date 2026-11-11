@@ -195,7 +195,8 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Goal:** Document moving from ArchUnitNET to Ariadne, construct by construct, with Daedalus's rules as the worked example.
 **Surface:** Docs
 **HelpWanted:** no
-**Plan:** _to be written_
+**Design:** `docs/superpowers/specs/2026-11-11-phase-4.4-migration-guide-design.md` (approved 2026-11-11)
+**Plan:** `docs/superpowers/plans/2026-11-11-phase-4.4-migration-guide.md`
 
 ### Phase 4.5: Daedalus switch-over [status: pending]
 **Goal:** In the Daedalus repo, replace the ArchUnitNET tests with an Ariadne pack checked through `Ariadne.NET.Testing`, and remove the ArchUnitNET package.
