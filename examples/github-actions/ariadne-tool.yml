@@ -11,6 +11,8 @@ permissions:
   contents: read
   # Needed by the upload step.
   security-events: write
+  # Needed by the upload step in a private repository.
+  actions: read
 
 jobs:
   ariadne:
@@ -37,11 +39,11 @@ jobs:
 
       # Runs after a failed validation too, so the violations reach code
       # scanning. Code scanning must be available for the repository: private
-      # repositories need GitHub Advanced Security. Skipped on pull requests
-      # from forks and on Dependabot runs, whose token cannot write code
-      # scanning results.
+      # repositories need GitHub Advanced Security. Skipped when Dependabot
+      # pushes, because that run's token cannot write code scanning results.
+      # Pull request runs upload, from forks and Dependabot too.
       - name: Upload the SARIF report
-        if: ${{ !cancelled() && hashFiles('ariadne.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor != 'dependabot[bot]' }}
+        if: ${{ !cancelled() && hashFiles('ariadne.sarif') != '' && !(github.event_name == 'push' && github.actor == 'dependabot[bot]') }}
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: ariadne.sarif
