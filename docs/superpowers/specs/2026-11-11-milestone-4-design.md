@@ -76,21 +76,23 @@ Taken with the owner on 2026-11-11:
    - **Goal:** Add naming pattern, base type, attribute, `sealed`, `abstract`, `static` and `nested` as conditions and, where the catalogue needs them, as selectors, and remove their `KnownGaps` entries.
 3. **Phase 4.3: Slices** — `Surface: Backend`
    - **Goal:** Add namespace capture segments and slice rules for "no cycles" and "no dependency between slices", use them in the `modular-monolith` pack, and close #32.
-4. **Phase 4.4: Migration guide** — `Surface: Docs`
+4. **Phase 4.4: Target vacuity** — `Surface: Backend`
+   - **Goal:** A `forbid`, `allowOnly` or `uniqueNames` rule can set `requireTarget: true` and then fails as `VacuousRule` when its target matches no type the solution declares or references. Inserted on 2026-11-11 after the CodeRabbit review of PR #84, so the guide can map Daedalus's load-bearing facts to it.
+5. **Phase 4.5: Migration guide** — `Surface: Docs`
    - **Goal:** Document moving from ArchUnitNET to Ariadne, construct by construct, with Daedalus's rules translated as the worked example.
-5. **Phase 4.5: Daedalus switch-over** — `Surface: Mixed`
+6. **Phase 4.6: Daedalus switch-over** — `Surface: Mixed`
    - **Goal:** In the Daedalus repo, replace the ArchUnitNET tests with an Ariadne pack checked through `Ariadne.NET.Testing`, and remove the ArchUnitNET package.
 
 ## Dependencies on Prior Milestones
 
 - **Depends on M2:** rule schema v2, the semantic analysis, placement rules, banned packages, vacuity detection, and the pack JSON Schema with its conformance tests.
-- **Depends on M3:** `Ariadne.NET.Testing`, which runs one call over every pack under `.architecture/`. The harness uses it for the Ariadne side, and Daedalus uses it in 4.5.
-- **4.5 depends on a release.** Daedalus consumes Ariadne from nuget.org, so 4.5 needs a published version that contains whatever its pack uses. Daedalus's current rules need nothing new from 4.2 or 4.3. They might still use 4.2's conditions if those read more clearly, and the phase decides that. Releases are cut by merging the release-please PR, which is the owner's call.
+- **Depends on M3:** `Ariadne.NET.Testing`, which runs one call over every pack under `.architecture/`. The harness uses it for the Ariadne side, and Daedalus uses it in 4.6.
+- **4.6 depends on a release.** Daedalus consumes Ariadne from nuget.org, so 4.6 needs a published version that contains whatever its pack uses. Daedalus's current rules need nothing new from 4.2 or 4.3. They might still use 4.2's conditions if those read more clearly, and the phase decides that. Releases are cut by merging the release-please PR, which is the owner's call.
 
 ## External Constraints
 
-- **4.5 runs in another repository.** Phase 4.5 changes Daedalus.NET, so it runs in a session opened on that repository. The phase completes here once its PR has merged there.
-- **Daedalus keeps moving.** Its rules changed twice in three weeks. Phase 4.5 reads Daedalus `main` when it starts, not the state recorded in this design.
+- **4.6 runs in another repository.** Phase 4.6 changes Daedalus.NET, so it runs in a session opened on that repository. The phase completes here once its PR has merged there.
+- **Daedalus keeps moving.** Its rules changed twice in three weeks. Phase 4.6 reads Daedalus `main` when it starts, not the state recorded in this design.
 - **ArchUnitNET's version is pinned.** The catalogue and the harness are written against one pinned version. Moving to a newer version is a deliberate change that updates both.
 
 ## Risk Areas
@@ -101,14 +103,14 @@ Taken with the owner on 2026-11-11:
 | Slices need a new schema concept (capture segments), the same design question as #32 | 4.3 grows into a schema redesign | 4.3's phase design settles the capture syntax first. If it does not fit one phase, split 4.3 rather than widen it. |
 | New conditions and slice rules change the pack schema | `pack.schema.json` and its conformance tests drift from the loader | Every phase that adds schema updates the JSON Schema and its conformance tests in the same PR, as 2.6 established |
 | Building the fixture solution makes the test run slower | CI and local runs get slower | One fixture solution with one project per variant, built once per test run, as the existing fixtures are |
-| Daedalus is not ready for 4.5 when M4 reaches it | M4 cannot close | 4.5 is the last phase and has no dependants. If Daedalus is blocked, the owner decides whether M4 waits or closes without it. |
+| Daedalus is not ready for 4.6 when M4 reaches it | M4 cannot close | 4.6 is the last phase and has no dependants. If Daedalus is blocked, the owner decides whether M4 waits or closes without it. |
 | Disagreement over what ArchUnitNET flags for an edge case | The catalogue overstates parity | The harness is the arbiter: a catalogue entry is "covered" only when its fixture pair agrees in CI |
 
 ## Calls made while writing this up
 
 Settled by Claude, not discussed; correct any of them.
 
-- **Phase order.** The harness comes first, so every later phase is measured against it. The guide comes before the switch-over, so that 4.5 can follow it, but the guide is not final until 4.5 has done the switch-over once.
+- **Phase order.** The harness comes first, so every later phase is measured against it. The guide comes before the switch-over, so that 4.6 can follow it, but the guide is not final until 4.6 has done the switch-over once.
 - **The catalogue is a docs-site page.** The harness tests cite the page's entry ids, so the page and the tests can be checked against each other.
 - **The fixture lives in `tests/fixtures/archunit-parity/`.** It has one project per rule kind and variant, so a broken variant cannot leak into a clean one.
 - **The ArchUnitNET package is the core `TngTech.ArchUnitNET`,** not the xUnit adapter. The harness calls `Evaluate` and compares results itself.
@@ -119,9 +121,9 @@ Settled by Claude, not discussed; correct any of them.
 - **ArchUnitNET is pinned at 0.13.2,** the version Daedalus already runs on .NET 10. That shows Mono.Cecil reads .NET 10 assemblies. 4.1 confirms it on the fixture as its first task.
 - **"Offending types" means `ArchitectureViolation.SourceType`,** which every violation already carries. The harness groups Ariadne's violations by `SourceType` and compares the resulting set with ArchUnitNET's failing types. No change to the violation model or to the output contract of `Ariadne.NET.Testing`.
 - **`modular-monolith` keeps its convention.** Its modules are `<Module>.Public`, `.Core` and `.Infrastructure`, as the built-in pack declares today. 4.3 adds the slice rule on that convention. Making the pack configurable is not part of M4.
-- **4.5 starts on the latest release.** If its pack needs something that is merged but not released, the phase stops and asks the owner to merge the release-please PR. It never builds against an unreleased package.
+- **4.6 starts on the latest release.** If its pack needs something that is merged but not released, the phase stops and asks the owner to merge the release-please PR. It never builds against an unreleased package.
 - **Member-level kinds are filed as one issue** when 4.1's catalogue lists them, not at the end of the milestone.
-- **Issue #36 stays out of scope.** Daedalus's pack is a standalone pack and does not amend inherited layers. If 4.5 finds it needs #36, the phase stops and asks.
+- **Issue #36 stays out of scope.** Daedalus's pack is a standalone pack and does not amend inherited layers. If 4.6 finds it needs #36, the phase stops and asks.
 
 ## Open Questions
 

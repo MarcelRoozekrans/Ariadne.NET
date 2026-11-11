@@ -191,19 +191,26 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Design:** `docs/superpowers/specs/2026-11-11-phase-4.3-slices-design.md` (approved 2026-11-11)
 **Plan:** `docs/superpowers/plans/2026-11-11-phase-4.3-slices.md`
 
-### Phase 4.4: Migration guide [status: pending]
+### Phase 4.4: Target vacuity [status: pending]
+**Goal:** A `forbid`, `allowOnly` or `uniqueNames` rule can set `requireTarget: true` and then fails as `VacuousRule` when its target matches no type the solution declares or references.
+**Surface:** Backend
+**HelpWanted:** no
+**Design:** `docs/superpowers/specs/2026-11-11-phase-4.4-target-vacuity-design.md` (approved 2026-11-11)
+**Plan:** `docs/superpowers/plans/2026-11-11-phase-4.4-target-vacuity.md`
+
+### Phase 4.5: Migration guide [status: pending]
 **Goal:** Document moving from ArchUnitNET to Ariadne, construct by construct, with Daedalus's rules as the worked example.
 **Surface:** Docs
 **HelpWanted:** no
-**Design:** `docs/superpowers/specs/2026-11-11-phase-4.4-migration-guide-design.md` (approved 2026-11-11)
-**Plan:** `docs/superpowers/plans/2026-11-11-phase-4.4-migration-guide.md`
+**Design:** `docs/superpowers/specs/2026-11-11-phase-4.5-migration-guide-design.md` (approved 2026-11-11)
+**Plan:** `docs/superpowers/plans/2026-11-11-phase-4.5-migration-guide.md`
 
-### Phase 4.5: Daedalus switch-over [status: pending]
+### Phase 4.6: Daedalus switch-over [status: pending]
 **Goal:** In the Daedalus repo, replace the ArchUnitNET tests with an Ariadne pack checked through `Ariadne.NET.Testing`, and remove the ArchUnitNET package.
 **Surface:** Mixed
 **HelpWanted:** no
-**Design:** `docs/superpowers/specs/2026-11-11-phase-4.5-daedalus-switch-over-design.md` (approved 2026-11-11)
-**Plan:** `docs/superpowers/plans/2026-11-11-phase-4.5-daedalus-switch-over.md`
+**Design:** `docs/superpowers/specs/2026-11-11-phase-4.6-daedalus-switch-over-design.md` (approved 2026-11-11)
+**Plan:** `docs/superpowers/plans/2026-11-11-phase-4.6-daedalus-switch-over.md`
 
 ## Milestone 5: Agent surfaces [status: pending]
 **Goal:** Agents in the family runtime and in editors use Ariadne while writing code.
