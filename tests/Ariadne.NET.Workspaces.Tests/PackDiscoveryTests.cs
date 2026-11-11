@@ -14,7 +14,7 @@ public sealed class PackDiscoveryTests : IDisposable
     public void Files_AreSortedByOrdinalFileName()
     {
         var solution = Touch("Shop.slnx");
-        Touch(".architecture/b.yaml");
+        Touch(".architecture/c.yaml");
         Touch(".architecture/B.yaml");
         Touch(".architecture/a.yaml");
 
@@ -22,7 +22,7 @@ public sealed class PackDiscoveryTests : IDisposable
 
         result.IsSuccess.Should().BeTrue();
         result.Value.ProjectRoot.Should().Be(_root);
-        result.Value.Files.Select(Path.GetFileName).Should().Equal("B.yaml", "a.yaml", "b.yaml");
+        result.Value.Files.Select(Path.GetFileName).Should().Equal("B.yaml", "a.yaml", "c.yaml");
         result.Value.Files.Should().OnlyContain(f => Path.IsPathRooted(f));
     }
 
