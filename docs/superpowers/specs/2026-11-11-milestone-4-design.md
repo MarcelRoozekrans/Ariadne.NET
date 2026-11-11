@@ -77,7 +77,7 @@ Taken with the owner on 2026-11-11:
 3. **Phase 4.3: Slices** — `Surface: Backend`
    - **Goal:** Add namespace capture segments and slice rules for "no cycles" and "no dependency between slices", use them in the `modular-monolith` pack, and close #32.
 4. **Phase 4.4: Target vacuity** — `Surface: Backend`
-   - **Goal:** A `forbid`, `allowOnly` or `uniqueNames` rule can set `requireTarget: true` and then fails as `VacuousRule` when its target matches nothing the solution uses: for `forbid` and `allowOnly`, no type it declares or references, or no member edge for a `members` target; for `uniqueNames`, no type it declares. Inserted on 2026-11-11 after the CodeRabbit review of PR #84, so the guide can map Daedalus's load-bearing facts to it.
+   - **Goal:** A `forbid`, `allowOnly` or `uniqueNames` rule can set `requireTarget: true` and then fails as `VacuousRule` when its target matches nothing the solution uses: for `forbid` and `allowOnly`, no type it declares or references, or no member edge for a `members` target; for `uniqueNames`, no type it declares. A target that names only layers already reported as `VacuousLayer` is left to that report. Inserted on 2026-11-11 after the CodeRabbit review of PR #84, so the guide can map Daedalus's load-bearing facts to it.
 5. **Phase 4.5: Migration guide** — `Surface: Docs`
    - **Goal:** Document moving from ArchUnitNET to Ariadne, construct by construct, with Daedalus's rules translated as the worked example.
 6. **Phase 4.6: Daedalus switch-over** — `Surface: Mixed`
