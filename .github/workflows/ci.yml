@@ -459,7 +459,7 @@ jobs:
           echo "PACKAGE_VERSION=$version" >> "$GITHUB_ENV"
 
       - name: Download the packages
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: packages
           path: ${{ runner.temp }}/packages
