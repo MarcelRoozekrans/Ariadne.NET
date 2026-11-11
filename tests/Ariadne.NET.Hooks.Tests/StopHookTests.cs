@@ -283,10 +283,29 @@ public class StopHookTests
         warn.ToString().Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task A_solution_with_its_packs_under_src_is_validated()
+    {
+        using var project = new TempProject();
+        var src = Path.Combine(project.Root, "src");
+        Directory.CreateDirectory(Path.Combine(src, ".architecture"));
+        File.WriteAllText(Path.Combine(src, ".architecture", "rules.yaml"), "schema: 2\nname: shop\n");
+        File.WriteAllText(Path.Combine(src, "Shop.slnx"), "<Solution />");
+        using var session = new TestSession();
+        EditedFiles.Record(session.Id, "/x/A.cs");
+        var validator = new FakeValidator(Report(Violation()));
+
+        var json = await RunAsync(Create(validator), project.Root, session.Id).ConfigureAwait(true);
+
+        validator.Calls.Should().Be(1);
+        validator.ValidatedPath.Should().Be(Path.Combine(src, "Shop.slnx"));
+        json.Should().NotBeNull();
+    }
+
     [Theory]
     [InlineData("imports.yaml")]
     [InlineData("imports.yml")]
-    public async Task A_folder_holding_only_the_sync_manifest_has_no_packs_and_is_silent(string manifest)
+    public async Task Without_a_solution_a_folder_holding_only_the_sync_manifest_has_no_packs_and_is_silent(string manifest)
     {
         using var project = new TempProject();
         project.WriteImports("shared", "1.0.0");
@@ -295,7 +314,6 @@ public class StopHookTests
             File.Move(Path.Combine(project.Root, ".architecture", "imports.yaml"), Path.Combine(project.Root, ".architecture", manifest));
         }
 
-        File.WriteAllText(Path.Combine(project.Root, "Shop.slnx"), "<Solution />");
         using var session = new TestSession();
         EditedFiles.Record(session.Id, "/x/A.cs");
         var validator = new FakeValidator(Report(Violation()));

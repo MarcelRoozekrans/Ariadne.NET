@@ -54,7 +54,11 @@ internal static class PackDiscovery
             : Result<DiscoveredPacks, AriadneError>.Success(new DiscoveredPacks(projectRoot, files));
     }
 
-    private static bool IsPackFile(string file)
+    /// <summary>
+    /// Whether <paramref name="file"/> is a pack: a <c>.yaml</c> or <c>.yml</c> file, except <c>imports.yaml</c> and
+    /// <c>imports.yml</c>. The stop hook uses the same rule to decide whether a project has packs.
+    /// </summary>
+    internal static bool IsPackFile(string file)
     {
         // imports.yaml is the 'ariadne sync' manifest, not a rule pack.
         var name = Path.GetFileNameWithoutExtension(file);
