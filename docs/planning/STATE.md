@@ -1,11 +1,11 @@
 # Session State
 
-**Last session:** 2026-11-10 (Milestone 3 started; grooming next)
+**Last session:** 2026-11-11 (Milestone 3 complete; Milestone 4 next)
 **Repository:** `MarcelRoozekrans/Ariadne.NET`, public since 2026-11-03. The old private repository `MarcelRoozekrans/architecture-governance-engine` is frozen. Local clones: remote `ariadne` is the new repository, `origin` the old one; push with `git push ariadne HEAD:<branch>`, never to `origin`.
 
 ## Current Position
 
-- **Milestone 3 — Fail the build:** [active, started 2026-11-10]. Design approved by the owner, `docs/superpowers/specs/2026-11-10-milestone-3-design.md`, with a builder check done and the calls listed in it. MILESTONE.md and the ROADMAP block are written. Phases 3.1 testing package, 3.2 JSON and SARIF, 3.3 dotnet tool, 3.4 CI examples, all pending and groomed 2026-11-10: approved designs and plans in `docs/superpowers/`, guard checks in the 3.1 to 3.3 plans. The 3.1 design corrects the milestone design: `extends` accepts no sibling pack file, so there is no base-pack case. Owner request 2026-11-10: groom the whole milestone, then run it unattended. Branch `chore/milestone-3-start` (pushed to `ariadne`, no PR opened) holds the milestone start commit; the groom commits go on it. `main` requires a PR, so the groomed plans must reach `main` before `ready-check` can queue an unattended run; opening that PR is the owner's call.
+- **Milestone 3 — Fail the build:** [complete 2026-11-11]. Phases 3.1 to 3.4 built by an unattended run as stacked PRs #68, #72, #73 and #76, landed on `main` as #77, example fixes in #81. Released as 0.7.1. Audit PASS: `docs/superpowers/reviews/2026-11-11-milestone-3-audit.md`. Follow-ups #66, #67, #70, #71, #75. Next: `new-milestone` for Milestone 4, Daedalus parity.
 - **Hooks fix branch:** `fix/hooks-follow-ups` is pushed, no PR yet. Its commits edit STATE.md too, so expect a small merge conflict in the 5.6 follow-up lines.
 
 - **Milestone:** 2 — Rule engine v2 [complete 2026-11-10]. Audit `docs/superpowers/reviews/2026-11-10-milestone-2-audit.md`: first run failed on the SQL, crypto and HTTP example, PR #60 closed it, second run passed. Released as 0.7.0 (release-please PR #61), which includes the #50 fix (PR #62).
