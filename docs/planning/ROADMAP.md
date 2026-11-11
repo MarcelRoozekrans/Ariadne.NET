@@ -202,7 +202,8 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Goal:** In the Daedalus repo, replace the ArchUnitNET tests with an Ariadne pack checked through `Ariadne.NET.Testing`, and remove the ArchUnitNET package.
 **Surface:** Mixed
 **HelpWanted:** no
-**Plan:** _to be written_
+**Design:** `docs/superpowers/specs/2026-11-11-phase-4.5-daedalus-switch-over-design.md` (approved 2026-11-11)
+**Plan:** `docs/superpowers/plans/2026-11-11-phase-4.5-daedalus-switch-over.md`
 
 ## Milestone 5: Agent surfaces [status: pending]
 **Goal:** Agents in the family runtime and in editors use Ariadne while writing code.
