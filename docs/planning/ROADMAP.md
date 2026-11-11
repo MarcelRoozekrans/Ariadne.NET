@@ -181,7 +181,8 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Goal:** Add naming pattern, base type, attribute, sealed, abstract, static and nested as conditions and, where needed, selectors.
 **Surface:** Backend
 **HelpWanted:** no
-**Plan:** _to be written_
+**Design:** `docs/superpowers/specs/2026-11-11-phase-4.2-type-level-conditions-design.md` (approved 2026-11-11)
+**Plan:** `docs/superpowers/plans/2026-11-11-phase-4.2-type-level-conditions.md`
 
 ### Phase 4.3: Slices [status: pending]
 **Goal:** Add namespace capture segments and slice rules for no cycles and no dependency between slices, use them in `modular-monolith`, and close #32.
