@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.7.1](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.7.0...v0.7.1) (2026-11-11)
+
+
+### Features
+
+* add the Ariadne.NET.Testing package with ArchitectureCheck ([1c89aee](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/1c89aeec4975ee721dd1d2a668624699221cde05))
+* ariadne validate checks every pack under the architecture folder ([1c89aee](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/1c89aeec4975ee721dd1d2a668624699221cde05))
+* ariadne validate writes json and sarif reports ([1c89aee](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/1c89aeec4975ee721dd1d2a668624699221cde05))
+* find the repository root for report paths ([1c89aee](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/1c89aeec4975ee721dd1d2a668624699221cde05))
+* name the pack on each architecture violation ([1c89aee](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/1c89aeec4975ee721dd1d2a668624699221cde05))
+* package the ariadne command line as the Ariadne.NET.Cli dotnet tool ([1c89aee](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/1c89aeec4975ee721dd1d2a668624699221cde05))
+* share the text report between the cli and the testing package ([1c89aee](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/1c89aeec4975ee721dd1d2a668624699221cde05))
+* the stop hook and mcp validation check every pack ([1c89aee](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/1c89aeec4975ee721dd1d2a668624699221cde05))
+* write architecture reports as json ([1c89aee](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/1c89aeec4975ee721dd1d2a668624699221cde05))
+* write architecture reports as sarif ([1c89aee](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/1c89aeec4975ee721dd1d2a668624699221cde05))
+* write reports from the testing package ([1c89aee](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/1c89aeec4975ee721dd1d2a668624699221cde05))
+
+
+### Bug Fixes
+
+* print the ariadne version without build metadata ([1c89aee](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/1c89aeec4975ee721dd1d2a668624699221cde05))
+
+
+### Documentation
+
+* github actions examples that fail the build on a violation ([1c89aee](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/1c89aeec4975ee721dd1d2a668624699221cde05))
+* upload the example sarif on pull request runs and grant actions read ([#81](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/81)) ([e73f40a](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/e73f40aa4d816a79418e8141cf67ca3d2566c16f))
+
 ## [0.7.0](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.6.1...v0.7.0) (2026-11-10)
 
 
