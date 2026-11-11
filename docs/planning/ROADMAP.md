@@ -147,11 +147,12 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Plan:** `docs/superpowers/plans/2026-11-10-phase-3.3-dotnet-tool.md`
 **Completed:** 2026-11-11
 
-### Phase 3.4: CI examples [status: pending]
+### Phase 3.4: CI examples [status: complete]
 **Goal:** GitHub Actions examples that fail a build on a violation.
 **Surface:** Docs
 **HelpWanted:** no
 **Plan:** `docs/superpowers/plans/2026-11-10-phase-3.4-ci-examples.md`
+**Completed:** 2026-11-11
 
 ## Milestone 4: Daedalus parity [status: pending]
 **Goal:** Ariadne proves it can replace Daedalus's ArchUnitNET architecture tests.
