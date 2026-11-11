@@ -41,6 +41,8 @@ permissions:
   contents: read
   # Needed by the upload step.
   security-events: write
+  # Needed by the upload step in a private repository.
+  actions: read
 
 jobs:
   ariadne:
@@ -67,24 +69,24 @@ jobs:
 
       # Runs after a failed validation too, so the violations reach code
       # scanning. Code scanning must be available for the repository: private
-      # repositories need GitHub Advanced Security. Skipped on pull requests
-      # from forks and on Dependabot runs, whose token cannot write code
-      # scanning results.
+      # repositories need GitHub Advanced Security. Skipped when Dependabot
+      # pushes, because that run's token cannot write code scanning results.
+      # Pull request runs upload, from forks and Dependabot too.
       - name: Upload the SARIF report
-        if: ${{ !cancelled() && hashFiles('ariadne.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor != 'dependabot[bot]' }}
+        if: ${{ !cancelled() && hashFiles('ariadne.sarif') != '' && !(github.event_name == 'push' && github.actor == 'dependabot[bot]') }}
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: ariadne.sarif
 ```
 
-The validate step is the one that fails the job. The upload step runs after a failed validation, so the violations still reach code scanning. It runs unless the job was cancelled and only when `ariadne.sarif` exists, so a run where Ariadne could not write a report (exit code 2) does not add a second, unrelated upload error. The step needs the `security-events: write` permission.
+The validate step is the one that fails the job. The upload step runs after a failed validation, so the violations still reach code scanning. It runs unless the job was cancelled and only when `ariadne.sarif` exists, so a run where Ariadne could not write a report (exit code 2) does not add a second, unrelated upload error. The step needs the `security-events: write` permission, and `actions: read` in a private repository.
 
 ### Code scanning
 
 Uploaded results appear as code scanning alerts. Three limits apply:
 
 - **Private repositories need GitHub Advanced Security.** Without it the upload step fails. Remove the upload step and the `security-events: write` permission; the validate step still fails the build.
-- **Pull requests from forks and Dependabot runs skip the upload.** GitHub gives them a read-only `GITHUB_TOKEN`, so the upload would fail. The validate step still fails the build on violations.
+- **A push by Dependabot skips the upload.** That run gets a read-only `GITHUB_TOKEN`, so the upload would fail. Pull request runs, from forks and from Dependabot too, still upload, because code scanning accepts results from `pull_request` runs. The validate step fails the build either way.
 - **Violations without a file location are not displayed.** A rule or layer that matches no type (`VacuousRule`, `VacuousLayer`) and a banned package have no source position. They are in the SARIF file and in the text report, and GitHub code scanning does not show them. They still make `ariadne validate` exit 1. See [issue #71](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/71).
 
 The SARIF mapping is described in [Reports](how-it-works/14-reports.md#sarif-report).

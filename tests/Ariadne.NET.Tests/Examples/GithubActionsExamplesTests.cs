@@ -46,13 +46,14 @@ public class GithubActionsExamplesTests
 
         var upload = steps.Single(s => (Scalar(s, "uses") ?? "").StartsWith("github/codeql-action/upload-sarif@", StringComparison.Ordinal));
         Scalar(upload, "if").Should().Contain("!cancelled()").And.Contain("hashFiles('ariadne.sarif')")
-            .And.Contain("github.event.pull_request.head.repo.full_name == github.repository")
-            .And.Contain("github.actor != 'dependabot[bot]'");
+            .And.Contain("!(github.event_name == 'push' && github.actor == 'dependabot[bot]')")
+            .And.NotContain("pull_request");
         steps.IndexOf(upload).Should().BeGreaterThan(steps.IndexOf(validate));
 
         var permissions = (YamlMappingNode)Get(root, "permissions")!;
         Scalar(permissions, "security-events").Should().Be("write");
         Scalar(permissions, "contents").Should().Be("read");
+        Scalar(permissions, "actions").Should().Be("read");
     }
 
     [Fact]
