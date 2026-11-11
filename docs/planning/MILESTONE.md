@@ -21,6 +21,6 @@ Any .NET solution can enforce its Ariadne packs in a test and in CI. One call in
 ## Phases
 
 1. Phase 3.1 — Ariadne.NET.Testing [complete]
-2. Phase 3.2 — JSON and SARIF reports [pending]
+2. Phase 3.2 — JSON and SARIF reports [complete]
 3. Phase 3.3 — dotnet tool [pending]
 4. Phase 3.4 — CI examples [pending]

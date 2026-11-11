@@ -132,12 +132,13 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Plan:** `docs/superpowers/plans/2026-11-10-phase-3.1-ariadne-net-testing.md`
 **Completed:** 2026-11-11
 
-### Phase 3.2: JSON and SARIF reports [status: pending]
+### Phase 3.2: JSON and SARIF reports [status: complete]
 **Note:** Use ZeroAlloc.Serialisation for the JSON and SARIF writers.
 **Goal:** Machine-readable reports from the CLI and the testing package.
 **Surface:** Backend
 **HelpWanted:** no
 **Plan:** `docs/superpowers/plans/2026-11-10-phase-3.2-json-and-sarif-reports.md`
+**Completed:** 2026-11-11
 
 ### Phase 3.3: dotnet tool [status: pending]
 **Goal:** Ship the CLI as the `ariadne` dotnet tool.
