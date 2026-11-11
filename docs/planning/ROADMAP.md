@@ -156,34 +156,47 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Plan:** `docs/superpowers/plans/2026-11-10-phase-3.4-ci-examples.md`
 **Completed:** 2026-11-11
 
-## Milestone 4: Daedalus parity [status: pending]
-**Goal:** Ariadne proves it can replace Daedalus's ArchUnitNET architecture tests.
+## Milestone 4: ArchUnitNET parity [status: active]
+**Goal:** Anyone who writes architecture rules in ArchUnitNET can write the same rules in Ariadne and get the same verdicts, proved side by side in this repo; Daedalus is the first consumer to switch over.
+**Started:** 2026-11-11
+**Design:** `docs/superpowers/specs/2026-11-11-milestone-4-design.md`
 **Definition of Done:**
-- [ ] A Daedalus pack covers all 34 unit-level architecture tests
-- [ ] The parity harness shows Ariadne and ArchUnitNET agree on clean and deliberately broken variants
-- [ ] A migration guide from ArchUnitNET exists
+- [ ] All planned phases complete
+- [ ] All tests passing
+- [ ] A parity catalogue on the docs site lists every type-level and slice rule kind of the pinned ArchUnitNET version with its Ariadne equivalent, or marks it deferred or out of scope
+- [ ] The side-by-side harness agrees on every in-scope kind, apart from documented `Divergences`; `KnownGaps` holds no type-level or slice entry
+- [ ] Packs express type-level conditions and slice rules, covered by the pack JSON Schema
+- [ ] The `modular-monolith` pack enforces module boundaries and #32 is closed
+- [ ] A migration guide from ArchUnitNET exists on the docs site
+- [ ] Daedalus `main` references no ArchUnitNET package and checks an Ariadne pack in CI
 
-### Phase 4.1: Daedalus pack [status: pending]
-**Goal:** Write the pack covering Daedalus's structural and project-specific rules.
-**Surface:** Mixed
-**HelpWanted:** no
-**Plan:** _to be written_
-
-### Phase 4.2: Parity harness [status: pending]
-**Goal:** Run Ariadne and ArchUnitNET on a Daedalus checkout, including deliberately broken variants, and compare verdicts.
+### Phase 4.1: Parity catalogue and harness [status: pending]
+**Goal:** Catalogue ArchUnitNET's rule kinds and build the side-by-side harness on a fixture solution, green for today's kinds with the rest in `KnownGaps`.
 **Surface:** Backend
 **HelpWanted:** no
 **Plan:** _to be written_
 
-### Phase 4.3: Close vocabulary gaps [status: pending]
-**Goal:** Fix every gap the parity harness finds.
+### Phase 4.2: Type-level conditions [status: pending]
+**Goal:** Add naming pattern, base type, attribute, sealed, abstract, static and nested as conditions and, where needed, selectors.
+**Surface:** Backend
+**HelpWanted:** no
+**Plan:** _to be written_
+
+### Phase 4.3: Slices [status: pending]
+**Goal:** Add namespace capture segments and slice rules for no cycles and no dependency between slices, use them in `modular-monolith`, and close #32.
 **Surface:** Backend
 **HelpWanted:** no
 **Plan:** _to be written_
 
 ### Phase 4.4: Migration guide [status: pending]
-**Goal:** Document moving from ArchUnitNET to Ariadne.
+**Goal:** Document moving from ArchUnitNET to Ariadne, construct by construct, with Daedalus's rules as the worked example.
 **Surface:** Docs
+**HelpWanted:** no
+**Plan:** _to be written_
+
+### Phase 4.5: Daedalus switch-over [status: pending]
+**Goal:** In the Daedalus repo, replace the ArchUnitNET tests with an Ariadne pack checked through `Ariadne.NET.Testing`, and remove the ArchUnitNET package.
+**Surface:** Mixed
 **HelpWanted:** no
 **Plan:** _to be written_
 
