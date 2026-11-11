@@ -150,6 +150,12 @@ public sealed class ExitCodeTests : IDisposable
 
         foreach (var directory in Directory.EnumerateDirectories(source))
         {
+            // A fixture's own pack would be found before the one a test writes above the copy, or before none at all.
+            if (string.Equals(Path.GetFileName(directory), ".architecture", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             CopyDirectory(directory, Path.Combine(target, Path.GetFileName(directory)));
         }
     }
