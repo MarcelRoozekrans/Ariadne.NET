@@ -174,7 +174,8 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Goal:** Catalogue ArchUnitNET's rule kinds and build the side-by-side harness on a fixture solution, green for today's kinds with the rest in `KnownGaps`.
 **Surface:** Backend
 **HelpWanted:** no
-**Plan:** _to be written_
+**Design:** `docs/superpowers/specs/2026-11-11-phase-4.1-parity-catalogue-and-harness-design.md` (approved 2026-11-11)
+**Plan:** `docs/superpowers/plans/2026-11-11-phase-4.1-parity-catalogue-and-harness.md`
 
 ### Phase 4.2: Type-level conditions [status: pending]
 **Goal:** Add naming pattern, base type, attribute, sealed, abstract, static and nested as conditions and, where needed, selectors.
