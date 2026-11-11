@@ -1,7 +1,8 @@
 # Milestone 3: Fail the build
 
-**Status:** active
+**Status:** complete
 **Started:** 2026-11-10
+**Completed:** 2026-11-11
 
 ## Goal
 
@@ -9,14 +10,14 @@ Any .NET solution can enforce its Ariadne packs in a test and in CI. One call in
 
 ## Definition of Done
 
-- [ ] All planned phases complete
-- [ ] All tests passing
-- [ ] One call in a test (plus the package's documented MSBuild reference line, if it cannot ship it) checks every pack under `.architecture/` against a solution and fails with the rule id, pack name and `because` of each violation; a fixture with two packs, one clean and one broken, proves it
-- [ ] `ariadne validate`, the stop hook and MCP validation check the same packs and name the pack per violation
-- [ ] CLI and testing package emit JSON and SARIF 2.1.0; a test validates the SARIF against the published schema
-- [ ] `ariadne` installs with `dotnet tool install` from the packed local feed in CI, and `publish-nuget` includes the package
-- [ ] A GitHub Actions example fails a build on a violation, and a job in this repo's CI proves the failing exit code on a broken fixture
-- [ ] The docs site documents the testing package, the report formats, the tool and the CI examples
+- [x] All planned phases complete
+- [x] All tests passing
+- [x] One call in a test (plus the package's documented MSBuild reference line, if it cannot ship it) checks every pack under `.architecture/` against a solution and fails with the rule id, pack name and `because` of each violation; a fixture with two packs, one clean and one broken, proves it
+- [x] `ariadne validate`, the stop hook and MCP validation check the same packs and name the pack per violation
+- [x] CLI and testing package emit JSON and SARIF 2.1.0; a test validates the SARIF against the published schema
+- [x] `ariadne` installs with `dotnet tool install` from the packed local feed in CI, and `publish-nuget` includes the package
+- [x] A GitHub Actions example fails a build on a violation, and a job in this repo's CI proves the failing exit code on a broken fixture
+- [x] The docs site documents the testing package, the report formats, the tool and the CI examples
 
 ## Phases
 
