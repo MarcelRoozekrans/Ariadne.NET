@@ -5,9 +5,11 @@
   <Project Path="../tests/Ariadne.NET.Hooks.Tests/Ariadne.NET.Hooks.Tests.csproj" />
   <Project Path="../tests/Ariadne.NET.Mcp.Tests/Ariadne.NET.Mcp.Tests.csproj" />
   <Project Path="../tests/Ariadne.NET.Workspaces.Tests/Ariadne.NET.Workspaces.Tests.csproj" />
+  <Project Path="../tests/Ariadne.NET.Testing.Tests/Ariadne.NET.Testing.Tests.csproj" />
   <Project Path="Ariadne.NET.Abstractions/Ariadne.NET.Abstractions.csproj" />
   <Project Path="Ariadne.NET/Ariadne.NET.csproj" />
   <Project Path="Ariadne.NET.Workspaces/Ariadne.NET.Workspaces.csproj" />
+  <Project Path="Ariadne.NET.Testing/Ariadne.NET.Testing.csproj" />
   <Project Path="Ariadne.NET.Mcp.Http/Ariadne.NET.Mcp.Http.csproj" />
   <Project Path="Ariadne.NET.Cli/Ariadne.NET.Cli.csproj" />
   <Project Path="Ariadne.NET.Hooks/Ariadne.NET.Hooks.csproj" />

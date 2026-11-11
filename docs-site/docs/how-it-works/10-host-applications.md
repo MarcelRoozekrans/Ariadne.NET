@@ -14,7 +14,7 @@ Built with **System.CommandLine 3.0** (uses `Command`, `RootCommand`, `Option<T>
 
 ### `init` — Initialize architecture rules
 
-> Until the `ariadne` dotnet tool ships, run these commands as `dotnet run --project src/Ariadne.NET.Cli -- <command>`.
+> These commands assume the installed `ariadne` tool; see [Install the tool](../getting-started.md#install-the-tool). From a clone of the repository, run them as `dotnet run --project src/Ariadne.NET.Cli -- <command>`.
 
 ```bash
 ariadne init --template clean-architecture
@@ -70,19 +70,22 @@ ariadne validate /path/to/MyApp.csproj
 ```
 
 - Argument: `path` (default: `"."`), a `.sln`, `.slnx`, `.slnf` or `.csproj` file, or a directory that holds exactly one of them
-- Loads the projects with `ISolutionValidator` and checks each one against the rules; Ariadne never restores, so run `dotnet restore` first
-- Prints the number of types and projects checked, a `Skipped` line for each skipped project, and each violation as `[Kind] file:line` followed by its message; a violation found in only some target frameworks lists them after the location, as in `[Kind] file:line (net10.0)`
-- Exit codes: 0 no violations, 1 violations, 2 error. A cancelled run prints `Cancelled.`
+- `--format text|json|sarif` (default `text`) and `--output <file>`: write a JSON or SARIF report, or put the report in a file. With `json` or `sarif` and no `--output`, the report is alone on standard output and the text report goes to standard error. See [Reports](14-reports.md)
+- Finds the pack set: every `.yaml` or `.yml` directly in the `.architecture` folder (not `imports.yaml` or `imports.yml`, the `ariadne sync` manifest), looked up from the solution's folder upward, not the working directory's `rules.yaml`. Each pack is loaded, resolved and checked on its own, and an error that does not already name the file is prefixed with `In pack file '<name>': `. A pack meant to be imported must be a `builtin://` or `import://` reference, because every file in the folder is checked as a pack
+- Loads the projects once with `IPackSetValidator` and checks each one against every pack; Ariadne never restores, so run `dotnet restore` first
+- Prints the number of types and projects checked, a `Skipped` line for each skipped project, and each violation as `[Kind] file:line pack <name>` followed by its message and, when the rule has a `because`, a `Rule <id>: <because>` line; a violation found in only some target frameworks lists them after the location, as in `[Kind] file:line (net10.0)`
+- Exit codes: 0 no violations, 1 violations, 2 error, which includes a report that cannot be written. A cancelled run prints `Cancelled.`. An unknown `--format` is a usage error and currently exits 1
 
 ```
 Checked 2 types in 2 projects
 Result: FAIL - 1 violation(s) found.
 
-  [DependencyNotAllowed] Shop.Domain/Order.cs:7
+  [DependencyNotAllowed] Shop.Domain/Order.cs:7 pack shop
     Layer 'Domain' is not allowed to depend on 'Infrastructure': Shop.Domain.Order references Shop.Infrastructure.SqlStore 3 times
+    Rule SHOP-LAYER-DOMAIN: The domain holds business rules only.
 ```
 
-File paths are shown relative to the directory of the solution or project.
+File paths in the text report are shown relative to the directory of the solution or project. The JSON and SARIF reports use the repository root instead.
 
 ### `sync` — Sync rule packs from git
 
@@ -115,7 +118,7 @@ ariadne hook stop
 |-------|--------------|
 | `session-start` | Adds the resolved layers, the rules with their `because`, the component roles, the naming conventions and the versions of the cached rule packs to the session. It warns when an import is missing from the cache or no longer satisfies its version range. The text is capped at 10,000 characters; when it does not fit, whole roles, rules and layers are dropped from the end, then the naming line, then the warnings, and a final `Truncated` line says how many lines went. Without a rules file it tells the agent to run `ariadne init`. |
 | `pre-tool-use` | Answers only `ask`, and only for a new `.cs` file whose assembly and namespace no layer selects. The namespace is read from the content that is written, with the folder as the fallback. It also records every `.cs` file that `Write`, `Edit` and `MultiEdit` touch, for `stop`. |
-| `stop` | Once per turn, when the agent edited `.cs` files, validates the solution found from the working directory and feeds at most 20 violations back through `additionalContext`, each with its message and, when it has one, its rule id and `because`. The text is capped at 10,000 characters too, and a final line says how many violations were left out. It prints nothing when the solution is clean, when `stop_hook_active` is set, and when no `.cs` file was edited. |
+| `stop` | Once per turn, when the agent edited `.cs` files, validates the solution found from the working directory against every pack in the `.architecture` folder above it, and feeds at most 20 violations back through `additionalContext`, each with its message and, when it has one, its rule id and `because` and the `Pack:` line naming the pack that raised it. The text is capped at 10,000 characters too, and a final line says how many violations were left out. It prints nothing when the solution is clean, when `stop_hook_active` is set, and when no `.cs` file was edited. |
 
 The stale-cache check is offline. It compares the version ranges in `.architecture/imports.yaml` with `resolvedTag` in `.architecture/.cache/git/<name>/.git-info.json` and never touches the network. Run `ariadne sync` to refresh the cache.
 
@@ -125,7 +128,7 @@ Limits to know about:
 
 - A project that no layer selects, such as tests, samples and tools, makes the new-file check ask on every new file there.
 - `stop` loads the whole solution, so it takes seconds; see `docs/perf/phase-5.6-hooks.md` for numbers.
-- The `ariadne` command must be on `PATH`. It is not a dotnet tool until phase 3.3. To try a hook from a checkout, run `dotnet run --project src/Ariadne.NET.Cli -- hook session-start`, or run the built dll with `dotnet <path to Ariadne.NET.Cli.dll> hook session-start`.
+- The `ariadne` command must be on `PATH`. [Install the tool](../getting-started.md#install-the-tool) with `dotnet tool install --global Ariadne.NET.Cli`. To try a hook from a checkout instead, run `dotnet run --project src/Ariadne.NET.Cli -- hook session-start`, or run the built dll with `dotnet <path to Ariadne.NET.Cli.dll> hook session-start`.
 
 Ariadne's hooks run beside AI.Sentinel's hook. Ariadne owns the structure rules and getting them to the agent; AI.Sentinel owns tool-call enforcement. Claude Code runs the matching hooks in parallel and resolves `PreToolUse` decisions as deny, then defer, then ask, then allow, so Ariadne's `ask` never overrides a deny from AI.Sentinel.
 
@@ -154,7 +157,7 @@ Ariadne's hooks run beside AI.Sentinel's hook. Ariadne owns the structure rules 
 
 ### Rules file resolution
 
-All commands that need rules use `RulesCommand.ResolveRulesFromFile()`:
+`rules`, `roles` and the other commands that need one pack use `RulesCommand.ResolveRulesFromFile()`. `validate` does not: it checks every pack in the `.architecture` folder, found from the solution's folder upward.
 
 1. Look for `.architecture/rules.yaml` in the current directory
 2. If not found, throw `FileNotFoundException` with helpful message
@@ -216,7 +219,7 @@ flowchart TD
 |-------------|---------|-------------|
 | `ariadne://packs/{name}` | Raw YAML string | Full content of a built-in pack |
 
-All tools auto-detect `.architecture/rules.yaml` in the working directory. The `template` parameter overrides auto-detection.
+The other tools auto-detect `.architecture/rules.yaml` in the working directory. `validate_source` without a `template` checks every `.yaml` or `.yml` directly in the `.architecture` folder (not `imports.yaml` or `imports.yml`, the `ariadne sync` manifest), found from the solution's folder upward, and, when no `.architecture` folder is found, falls back to the `rules.yaml` in the working directory's `.architecture` folder, else to `clean-architecture`; its violations name their pack. The `template` parameter overrides auto-detection and checks that one pack.
 
 ---
 

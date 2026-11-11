@@ -6,8 +6,8 @@ namespace Microsoft.Extensions.DependencyInjection;
 public static class AriadneNETWorkspacesServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers <see cref="ISolutionLoader"/> and <see cref="ISolutionValidator"/> as singletons. The validator needs the engine's
-    /// <c>IArchitectureValidator</c>, so callers also call <see cref="AriadneNETServiceCollectionExtensions.AddAriadneNETServices"/>.
+    /// Registers <see cref="ISolutionLoader"/>, <see cref="ISolutionValidator"/> and <see cref="IPackSetValidator"/> as singletons. The validators need the engine's
+    /// <c>IArchitectureValidator</c> and the pack loader and resolver, so callers also call <see cref="AriadneNETServiceCollectionExtensions.AddAriadneNETServices"/>.
     /// </summary>
     public static IServiceCollection AddAriadneNETWorkspaces(this IServiceCollection services)
     {
@@ -15,6 +15,7 @@ public static class AriadneNETWorkspacesServiceCollectionExtensions
 
         services.AddSingleton<ISolutionLoader, SolutionLoader>();
         services.AddSingleton<ISolutionValidator, SolutionValidator>();
+        services.AddSingleton<IPackSetValidator, PackSetValidator>();
         return services;
     }
 }

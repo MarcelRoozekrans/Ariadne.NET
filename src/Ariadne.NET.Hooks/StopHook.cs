@@ -1,7 +1,6 @@
 using Ariadne.NET.Abstractions;
 using Ariadne.NET.Analysis;
 using Ariadne.NET.Workspaces;
-using ZeroAlloc.Results;
 
 namespace Ariadne.NET.Hooks;
 
@@ -9,7 +8,7 @@ namespace Ariadne.NET.Hooks;
 /// Checks the solution when a turn ends, if the agent edited C# files, and feeds the violations back so the agent can fix
 /// them. It never blocks: any failure is a warning on stderr and the turn ends as usual.
 /// </summary>
-public sealed class StopHook(IProjectRules rules, ISolutionValidator validator, Func<string, string?>? getEnvironmentVariable = null) : IHook
+public sealed class StopHook(IPackSetValidator validator, Func<string, string?>? getEnvironmentVariable = null) : IHook
 {
     /// <inheritdoc />
     public string Event => "stop";
@@ -44,25 +43,19 @@ public sealed class StopHook(IProjectRules rules, ISolutionValidator validator, 
         }
 
         var root = ProjectRoot.Resolve(input.Cwd, getEnvironmentVariable);
-        var loaded = rules.Load(root);
-        if (loaded.IsFailure)
+        var solution = SolutionDiscovery.Find(root);
+        if (solution is null)
         {
-            if (loaded.Error.Code != AriadneErrorCode.NotFound)
+            // Without packs there is nothing to check, so only a project with packs hears about the missing solution.
+            if (HasPackFile(root))
             {
-                warn.WriteLine($"ariadne: could not load the project rules: {TextLimit.Shorten(loaded.Error.Message)}");
+                warn.WriteLine("ariadne: found no single solution to validate; skipping the check.");
             }
 
             return null;
         }
 
-        var solution = SolutionDiscovery.Find(root);
-        if (solution is null)
-        {
-            warn.WriteLine("ariadne: found no single solution to validate; skipping the check.");
-            return null;
-        }
-
-        var report = await ValidateAsync(validator, loaded.Value, solution, warn, cancellationToken).ConfigureAwait(false);
+        var report = await ValidateAsync(validator, solution, warn, cancellationToken).ConfigureAwait(false);
         if (report is null)
         {
             return null;
@@ -73,20 +66,38 @@ public sealed class StopHook(IProjectRules rules, ISolutionValidator validator, 
     }
 
     /// <summary>
-    /// Validates, or warns once and returns null when the validation failed. A validator that throws propagates to
+    /// Validates against every pack under <c>.architecture</c>. Returns null, silently, when the project has no packs, and
+    /// warns once and returns null when the validation failed. A validator that throws propagates to
     /// <see cref="HookHost"/>, which reports it as one stderr line; the edit list is kept because nothing forgets it then.
     /// </summary>
     private static async Task<ArchitectureReport?> ValidateAsync(
-        ISolutionValidator validator, RulePack pack, string solution, TextWriter warn, CancellationToken cancellationToken)
+        IPackSetValidator validator, string solution, TextWriter warn, CancellationToken cancellationToken)
     {
-        var result = await validator.ValidateAsync(pack, solution, cancellationToken).ConfigureAwait(false);
+        var result = await validator.ValidateAsync(solution, cancellationToken).ConfigureAwait(false);
         if (result.IsSuccess)
         {
             return result.Value;
         }
 
-        warn.WriteLine($"ariadne: could not validate the solution: {TextLimit.Shorten(result.Error.Message.ReplaceLineEndings(" "))}");
+        if (result.Error.Code != AriadneErrorCode.NotFound)
+        {
+            warn.WriteLine($"ariadne: could not validate the solution: {TextLimit.Shorten(result.Error.Message.ReplaceLineEndings(" "))}");
+        }
+
         return null;
+    }
+
+    private static bool HasPackFile(string root)
+    {
+        var folder = Path.Combine(root, ".architecture");
+        try
+        {
+            return Directory.Exists(folder) && Directory.EnumerateFiles(folder).Any(PackDiscovery.IsPackFile);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return true;
+        }
     }
 
     // Only what this run read: an edit recorded while the check ran stays for the next one.

@@ -5,6 +5,8 @@
 [![Ariadne.NET](https://img.shields.io/nuget/v/Ariadne.NET?label=Ariadne.NET)](https://www.nuget.org/packages/Ariadne.NET)
 [![Ariadne.NET.Abstractions](https://img.shields.io/nuget/v/Ariadne.NET.Abstractions?label=Ariadne.NET.Abstractions)](https://www.nuget.org/packages/Ariadne.NET.Abstractions)
 [![Ariadne.NET.Workspaces](https://img.shields.io/nuget/v/Ariadne.NET.Workspaces?label=Ariadne.NET.Workspaces)](https://www.nuget.org/packages/Ariadne.NET.Workspaces)
+[![Ariadne.NET.Testing](https://img.shields.io/nuget/v/Ariadne.NET.Testing?label=Ariadne.NET.Testing)](https://www.nuget.org/packages/Ariadne.NET.Testing)
+[![Ariadne.NET.Cli](https://img.shields.io/nuget/v/Ariadne.NET.Cli?label=Ariadne.NET.Cli)](https://www.nuget.org/packages/Ariadne.NET.Cli)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://marcelroozekrans.github.io/Ariadne.NET/)
 
 A .NET library that enforces structural rules on AI-generated code. You describe an architecture in a declarative YAML rule pack: layers, allowed dependencies, component roles and naming. Ariadne.NET resolves the pack, generates correctly placed C# components, and checks existing solutions against it.
@@ -22,7 +24,7 @@ dotnet add package Ariadne.NET.Workspaces
 Load a built-in rule pack and check a solution or project against it in a console app. This needs `dotnet add package Microsoft.Extensions.DependencyInjection` as well, because Ariadne.NET references only the dependency injection abstractions. It also needs a .NET SDK on the machine, and one extra reference in the app's project file, which keeps the MSBuild assemblies out of the output. Without it the build fails with `MSBL001`:
 
 ```xml
-<PackageReference Include="Microsoft.Build.Framework" Version="17.11.48" ExcludeAssets="runtime" />
+<PackageReference Include="Microsoft.Build.Framework" Version="17.14.28" ExcludeAssets="runtime" />
 ```
 
 ```csharp
@@ -84,7 +86,7 @@ return report.IsValid ? 0 : 1;
 
 ## CLI and MCP server
 
-The CLI and the MCP server are not packaged yet. Run them from a clone of this repository.
+The CLI is a .NET tool. Install it with `dotnet tool install --global Ariadne.NET.Cli`, which gives you the `ariadne` command, and check the install with `ariadne --version`. It needs the .NET 10 SDK, because it locates MSBuild at run time. The MCP server is not packaged yet. Run it from a clone of this repository. The examples below use `dotnet run --project src/Ariadne.NET.Cli --` from a clone; with the tool installed, write `ariadne` instead.
 
 ### CLI
 
@@ -150,7 +152,7 @@ dotnet run --project src/Ariadne.NET.Mcp.Http
 |----------|-------------|
 | `ariadne://packs/{name}` | Full YAML content of a built-in rule pack |
 
-All tools auto-detect `.architecture/rules.yaml` in the working directory. Pass an explicit `template` parameter to override; composite templates such as `clean-architecture+cqrs` work here as well.
+All tools except `validate_source` auto-detect `.architecture/rules.yaml` in the working directory; `validate_source` checks every pack in the `.architecture` folder above the solution. Pass an explicit `template` parameter to override; composite templates such as `clean-architecture+cqrs` work here as well.
 
 ## How It Works
 
@@ -334,7 +336,7 @@ Result: FAIL - 1 violation(s) found.
     Layer 'Domain' is not allowed to depend on 'Infrastructure': Shop.Domain.Order references Shop.Infrastructure.SqlStore 3 times
 ```
 
-Over MCP, use the `validate_source` tool, which takes a `path` and an optional `template` and returns the report.
+`validate` checks every `.yaml` or `.yml` directly in the `.architecture` folder (not `imports.yaml` or `imports.yml`, the `ariadne sync` manifest), found from the solution's folder upward. Over MCP, use the `validate_source` tool, which takes a `path` and an optional `template` and returns the report. To run the check from a unit test, add `Ariadne.NET.Testing` and call `ArchitectureCheck.AssertValid()`.
 
 What counts as a dependency:
 - Base types, interfaces, attributes, member signatures, generic arguments and types used in method bodies.
@@ -426,10 +428,10 @@ The table below lists what is registered:
 | `ariadne rules` | Print resolved layers, rules and naming conventions |
 | `ariadne roles` | Print component roles table |
 | `ariadne generate --role <role> --name <name> --solution <sol> --feature <feat>` | Generate a component |
-| `ariadne validate [path]` | Validate a solution or project against architecture rules; `path` defaults to `.` |
+| `ariadne validate [path]` | Validate a solution or project against every pack in the `.architecture` folder; `path` defaults to `.` |
 | `ariadne sync` | Sync rule packs from git repositories defined in imports.yaml |
 
-Exit codes: `0` success, `1` violations found, `2` error (missing files or directories, a solution that does not load, failed generation or sync). CI pipelines can fail on any non-zero code, or treat `1` and `2` differently.
+Exit codes: `0` success, `1` violations found, `2` error (missing files or directories, a solution that does not load, failed generation or sync). A usage error, such as an unknown `--format`, currently exits 1 as well ([issue #70](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/70)). CI pipelines can fail on any non-zero code, or treat `1` and `2` differently.
 
 ## Building
 

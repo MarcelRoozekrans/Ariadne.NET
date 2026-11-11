@@ -8,7 +8,7 @@ Loads .NET solutions and projects with `MSBuildWorkspace`, so Ariadne.NET can ch
 - **A `Microsoft.Build.Framework` reference in every project that references this package.** It keeps the MSBuild assemblies out of your output, and the exclusion does not flow from the package to you:
 
   ```xml
-  <PackageReference Include="Microsoft.Build.Framework" Version="17.11.48" ExcludeAssets="runtime" />
+  <PackageReference Include="Microsoft.Build.Framework" Version="17.14.28" ExcludeAssets="runtime" />
   ```
 
   Without it the build fails with `MSBL001`. The `BuildHost-netcore` and `BuildHost-net472` folders that the workspace needs come with the package and land in your output.

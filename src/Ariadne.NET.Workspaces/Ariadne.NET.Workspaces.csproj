@@ -11,6 +11,10 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Ariadne.NET.Workspaces.Tests" />
+    <InternalsVisibleTo Include="Ariadne.NET.Mcp.Tests" />
+    <InternalsVisibleTo Include="Ariadne.NET.Hooks.Tests" />
+    <!-- The stop hook shares the pack-file rule of PackDiscovery. -->
+    <InternalsVisibleTo Include="Ariadne.NET.Hooks" />
   </ItemGroup>
 
   <ItemGroup>

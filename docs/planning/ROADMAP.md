@@ -111,38 +111,44 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Plan:** `docs/superpowers/plans/2026-11-09-phase-2.6-pack-reference-and-json-schema.md`
 **Completed:** 2026-11-09
 
-## Milestone 3: Fail the build [status: pending]
+## Milestone 3: Fail the build [status: active]
 **Goal:** Any .NET solution can enforce its Ariadne packs in tests and CI.
+**Started:** 2026-11-10
+**Design:** `docs/superpowers/specs/2026-11-10-milestone-3-design.md`
 **Definition of Done:**
-- [ ] One test call checks all packs against a solution
-- [ ] CLI and testing package emit JSON and SARIF
-- [ ] `ariadne` is installable as a dotnet tool
-- [ ] A GitHub Actions example fails a build on a violation
+- [ ] All planned phases complete
+- [ ] All tests passing
+- [ ] One call in a test (plus the package's documented MSBuild reference line, if it cannot ship it) checks every pack under `.architecture/` against a solution and fails with the rule id, pack name and `because` of each violation; a fixture with two packs, one clean and one broken, proves it
+- [ ] `ariadne validate`, the stop hook and MCP validation check the same packs and name the pack per violation
+- [ ] CLI and testing package emit JSON and SARIF 2.1.0; a test validates the SARIF against the published schema
+- [ ] `ariadne` installs with `dotnet tool install` from the packed local feed in CI, and `publish-nuget` includes the package
+- [ ] A GitHub Actions example fails a build on a violation, and a job in this repo's CI proves the failing exit code on a broken fixture
+- [ ] The docs site documents the testing package, the report formats, the tool and the CI examples
 
 ### Phase 3.1: Ariadne.NET.Testing [status: pending]
 **Goal:** One call in a test checks all packs against the solution.
 **Surface:** Backend
 **HelpWanted:** no
-**Plan:** _to be written_
+**Plan:** `docs/superpowers/plans/2026-11-10-phase-3.1-ariadne-net-testing.md`
 
 ### Phase 3.2: JSON and SARIF reports [status: pending]
 **Note:** Use ZeroAlloc.Serialisation for the JSON and SARIF writers.
 **Goal:** Machine-readable reports from the CLI and the testing package.
 **Surface:** Backend
 **HelpWanted:** no
-**Plan:** _to be written_
+**Plan:** `docs/superpowers/plans/2026-11-10-phase-3.2-json-and-sarif-reports.md`
 
 ### Phase 3.3: dotnet tool [status: pending]
 **Goal:** Ship the CLI as the `ariadne` dotnet tool.
 **Surface:** Infra
 **HelpWanted:** no
-**Plan:** _to be written_
+**Plan:** `docs/superpowers/plans/2026-11-10-phase-3.3-dotnet-tool.md`
 
 ### Phase 3.4: CI examples [status: pending]
 **Goal:** GitHub Actions examples that fail a build on a violation.
 **Surface:** Docs
 **HelpWanted:** no
-**Plan:** _to be written_
+**Plan:** `docs/superpowers/plans/2026-11-10-phase-3.4-ci-examples.md`
 
 ## Milestone 4: Daedalus parity [status: pending]
 **Goal:** Ariadne proves it can replace Daedalus's ArchUnitNET architecture tests.

@@ -24,6 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Shared\StrayFiles.cs" Link="Shared\StrayFiles.cs" />
     <Compile Include="..\Shared\UnixFactAttribute.cs" Link="Shared\UnixFactAttribute.cs" />
     <Compile Include="..\Shared\UnixNonRootFactAttribute.cs" Link="Shared\UnixNonRootFactAttribute.cs" />
   </ItemGroup>
@@ -33,6 +34,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Reports\sarif-schema-2.1.0.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Reports\Golden\*.sarif">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Reports\Golden\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="RuleLoader\TestData\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

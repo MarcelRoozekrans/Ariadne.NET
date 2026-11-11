@@ -7,7 +7,7 @@ public class ViolationFeedbackTests
 {
     private static readonly string Root = Path.Combine(Path.GetTempPath(), "feedback-root");
 
-    private static ArchitectureViolation Violation(int i, string because = "Because reasons.", string? file = "src/A.cs", string message = "A depends on B.") =>
+    private static ArchitectureViolation Violation(int i, string because = "Because reasons.", string? file = "src/A.cs", string message = "A depends on B.", string pack = "") =>
         new()
         {
             RuleId = $"RULE-{i}",
@@ -15,6 +15,7 @@ public class ViolationFeedbackTests
             SourceType = $"Shop.Type{i}",
             Message = message,
             Because = because,
+            Pack = pack,
             Location = file is null ? null : new SourceLocation(Path.Combine(Root, file), 7 + i, 1),
         };
 
@@ -28,6 +29,13 @@ public class ViolationFeedbackTests
 
         text.Should().StartWith("Ariadne found 1 architecture violation(s) in the solution after your edits this turn:");
         text.Should().Contain("[ForbiddenDependency] src/A.cs:7").And.Contain("A depends on B.").And.Contain("Rule RULE-0: Because reasons.");
+    }
+
+    [Fact]
+    public void Names_the_pack_when_the_violation_has_one()
+    {
+        ViolationFeedback.Build(Report(Violation(0, pack: "broken-pack")), Root).Should().Contain("Pack: broken-pack");
+        ViolationFeedback.Build(Report(Violation(0)), Root).Should().NotContain("Pack:");
     }
 
     [Fact]

@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="FluentAssertions" Version="8.11.0" />
+    <PackageReference Include="JsonSchema.Net" Version="9.6.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1" />
+    <!--
+      A project reference does not apply the package's buildTransitive targets, so this project keeps the reference every
+      project that references Ariadne.NET.Workspaces needs; see the Workspaces README.
+    -->
+    <PackageReference Include="Microsoft.Build.Framework" Version="17.14.28" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Ariadne.NET.Testing\Ariadne.NET.Testing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\FixtureProjects.cs" Link="Shared\FixtureProjects.cs" />
+    <Compile Include="..\Shared\StrayFiles.cs" Link="Shared\StrayFiles.cs" />
+    <Compile Include="..\Ariadne.NET.Tests\Reports\SarifSchema.cs" Link="Reports\SarifSchema.cs" />
+    <None Include="..\Ariadne.NET.Tests\Reports\sarif-schema-2.1.0.json" Link="Reports\sarif-schema-2.1.0.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

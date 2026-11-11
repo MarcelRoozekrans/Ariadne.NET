@@ -3,19 +3,26 @@
 Usage: python3 tools/release/inspect_packages.py <directory> <version>
 
 A NuGet version can be unlisted but never deleted, so ci.yml runs this in pack-validate on every push and again in
-publish-nuget just before the push. It fails when the directory does not hold exactly Ariadne.NET,
-Ariadne.NET.Abstractions and Ariadne.NET.Workspaces at the release version, each with its .snupkg symbol package;
-when a DLL under lib/ was built without -p:AriadneRelease=true, which Directory.Build.props versions <release>-local
-and which is compiled into the DLL; when Ariadne.NET.Abstractions depends on anything but ZeroAlloc.Results and
-ZeroAlloc.Validation; when Ariadne.NET depends on Ariadne.NET.Abstractions at a different version, or on any MSBuild
-package, since only Ariadne.NET.Workspaces may reference MSBuild; when Ariadne.NET.Workspaces depends on Ariadne.NET
-at a different version; or when a package lists an Ariadne dependency it does not declare. Other third-party
-dependencies are not checked. Prints one ::error:: line per problem, which GitHub Actions shows as an annotation.
+publish-nuget just before the push. It fails when the directory does not hold exactly the five release packages,
+Ariadne.NET, Ariadne.NET.Abstractions, Ariadne.NET.Workspaces, Ariadne.NET.Testing and the dotnet tool
+Ariadne.NET.Cli, at the release version, each with its .snupkg symbol package; when an Ariadne DLL was built without
+-p:AriadneRelease=true, which Directory.Build.props versions <release>-local and which is compiled into the DLL;
+when Ariadne.NET.Abstractions depends on anything but ZeroAlloc.Results and ZeroAlloc.Validation; when Ariadne.NET
+depends on Ariadne.NET.Abstractions at a different version, or when Ariadne.NET, Ariadne.NET.Abstractions or the
+tool depends on any MSBuild package, since only Ariadne.NET.Workspaces and Ariadne.NET.Testing may reference
+MSBuild; when Ariadne.NET.Workspaces depends on Ariadne.NET at a different version; when Ariadne.NET.Testing depends
+on Ariadne.NET.Workspaces at a different version; or when a package lists an Ariadne dependency it does not declare.
+The tool bundles its dependencies, so it lists no Ariadne dependency at all; it also fails when it is not a
+DotnetTool package whose DotnetToolSettings.xml runs the bundled Ariadne.NET.Cli.dll with dotnet as the ariadne
+command, or when it bundles any Microsoft.Build assembly but Microsoft.Build.Locator.dll, because MSBuildLocator
+must load MSBuild from the .NET SDK. Other third-party dependencies are not checked. Prints one ::error:: line per
+problem, which GitHub Actions shows as an annotation.
 Standard library only.
 """
 import pathlib
 import re
 import sys
+import xml.etree.ElementTree as ElementTree
 import zipfile
 
 # Each package and the Ariadne packages it must depend on, from the ProjectReferences in its csproj.
@@ -24,16 +31,34 @@ PACKAGES: dict[str, tuple[str, ...]] = {
     "Ariadne.NET.Abstractions": (),
     # Abstractions reaches Workspaces only through Ariadne.NET, so it is not a direct dependency.
     "Ariadne.NET.Workspaces": ("Ariadne.NET",),
+    # Testing reaches the engine and Abstractions only through Workspaces.
+    "Ariadne.NET.Testing": ("Ariadne.NET.Workspaces",),
+    # The tool bundles the engine, Workspaces and Hooks under its tools folder instead of depending on the packages.
+    "Ariadne.NET.Cli": (),
 }
 
 # Abstractions stays dependency-light so a rule-pack author can reference it without the engine: nothing else may creep in.
 ABSTRACTIONS = "Ariadne.NET.Abstractions"
 ABSTRACTIONS_DEPENDENCIES = {"ZeroAlloc.Results", "ZeroAlloc.Validation"}
 
-# Only Ariadne.NET.Workspaces may reference MSBuild: the engine must stay loadable without it, and the CLI and MCP
-# server must not carry Microsoft.Build assemblies. The name prefix Microsoft.Build covers Microsoft.Build.Locator too.
-ENGINE = "Ariadne.NET"
+# Only Ariadne.NET.Workspaces and Ariadne.NET.Testing may reference MSBuild: the engine must stay loadable without it,
+# and the CLI and MCP server must not carry Microsoft.Build assemblies. Testing loads solutions through Workspaces and
+# needs the MSBuild BuildHost folders. The name prefix Microsoft.Build covers Microsoft.Build.Locator too.
+MSBUILD_PACKAGES = {"Ariadne.NET.Workspaces", "Ariadne.NET.Testing"}
 MSBUILD_PREFIXES = ("Microsoft.Build", "Microsoft.CodeAnalysis.Workspaces.MSBuild")
+
+# The dotnet tool: everything it runs sits in one framework-dependent folder, described by DotnetToolSettings.xml.
+TOOL = "Ariadne.NET.Cli"
+TOOL_COMMAND = "ariadne"
+TOOL_RUNNER = "dotnet"
+TOOL_FOLDER = "tools/net10.0/any/"
+# The tool's own assembly and the Ariadne assemblies its project references bring in, which a real pack bundles.
+TOOL_BUNDLED = ("Ariadne.NET.Cli", "Ariadne.NET", "Ariadne.NET.Abstractions", "Ariadne.NET.Workspaces", "Ariadne.NET.Hooks")
+# MSBuildLocator loads MSBuild from the .NET SDK, so the tool must not bundle a copy of any Microsoft.Build assembly,
+# satellite resources included. A real pack holds only Microsoft.Build.Locator.dll, at the top of the tools folder and
+# in the BuildHost-netcore and BuildHost-net472 folders that Microsoft.CodeAnalysis.Workspaces.MSBuild ships, where
+# the out-of-process build host locates MSBuild the same way.
+TOOL_MSBUILD_ALLOWED = {"Microsoft.Build.Locator.dll"}
 
 
 def _informational_version_found(dll: bytes, version: str) -> bool:
@@ -73,6 +98,52 @@ def _symbol_problems(directory: pathlib.Path, package: str, version: str) -> lis
     return []
 
 
+def _is_bundled_ariadne_dll(name: str) -> bool:
+    # Every Ariadne assembly in the tool comes from the same pack, so the prefix match takes all of them, Ariadne.NET.dll
+    # and Ariadne.NET.Abstractions.dll included, for the version check. Only the top of the tools folder counts: the
+    # culture and BuildHost folders hold no Ariadne assembly.
+    file = name.removeprefix(TOOL_FOLDER)
+    return name.startswith(TOOL_FOLDER) and "/" not in file and file.startswith("Ariadne.NET") and file.endswith(".dll")
+
+
+def _tool_problems(nuspec: str, names: list[str], settings: bytes | None) -> list[str]:
+    errors: list[str] = []
+    package_types = re.findall(r'<packageType\b[^>]*\bname="([^"]+)"', nuspec)
+    if "DotnetTool" not in package_types:
+        errors.append(f"{TOOL}: nuspec package type is {', '.join(package_types) or 'missing'}, expected DotnetTool")
+
+    for bundled in TOOL_BUNDLED:
+        if f"{TOOL_FOLDER}{bundled}.dll" not in names:
+            errors.append(f"{TOOL}: {TOOL_FOLDER}{bundled}.dll is missing")
+
+    if settings is None:
+        errors.append(f"{TOOL}: {TOOL_FOLDER}DotnetToolSettings.xml is missing")
+    else:
+        try:
+            commands = ElementTree.fromstring(settings).findall("./Commands/Command")
+        except ElementTree.ParseError as exc:
+            commands = []
+            errors.append(f"{TOOL}: {TOOL_FOLDER}DotnetToolSettings.xml is not valid XML: {exc}")
+        else:
+            if len(commands) != 1:
+                errors.append(f"{TOOL}: DotnetToolSettings.xml has {len(commands)} commands, expected one")
+        for command in commands[:1]:
+            name, entry_point, runner = (command.get(key) for key in ("Name", "EntryPoint", "Runner"))
+            if name != TOOL_COMMAND:
+                errors.append(f"{TOOL}: the command is named {name}, expected {TOOL_COMMAND}")
+            if runner != TOOL_RUNNER:
+                errors.append(f"{TOOL}: the command's runner is {runner}, expected {TOOL_RUNNER}")
+            if not entry_point or f"{TOOL_FOLDER}{entry_point}" not in names:
+                errors.append(f"{TOOL}: the command's entry point {entry_point} is not in {TOOL_FOLDER}")
+
+    for name in sorted(names):
+        file = name.rsplit("/", 1)[-1]
+        if file.startswith("Microsoft.Build.") and file not in TOOL_MSBUILD_ALLOWED:
+            errors.append(f"{TOOL}: bundles {name}; MSBuild must come from the .NET SDK, and only "
+                          f"Microsoft.Build.Locator.dll may ship")
+    return errors
+
+
 def _dependencies(nuspec: str) -> dict[str, list[str]]:
     found: dict[str, list[str]] = {}
     for tag in re.findall(r"<dependency\b[^>]*>", nuspec):
@@ -90,8 +161,14 @@ def _package_problems(directory: pathlib.Path, package: str, version: str) -> li
     try:
         with zipfile.ZipFile(path) as archive:
             nuspec = archive.read(f"{package}.nuspec").decode("utf-8")
-            dlls = {name: archive.read(name) for name in archive.namelist()
-                    if name.startswith("lib/") and name.endswith(".dll")}
+            names = archive.namelist()
+            # A library's DLLs are its own build. The tool's top folder also holds third-party DLLs with their own
+            # versions, so only the Ariadne assemblies, all built in the same pack, are checked there.
+            dlls = {name: archive.read(name) for name in names
+                    if (_is_bundled_ariadne_dll(name) if package == TOOL
+                        else name.startswith("lib/") and name.endswith(".dll"))}
+            settings = archive.read(f"{TOOL_FOLDER}DotnetToolSettings.xml") \
+                if package == TOOL and f"{TOOL_FOLDER}DotnetToolSettings.xml" in names else None
     except zipfile.BadZipFile as exc:
         return [f"{package}: {path.name} is not a valid package: {exc}"]
     except KeyError:
@@ -105,7 +182,9 @@ def _package_problems(directory: pathlib.Path, package: str, version: str) -> li
     if declared is None or declared.group(1) != version:
         errors.append(f"{package}: nuspec version is {declared.group(1) if declared else 'missing'}, expected {version}")
 
-    if not dlls:
+    if package == TOOL:
+        errors.extend(_tool_problems(nuspec, names, settings))
+    elif not dlls:
         errors.append(f"{package}: {path.name} has no DLL under lib/")
     for name, content in sorted(dlls.items()):
         if not _informational_version_found(content, version):
@@ -122,10 +201,10 @@ def _package_problems(directory: pathlib.Path, package: str, version: str) -> li
         for dependency in sorted(found.keys() - ABSTRACTIONS_DEPENDENCIES):
             errors.append(f"{package} depends on {dependency}, which is not one of ZeroAlloc.Results and ZeroAlloc.Validation")
 
-    if package == ENGINE:
+    if package not in MSBUILD_PACKAGES:
         for dependency in sorted(found):
             if dependency.startswith(MSBUILD_PREFIXES):
-                errors.append(f"{package} depends on {dependency}; only Ariadne.NET.Workspaces may reference MSBuild")
+                errors.append(f"{package} depends on {dependency}; only Ariadne.NET.Workspaces and Ariadne.NET.Testing may reference MSBuild")
 
     # The SDK writes a project reference as the plain package version, so that is the one form accepted.
     for dependency in PACKAGES[package]:
@@ -147,7 +226,7 @@ def problems(directory: pathlib.Path, version: str) -> list[str]:
     if found != expected:
         missing = sorted(set(expected) - set(found))
         extra = sorted(set(found) - set(expected))
-        return [f"expected exactly the three release packages in {directory}; missing {missing}, unexpected {extra}"]
+        return [f"expected exactly the five release packages in {directory}; missing {missing}, unexpected {extra}"]
 
     errors: list[str] = []
     expected_symbols = {f"{package}.{version}.snupkg" for package in PACKAGES}

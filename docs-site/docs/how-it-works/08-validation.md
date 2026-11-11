@@ -11,7 +11,7 @@ The engine checks existing code with the compiler's semantic model on a loaded s
 **Interfaces:** `ISolutionValidator` (`Ariadne.NET.Workspaces`) and `IArchitectureValidator` (`Ariadne.NET`)
 **Implementations:** `SolutionValidator` and `ArchitectureValidator`
 
-`ISolutionValidator` is the entry point for hosts. The CLI `validate` command and the MCP `validate_source` tool both call it.
+`ISolutionValidator` is the entry point for hosts that check one resolved pack. The CLI `validate` command, the stop hook and the MCP `validate_source` tool (without a `template`) call `IPackSetValidator` instead, which checks every `.yaml` or `.yml` directly in the `.architecture` folder (not `imports.yaml` or `imports.yml`, the `ariadne sync` manifest), found from the solution's folder upward. It loads the solution once, checks each pack on its own and merges the violations into one report. Each violation names its pack, and a pack that fails to load fails the check, and the message names the file once: the loader's own message when it already does, otherwise a leading `In pack file '<name>': `. A pack meant to be imported must be a `builtin://` or `import://` reference, not a file in that folder. `Ariadne.NET.Testing` runs the same check from a unit test; see [Testing](13-testing.md). The report can be written as JSON or SARIF; see [Reports](14-reports.md).
 
 ```
 ISolutionValidator
@@ -138,11 +138,12 @@ The CLI prints a report like this:
 Checked 2 types in 2 projects
 Result: FAIL - 1 violation(s) found.
 
-  [DependencyNotAllowed] Shop.Domain/Order.cs:7
+  [DependencyNotAllowed] Shop.Domain/Order.cs:7 pack shop
     Layer 'Domain' is not allowed to depend on 'Infrastructure': Shop.Domain.Order references Shop.Infrastructure.SqlStore 3 times
+    Rule SHOP-LAYER-DOMAIN: The domain holds business rules only.
 ```
 
-Paths in the report are absolute. The CLI shows them relative to the directory of the solution or project it loaded, and puts a non-empty `TargetFrameworks` list in parentheses after the location, as in `Shop.Domain/Order.cs:7 (net10.0)`.
+Paths in the report are absolute. The CLI shows them relative to the directory of the solution or project it loaded, and puts a non-empty `TargetFrameworks` list in parentheses after the location, as in `Shop.Domain/Order.cs:7 (net10.0)`. After the location comes the pack the violation came from, and under the message the rule id with its `because`, when the rule has one.
 
 ### Which projects are checked
 
@@ -160,10 +161,10 @@ Ariadne never restores. A compilation that is complete passes even without a res
 
 ### Requirements for package consumers
 
-`Ariadne.NET.Workspaces` loads projects with MSBuild from an installed .NET SDK, which it finds with MSBuildLocator. A project that references the package must also add its own reference, or the build fails with `MSBL001`:
+`Ariadne.NET.Testing` needs no extra reference; see [Testing](13-testing.md). `Ariadne.NET.Workspaces` loads projects with MSBuild from an installed .NET SDK, which it finds with MSBuildLocator. A project that references the package must also add its own reference, or the build fails with `MSBL001`:
 
 ```xml
-<PackageReference Include="Microsoft.Build.Framework" Version="17.11.48" ExcludeAssets="runtime" />
+<PackageReference Include="Microsoft.Build.Framework" Version="17.14.28" ExcludeAssets="runtime" />
 ```
 
 The `BuildHost-*` folders that the workspace needs come with the package.

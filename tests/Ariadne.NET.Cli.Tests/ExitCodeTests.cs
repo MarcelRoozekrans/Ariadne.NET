@@ -77,17 +77,94 @@ public sealed class ExitCodeTests : IDisposable
     [Fact]
     public void Validate_CleanFixture_ShouldReturnSuccess()
     {
-        var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("fourlayer", "Shop.csproj"));
+        var (exitCode, stdout) = RunCapturingStdout("validate", CopiedFixture("fourlayer", "Shop.csproj"));
 
         exitCode.Should().Be(ExitCodes.Success);
         stdout.Should().Contain("Result: PASS - No violations found.");
     }
 
     [Fact]
+    public void Validate_TwoPacksFixture_ChecksEveryPackAndNamesTheBrokenOne()
+    {
+        var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("twopacks", "Shop.slnx"));
+
+        exitCode.Should().Be(ExitCodes.Violations);
+        stdout.Should().Contain("broken-pack").And.Contain("Result: FAIL");
+    }
+
+    [Fact]
+    public void Validate_TwoPacksFixture_FindsThePacksFromTheSolutionNotTheWorkingDirectory()
+    {
+        // The working directory holds its own pack, named so that it cannot be mistaken for anything else.
+        WriteRules("schema: 2\nname: working-directory-only-pack\nextends:\n  - builtin://clean-architecture\n");
+        var (fromTemp, tempOut) = RunCapturingStdout("validate", FixtureProjects.Path("twopacks", "Shop.slnx"));
+
+        Directory.SetCurrentDirectory(FixtureProjects.Path("twopacks"));
+        var (fromFixture, fixtureOut) = RunCapturingStdout("validate", "Shop.slnx");
+
+        fromTemp.Should().Be(ExitCodes.Violations);
+        fromFixture.Should().Be(ExitCodes.Violations);
+        tempOut.Should().Contain("broken-pack").And.NotContain("working-directory-only-pack");
+        fixtureOut.Should().Contain("broken-pack").And.NotContain("working-directory-only-pack");
+    }
+
+    [Fact]
+    public void Validate_SolutionWithoutAnArchitectureFolderAbove_ReturnsNotFound()
+    {
+        var copy = Path.Combine(Path.GetTempPath(), $"ariadne-cli-nopacks-{Guid.NewGuid():N}");
+        try
+        {
+            CopyDirectory(FixtureProjects.Path("clean"), copy);
+            StrayFiles.AssertNoArchitectureFolderAbove(copy);
+            var (exitCode, stderr) = RunCapturingStderr("validate", Path.Combine(copy, "Shop.slnx"));
+
+            exitCode.Should().Be(ExitCodes.Error);
+            stderr.Should().StartWith($"Error: No '.architecture' folder was found in '{copy}' or any folder above it.");
+        }
+        finally
+        {
+            Directory.Delete(copy, true);
+        }
+    }
+
+    // The pack folder is found from the solution upward, so a test that writes rules.yaml into the temp working
+    // directory validates a copy of the fixture below it instead of the original under tests/fixtures.
+    private string CopiedFixture(string name, string? file = null)
+    {
+        var target = Path.Combine(_tempDir, "fixtures", name);
+        if (!Directory.Exists(target))
+        {
+            CopyDirectory(FixtureProjects.Path(name), target);
+        }
+
+        return file is null ? target : Path.Combine(target, file);
+    }
+
+    private static void CopyDirectory(string source, string target)
+    {
+        Directory.CreateDirectory(target);
+        foreach (var file in Directory.EnumerateFiles(source))
+        {
+            File.Copy(file, Path.Combine(target, Path.GetFileName(file)));
+        }
+
+        foreach (var directory in Directory.EnumerateDirectories(source))
+        {
+            // A fixture's own pack would be found before the one a test writes above the copy, or before none at all.
+            if (string.Equals(Path.GetFileName(directory), ".architecture", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            CopyDirectory(directory, Path.Combine(target, Path.GetFileName(directory)));
+        }
+    }
+
+    [Fact]
     public void Validate_BrokenFixture_ShouldReturnViolations()
     {
         WriteLayerRules("Domain", "Infrastructure");
-        var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("broken", "Shop.slnx"));
+        var (exitCode, stdout) = RunCapturingStdout("validate", CopiedFixture("broken", "Shop.slnx"));
 
         exitCode.Should().Be(ExitCodes.Violations);
         stdout.Should().Contain("Result: FAIL - 1 violation(s) found.")
@@ -98,7 +175,7 @@ public sealed class ExitCodeTests : IDisposable
     [Fact]
     public void Validate_BrokenFixture_ShowsViolationFileRelativeToTheSolutionDirectory()
     {
-        var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("broken", "Shop.slnx"));
+        var (exitCode, stdout) = RunCapturingStdout("validate", CopiedFixture("broken", "Shop.slnx"));
 
         exitCode.Should().Be(ExitCodes.Violations);
         stdout.Should().Contain("  [DependencyNotAllowed] Shop.Domain/Order.cs:").And.NotContain(FixtureProjects.Root);
@@ -107,7 +184,7 @@ public sealed class ExitCodeTests : IDisposable
     [Fact]
     public void Validate_ProjectFolder_ShowsViolationFilesRelativeToTheFolder()
     {
-        var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("multitarget"));
+        var (exitCode, stdout) = RunCapturingStdout("validate", CopiedFixture("multitarget"));
 
         exitCode.Should().Be(ExitCodes.Violations);
         stdout.Should().Contain("  [DependencyNotAllowed] Domain/Order.cs:").And.NotContain(FixtureProjects.Root);
@@ -116,10 +193,10 @@ public sealed class ExitCodeTests : IDisposable
     [Fact]
     public void Validate_ViolationInSomeTargetFrameworks_ListsThemAfterTheLocation()
     {
-        var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("multitarget", "Multi.csproj"));
+        var (exitCode, stdout) = RunCapturingStdout("validate", CopiedFixture("multitarget", "Multi.csproj"));
 
         exitCode.Should().Be(ExitCodes.Violations);
-        stdout.Should().MatchRegex(@"(?m)^  \[DependencyNotAllowed\] Domain/Order\.cs:\d+ \(net10\.0\)\r?$");
+        stdout.Should().MatchRegex(@"(?m)^  \[DependencyNotAllowed\] Domain/Order\.cs:\d+ \(net10\.0\) pack clean-architecture\+shop\r?$");
     }
 
     [Fact]
@@ -158,7 +235,7 @@ public sealed class ExitCodeTests : IDisposable
     [Fact]
     public void Validate_reports_a_vacuous_layer_by_kind_name()
     {
-        var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("broken", "Shop.slnx"));
+        var (exitCode, stdout) = RunCapturingStdout("validate", CopiedFixture("broken", "Shop.slnx"));
 
         exitCode.Should().Be(ExitCodes.Violations);
         stdout.Should().Contain("  [VacuousLayer] Application")
@@ -266,6 +343,121 @@ public sealed class ExitCodeTests : IDisposable
         writer.ToString().Split(Environment.NewLine).Should().Contain("  [TypeKindMismatch] Shop.Domain.Order (net8.0, net9.0)");
     }
 
+    // JSON and SARIF go to the standard output as bytes, not through Console.Out, so a test swaps the stream.
+    private (int ExitCode, byte[] Stdout, string Stderr, string ConsoleOut) RunWithBinaryStdout(params string[] args)
+    {
+        var originalError = Console.Error;
+        var originalOut = Console.Out;
+        using var error = new StringWriter();
+        using var console = new StringWriter();
+        using var stream = new MemoryStream();
+        Console.SetError(error);
+        Console.SetOut(console);
+        ValidateCommand.OpenStandardOutput = () => stream;
+        try
+        {
+            var exitCode = Run(args);
+            return (exitCode, stream.ToArray(), error.ToString(), console.ToString());
+        }
+        finally
+        {
+            ValidateCommand.OpenStandardOutput = Console.OpenStandardOutput;
+            Console.SetError(originalError);
+            Console.SetOut(originalOut);
+        }
+    }
+
+    [Fact]
+    public void Validate_FormatTextWithOutput_WritesTheTextToTheFileAndNothingToStdout()
+    {
+        var output = Path.Combine(_tempDir, "reports", "out.txt");
+
+        var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("twopacks", "Shop.slnx"), "--format", "text", "--output", output);
+
+        exitCode.Should().Be(ExitCodes.Violations);
+        stdout.Should().BeEmpty();
+        File.ReadAllText(output).Should().Contain("Checked ").And.Contain("Result: FAIL");
+    }
+
+    [Fact]
+    public void Validate_FormatJson_ReportsTheEngineVersion()
+    {
+        var (_, stdout, _, _) = RunWithBinaryStdout("validate", FixtureProjects.Path("twopacks", "Shop.slnx"), "--format", "json");
+
+        using var document = System.Text.Json.JsonDocument.Parse(stdout);
+        var version = document.RootElement.GetProperty("tool").GetProperty("version").GetString()!;
+        var engine = System.Reflection.CustomAttributeExtensions
+            .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(Ariadne.NET.Reports.ReportRoot).Assembly)!.InformationalVersion;
+        version.Should().Be(engine.Split('+')[0]);
+    }
+
+    [Fact]
+    public void Validate_FormatJson_LeavesOnlyJsonOnStdoutAndTheSummaryOnStderr()
+    {
+        var (exitCode, stdout, stderr, consoleOut) = RunWithBinaryStdout("validate", FixtureProjects.Path("twopacks", "Shop.slnx"), "--format", "json");
+
+        exitCode.Should().Be(ExitCodes.Violations);
+        stdout.Take(3).Should().NotEqual(new byte[] { 0xEF, 0xBB, 0xBF });
+        using var document = System.Text.Json.JsonDocument.Parse(stdout);
+        document.RootElement.GetProperty("schema").GetInt32().Should().Be(1);
+        document.RootElement.GetProperty("violations").GetArrayLength().Should().BeGreaterThan(0);
+        consoleOut.Should().BeEmpty();
+        stderr.Should().Contain("Checked ").And.Contain("Result: FAIL");
+    }
+
+    [Fact]
+    public void Validate_FormatSarifWithOutput_WritesTheFileAndKeepsTheTextOnStdout()
+    {
+        var output = Path.Combine(_tempDir, "reports", "nested", "out.sarif");
+
+        var (exitCode, stdout) = RunCapturingStdout("validate", FixtureProjects.Path("twopacks", "Shop.slnx"), "--format", "sarif", "--output", output);
+
+        exitCode.Should().Be(ExitCodes.Violations);
+        File.Exists(output).Should().BeTrue();
+        using var document = System.Text.Json.JsonDocument.Parse(File.ReadAllBytes(output));
+        document.RootElement.GetProperty("version").GetString().Should().Be("2.1.0");
+        stdout.Should().Contain("Checked ").And.Contain("Result: FAIL");
+    }
+
+    [Fact]
+    public void Validate_UnknownFormat_IsAUsageError()
+    {
+        var (exitCode, stderr) = RunCapturingStderr("validate", FixtureProjects.Path("twopacks", "Shop.slnx"), "--format", "yaml");
+
+        exitCode.Should().NotBe(ExitCodes.Success);
+        stderr.Should().Contain("yaml");
+    }
+
+    [Fact]
+    public void Validate_FormatJsonOnACleanSolution_ReturnsSuccess()
+    {
+        var (exitCode, stdout, _, _) = RunWithBinaryStdout("validate", CopiedFixture("fourlayer", "Shop.csproj"), "--format", "json");
+
+        exitCode.Should().Be(ExitCodes.Success);
+        using var document = System.Text.Json.JsonDocument.Parse(stdout);
+        document.RootElement.GetProperty("violations").GetArrayLength().Should().Be(0);
+    }
+
+    [Fact]
+    public void Validate_OutputPathWhoseParentIsAFile_ReturnsErrorWithAnErrorLine()
+    {
+        var blocker = Path.Combine(_tempDir, "blocker");
+        File.WriteAllText(blocker, "x");
+
+        var (exitCode, stderr) = RunCapturingStderr("validate", FixtureProjects.Path("twopacks", "Shop.slnx"), "--format", "json", "--output", Path.Combine(blocker, "out.json"));
+
+        exitCode.Should().Be(ExitCodes.Error);
+        stderr.Should().Contain("Error: ").And.Contain("could not be written.");
+    }
+
+    [Fact]
+    public void Validate_Help_ShowsFormatAndOutput()
+    {
+        var (_, stdout) = RunCapturingStdout("validate", "--help");
+
+        stdout.Should().Contain("--format").And.Contain("--output");
+    }
+
     [Fact]
     public void Validate_MissingPath_ShouldReturnError()
     {
@@ -275,7 +467,7 @@ public sealed class ExitCodeTests : IDisposable
     [Fact]
     public void Validate_DirectoryWithTwoSolutions_ShouldReturnError()
     {
-        var (exitCode, stderr) = RunCapturingStderr("validate", FixtureProjects.Path("clean"));
+        var (exitCode, stderr) = RunCapturingStderr("validate", CopiedFixture("clean"));
 
         exitCode.Should().Be(ExitCodes.Error);
         stderr.Should().StartWith("Error: ");
@@ -284,7 +476,7 @@ public sealed class ExitCodeTests : IDisposable
     [Fact]
     public void Validate_CompileErrorFixture_ShouldReturnError()
     {
-        Run("validate", FixtureProjects.Path("compile-error", "Broken.csproj")).Should().Be(ExitCodes.Error);
+        Run("validate", CopiedFixture("compile-error", "Broken.csproj")).Should().Be(ExitCodes.Error);
     }
 
     [Fact]
@@ -297,7 +489,7 @@ public sealed class ExitCodeTests : IDisposable
         written.Should().Contain("- builtin://clean-architecture").And.Contain("- builtin://cqrs");
 
         // The fourlayer fixture has a type in each of the four layers of clean-architecture.
-        Run("validate", FixtureProjects.Path("fourlayer", "Shop.csproj")).Should().Be(ExitCodes.Success);
+        Run("validate", CopiedFixture("fourlayer", "Shop.csproj")).Should().Be(ExitCodes.Success);
     }
 
     [Theory]
@@ -610,7 +802,7 @@ public sealed class ExitCodeTests : IDisposable
 
         try
         {
-            Run("validate", FixtureProjects.Path("clean", "Shop.slnx")).Should().Be(ExitCodes.Error);
+            Run("validate", CopiedFixture("clean", "Shop.slnx")).Should().Be(ExitCodes.Error);
         }
         finally
         {
@@ -618,7 +810,7 @@ public sealed class ExitCodeTests : IDisposable
         }
 
         var lines = error.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
-        lines[0].Should().Be("Error: Built-in pack 'nope' not found.");
+        lines[0].Should().Be("Error: In pack file 'rules.yaml': Built-in pack 'nope' not found.");
         lines[1].Should().StartWith("Available packs: ");
     }
 
@@ -632,7 +824,7 @@ public sealed class ExitCodeTests : IDisposable
 
         try
         {
-            Run("validate", FixtureProjects.Path("clean", "Shop.slnx")).Should().Be(ExitCodes.Error);
+            Run("validate", CopiedFixture("clean", "Shop.slnx")).Should().Be(ExitCodes.Error);
         }
         finally
         {
@@ -640,8 +832,8 @@ public sealed class ExitCodeTests : IDisposable
         }
 
         var lines = error.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
-        lines[0].Should().Be("Error: Rule pack file '.architecture/rules.yaml' has 1 problem(s).");
-        lines[1].Should().StartWith(".architecture/rules.yaml:4:1: ");
+        lines[0].Should().StartWith("Error: Rule pack file '").And.EndWith("rules.yaml' has 1 problem(s).");
+        lines[1].Should().Contain("rules.yaml:4:1: ");
         error.ToString().Should().NotContain(" at ", "an expected failure prints no stack trace");
     }
 
@@ -657,7 +849,7 @@ public sealed class ExitCodeTests : IDisposable
 
         try
         {
-            Run("validate", FixtureProjects.Path("clean", "Shop.slnx")).Should().Be(ExitCodes.Error);
+            Run("validate", CopiedFixture("clean", "Shop.slnx")).Should().Be(ExitCodes.Error);
         }
         finally
         {
@@ -667,7 +859,7 @@ public sealed class ExitCodeTests : IDisposable
 
         var lines = error.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
         lines.Should().HaveCount(2, "an expected failure prints the message and the OS reason, not a stack trace");
-        lines[0].Should().Be("Error: Rule pack file '.architecture/rules.yaml' could not be read.");
+        lines[0].Should().StartWith("Error: Rule pack file '").And.EndWith("rules.yaml' could not be read.");
     }
 
     [Fact]

@@ -9,9 +9,12 @@ internal static class TestPacks
     /// Domain depends on nothing; Infrastructure and WebApi may depend on Domain. A layer that covers no type fails the run,
     /// so a test names the layers its fixture has, and gets all three when it names none.
     /// </summary>
-    public static RulePack Layered(params string[] layers) => new()
+    public static RulePack Layered(params string[] layers) => Named("test", layers);
+
+    /// <summary>The same layered pack under the given name.</summary>
+    public static RulePack Named(string name, params string[] layers) => new()
     {
-        Name = "test",
+        Name = name,
         Layers = new[]
         {
             new LayerDefinition { Name = "Domain", Id = "TEST-LAYER-DOMAIN", Because = "Test layer Domain.", Namespaces = ["**.Domain.**"] },
