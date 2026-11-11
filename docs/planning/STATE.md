@@ -78,10 +78,19 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 
 ## Recommended Next Step
 
-Milestone 4 is groomed: all five phases have approved designs, plans with `## Checks` and guard checks. Next:
+Milestone 4 is groomed: all five phases have approved designs, plans with `## Checks` and guard checks. **PR #84** (`chore/milestone-4-start` → `main`, opened 2026-11-11 with the owner's go-ahead; the owner merges) has all CI checks green, but CodeRabbit requested changes. Next, on branch `chore/milestone-4-start` (worktree: local branch from `origin/chore/milestone-4-start`, push with `git push origin HEAD:chore/milestone-4-start`):
 
-1. Get the groomed plans onto `main`. `main` requires a PR: open one from `chore/milestone-4-start` when the owner allows it, or ask the owner to merge. In this clone, `origin` is `MarcelRoozekrans/Ariadne.NET`.
-2. Run `ready-check` on `main` and queue only phases 4.1 to 4.4 for the unattended run; 4.5 changes the Daedalus.NET repository and is built later in a session on that repository, after a release that contains Milestone 4.
+1. **Fix the CodeRabbit findings on #84 in this PR**, validating each against the files first. Read them with `gh api repos/MarcelRoozekrans/Ariadne.NET/pulls/84/comments`. A first read, to confirm:
+   - 4.1 plan Task 9 Steps 2a and 2b: `Phase42ContractTests` asserts a 4.2 gap exists and `Phase43ContractTests` asserts the slice cases stay gaps, so both guards fail once 4.2 or 4.3 closes its gaps and the full test run goes red. Likely valid: keep the typed name bindings, drop the gap-state assertions or make them hold before and after closing.
+   - 4.2 plan line ~171: `AreNotAssignableTo` mapped to type-name exceptions is not a real negative assignability predicate. Likely valid: use `assignableTo` under `isNot`, or for the predicate keep the gap.
+   - 4.2 plan line ~186: negative-polarity cases must select `NotClean` / `NotBroken`, not `Clean` / `Broken`.
+   - 4.2 design line ~60: with `CSharpTypeKind` gaining `Enum` and `Delegate`, a code-built pack could hand them to roles and code generation; add a validator backstop and a test.
+   - 4.3 design lines ~94 to 103: type identity should include the assembly, as `UniqueNameRules.Collect` does; excepted types must stay available as targets, since exceptions exempt sources only; edges and reported target frameworks should stay per framework.
+   - 4.4 plan line ~95: split multi-id map cells before checking them; add a multi-id sample.
+   - 4.4 design line ~66: the "not needed" mapping for the load-bearing facts loses the check that `Thalos.ISubagentRunner` exists, because the `to` side of `allowOnly` is never vacuity-checked. Needs a decision: a `require` rule with `allowEmpty: false` over the target, or say plainly in the guide that the target side is unchecked. Ask the owner.
+   - 4.5 plan line ~81: facts that stay in C# must be moved out of the two deleted files before deleting them.
+   Commit the fixes, push, reply on each thread, and wait for CodeRabbit and CI again.
+2. After the owner merges #84: run `ready-check` on `main` and queue only phases 4.1 to 4.4. 4.5 changes the Daedalus.NET repository and is built later in a session on that repository, after a release that contains Milestone 4.
 3. `fix/hooks-follow-ups` is still pushed with no PR.
 
 Commit rules: conventional commits; no `Co-Authored-By` trailer or session link; no nested parentheses in commit bodies; keep every footer line under 100 characters, because commitlint rejects longer ones; breaking commits carry `!` and a `BREAKING CHANGE` footer. Shared VM: one build or test at a time, no local AOT publish.
