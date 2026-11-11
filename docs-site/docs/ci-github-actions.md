@@ -67,9 +67,11 @@ jobs:
 
       # Runs after a failed validation too, so the violations reach code
       # scanning. Code scanning must be available for the repository: private
-      # repositories need GitHub Advanced Security.
+      # repositories need GitHub Advanced Security. Skipped on pull requests
+      # from forks and on Dependabot runs, whose token cannot write code
+      # scanning results.
       - name: Upload the SARIF report
-        if: ${{ !cancelled() && hashFiles('ariadne.sarif') != '' }}
+        if: ${{ !cancelled() && hashFiles('ariadne.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor != 'dependabot[bot]' }}
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: ariadne.sarif
@@ -79,9 +81,10 @@ The validate step is the one that fails the job. The upload step runs after a fa
 
 ### Code scanning
 
-Uploaded results appear as code scanning alerts. Two limits apply:
+Uploaded results appear as code scanning alerts. Three limits apply:
 
 - **Private repositories need GitHub Advanced Security.** Without it the upload step fails. Remove the upload step and the `security-events: write` permission; the validate step still fails the build.
+- **Pull requests from forks and Dependabot runs skip the upload.** GitHub gives them a read-only `GITHUB_TOKEN`, so the upload would fail. The validate step still fails the build on violations.
 - **Violations without a file location are not displayed.** A rule or layer that matches no type (`VacuousRule`, `VacuousLayer`) and a banned package have no source position. They are in the SARIF file and in the text report, and GitHub code scanning does not show them. They still make `ariadne validate` exit 1. See [issue #71](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/71).
 
 The SARIF mapping is described in [Reports](how-it-works/14-reports.md#sarif-report).
