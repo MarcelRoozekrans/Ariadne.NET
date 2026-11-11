@@ -1,10 +1,12 @@
 # Session State
 
-**Last session:** 2026-11-11 (Milestone 3 complete; Milestone 4 next)
+**Last session:** 2026-11-11 (Milestone 4 started as ArchUnitNET parity; grooming next)
 **Repository:** `MarcelRoozekrans/Ariadne.NET`, public since 2026-11-03. The old private repository `MarcelRoozekrans/architecture-governance-engine` is frozen. Local clones: remote `ariadne` is the new repository, `origin` the old one; push with `git push ariadne HEAD:<branch>`, never to `origin`.
 
 ## Current Position
 
+- **Milestone 4 — ArchUnitNET parity:** [active, started 2026-11-11] on branch `chore/milestone-4-start` (pushed, no PR yet). Renamed from "Daedalus parity" by the owner: parity with ArchUnitNET in general, proved side by side in this repo; Ariadne depends on nothing from Daedalus. Approved design `docs/superpowers/specs/2026-11-11-milestone-4-design.md`. Phases 4.1 to 4.5 all `pending`, none groomed yet. Owner decisions 2026-11-11: scope is type-level conditions plus slices, member level deferred to one issue; approach A, both tools run in one test; documented `Divergences` allowed, `KnownGaps` must be empty for in-scope kinds; the last phase, 4.5, switches Daedalus over in the Daedalus repo.
+- **Owner's instruction 2026-11-11:** groom the whole of Milestone 4, then execute it unattended.
 - **Milestone 3 — Fail the build:** [complete 2026-11-11]. Phases 3.1 to 3.4 built by an unattended run as stacked PRs #68, #72, #73 and #76, landed on `main` as #77, example fixes in #81. Released as 0.7.1. Audit PASS: `docs/superpowers/reviews/2026-11-11-milestone-3-audit.md`. Follow-ups #66, #67, #70, #71, #75. Next: `new-milestone` for Milestone 4, Daedalus parity.
 - **Hooks fix branch:** `fix/hooks-follow-ups` is pushed, no PR yet. Its commits edit STATE.md too, so expect a small merge conflict in the 5.6 follow-up lines.
 
@@ -70,8 +72,17 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 - Deferred minors from the reviews: the Daedalus fixture never exercises the Agents layer's `allowedDependencies`; `Owned<T>` and the reader have no further known gaps.
 - **Parked, approved 2026-11-06:** phase 5.7 Guidance delivery, designed in `docs/superpowers/specs/2026-11-06-agent-guidance-hooks-design.md` (stage B). Owner decisions: one tool with a separate `Ariadne.NET.Guidance` package; Ariadne owns structure and delivery while AI.Sentinel owns tool-call enforcement. It takes over the pack attachments that 5.6 left out.
 
+## Grooming
+
+Grooming: milestone 4, next phase 4.1
+
 ## Recommended Next Step
 
-The groomed plans must reach `main` (it requires a PR; the owner opens it) before `ready-check` can queue an unattended run of phases 3.1 to 3.4 in order. Then run `ready-check`, or `start-next-phase` to build attended. Do not merge release-please or Renovate PRs unless asked.
+Run `groom-milestone` for Milestone 4 on branch `chore/milestone-4-start`, starting with phase 4.1, then 4.2 to 4.5 in order. Each phase gets a phase-scope brainstorm (approved design), a plan with `## Checks`, and `**Builds on:**` lines plus guard checks where a phase uses an earlier one. 4.2 and 4.3 build on 4.1's harness, and 4.4 on all three. Then:
+
+- Phase 4.5 changes the Daedalus.NET repo, so an unattended run in this repo cannot build it. Groom its design and plan here, queue only 4.1 to 4.4 with `ready-check`, and build 4.5 later in a session on the Daedalus repo, after a release that contains what its pack needs.
+- The groomed plans must reach `main` before `ready-check` can queue the run. `main` requires a PR: open one from `chore/milestone-4-start` when the owner allows it, or ask the owner to merge.
+- In this clone, `origin` is `MarcelRoozekrans/Ariadne.NET`.
+- `fix/hooks-follow-ups` is still pushed with no PR.
 
 Commit rules: conventional commits; no `Co-Authored-By` trailer or session link; no nested parentheses in commit bodies; keep every footer line under 100 characters, because commitlint rejects longer ones; breaking commits carry `!` and a `BREAKING CHANGE` footer. Shared VM: one build or test at a time, no local AOT publish.
