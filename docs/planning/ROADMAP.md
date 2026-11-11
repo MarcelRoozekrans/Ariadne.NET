@@ -192,7 +192,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Plan:** `docs/superpowers/plans/2026-11-11-phase-4.3-slices.md`
 
 ### Phase 4.4: Target vacuity [status: pending]
-**Goal:** A `forbid`, `allowOnly` or `uniqueNames` rule can set `requireTarget: true` and then fails as `VacuousRule` when its target matches no type the solution declares or references.
+**Goal:** A `forbid`, `allowOnly` or `uniqueNames` rule can set `requireTarget: true` and then fails as `VacuousRule` when its target matches nothing the solution uses: for `forbid` and `allowOnly`, no type it declares or references, or no member edge for a `members` target; for `uniqueNames`, no type it declares.
 **Surface:** Backend
 **HelpWanted:** no
 **Design:** `docs/superpowers/specs/2026-11-11-phase-4.4-target-vacuity-design.md` (approved 2026-11-11)
