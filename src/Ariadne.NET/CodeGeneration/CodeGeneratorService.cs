@@ -33,7 +33,7 @@ public sealed class CodeGeneratorService : ICodeGeneratorService
                 nameof(request));
         }
 
-        EnsureGeneratable(role);
+        EnsureGeneratable(role, nameof(resolvedPack));
 
         var resolvedNamespace = ResolveTemplate(
             resolvedPack.NamingConventions.Namespace,
@@ -79,13 +79,14 @@ public sealed class CodeGeneratorService : ICodeGeneratorService
             .Replace("{ComponentName}", request.ComponentName, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static void EnsureGeneratable(ComponentRoleDefinition role)
+    // The role comes from the pack, so the pack is the argument at fault.
+    private static void EnsureGeneratable(ComponentRoleDefinition role, string paramName)
     {
         if (role.TypeKind is CSharpTypeKind.Enum or CSharpTypeKind.Delegate)
         {
             throw new ArgumentException(
                 $"Role '{role.Name}' has type kind {role.TypeKind}, which cannot be generated.",
-                nameof(role));
+                paramName);
         }
     }
 

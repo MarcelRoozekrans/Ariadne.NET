@@ -40,7 +40,7 @@ public sealed class CodeGeneratorServiceTests
 
         var act = () => _sut.Generate(pack, request);
 
-        act.Should().Throw<ArgumentException>().WithMessage("*Status*");
+        act.Should().Throw<ArgumentException>().WithMessage("*Status*").And.ParamName.Should().Be("resolvedPack");
     }
 
     [Fact]
