@@ -611,6 +611,44 @@ public class RulePackReferenceCheckTests
         Resolve(PackWithRule(SlicesRule(slices))).Error.Detail.Should().Be("the slices of rule 'R-1' needs at least one entry in matching");
     }
 
+    [Fact]
+    public void Capture_in_an_exception_of_a_slices_rule_is_invalid()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "R-1",
+            Because = "because",
+            Kind = RuleKind.Slices,
+            From = new TargetSelector(),
+            Slices = Slices(),
+            Exceptions = [new RuleException { Namespaces = ["Shop.(*).Legacy"], Because = "x" }],
+        };
+
+        Resolve(PackWithRule(rule)).Error.Detail.Should().Be(
+            "exceptions[0] of rule 'R-1' has a pattern with a capture; a capture, (*) or (**), is only accepted in the matching of a slices rule");
+    }
+
+    [Fact]
+    public void Capture_in_an_amendment_exception_of_a_slices_rule_is_invalid()
+    {
+        var pack = new RulePack
+        {
+            Name = "child",
+            Extends = ["builtin://modular-monolith"],
+            RuleAmendments = [new RuleAmendment { Id = "MM-MODULES-INDEPENDENT", Exceptions = [new RuleException { Namespaces = ["Shop.(**).Legacy"], Because = "x" }] }],
+        };
+
+        Resolve(pack).Error.Detail.Should().Be(
+            "exceptions[0] of rule 'MM-MODULES-INDEPENDENT' has a pattern with a capture; a capture, (*) or (**), is only accepted in the matching of a slices rule");
+    }
+
+    [Fact]
+    public void Capture_in_the_allow_of_a_slices_rule_is_invalid()
+    {
+        Resolve(PackWithRule(SlicesRule(Slices(new TargetSelector { Namespaces = ["Shop.(**).Public"] })))).Error.Detail.Should().Be(
+            "the allow of rule 'R-1' has a pattern with a capture; a capture, (*) or (**), is only accepted in the matching of a slices rule");
+    }
+
     [Theory]
     [InlineData("members", "the allow of rule 'R-1' has members, which it does not take")]
     [InlineData("empty", "the allow of rule 'R-1' selects nothing; it needs at least one selector key")]

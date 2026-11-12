@@ -118,13 +118,15 @@ public class SliceRulesTests
             namespace Shop.Orders { public class A { public Shop.Billing.B? X; } }
             """)).WithAssemblyName("Shop.One");
         var two = TestCompilation.Create(("Two.cs", """
-            namespace Shop.Orders { public class A { } }
+            namespace Shop.Billing { public class B { } }
+            namespace Shop.Orders { public class A { public Shop.Billing.B? X; } }
             """)).WithAssemblyName("Shop.Two");
 
-        var v = Check(PackWith(Independent([ShopModules])), (two, null), (one, null)).Should().ContainSingle().Subject;
+        var violations = Check(PackWith(Independent([ShopModules])), (two, null), (one, null));
 
-        v.SourceType.Should().Be("Shop.Orders.A");
-        v.Location!.Value.FilePath.Should().Be("One.cs");
+        violations.Should().HaveCount(2);
+        violations.Select(v => v.Location!.Value.FilePath).Should().BeEquivalentTo("One.cs", "Two.cs");
+        violations.Should().OnlyContain(v => v.ReferenceCount == 1 && string.Equals(v.SourceType, "Shop.Orders.A", StringComparison.Ordinal));
     }
 
     [Fact]

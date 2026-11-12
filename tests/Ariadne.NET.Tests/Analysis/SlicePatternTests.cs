@@ -20,6 +20,9 @@ public sealed class SlicePatternTests
     [InlineData("**.(*)", "Orders", "Orders")]
     [InlineData("(**)", "", null)]
     [InlineData("Shop.(*)", "shop.Orders", null)]
+    [InlineData("Shop.(**).Core.**", "Shop.Sales.Eu.Core.Models", "Sales.Eu")]
+    [InlineData("Shop.(*)", "Store.Orders", null)]
+    [InlineData("**.(**).**", "A.B", "A")]
     public void Captures(string pattern, string ns, string? expected)
     {
         var slicePattern = SlicePattern.Compile(pattern).Value;
@@ -57,7 +60,7 @@ public sealed class SlicePatternTests
     [InlineData("**.(**).Core.**")]
     public void Valid_pattern_has_no_message(string pattern) => SlicePattern.Validate(pattern).Should().BeNull();
 
-    // Interim: measures with GC.GetAllocatedBytesForCurrentThread, as GlobTests does.
+    // Measures with GC.GetAllocatedBytesForCurrentThread, as GlobTests does.
     [Fact]
     public void TryCapture_does_not_allocate_on_a_miss()
     {

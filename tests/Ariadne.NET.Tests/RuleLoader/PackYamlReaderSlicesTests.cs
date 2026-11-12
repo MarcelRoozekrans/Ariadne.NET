@@ -101,12 +101,17 @@ public class PackYamlReaderSlicesTests
         { "slices:|  matching: [\"Shop.(*).**\"]|  independent: true|  allow:|    namespaces:|      - Shop.(*).Public", 11, 13, "'Shop.(*).Public' in the allow of rule 'R1' is not a valid pattern: " + Capture },
         { "slices:|  matching: [\"Shop.(*).**\"]|  independent: true|exceptions:|  - namespaces:|      - Shop.(*).Legacy|    because: y", 11, 13, "'Shop.(*).Legacy' in exceptions[0] of rule 'R1' is not a valid pattern: " + Capture },
 
+        // matching must be a list of non-empty patterns, and a condition must be a boolean.
+        { "slices:|  matching: [\"\"]|  independent: true", 7, 18, "pattern must not be empty" },
+        { "slices:|  matching: \"Shop.(*)\"|  independent: true", 7, 7, "'matching' in the slices of rule 'R1' must be a list of strings" },
+        { "slices:|  matching: [\"Shop.(*)\"]|  freeOfCycles: \"true\"", 8, 7, "'freeOfCycles' in the slices of rule 'R1' must be true or false" },
+
         // matching must hold a pattern.
         { "slices:|  matching: []|  independent: true", 7, 7, "the slices of rule 'R1' needs at least one entry in 'matching'" },
         { "slices:|  independent: true", 7, 7, "the slices of rule 'R1' needs at least one entry in 'matching'" },
 
         // Exactly one of the conditions, set to true.
-        { "slices:|  matching: [\"Shop.(*).**\"]|  freeOfCycles: true|  independent: true", 9, 7, "the slices of rule 'R1' must have only one of 'freeOfCycles' and 'independent'" },
+        { "slices:|  matching: [\"Shop.(*).**\"]|  freeOfCycles: true|  independent: true", 9, 7, "the slices of rule 'R1' must have only one of 'freeOfCycles' and 'independent'; 'independent' rules out cycles except through targets that allow selects" },
         { "slices:|  matching: [\"Shop.(*).**\"]", 7, 7, "the slices of rule 'R1' needs 'freeOfCycles: true' or 'independent: true'" },
         { "slices:|  matching: [\"Shop.(*).**\"]|  independent: false", 8, 7, "'independent' in the slices of rule 'R1' must be true" },
         { "slices:|  matching: [\"Shop.(*).**\"]|  freeOfCycles: false", 8, 7, "'freeOfCycles' in the slices of rule 'R1' must be true" },

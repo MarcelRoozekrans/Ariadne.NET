@@ -138,6 +138,26 @@ public class SliceRulesCycleTests
     }
 
     [Fact]
+    public void Same_cycle_in_every_framework_is_reported_once_with_the_larger_count()
+    {
+        const string twiceInNet8 = """
+            namespace Shop.Orders { public class A { public Shop.Billing.B? X; public Shop.Billing.B? Y; } }
+            namespace Shop.Billing { public class B { public Shop.Orders.A? Back; } }
+            """;
+        const string onceInNet10 = """
+            namespace Shop.Orders { public class A { public Shop.Billing.B? X; } }
+            namespace Shop.Billing { public class B { public Shop.Orders.A? Back; } }
+            """;
+
+        var violations = Check(PackWith(Acyclic()), (TestCompilation.Create(twiceInNet8), "net8.0"), (TestCompilation.Create(onceInNet10), "net10.0"));
+
+        violations.Should().HaveCount(2).And.OnlyContain(v => v.Kind == ViolationKind.SliceCycle);
+        violations.Should().OnlyContain(v => v.TargetFrameworks.Count == 0);
+        violations.Single(v => v.Message.StartsWith("Slice 'Orders'", StringComparison.Ordinal)).ReferenceCount.Should().Be(2);
+        violations.Single(v => v.Message.StartsWith("Slice 'Billing'", StringComparison.Ordinal)).ReferenceCount.Should().Be(1);
+    }
+
+    [Fact]
     public void Source_is_the_earliest_reference_from_the_slice()
     {
         var violations = Check(PackWith(Acyclic()), """

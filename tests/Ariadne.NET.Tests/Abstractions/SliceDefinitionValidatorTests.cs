@@ -57,6 +57,16 @@ public sealed class SliceDefinitionValidatorTests
     }
 
     [Fact]
+    public void Same_rule_with_independent_set_is_valid()
+    {
+        var result = new SliceDefinitionValidator(new TargetSelectorValidator())
+            .Validate(new SliceDefinition { Matching = ["Shop.(*)"], Independent = true });
+
+        result.IsValid.Should().BeTrue();
+        Messages(result).Should().NotContain(ConditionMessage);
+    }
+
+    [Fact]
     public void Slices_kind_is_six_and_rule_defaults_to_no_slices()
     {
         ((int)RuleKind.Slices).Should().Be(6);
