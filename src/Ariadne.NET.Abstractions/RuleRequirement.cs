@@ -10,6 +10,7 @@ public sealed class RuleRequirement
     public string? Layer { get; init; }
 
     /// <summary>The kind the type must have.</summary>
+    [Must(nameof(IsCodeBuildable), Message = "{PropertyName} must be Class, Interface, Record, Struct or RecordStruct.")]
     public CSharpTypeKind? Kind { get; init; }
 
     /// <summary>The accessibility the type must have.</summary>
@@ -23,4 +24,6 @@ public sealed class RuleRequirement
 
     /// <summary>A selector the type must not match. Allows every selector key except <c>layers</c> and <c>members</c>.</summary>
     public TargetSelector? IsNot { get; init; }
+
+    internal bool IsCodeBuildable(CSharpTypeKind? kind) => kind is not (CSharpTypeKind.Enum or CSharpTypeKind.Delegate);
 }
