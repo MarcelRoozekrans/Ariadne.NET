@@ -11,7 +11,7 @@ internal static class ExceptionKeyRules
     /// <summary>Why the exception key does not apply to the rule kind, or null when it does.</summary>
     public static string? Rejection(RuleKind kind, string key) => kind switch
     {
-        RuleKind.BannedPackages when key is "types" or "namespaces" =>
+        RuleKind.BannedPackages when key is "types" or "namespaces" || Array.IndexOf(PackYamlReader.TraitKeys, key) >= 0 =>
             "a package belongs to a project, so the exception of a bannedPackages rule names it by 'assemblies'",
         RuleKind.UniqueNames when key is "assemblies" =>
             "an exception of a uniqueNames rule excuses a type's name, so it takes 'types' or 'namespaces'",
@@ -22,7 +22,7 @@ internal static class ExceptionKeyRules
     public static string[] Allowed(RuleKind kind) => kind switch
     {
         RuleKind.BannedPackages => ["assemblies"],
-        RuleKind.UniqueNames => ["namespaces", "types"],
-        _ => ["namespaces", "assemblies", "types"],
+        RuleKind.UniqueNames => ["namespaces", "types", .. PackYamlReader.TraitKeys],
+        _ => ["namespaces", "assemblies", "types", .. PackYamlReader.TraitKeys],
     };
 }

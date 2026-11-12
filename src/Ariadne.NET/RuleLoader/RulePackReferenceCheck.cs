@@ -128,10 +128,14 @@ internal static class RulePackReferenceCheck
             return;
         }
 
-        if (requirement.Layer is null && requirement.Kind is null && requirement.Accessibility is null && requirement.Implements is null)
+        if (requirement.Layer is null && requirement.Kind is null && requirement.Accessibility is null && requirement.Implements is null
+            && requirement.Is is null && requirement.IsNot is null)
         {
-            failures.Add($"the requirement of rule '{id}' needs at least one of layer, kind, accessibility, implements");
+            failures.Add($"the requirement of rule '{id}' needs at least one of layer, kind, accessibility, implements, is, isNot");
         }
+
+        CheckCondition(id, "is", requirement.Is, failures);
+        CheckCondition(id, "isNot", requirement.IsNot, failures);
 
         if (requirement.Accessibility is { } accessibility
             && !accessibility.Equals("public", StringComparison.OrdinalIgnoreCase)
@@ -144,6 +148,29 @@ internal static class RulePackReferenceCheck
             && implements.Namespaces.Count == 0 && implements.Assemblies.Count == 0 && implements.Types.Count == 0)
         {
             failures.Add($"the implements of rule '{id}' needs at least one of namespaces, assemblies, types");
+        }
+    }
+
+    // RequireRules ignores layers and members in a condition and checks nothing for an empty one.
+    private static void CheckCondition(string id, string key, TargetSelector? condition, List<string> failures)
+    {
+        if (condition is null)
+        {
+            return;
+        }
+
+        if (condition.Layers.Count > 0 || condition.Members.Count > 0)
+        {
+            failures.Add($"the {key} of rule '{id}' has layers or members, which a condition does not take");
+        }
+        else if (condition is
+                 {
+                     Namespaces.Count: 0, Assemblies.Count: 0, Types.Count: 0, BaseTypes.Count: 0, Interfaces.Count: 0, Attributes.Count: 0,
+                     Names.Count: 0, Kinds.Count: 0, Accessibility.Count: 0, AssignableTo.Count: 0,
+                     Sealed: null, Abstract: null, Static: null, Nested: null,
+                 })
+        {
+            failures.Add($"the {key} of rule '{id}' selects nothing; it needs at least one selector key other than layers and members");
         }
     }
 

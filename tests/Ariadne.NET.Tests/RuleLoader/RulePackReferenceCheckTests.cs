@@ -277,7 +277,39 @@ public class RulePackReferenceCheckTests
     public void RequireRule_WithAnEmptyRequirement_Fails()
     {
         Resolve(PackWithRequire(new RuleRequirement())).Error.Detail.Should()
-            .Contain("the requirement of rule 'R-1' needs at least one of layer, kind, accessibility, implements");
+            .Contain("the requirement of rule 'R-1' needs at least one of layer, kind, accessibility, implements, is, isNot");
+    }
+
+    [Fact]
+    public void RequireRule_WithOnlyIs_Passes()
+    {
+        Resolve(PackWithRequire(new RuleRequirement { Is = new TargetSelector { Sealed = true } })).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void RequireRule_WithOnlyIsNot_Passes()
+    {
+        Resolve(PackWithRequire(new RuleRequirement { IsNot = new TargetSelector { Types = ["**"] } })).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void RequireRule_WithAnEmptyIs_Fails()
+    {
+        Resolve(PackWithRequire(new RuleRequirement { Is = new TargetSelector() })).Error.Detail.Should()
+            .Contain("the is of rule 'R-1' selects nothing; it needs at least one selector key other than layers and members");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void RequireRule_ConditionWithLayersOrMembers_Fails(bool layers)
+    {
+        var condition = layers
+            ? new TargetSelector { Layers = ["Domain"], Sealed = true }
+            : new TargetSelector { Members = ["**.M"], Sealed = true };
+
+        Resolve(PackWithRequire(new RuleRequirement { IsNot = condition })).Error.Detail.Should()
+            .Contain("the isNot of rule 'R-1' has layers or members, which a condition does not take");
     }
 
     [Fact]
