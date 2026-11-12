@@ -5,9 +5,8 @@ namespace Ariadne.NET.Analysis;
 
 /// <summary>
 /// Tests whether a type is selected by a rule target: a list of layers, or a namespace, assembly and type selector, either
-/// one narrowed by type-level traits. The
-/// answer is cached per symbol, so a type that many edges touch is matched once. Like the layer map it uses, one instance
-/// serves one single-threaded check.
+/// one narrowed by type-level traits. The answer is cached per symbol, so a type that many edges touch is matched once.
+/// Like the layer map it uses, one instance serves one single-threaded check.
 /// </summary>
 internal sealed class TargetMatcher
 {
