@@ -37,9 +37,9 @@ public static class KnownGaps
             + "that name."),
         new(
             "p-have-any-attributes:not",
-            "4.2",
-            "No 'attributes' in rule exceptions; phase 4.2's design adds only the eight traits there, so this "
-            + "needs an owner's call."),
+            "unplanned",
+            "No 'attributes' in rule exceptions, so an exception cannot leave out the types that carry an attribute; phase "
+            + "4.2 adds only the eight traits there. Tracked in #97."),
         new("p-are-abstract", "4.2", "No 'abstract' selector key."),
         new("p-are-abstract:not", "4.2", "No 'abstract' selector key."),
         new("p-are-sealed", "4.2", "No 'sealed' selector key."),
@@ -88,8 +88,7 @@ public static class KnownGaps
         new(
             "c-be-record",
             "4.2",
-            "No 'is' on require; the catalogue maps it to 'is: { kinds: [record] }', and Task 4 kept it a 4.2 "
-            + "gap although 'kind: record' exists."),
+            "No 'is' on require. BeRecord maps to 'is: { kinds: [record] }', which phase 4.2 adds."),
         new("c-be-record:not", "4.2", "No 'isNot' on require, and no 'kinds' selector key."),
         new("c-attribute-be-abstract", "4.2", "No 'is' on require, and no 'abstract' selector key."),
         new("c-attribute-be-abstract:not", "4.2", "No 'isNot' on require, and no 'abstract' selector key."),

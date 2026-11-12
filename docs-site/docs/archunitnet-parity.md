@@ -172,7 +172,7 @@ Methods that every kind of object has, here applied to `Types()`.
 
 | Id | ArchUnitNET | Ariadne | Status | Notes |
 |---|---|---|---|---|
-| `p-have-any-attributes` | `HaveAnyAttributes`, `DoNotHaveAnyAttributes` | `attributes`; `:not` as an exception with `attributes` | `gap` | 4.2, `:not` only |
+| `p-have-any-attributes` | `HaveAnyAttributes`, `DoNotHaveAnyAttributes` | `attributes`; `:not` as an exception with `attributes` | `gap` | unplanned, #97: `:not` only. Rule exceptions take no `attributes`, so an exception cannot leave out the types that carry one. |
 | `c-have-any-attributes` | `HaveAnyAttributes`, `HaveAnyAttributesThat`, `NotHaveAnyAttributes`, `NotHaveAnyAttributesThat` | `require` with `is: { attributes }`, `isNot: { attributes }` | `gap` | 4.2 |
 | `p-have-attribute-with-arguments` | `HaveAttributeWithArguments`, `HaveAnyAttributesWithArguments`, `DoNotHaveAttributeWithArguments`, `DoNotHaveAnyAttributesWithArguments` | — | `deferred` | attribute arguments, see #95 |
 | `c-have-attribute-with-arguments` | `HaveAttributeWithArguments`, `HaveAnyAttributesWithArguments`, `NotHaveAttributeWithArguments`, `NotHaveAnyAttributesWithArguments` | — | `deferred` | attribute arguments, see #95 |
