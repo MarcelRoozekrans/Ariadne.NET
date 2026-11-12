@@ -28,7 +28,7 @@
     <PackageReference Include="ZeroAlloc.Inject.Generator" Version="1.11.6" PrivateAssets="all" />
     <PackageReference Include="ZeroAlloc.Resilience" Version="3.5.0" />
     <PackageReference Include="ZeroAlloc.Serialisation" Version="2.11.0" />
-    <PackageReference Include="ZeroAlloc.Serialisation.SystemTextJson" Version="2.10.0" />
+    <PackageReference Include="ZeroAlloc.Serialisation.SystemTextJson" Version="2.11.0" />
     <!--
       The [Instrument] attributes are needed at run time, so the library flows to consumers. The bundled proxy generator
       runs for this library only: PrivateAssets keeps its analyzer and build assets out of consumers' builds, as Minos.NET
