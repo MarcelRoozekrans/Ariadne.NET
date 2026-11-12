@@ -291,9 +291,9 @@ public class VacuityRulesTests
         """).WithAssemblyName("Lib");
 
     private static RuleDefinition Target(
-        RuleKind kind, TargetSelector from, TargetSelector target, bool requireTarget = true, bool allowEmpty = false) => new()
+        RuleKind kind, TargetSelector from, TargetSelector target, bool requireTarget = true, bool allowEmpty = false, string id = "R") => new()
     {
-        Id = "R",
+        Id = id,
         Because = "Because R.",
         Kind = kind,
         From = from,
@@ -425,11 +425,34 @@ public class VacuityRulesTests
     }
 
     [Fact]
-    public void Target_naming_a_layer_that_has_types_but_none_of_the_rule_target_is_found()
+    public void Target_naming_a_non_vacuous_layer_is_found()
     {
         var pack = Pack([Layer("Agents", "N.Agents.**")], [Target(RuleKind.Forbid, Ns("N.Domain.**"), InLayer("Agents"))]);
 
         CheckTwoProjects(pack, AgentsUsingTheRunner).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void UniqueNames_against_members_does_not_use_member_edges()
+    {
+        var members = new TargetSelector { Types = ["Lib.Api"], Members = ["Lib.Api.Call"] };
+        var pack = Pack([], [
+            Target(RuleKind.UniqueNames, Ns("N.Domain.**"), members),
+            Target(RuleKind.Forbid, Ns("N.Domain.**"), members, requireTarget: false, id: "F"),
+        ]);
+
+        CheckTwoProjects(pack, "namespace N.Agents { public class Runner { public void Go(Lib.Api a) => a.Call(); } }")
+            .Select(v => v.Message).Should().Equal(
+                "Rule 'R' requires its target, but its 'against' selector matches no type declared in the 2 project(s) loaded.");
+    }
+
+    [Fact]
+    public void Traits_only_target_is_found_by_a_matching_source_type()
+    {
+        var pack = Pack([], [Target(RuleKind.Forbid, Ns("N.Domain.**"), new TargetSelector { Sealed = true })]);
+
+        CheckTwoProjects(pack, "namespace N.Agents { public sealed class Runner { } }").Should().BeEmpty();
+        CheckTwoProjects(pack, "namespace N.Agents { public class Runner { } }").Select(v => v.Message).Should().Equal(ToMessage);
     }
 
     private static AnalyzedProject Project(CSharpCompilation compilation) => new("Shop", null, compilation);

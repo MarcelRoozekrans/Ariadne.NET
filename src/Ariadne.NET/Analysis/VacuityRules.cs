@@ -134,7 +134,7 @@ internal static class VacuityRules
         var matcher = TargetMatcher.From(target, map);
         foreach (var graph in graphs)
         {
-            if (matcher.HasMembers)
+            if (matcher.HasMembers && kind != RuleKind.UniqueNames)
             {
                 foreach (var edge in graph.MemberEdges)
                 {
