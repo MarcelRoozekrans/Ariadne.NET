@@ -1,0 +1,18 @@
+schema: 2
+name: parity-c-reside-in-assembly
+version: "1.0.0"
+author: fixture
+
+layers:
+  - name: Home
+    id: PARITY-CRESIDEINASSEMBLY-HOME
+    because: The assembly the rule requires.
+    assemblies: ["Parity.CResideInAssembly.Other"]
+
+rules:
+  - id: PARITY-CRESIDEINASSEMBLY
+    because: Mirrors ArchUnitNET's ResideInAssembly condition; Broken and Clean must reside in the Other assembly.
+    require:
+      for:
+        namespaces: ["Parity.CResideInAssembly.Broken", "Parity.CResideInAssembly.Clean"]
+      layer: Home

@@ -106,7 +106,7 @@ Methods that every kind of object has, here applied to `Types()`.
 |---|---|---|---|---|
 | `p-are` | `Are`, `AreNot` | `types`; `:not` as an exception with `types` | `covered` | |
 | `c-be` | `Be`, `BeTypesThat`, `NotBe` | `require` with `is: { types }`, `isNot: { types }` | `gap` | 4.2 |
-| `c-be-kind` | `Be(Classes())`, `Be(Interfaces())`, `NotBe(Interfaces())` | `require` with `kind`; `:not` as `isNot: { kinds }` | `gap` | 4.2, `:not` only |
+| `c-be-kind` | `Be(Classes())`, `Be(Interfaces())`, `NotBe(Interfaces())` | `require` with `kind`; `:not` as `isNot: { kinds }` | `gap` | 4.2, `:not` only. `kind: class` leaves out records, which `Classes()` holds; see [c-be-kind](#c-be-kind). |
 | `c-exist` | `Exist` | `VacuousRule` | `out-of-scope` | Every Ariadne rule already fails when its subject selects nothing. That failure names no type, so there is nothing to compare. |
 | `c-not-exist` | `NotExist` | `require` with `isNot: { types: ["**"] }` and `allowEmpty: true` | `gap` | 4.2 |
 
@@ -161,7 +161,7 @@ Methods that every kind of object has, here applied to `Types()`.
 | Id | ArchUnitNET | Ariadne | Status | Notes |
 |---|---|---|---|---|
 | `c-not-depend-on-any` | `NotDependOnAny`, `NotDependOnAnyTypesThat` | `forbid` | `covered` | |
-| `c-only-depend-on` | `OnlyDependOn`, `OnlyDependOnTypesThat` | a layer's `allowedDependencies` | `covered` | ArchUnitNET counts framework types such as `System.Object` as dependencies. |
+| `c-only-depend-on` | `OnlyDependOn`, `OnlyDependOnTypesThat` | a layer's `allowedDependencies` | `divergence` | Framework types count for neither tool, though ArchUnitNET names `System.Object` in its message. See [c-only-depend-on](#c-only-depend-on). |
 | `c-depend-on-any` | `DependOnAny`, `DependOnAnyTypesThat` | — | `deferred` | dependency as a requirement, see #96 |
 | `p-depend-on-any` | `DependOnAny`, `DoNotDependOnAny` | — | `deferred` | dependency as a selector, see #96 |
 | `p-only-depend-on` | `OnlyDependOn` | — | `deferred` | dependency as a selector, see #96 |
@@ -243,4 +243,18 @@ ArchUnitNET joins predicates with `And()` and `Or()` and negates them with `Not`
 
 ## Divergences
 
-Here ArchUnitNET and Ariadne answer differently on purpose, mostly because one reads IL and the other source. Each entry names its fixture, the reason and the answer a developer would expect. The measurements of the covered kinds fill this section; it has no entries yet.
+Here ArchUnitNET and Ariadne answer differently on purpose, mostly because one reads IL and the other source. Each entry names its fixture, the reason and the answer a developer would expect.
+
+### c-be-kind
+
+Fixture `tests/fixtures/archunit-parity/CBeKind`, rule `Should().Be(Classes())` against `require` with `kind: class`. Both tools flag the interface `Broken.IOrderService` and the struct `Broken.Money`. Only Ariadne flags the record `Broken.Ledger`.
+
+- **Reason:** a record class compiles to a class, so ArchUnitNET's `Classes()` holds it. Ariadne reads source, where `record` is a kind of its own, so `kind: class` rejects a record.
+- **Expected:** ArchUnitNET's answer, since a record class is a class in C#. Phase 4.2's `is: { kinds: [class, record] }` expresses `Be(Classes())` exactly; today's `kind` takes one kind.
+
+### c-only-depend-on
+
+Fixture `tests/fixtures/archunit-parity/COnlyDependOn`, rule `Should().OnlyDependOn(Types().That().ResideInNamespace("….Target"))` against a `Subject` layer with `allowedDependencies: [Allowed]`. Both tools flag `Broken.OrderService`, which depends on `Forbidden.Mailer` in a layer the subject may not use. Only ArchUnitNET flags `Broken.AuditTrail`, which depends on `Helpers.Clock`, a type no layer covers. Neither flags `Broken.ReportBuilder`, which depends on `System.Text.StringBuilder`.
+
+- **Reason:** `OnlyDependOn` fails a dependency on any type of the loaded assemblies outside the allowed set. The layer check is open-world: it does not check a dependency on a type no layer covers. Framework types are outside the loaded assemblies, so they count for neither tool, although ArchUnitNET 0.13.2 names `System.Object` in its failure message.
+- **Expected:** ArchUnitNET's answer, for a developer who wrote `OnlyDependOn`. In a pack, cover the namespace with a layer that is not in `allowedDependencies`, as the fixture does for `Forbidden`, and Ariadne flags the dependency too.

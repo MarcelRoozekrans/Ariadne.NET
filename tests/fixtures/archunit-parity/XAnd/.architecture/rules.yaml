@@ -1,0 +1,14 @@
+schema: 2
+name: parity-x-and
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-XAND
+    because: Mirrors ArchUnitNET's And between ResideInNamespace and HaveNameEndingWith; the types both select must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.XAnd.Broken"]
+        types: ["**.*Service"]
+      to:
+        namespaces: ["Parity.XAnd.Target.**"]

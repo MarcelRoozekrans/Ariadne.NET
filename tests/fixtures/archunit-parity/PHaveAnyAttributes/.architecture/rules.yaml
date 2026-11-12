@@ -1,0 +1,12 @@
+schema: 2
+name: parity-p-have-any-attributes
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-PHAVEANYATTRIBUTES
+    because: Mirrors ArchUnitNET's HaveAnyAttributes; the types it selects must not depend on Target.
+    forbid:
+      from: { attributes: ["Parity.PHaveAnyAttributes.Contracts.AuditedAttribute"] }
+      to:
+        namespaces: ["Parity.PHaveAnyAttributes.Target.**"]

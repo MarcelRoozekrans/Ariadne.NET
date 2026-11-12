@@ -1,0 +1,13 @@
+schema: 2
+name: parity-c-implement-interface
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-CIMPLEMENTINTERFACE
+    because: Mirrors ArchUnitNET's ImplementInterface condition; Broken and Clean must implement IAuditable.
+    require:
+      for:
+        namespaces: ["Parity.CImplementInterface.Broken", "Parity.CImplementInterface.Clean"]
+      implements:
+        types: ["Parity.CImplementInterface.Target.IAuditable"]

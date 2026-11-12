@@ -1,0 +1,12 @@
+schema: 2
+name: parity-x-or-within-predicate
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-XORWITHINPREDICATE
+    because: Mirrors ArchUnitNET's Or between two HaveName calls; the types either selects must not depend on Target.
+    forbid:
+      from: { types: ["**.OrderService", "**.PaymentService"] }
+      to:
+        namespaces: ["Parity.XOrWithinPredicate.Target.**"]

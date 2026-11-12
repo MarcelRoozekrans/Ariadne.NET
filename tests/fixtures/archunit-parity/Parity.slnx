@@ -12,4 +12,15 @@
   <Project Path="PHaveFullNameStartingWith/Parity.PHaveFullNameStartingWith.csproj" />
   <Project Path="PHaveFullNameEndingWith/Parity.PHaveFullNameEndingWith.csproj" />
   <Project Path="PHaveFullNameContaining/Parity.PHaveFullNameContaining.csproj" />
+  <Project Path="COnlyDependOn/Parity.COnlyDependOn.csproj" />
+  <Project Path="CResideInNamespace/Parity.CResideInNamespace.csproj" />
+  <Project Path="CResideInAssembly/Parity.CResideInAssembly.csproj" />
+  <Project Path="CResideInAssembly/Other/Parity.CResideInAssembly.Other.csproj" />
+  <Project Path="CImplementInterface/Parity.CImplementInterface.csproj" />
+  <Project Path="CBeKind/Parity.CBeKind.csproj" />
+  <Project Path="CBeInternal/Parity.CBeInternal.csproj" />
+  <Project Path="PImplementInterface/Parity.PImplementInterface.csproj" />
+  <Project Path="PHaveAnyAttributes/Parity.PHaveAnyAttributes.csproj" />
+  <Project Path="XAnd/Parity.XAnd.csproj" />
+  <Project Path="XOrWithinPredicate/Parity.XOrWithinPredicate.csproj" />
 </Solution>

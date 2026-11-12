@@ -1,0 +1,12 @@
+schema: 2
+name: parity-c-be-kind
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-CBEKIND
+    because: Mirrors ArchUnitNET's Be with Classes; Broken and Clean must be classes.
+    require:
+      for:
+        namespaces: ["Parity.CBeKind.Broken", "Parity.CBeKind.Clean"]
+      kind: class

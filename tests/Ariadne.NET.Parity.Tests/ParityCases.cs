@@ -51,6 +51,41 @@ public static class ParityCases
             a => Types().That().DoNotResideInAssembly(AssemblyOf(a, OtherAssembly))
                 .Should().NotDependOnAny(Types().That().ResideInNamespace("Parity.PResideInAssembly.Target"))),
         new(
+            "p-implement-interface",
+            "PImplementInterface",
+            "Parity.PImplementInterface",
+            "PARITY-PIMPLEMENTINTERFACE",
+            Projection.Types,
+            a => Types().That().ImplementInterface(InterfaceOf(a, "Parity.PImplementInterface.Contracts.IAuditable"))
+                .Should().NotDependOnAny(Types().That().ResideInNamespace("Parity.PImplementInterface.Target"))),
+        new(
+            "c-reside-in-namespace",
+            "CResideInNamespace",
+            "Parity.CResideInNamespace",
+            "PARITY-CRESIDEINNAMESPACE",
+            Projection.Types,
+            _ => Types().That().ResideInNamespace("Parity.CResideInNamespace.Broken")
+                .Or().ResideInNamespace("Parity.CResideInNamespace.Clean")
+                .Should().ResideInNamespace("Parity.CResideInNamespace.Clean")),
+        new(
+            "c-reside-in-assembly",
+            "CResideInAssembly",
+            "Parity.CResideInAssembly",
+            "PARITY-CRESIDEINASSEMBLY",
+            Projection.Types,
+            a => Types().That().ResideInNamespace("Parity.CResideInAssembly.Broken")
+                .Or().ResideInNamespace("Parity.CResideInAssembly.Clean")
+                .Should().ResideInAssembly(AssemblyOf(a, "Parity.CResideInAssembly.Other"))),
+        new(
+            "c-implement-interface",
+            "CImplementInterface",
+            "Parity.CImplementInterface",
+            "PARITY-CIMPLEMENTINTERFACE",
+            Projection.Types,
+            a => Types().That().ResideInNamespace("Parity.CImplementInterface.Broken")
+                .Or().ResideInNamespace("Parity.CImplementInterface.Clean")
+                .Should().ImplementInterface(InterfaceOf(a, "Parity.CImplementInterface.Target.IAuditable"))),
+        new(
             "p-are",
             "PAre",
             "Parity.PAre",
@@ -66,6 +101,24 @@ public static class ParityCases
             Projection.Types,
             a => Types().That().AreNot(TypeOf(a, "Parity.PAre.NotClean.ShipmentService"))
                 .Should().NotDependOnAny(Types().That().ResideInNamespace("Parity.PAre.Target"))),
+        new(
+            "c-be-kind",
+            "CBeKind",
+            "Parity.CBeKind",
+            "PARITY-CBEKIND",
+            Projection.Types,
+            _ => Types().That().ResideInNamespace("Parity.CBeKind.Broken")
+                .Or().ResideInNamespace("Parity.CBeKind.Clean")
+                .Should().Be(Classes())),
+        new(
+            "c-be-internal",
+            "CBeInternal",
+            "Parity.CBeInternal",
+            "PARITY-CBEINTERNAL",
+            Projection.Types,
+            _ => Types().That().ResideInNamespace("Parity.CBeInternal.Broken")
+                .Or().ResideInNamespace("Parity.CBeInternal.Clean")
+                .Should().BeInternal()),
         new(
             "p-have-name",
             "PHaveName",
@@ -194,6 +247,39 @@ public static class ParityCases
             Projection.Types,
             _ => Types().That().DoNotHaveFullNameContaining("NotClean")
                 .Should().NotDependOnAny(Types().That().ResideInNamespace("Parity.PHaveFullNameContaining.Target"))),
+        new(
+            "c-only-depend-on",
+            "COnlyDependOn",
+            "Parity.COnlyDependOn",
+            "PARITY-CONLYDEPENDON",
+            Projection.Types,
+            _ => Types().That().ResideInNamespace("Parity.COnlyDependOn.Broken")
+                .Or().ResideInNamespace("Parity.COnlyDependOn.Clean")
+                .Should().OnlyDependOn(Types().That().ResideInNamespace("Parity.COnlyDependOn.Target"))),
+        new(
+            "p-have-any-attributes",
+            "PHaveAnyAttributes",
+            "Parity.PHaveAnyAttributes",
+            "PARITY-PHAVEANYATTRIBUTES",
+            Projection.Types,
+            a => Types().That().HaveAnyAttributes(AttributeOf(a, "Parity.PHaveAnyAttributes.Contracts.AuditedAttribute"))
+                .Should().NotDependOnAny(Types().That().ResideInNamespace("Parity.PHaveAnyAttributes.Target"))),
+        new(
+            "x-and",
+            "XAnd",
+            "Parity.XAnd",
+            "PARITY-XAND",
+            Projection.Types,
+            _ => Types().That().ResideInNamespace("Parity.XAnd.Broken").And().HaveNameEndingWith("Service")
+                .Should().NotDependOnAny(Types().That().ResideInNamespace("Parity.XAnd.Target"))),
+        new(
+            "x-or-within-predicate",
+            "XOrWithinPredicate",
+            "Parity.XOrWithinPredicate",
+            "PARITY-XORWITHINPREDICATE",
+            Projection.Types,
+            _ => Types().That().HaveName("OrderService").Or().HaveName("PaymentService")
+                .Should().NotDependOnAny(Types().That().ResideInNamespace("Parity.XOrWithinPredicate.Target"))),
     ];
 
     // The second assembly of the PResideInAssembly kind, by its simple name.
@@ -219,4 +305,14 @@ public static class ParityCases
     private static IType TypeOf(Architecture architecture, string fullName) =>
         architecture.Types.FirstOrDefault(t => string.Equals(t.FullName, fullName, StringComparison.Ordinal))
         ?? throw new KeyNotFoundException($"The parity fixture declares no type '{fullName}'.");
+
+    // The loaded interface with full name fullName, for the rules that take an interface.
+    private static Interface InterfaceOf(Architecture architecture, string fullName) =>
+        architecture.Interfaces.FirstOrDefault(t => string.Equals(t.FullName, fullName, StringComparison.Ordinal))
+        ?? throw new KeyNotFoundException($"The parity fixture declares no interface '{fullName}'.");
+
+    // The loaded attribute class with full name fullName, for the rules that take an attribute.
+    private static ArchUnitNET.Domain.Attribute AttributeOf(Architecture architecture, string fullName) =>
+        architecture.Attributes.FirstOrDefault(t => string.Equals(t.FullName, fullName, StringComparison.Ordinal))
+        ?? throw new KeyNotFoundException($"The parity fixture declares no attribute '{fullName}'.");
 }

@@ -1,0 +1,12 @@
+schema: 2
+name: parity-p-implement-interface
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-PIMPLEMENTINTERFACE
+    because: Mirrors ArchUnitNET's ImplementInterface; the types it selects must not depend on Target.
+    forbid:
+      from: { interfaces: ["Parity.PImplementInterface.Contracts.IAuditable"] }
+      to:
+        namespaces: ["Parity.PImplementInterface.Target.**"]
