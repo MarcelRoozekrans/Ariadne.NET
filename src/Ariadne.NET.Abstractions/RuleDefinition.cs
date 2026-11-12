@@ -26,11 +26,23 @@ public sealed class RuleDefinition
     public bool AllowEmpty { get; init; }
 
     /// <summary>
+    /// When <see langword="true"/>, the rule's target must match something the loaded solution uses, or the rule is reported as
+    /// vacuous. Only <see cref="RuleKind.Forbid"/>, <see cref="RuleKind.AllowOnly"/> and <see cref="RuleKind.UniqueNames"/> rules
+    /// have a target: <see cref="To"/> for the first two, <see cref="Against"/> for the last.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    [Must(nameof(TargetCanBeRequired), Message = "{PropertyName} applies only to forbid, allowOnly and uniqueNames rules.")]
+    public bool RequireTarget { get; init; }
+
+    /// <summary>
     /// The slices of a <see cref="RuleKind.Slices"/> rule: namespace patterns with one capture each, <c>(*)</c> for exactly
     /// one segment or <c>(**)</c> for one or more, and whether the slices must be free of cycles or independent.
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SliceDefinition? Slices { get; init; }
+
+    internal bool TargetCanBeRequired(bool requireTarget) =>
+        !requireTarget || Kind is RuleKind.Forbid or RuleKind.AllowOnly or RuleKind.UniqueNames;
 
     internal bool HasNoNullEntries<T>(IList<T>? items) => NullEntries.None(items);
 }

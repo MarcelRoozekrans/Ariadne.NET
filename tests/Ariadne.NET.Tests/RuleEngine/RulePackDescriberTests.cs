@@ -281,6 +281,34 @@ public class RulePackDescriberTests
     }
 
     [Fact]
+    public void Describes_requireTarget()
+    {
+        RuleDefinition Rule(bool allowEmpty, bool requireTarget) => new()
+        {
+            Id = "R-TARGET",
+            Because = "The seam must exist.",
+            Kind = RuleKind.AllowOnly,
+            From = new TargetSelector { Layers = ["Agents"] },
+            To = new TargetSelector { Types = ["Lib.ISubagentRunner"] },
+            AllowEmpty = allowEmpty,
+            RequireTarget = requireTarget,
+        };
+
+        RulePackDescriber.DescribeRule(Rule(allowEmpty: false, requireTarget: true)).Should().Equal(
+            "R-TARGET allowOnly layers Agents -> types Lib.ISubagentRunner",
+            "requireTarget",
+            "The seam must exist.");
+        RulePackDescriber.DescribeRule(Rule(allowEmpty: true, requireTarget: true)).Should().Equal(
+            "R-TARGET allowOnly layers Agents -> types Lib.ISubagentRunner",
+            "allowEmpty",
+            "requireTarget",
+            "The seam must exist.");
+        RulePackDescriber.DescribeRule(Rule(allowEmpty: false, requireTarget: false)).Should().Equal(
+            "R-TARGET allowOnly layers Agents -> types Lib.ISubagentRunner",
+            "The seam must exist.");
+    }
+
+    [Fact]
     public void Describer_shows_allowEmpty_only_when_true()
     {
         RuleDefinition Rule(bool allowEmpty) => new()
