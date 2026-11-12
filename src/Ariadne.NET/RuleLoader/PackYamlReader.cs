@@ -632,7 +632,7 @@ internal static class PackYamlReader
             return matching;
         }
 
-        // Exactly one of freeOfCycles and independent, and it must be true: independent already keeps the slices acyclic.
+        // Exactly one of freeOfCycles and independent, and it must be true: independent rules out cycles except through targets that allow selects.
         private void CheckCondition(Dictionary<string, Field> fields, string where, YamlMappingNode map, bool? freeOfCycles, bool? independent)
         {
             if (freeOfCycles == false)
@@ -648,7 +648,7 @@ internal static class PackYamlReader
             if (freeOfCycles == true && independent == true)
             {
                 Add(Later(fields["freeOfCycles"].Key, fields["independent"].Key),
-                    $"{where} must have only one of 'freeOfCycles' and 'independent'; 'independent' already keeps the slices free of cycles");
+                    $"{where} must have only one of 'freeOfCycles' and 'independent'; 'independent' rules out cycles except through targets that allow selects");
             }
             else if (!fields.ContainsKey("freeOfCycles") && !fields.ContainsKey("independent"))
             {
@@ -1253,7 +1253,7 @@ internal static class PackYamlReader
             var sequence = (YamlSequenceNode)fields[key].Value;
             for (var i = 0; i < values.Count; i++)
             {
-                if (_inSlicesRule && HasCapture(values[i]))
+                if (_inSlicesRule && SlicePattern.HasCapture(values[i]))
                 {
                     AddInvalidPattern(sequence.Children[i], values[i], where, CaptureOutsideMatching);
                     continue;
@@ -1276,9 +1276,6 @@ internal static class PackYamlReader
             var shownReason = reason.Replace($"'{pattern}'", $"'{shown}'", StringComparison.Ordinal);
             Add(node, $"'{shown}' in {where} is not a valid pattern: {PackText.Escape(shownReason)}");
         }
-
-        private static bool HasCapture(string pattern) =>
-            pattern.Contains("(*)", StringComparison.Ordinal) || pattern.Contains("(**)", StringComparison.Ordinal);
 
         // A name is the type's innermost simple name, so a dot could never match.
         private static Result<Glob, string> NamePattern(string pattern) =>

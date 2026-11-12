@@ -164,6 +164,11 @@ internal static class RulePackReferenceCheck
         }
 
         CheckTarget($"the allow of rule '{id}'", allow, failures);
+        if (HasCapture(allow.Namespaces, allow.Assemblies, allow.Types, allow.BaseTypes, allow.Interfaces, allow.Attributes, allow.Names, allow.AssignableTo))
+        {
+            failures.Add($"the allow of rule '{id}' has a pattern with a capture; {CaptureOutsideMatching}");
+        }
+
         if (allow.Members.Count > 0)
         {
             failures.Add($"the allow of rule '{id}' has members, which it does not take");
@@ -215,7 +220,31 @@ internal static class RulePackReferenceCheck
             }
 
             CheckTraitValues(where, exception.Kinds, exception.Accessibility, failures);
+            if (rule.Kind == RuleKind.Slices
+                && HasCapture(exception.Namespaces, exception.Assemblies, exception.Types, exception.Names, exception.AssignableTo))
+            {
+                failures.Add($"{where} has a pattern with a capture; {CaptureOutsideMatching}");
+            }
         }
+    }
+
+    private const string CaptureOutsideMatching = "a capture, (*) or (**), is only accepted in the matching of a slices rule";
+
+    // A capture only names a slice in matching, so anywhere else it would be a literal glob segment that never matches.
+    private static bool HasCapture(params IList<string>[] lists)
+    {
+        foreach (var list in lists)
+        {
+            foreach (var pattern in list)
+            {
+                if (pattern is not null && SlicePattern.HasCapture(pattern))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     // TargetMatcher compiles a target only when it selects either layers or code patterns; traits may join both.

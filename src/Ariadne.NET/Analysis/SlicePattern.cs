@@ -115,6 +115,15 @@ internal sealed class SlicePattern
         return false;
     }
 
+    /// <summary>Tells whether a pattern contains a capture text, <c>(*)</c> or <c>(**)</c>, anywhere.</summary>
+    /// <param name="pattern">The pattern to look at.</param>
+    /// <returns><see langword="true"/> when the pattern holds a capture text.</returns>
+    public static bool HasCapture(string pattern)
+    {
+        ArgumentNullException.ThrowIfNull(pattern);
+        return pattern.Contains(OneSegment, StringComparison.Ordinal) || pattern.Contains(AnySegments, StringComparison.Ordinal);
+    }
+
     private static bool IsCapture(string segment) =>
         string.Equals(segment, OneSegment, StringComparison.Ordinal) || string.Equals(segment, AnySegments, StringComparison.Ordinal);
 

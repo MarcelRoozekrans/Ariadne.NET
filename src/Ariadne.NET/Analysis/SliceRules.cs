@@ -18,8 +18,8 @@ internal static class SliceRules
     /// display string, so a type seen in several target frameworks of one project counts once. An exception exempts a source
     /// type only, and a target that <c>allow</c> selects is not a dependency. Edges are checked per target framework scope, and
     /// a violation found in several scopes is reported once, naming the frameworks that found it, or none when every scope did.
-    /// For a <c>freeOfCycles</c> rule it returns one <see cref="ViolationKind.SliceCycle"/> per slice edge whose two slices share
-    /// a strongly connected component of the scope's slice graph, through the earliest reference from the one to the other.
+    /// For a <c>freeOfCycles</c> rule it returns one <see cref="ViolationKind.SliceCycle"/> per slice edge and component: one for each
+    /// edge whose two slices share a strongly connected component of the scope's slice graph, through the earliest reference from the one to the other.
     /// </summary>
     /// <param name="layers">The layer map of the pack.</param>
     /// <param name="pack">The resolved pack.</param>

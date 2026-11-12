@@ -1103,7 +1103,7 @@
         },
         "independent": {
           "const": true,
-          "description": "Slices may not depend on each other at all, except on what allow selects. Also implies no cycles."
+          "description": "Slices may not depend on each other at all, except on what allow selects. Also rules out cycles, except through targets that allow selects."
         },
         "allow": {
           "$ref": "#/$defs/sliceAllowSelector"
