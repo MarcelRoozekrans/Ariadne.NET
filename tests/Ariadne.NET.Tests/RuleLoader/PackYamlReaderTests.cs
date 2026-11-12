@@ -277,14 +277,14 @@ public class PackYamlReaderTests
             """;
 
         Problems(yaml).Should().Equal(
-            new PackProblem(9, 5, "rule 'SH-001' must have exactly one of 'forbid', 'allowOnly', 'require', 'bannedPackages' or 'uniqueNames'"));
+            new PackProblem(9, 5, "rule 'SH-001' must have exactly one of 'forbid', 'allowOnly', 'require', 'bannedPackages', 'uniqueNames' or 'slices'"));
     }
 
     [Fact]
     public void RuleWithNeitherForbidNorAllowOnly()
     {
         Problems("schema: 2\nname: shop\nrules:\n  - id: SH-001\n    because: x\n    locked: false\n").Should().Equal(
-            new PackProblem(4, 5, "rule 'SH-001' must have exactly one of 'forbid', 'allowOnly', 'require', 'bannedPackages' or 'uniqueNames'"));
+            new PackProblem(4, 5, "rule 'SH-001' must have exactly one of 'forbid', 'allowOnly', 'require', 'bannedPackages', 'uniqueNames' or 'slices'"));
     }
 
     [Fact]
@@ -1092,7 +1092,7 @@ public class PackYamlReaderTests
             """;
 
         Problems(yaml).Should().Equal(
-            new PackProblem(9, 5, "rule 'SH-001' must have exactly one of 'forbid', 'allowOnly', 'require', 'bannedPackages' or 'uniqueNames'"));
+            new PackProblem(9, 5, "rule 'SH-001' must have exactly one of 'forbid', 'allowOnly', 'require', 'bannedPackages', 'uniqueNames' or 'slices'"));
     }
 
     [Theory]
@@ -1417,7 +1417,7 @@ public class PackYamlReaderTests
             """;
 
         Problems(yaml).Should().Equal(
-            new PackProblem(8, 5, "rule 'SH-001' must have exactly one of 'forbid', 'allowOnly', 'require', 'bannedPackages' or 'uniqueNames'"));
+            new PackProblem(8, 5, "rule 'SH-001' must have exactly one of 'forbid', 'allowOnly', 'require', 'bannedPackages', 'uniqueNames' or 'slices'"));
     }
 
     [Fact]

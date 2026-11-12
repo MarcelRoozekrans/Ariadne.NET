@@ -496,4 +496,46 @@ public class RulePackMergerTests
 
         act.Should().Throw<ArgumentNullException>();
     }
+
+    private static RuleDefinition SlicesRule(bool locked = false) => new()
+    {
+        Id = "S1",
+        Because = "because",
+        Kind = RuleKind.Slices,
+        From = new TargetSelector(),
+        Slices = new SliceDefinition { Matching = ["Shop.(*).**"], Independent = true, Allow = new TargetSelector { Namespaces = ["Shop.*.Public.**"] } },
+        Exceptions = [Exception("one")],
+        Locked = locked,
+        AllowEmpty = true,
+    };
+
+    [Fact]
+    public void Child_appends_exceptions_to_a_slices_rule()
+    {
+        var parent = SlicesRule();
+        var result = _merger.Merge(
+        [
+            new RulePack { Name = "parent", Rules = [parent] },
+            new RulePack { Name = "child", RuleAmendments = [new RuleAmendment { Id = "S1", Exceptions = [Exception("two")] }] },
+        ]);
+
+        result.IsSuccess.Should().BeTrue();
+        var merged = result.Value.Rules.Should().ContainSingle().Subject;
+        merged.Kind.Should().Be(RuleKind.Slices);
+        merged.Slices.Should().BeSameAs(parent.Slices);
+        merged.AllowEmpty.Should().BeTrue();
+        merged.Exceptions.Select(e => e.Because).Should().Equal("one", "two");
+    }
+
+    [Fact]
+    public void Amending_a_locked_slices_rule_fails()
+    {
+        var result = _merger.Merge(
+        [
+            new RulePack { Name = "org", Rules = [SlicesRule(locked: true)] },
+            new RulePack { Name = "team", RuleAmendments = [new RuleAmendment { Id = "S1", Exceptions = [Exception("two")] }] },
+        ]);
+
+        Problems(result).Should().Equal("rule 'S1' from pack 'org' is locked; pack 'team' cannot add exceptions");
+    }
 }

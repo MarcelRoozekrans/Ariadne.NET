@@ -85,7 +85,8 @@ internal static class VacuityRules
     {
         foreach (var rule in pack.Rules)
         {
-            if (rule.AllowEmpty || NamesOnlyVacuousLayers(rule.From, vacuousLayers) || !IsVacuous(rule, map, graphs, projects))
+            // A slices rule selects through its patterns and leaves 'from' empty, which would always look vacuous here.
+            if (rule.Kind == RuleKind.Slices || rule.AllowEmpty || NamesOnlyVacuousLayers(rule.From, vacuousLayers) || !IsVacuous(rule, map, graphs, projects))
             {
                 continue;
             }

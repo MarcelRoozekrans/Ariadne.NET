@@ -1,4 +1,5 @@
 using Ariadne.NET.Abstractions;
+using Ariadne.NET.Analysis;
 
 using ZeroAlloc.Results;
 
@@ -104,6 +105,11 @@ internal static class RulePackReferenceCheck
             CheckTargetLayers(rule.Id, rule.From, layerNames, failures);
             CheckTargetLayers(rule.Id, rule.To, layerNames, failures);
             CheckTargetLayers(rule.Id, rule.Against, layerNames, failures);
+            if (rule.Slices?.Allow is { } allow)
+            {
+                CheckTargetLayers(rule.Id, allow, layerNames, failures);
+            }
+
             CheckTraitsOf(rule, failures);
 
             if (rule.Require?.Layer is { } required && !Contains(layerNames, required))
@@ -115,6 +121,61 @@ internal static class RulePackReferenceCheck
             {
                 CheckRequirement(rule, failures);
             }
+
+            if (rule.Kind == RuleKind.Slices)
+            {
+                CheckSlices(rule, failures);
+            }
+        }
+    }
+
+    // The loader enforces these for a YAML pack. A pack built in code skips the loader, and the slice check would throw on a
+    // malformed pattern or a target mixing layers with code patterns, so they are reported here.
+    private static void CheckSlices(RuleDefinition rule, List<string> failures)
+    {
+        var id = PackText.Show(rule.Id);
+        if (rule.Slices is not { } slices)
+        {
+            failures.Add($"rule '{id}' is a slices rule and has no slices");
+            return;
+        }
+
+        if (slices.Matching.Count == 0)
+        {
+            failures.Add($"the slices of rule '{id}' needs at least one entry in matching");
+        }
+
+        foreach (var pattern in slices.Matching)
+        {
+            if (pattern is not null && SlicePattern.Validate(pattern) is { } reason)
+            {
+                failures.Add($"the slices of rule '{id}' has an invalid pattern: {PackText.Escape(reason)}");
+            }
+        }
+
+        if (slices.FreeOfCycles == slices.Independent)
+        {
+            failures.Add($"the slices of rule '{id}' must set exactly one of freeOfCycles and independent to true");
+        }
+
+        if (slices.Allow is not { } allow)
+        {
+            return;
+        }
+
+        CheckTarget($"the allow of rule '{id}'", allow, failures);
+        if (allow.Members.Count > 0)
+        {
+            failures.Add($"the allow of rule '{id}' has members, which it does not take");
+        }
+        else if (allow is
+                 {
+                     Layers.Count: 0, Namespaces.Count: 0, Assemblies.Count: 0, Types.Count: 0, BaseTypes.Count: 0, Interfaces.Count: 0,
+                     Attributes.Count: 0, Names.Count: 0, Kinds.Count: 0, Accessibility.Count: 0, AssignableTo.Count: 0,
+                     Sealed: null, Abstract: null, Static: null, Nested: null,
+                 })
+        {
+            failures.Add($"the allow of rule '{id}' selects nothing; it needs at least one selector key");
         }
     }
 
