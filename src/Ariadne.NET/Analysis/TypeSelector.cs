@@ -176,10 +176,13 @@ internal sealed class TypeSelector
             return false;
         }
 
-        return (_baseTypes.Length == 0 || AnyBaseMatches(type, names))
+        // The traits that read only the type go before the base, interface and attribute walks; assignableTo walks last.
+        var hasTraits = !_traits.IsEmpty;
+        return (!hasTraits || _traits.FlagsMatch(type))
+            && (_baseTypes.Length == 0 || AnyBaseMatches(type, names))
             && (_interfaces.Length == 0 || AnyInterfaceMatches(type, names))
             && (_attributes.Length == 0 || AnyAttributeMatches(type, names))
-            && (_traits.IsEmpty || _traits.Matches(type, names));
+            && (!hasTraits || _traits.AssignableMatches(type, names));
     }
 
     private bool AnyBaseMatches(INamedTypeSymbol type, TypeNames names)
