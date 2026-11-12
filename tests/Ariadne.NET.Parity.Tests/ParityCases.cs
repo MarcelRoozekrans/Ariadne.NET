@@ -1057,7 +1057,7 @@ public static class ParityCases
             Projection.Types,
             _ => Types().That().ResideInNamespace("Parity.CHaveFullNameContaining.NotBroken")
                 .Or().ResideInNamespace("Parity.CHaveFullNameContaining.NotClean")
-                .Should().NotHaveFullNameContaining("NotBroken")),
+                .Should().NotHaveFullNameContaining("NotBroken.Pay")),
         new(
             "c-have-any-attributes",
             "CHaveAnyAttributes",
