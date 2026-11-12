@@ -16,6 +16,7 @@ internal static class TypeNames
         var result = new StringBuilder(name.Length);
         var angleDepth = 0;
         var bracketDepth = 0;
+        var parenDepth = 0;
         var arity = 0;
         foreach (var c in name)
         {
@@ -42,7 +43,13 @@ internal static class TypeNames
                         result.Append('`').Append(arity.ToString(CultureInfo.InvariantCulture));
                     }
                     break;
-                case ',' when angleDepth == 1:
+                case '(' when angleDepth > 0:
+                    parenDepth++;
+                    break;
+                case ')' when angleDepth > 0:
+                    parenDepth--;
+                    break;
+                case ',' when angleDepth == 1 && parenDepth == 0:
                     arity++;
                     break;
                 default:

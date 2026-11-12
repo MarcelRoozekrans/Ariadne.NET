@@ -116,10 +116,19 @@ internal static class ParityHarness
             : sources.ToHashSet(StringComparer.Ordinal);
     }
 
-    /// <summary>Drops compiler-generated types: names with a <c>&lt;</c>, and types that carry <c>CompilerGeneratedAttribute</c>.</summary>
+    /// <summary>
+    /// Drops compiler-generated types: names with a <c>&lt;</c>, and types of any fixture kind that carry
+    /// <c>CompilerGeneratedAttribute</c>. Loads every kind's architecture first, so the result does not depend on which
+    /// kinds were loaded before.
+    /// </summary>
     public static IEnumerable<string> SourceTypesOnly(IEnumerable<string> names)
     {
         ArgumentNullException.ThrowIfNull(names);
+        foreach (var kind in ParityCases.All.Select(c => c.Kind).Distinct(StringComparer.Ordinal))
+        {
+            ArchitectureOf(kind);
+        }
+
         return names.Where(n => !n.Contains('<', StringComparison.Ordinal) && !CompilerGenerated.ContainsKey(TypeNames.Canonical(n)));
     }
 
@@ -207,8 +216,15 @@ internal static class ParityHarness
 
     private static Architecture Load(string kind)
     {
-        var dll = Path.Combine(FixtureProjects.ParityRoot, kind, "bin", "Debug", "net10.0", $"Parity.{kind}.dll");
-        var architecture = new ArchLoader().LoadAssemblies(System.Reflection.Assembly.LoadFrom(dll)).Build();
+        // A path-based load reads the DLL with Mono.Cecil instead of loading it into the test process, which would lock it.
+        var output = Path.Combine(FixtureProjects.ParityRoot, kind, "bin", "Debug", "net10.0");
+        var dll = $"Parity.{kind}.dll";
+        if (!File.Exists(Path.Combine(output, dll)))
+        {
+            throw new FileNotFoundException($"The parity fixture '{kind}' has no build output.", Path.Combine(output, dll));
+        }
+
+        var architecture = new ArchLoader().LoadFilteredDirectory(output, dll, SearchOption.TopDirectoryOnly).Build();
         var namespaces = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var type in architecture.Types)
         {
@@ -258,7 +274,7 @@ internal static class ParityHarness
         }
 
         var prefix = SlicePrefix(c);
-        if (!ns.StartsWith(prefix, StringComparison.Ordinal) || ns.Length == prefix.Length)
+        if (!ns.StartsWith(prefix, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(string.Create(
                 CultureInfo.InvariantCulture,

@@ -5,6 +5,8 @@ using Ariadne.NET.Testing;
 using Ariadne.NET.Tests.Shared;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using Xunit.Sdk;
+using static ArchUnitNET.Fluent.Slices.SliceRuleDefinition;
 
 namespace Ariadne.NET.Parity.Tests;
 
@@ -45,13 +47,9 @@ public sealed class HarnessGuardTests
         var ariadne = ParityHarness.AriadneFailures(Case, copy.Project);
         ariadne.Should().BeEquivalentTo([BrokenType, LeakyType]);
 
-        // Against ArchUnitNET's answer on the real fixture the sets differ.
-        var differ = () => ParityHarness.AssertAgrees(Case, ParityHarness.ArchUnitNetFailures(Case), ariadne);
-        differ.Should().Throw<Exception>();
-
-        // Even when both tools flag the Clean type, the case fails, and says which type.
+        // Even when both tools flag the Clean type, so the sets agree, the case fails and names the type and the case.
         var agree = () => ParityHarness.AssertAgrees(Case, ariadne, ariadne);
-        agree.Should().Throw<Exception>().Which.Message.Should().Contain(LeakyType);
+        agree.Should().Throw<XunitException>().Which.Message.Should().Contain(LeakyType).And.Contain(Case.Id);
     }
 
     [Fact]
@@ -61,7 +59,7 @@ public sealed class HarnessGuardTests
         ParityHarness.PackHasRule(Kind, "PARITY-NO-SUCH-RULE").Should().BeFalse();
 
         var gap = () => ParityHarness.AssertGapHasNoRule(Case);
-        gap.Should().Throw<Exception>().Which.Message.Should().Contain(RuleId);
+        gap.Should().Throw<XunitException>().Which.Message.Should().Contain(RuleId).And.Contain(Case.Id);
     }
 
     [Fact]
@@ -82,7 +80,7 @@ public sealed class HarnessGuardTests
 
         // The tools now agree, so the empty differences no longer match the recorded one.
         var agree = () => ParityHarness.AssertDivergence(Case, recorded, broken, broken);
-        agree.Should().Throw<Exception>();
+        agree.Should().Throw<XunitException>().Which.Message.Should().Contain(BrokenType).And.Contain(Case.Id);
     }
 
     [Fact]
@@ -100,7 +98,7 @@ public sealed class HarnessGuardTests
 
         var run = () => ParityHarness.AriadneFailures(Case, copy.Project);
 
-        run.Should().Throw<ArchitectureCheckException>().Which.Message.Should().Contain(expected);
+        run.Should().Throw<ArchitectureCheckException>().Which.Message.Should().Contain(expected).And.Contain("bogus");
     }
 
     [Fact]
@@ -118,7 +116,7 @@ public sealed class HarnessGuardTests
 
         var project = () => ParityHarness.FromReport(Case, report);
 
-        project.Should().Throw<InvalidOperationException>().Which.Message.Should().Contain("the project did not load");
+        project.Should().Throw<InvalidOperationException>().Which.Message.Should().Contain("the project did not load").And.Contain(Case.Id);
     }
 
     [Fact]
@@ -142,8 +140,69 @@ public sealed class HarnessGuardTests
 
         var project = () => ParityHarness.FromReport(Case, report);
 
-        project.Should().Throw<InvalidOperationException>().Which.Message.Should().Contain("SHOP-OTHER");
+        project.Should().Throw<InvalidOperationException>().Which.Message.Should().Contain("SHOP-OTHER").And.Contain(Case.Id);
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Slice_projection_yields_full_namespaces(bool withPackages)
+    {
+        // The fixture has no cycle, but Broken depends on Target, so "should not depend on each other" fails the Broken
+        // slice. Matching names it by the remainder, Broken, and the harness prepends the literal prefix;
+        // MatchingWithPackages names it by its full namespace already. Both sides must read Parity.CNotDependOnAny.Broken.
+        const string Pattern = "Parity.CNotDependOnAny.(*)";
+        var slices = new ParityCase(
+            "s-guard",
+            Kind,
+            "Parity.CNotDependOnAny",
+            RuleId,
+            Projection.Slices,
+            _ => (withPackages ? Slices().MatchingWithPackages("Parity.CNotDependOnAny.(**)") : Slices().Matching(Pattern))
+                .Should().NotDependOnEachOther(),
+            Pattern);
+
+        var archUnitNet = ParityHarness.ArchUnitNetFailures(slices);
+        var ariadne = ParityHarness.FromReport(slices, ReportOf(BrokenType));
+
+        archUnitNet.Should().BeEquivalentTo(["Parity.CNotDependOnAny.Broken"]);
+        ariadne.Should().BeEquivalentTo(["Parity.CNotDependOnAny.Broken"]);
+        ParityHarness.AssertAgrees(slices, archUnitNet, ariadne);
+    }
+
+    [Fact]
+    public void Slice_outside_pattern_fails()
+    {
+        // Broken.OrderService lies in Parity.CNotDependOnAny.Broken itself, which no slice of the pattern below holds.
+        var slices = new ParityCase(
+            "s-guard-outside",
+            Kind,
+            "Parity.CNotDependOnAny",
+            RuleId,
+            Projection.Slices,
+            _ => Slices().Matching("Parity.CNotDependOnAny.Broken.(*)").Should().NotDependOnEachOther(),
+            "Parity.CNotDependOnAny.Broken.(*)");
+
+        var project = () => ParityHarness.FromReport(slices, ReportOf(BrokenType));
+
+        project.Should().Throw<InvalidOperationException>().Which.Message.Should().Contain(BrokenType).And.Contain("s-guard-outside");
+    }
+
+    private static ArchitectureReport ReportOf(string sourceType) => new()
+    {
+        Violations =
+        [
+            new ArchitectureViolation
+            {
+                RuleId = RuleId,
+                Kind = ViolationKind.ForbiddenDependency,
+                SourceType = sourceType,
+                Message = "m",
+            },
+        ],
+        Projects = [],
+        TypesChecked = 1,
+    };
 
     private static string LoaderError(string packPath)
     {

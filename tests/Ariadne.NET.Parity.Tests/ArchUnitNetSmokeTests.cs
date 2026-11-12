@@ -13,8 +13,8 @@ public sealed class ArchUnitNetSmokeTests
     [Fact]
     public void ArchUnitNet_loads_a_net10_fixture_and_flags_the_broken_type()
     {
-        var dll = Path.Combine(FixtureProjects.ParityRoot, "CNotDependOnAny", "bin", "Debug", "net10.0", "Parity.CNotDependOnAny.dll");
-        var architecture = new ArchLoader().LoadAssemblies(System.Reflection.Assembly.LoadFrom(dll)).Build();
+        var output = Path.Combine(FixtureProjects.ParityRoot, "CNotDependOnAny", "bin", "Debug", "net10.0");
+        var architecture = new ArchLoader().LoadFilteredDirectory(output, "Parity.CNotDependOnAny.dll", SearchOption.TopDirectoryOnly).Build();
         var rule = Types().That().ResideInNamespace("Parity.CNotDependOnAny.Broken")
             .Should().NotDependOnAny(Types().That().ResideInNamespace("Parity.CNotDependOnAny.Target"));
 

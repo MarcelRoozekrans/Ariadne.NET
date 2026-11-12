@@ -240,6 +240,7 @@ internal static class FixtureProjects
     /// True for the lock and marker files of the restore and the parity build, wherever they sit: they change on every run, so
     /// counting them would make each marker invalidate the other.
     /// </summary>
+    /// <remarks>Lock and marker files only live at fixture roots, so matching the file name alone cannot skip a source file.</remarks>
     internal static bool IsLockOrMarker(string fileName) =>
         fileName.StartsWith(".restore", StringComparison.Ordinal) || fileName.StartsWith(".parity-", StringComparison.Ordinal);
 

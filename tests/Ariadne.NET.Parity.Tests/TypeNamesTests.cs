@@ -16,6 +16,8 @@ public sealed class TypeNamesTests
     [InlineData("Ns.Outer<T>.Inner", "Ns.Outer`1.Inner")]
     [InlineData("Ns.Outer<Ns.Foo<int>>.Inner", "Ns.Outer`1.Inner")]
     [InlineData("Ns.Foo`1[[System.Int32, System.Private.CoreLib]]", "Ns.Foo`1")]
+    [InlineData("Ns.Map<Ns.A<Ns.B, Ns.C>, Ns.D>", "Ns.Map`2")]
+    [InlineData("Ns.Foo<(int, int)>", "Ns.Foo`1")]
     public void Canonical_maps_both_styles_to_one_form(string input, string expected)
         => TypeNames.Canonical(input).Should().Be(expected);
 }
