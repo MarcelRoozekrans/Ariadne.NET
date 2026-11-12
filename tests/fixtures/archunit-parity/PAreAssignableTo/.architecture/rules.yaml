@@ -3,4 +3,22 @@ name: parity-p-are-assignable-to
 version: "1.0.0"
 author: fixture
 
-# No rule yet: a selector has no assignableTo, and an exception cannot name it. Phase 4.2 adds PARITY-PAREASSIGNABLETO and PARITY-PAREASSIGNABLETO-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-PAREASSIGNABLETO
+    because: Mirrors ArchUnitNET's AreAssignableTo; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PAreAssignableTo.**"]
+        assignableTo: ["Parity.PAreAssignableTo.Broken.OrderBase"]
+      to:
+        namespaces: ["Parity.PAreAssignableTo.Target.**"]
+  - id: PARITY-PAREASSIGNABLETO-NOT
+    because: Mirrors ArchUnitNET's AreNotAssignableTo; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PAreAssignableTo.**"]
+      to:
+        namespaces: ["Parity.PAreAssignableTo.Target.**"]
+    exceptions:
+      - assignableTo: ["Parity.PAreAssignableTo.Broken.OrderBase"]
+        because: AreNotAssignableTo leaves out OrderBase and its subclasses.

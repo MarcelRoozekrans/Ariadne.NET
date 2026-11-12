@@ -3,4 +3,20 @@ name: parity-p-are-private
 version: "1.0.0"
 author: fixture
 
-# No rule yet: a selector has no accessibility. Phase 4.2 adds PARITY-PAREPRIVATE and PARITY-PAREPRIVATE-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-PAREPRIVATE
+    because: Mirrors ArchUnitNET's ArePrivate; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PArePrivate.**"]
+        accessibility: [private]
+      to:
+        namespaces: ["Parity.PArePrivate.Target.**"]
+  - id: PARITY-PAREPRIVATE-NOT
+    because: Mirrors ArchUnitNET's AreNotPrivate; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PArePrivate.**"]
+        accessibility: [public, internal, protected, "protected internal", "private protected"]
+      to:
+        namespaces: ["Parity.PArePrivate.Target.**"]

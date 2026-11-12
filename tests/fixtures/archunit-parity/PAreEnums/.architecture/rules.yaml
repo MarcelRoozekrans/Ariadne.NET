@@ -3,4 +3,20 @@ name: parity-p-are-enums
 version: "1.0.0"
 author: fixture
 
-# No rule yet: a selector has no kinds. Phase 4.2 adds PARITY-PAREENUMS and PARITY-PAREENUMS-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-PAREENUMS
+    because: Mirrors ArchUnitNET's AreEnums; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PAreEnums.**"]
+        kinds: [enum]
+      to:
+        namespaces: ["Parity.PAreEnums.Target.**"]
+  - id: PARITY-PAREENUMS-NOT
+    because: Mirrors ArchUnitNET's AreNotEnums; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PAreEnums.**"]
+        kinds: [class, interface, record, struct, recordStruct, delegate]
+      to:
+        namespaces: ["Parity.PAreEnums.Target.**"]

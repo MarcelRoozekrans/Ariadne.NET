@@ -3,4 +3,22 @@ name: parity-p-are-abstract
 version: "1.0.0"
 author: fixture
 
-# No rule yet: a selector has no abstract. Phase 4.2 adds PARITY-PAREABSTRACT and PARITY-PAREABSTRACT-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-PAREABSTRACT
+    because: Mirrors ArchUnitNET's AreAbstract on Classes(); the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PAreAbstract.**"]
+        kinds: [class, record]
+        abstract: true
+      to:
+        namespaces: ["Parity.PAreAbstract.Target.**"]
+  - id: PARITY-PAREABSTRACT-NOT
+    because: Mirrors ArchUnitNET's AreNotAbstract on Classes(); the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PAreAbstract.**"]
+        kinds: [class, record]
+        abstract: false
+      to:
+        namespaces: ["Parity.PAreAbstract.Target.**"]

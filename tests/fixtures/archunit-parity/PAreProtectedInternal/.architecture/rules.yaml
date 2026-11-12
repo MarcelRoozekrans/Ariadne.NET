@@ -3,4 +3,20 @@ name: parity-p-are-protected-internal
 version: "1.0.0"
 author: fixture
 
-# No rule yet: a selector has no accessibility. Phase 4.2 adds PARITY-PAREPROTECTEDINTERNAL and PARITY-PAREPROTECTEDINTERNAL-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-PAREPROTECTEDINTERNAL
+    because: Mirrors ArchUnitNET's AreProtectedInternal; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PAreProtectedInternal.**"]
+        accessibility: ["protected internal"]
+      to:
+        namespaces: ["Parity.PAreProtectedInternal.Target.**"]
+  - id: PARITY-PAREPROTECTEDINTERNAL-NOT
+    because: Mirrors ArchUnitNET's AreNotProtectedInternal; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PAreProtectedInternal.**"]
+        accessibility: [public, internal, protected, private, "private protected"]
+      to:
+        namespaces: ["Parity.PAreProtectedInternal.Target.**"]

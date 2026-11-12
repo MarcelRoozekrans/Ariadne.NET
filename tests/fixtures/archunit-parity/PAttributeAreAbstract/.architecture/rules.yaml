@@ -3,4 +3,22 @@ name: parity-p-attribute-are-abstract
 version: "1.0.0"
 author: fixture
 
-# No rule yet: a selector has no abstract. Phase 4.2 adds PARITY-PATTRIBUTEAREABSTRACT and PARITY-PATTRIBUTEAREABSTRACT-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-PATTRIBUTEAREABSTRACT
+    because: Mirrors ArchUnitNET's AreAbstract on Attributes(); the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PAttributeAreAbstract.**"]
+        assignableTo: ["System.Attribute"]
+        abstract: true
+      to:
+        namespaces: ["Parity.PAttributeAreAbstract.Target.**"]
+  - id: PARITY-PATTRIBUTEAREABSTRACT-NOT
+    because: Mirrors ArchUnitNET's AreNotAbstract on Attributes(); the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PAttributeAreAbstract.**"]
+        assignableTo: ["System.Attribute"]
+        abstract: false
+      to:
+        namespaces: ["Parity.PAttributeAreAbstract.Target.**"]

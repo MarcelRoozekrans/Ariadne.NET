@@ -3,4 +3,20 @@ name: parity-p-are-nested
 version: "1.0.0"
 author: fixture
 
-# No rule yet: a selector has no nested. Phase 4.2 adds PARITY-PARENESTED and PARITY-PARENESTED-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-PARENESTED
+    because: Mirrors ArchUnitNET's AreNested; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PAreNested.**"]
+        nested: true
+      to:
+        namespaces: ["Parity.PAreNested.Target.**"]
+  - id: PARITY-PARENESTED-NOT
+    because: Mirrors ArchUnitNET's AreNotNested; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PAreNested.**"]
+        nested: false
+      to:
+        namespaces: ["Parity.PAreNested.Target.**"]

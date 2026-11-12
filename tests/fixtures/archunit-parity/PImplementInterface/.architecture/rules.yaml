@@ -10,3 +10,13 @@ rules:
       from: { interfaces: ["Parity.PImplementInterface.Contracts.IAuditable"] }
       to:
         namespaces: ["Parity.PImplementInterface.Target.**"]
+  - id: PARITY-PIMPLEMENTINTERFACE-NOT
+    because: Mirrors ArchUnitNET's DoNotImplementInterface; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PImplementInterface.**"]
+      to:
+        namespaces: ["Parity.PImplementInterface.Target.**"]
+    exceptions:
+      - assignableTo: ["Parity.PImplementInterface.Contracts.IAuditable"]
+        because: DoNotImplementInterface leaves out the implementers of IAuditable.

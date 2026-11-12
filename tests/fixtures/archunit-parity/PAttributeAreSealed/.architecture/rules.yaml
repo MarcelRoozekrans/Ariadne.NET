@@ -3,4 +3,22 @@ name: parity-p-attribute-are-sealed
 version: "1.0.0"
 author: fixture
 
-# No rule yet: a selector has no sealed. Phase 4.2 adds PARITY-PATTRIBUTEARESEALED and PARITY-PATTRIBUTEARESEALED-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-PATTRIBUTEARESEALED
+    because: Mirrors ArchUnitNET's AreSealed on Attributes(); the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PAttributeAreSealed.**"]
+        assignableTo: ["System.Attribute"]
+        sealed: true
+      to:
+        namespaces: ["Parity.PAttributeAreSealed.Target.**"]
+  - id: PARITY-PATTRIBUTEARESEALED-NOT
+    because: Mirrors ArchUnitNET's AreNotSealed on Attributes(); the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PAttributeAreSealed.**"]
+        assignableTo: ["System.Attribute"]
+        sealed: false
+      to:
+        namespaces: ["Parity.PAttributeAreSealed.Target.**"]
