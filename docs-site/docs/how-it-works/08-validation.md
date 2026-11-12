@@ -99,7 +99,7 @@ Role violations carry generated rule ids and a `because`. `ROLE-<Name>` is the t
 
 An element that selects no type in the projects loaded cannot fail, so it is a violation itself. A rule or a component role is reported as `VacuousRule`, and a layer as `VacuousLayer`. Both are solution-level, with no file or line, and the message names the number of projects loaded.
 
-- The check covers the subject side only: `from` of `forbid` and `allowOnly`, `for` of `require` and `uniqueNames`, and the `matching` patterns of `slices`. `to`, `against`, `members` and exceptions are not checked unless the rule sets `requireTarget: true` on a `forbid`, `allowOnly` or `uniqueNames` rule; see [a target that matches nothing](rule-types.md#a-target-that-matches-nothing).
+- The check covers the subject side only: `from` of `forbid` and `allowOnly`, `for` of `require` and `uniqueNames`, and the `matching` patterns of `slices`. `to`, `against` and `members` are not checked unless the rule sets `requireTarget: true` on a `forbid`, `allowOnly` or `uniqueNames` rule, which checks only that target selector; exceptions are never checked. See [a target that matches nothing](rule-types.md#a-target-that-matches-nothing).
 - A `bannedPackages` rule is vacuous only when its `from.assemblies` is non-empty and matches no loaded project.
 - A role is vacuous when no type in its layer matches it.
 - A rule or role whose subject resolves only through layers already reported as vacuous gets no second violation.
