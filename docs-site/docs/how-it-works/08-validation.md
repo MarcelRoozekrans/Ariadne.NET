@@ -119,7 +119,8 @@ ArchitectureReport
   │     │                                     DependencyNotPermitted, LayerOverlap, TypeKindMismatch,
   │     │                                     AccessibilityMismatch, MissingInterface, WrongLayer,
   │     │                                     RequirementNotMet,
-  │     │                                     BannedPackage, NameCollision, VacuousRule, VacuousLayer)
+  │     │                                     BannedPackage, NameCollision, SliceCycle, SliceDependency,
+  │     │                                     VacuousRule, VacuousLayer)
   │     ├── SourceType: string               (fully qualified name; for a vacuous violation the layer name, rule id or role name)
   │     ├── Target: string?                  (the type depended on, absent for role, require and overlap checks)
   │     ├── Location: SourceLocation?        (file path, line, column; the first reference)

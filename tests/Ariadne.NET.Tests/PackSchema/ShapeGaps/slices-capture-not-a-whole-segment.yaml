@@ -1,0 +1,9 @@
+# A capture must be a whole segment, a rule about the characters around it that the schema leaves to the loader.
+schema: 2
+name: x
+rules:
+  - id: X-R1
+    because: b
+    slices:
+      matching: ["Shop.Ord(*)"]
+      independent: true

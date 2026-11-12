@@ -61,7 +61,7 @@ Every mapping in a pack has a closed set of keys. An unknown key, a missing requ
 | `author` | no | Pack author or maintainer, default `""`. |
 | `extends` | no | Parent pack references: `builtin://name` or `import://name`. See [`extends`](#extends). |
 | `layers` | no | List of layers. |
-| `rules` | no | List of `forbid`, `allowOnly`, `require`, `bannedPackages` and `uniqueNames` rules. |
+| `rules` | no | List of `forbid`, `allowOnly`, `require`, `bannedPackages`, `uniqueNames` and `slices` rules. |
 | `componentRoles` | no | List of component roles, used for code generation and role checks. |
 | `namingConventions` | no | Templates for namespaces and file paths. |
 
@@ -148,7 +148,7 @@ The C# model is `LayerDefinition`:
 
 ## Rules
 
-The `rules:` list holds `forbid`, `allowOnly`, `require`, `bannedPackages` and `uniqueNames` rules. Every rule has an `id` and a `because`; the rule types, their fields, examples and limits are on the [Rule Types](rule-types.md) page. Rules that select nothing fail the run; see [Rules that select nothing](rule-types.md#rules-that-select-nothing).
+The `rules:` list holds `forbid`, `allowOnly`, `require`, `bannedPackages`, `uniqueNames` and `slices` rules. Every rule has an `id` and a `because`; the rule types, their fields, examples and limits are on the [Rule Types](rule-types.md) page. Rules that select nothing fail the run; see [Rules that select nothing](rule-types.md#rules-that-select-nothing).
 
 ## Selectors
 

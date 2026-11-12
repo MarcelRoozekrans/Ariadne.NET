@@ -50,6 +50,43 @@ public class RulePackDescriberTests
     }
 
     [Fact]
+    public void Describes_slices_rule()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "R-SLICES",
+            Because = "Modules stay independent.",
+            Kind = RuleKind.Slices,
+            From = new TargetSelector(),
+            Slices = new SliceDefinition
+            {
+                Matching = ["Shop.(*).**", "Lib.(**).Core"],
+                Independent = true,
+                Allow = new TargetSelector { Namespaces = ["Shop.*.Public.**"] },
+            },
+        };
+
+        RulePackDescriber.DescribeRule(rule).Should().Equal(
+            "R-SLICES slices matching Shop.(*).**, Lib.(**).Core -> independent; allow namespaces Shop.*.Public.**",
+            "Modules stay independent.");
+    }
+
+    [Fact]
+    public void Describes_free_of_cycles_slices_rule_without_allow()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "R-CYCLES",
+            Because = "No cycles.",
+            Kind = RuleKind.Slices,
+            From = new TargetSelector(),
+            Slices = new SliceDefinition { Matching = ["Shop.(*)"], FreeOfCycles = true },
+        };
+
+        RulePackDescriber.DescribeRule(rule).Should().Equal("R-CYCLES slices matching Shop.(*) -> freeOfCycles", "No cycles.");
+    }
+
+    [Fact]
     public void DescribeRule_BannedPackages_PrintsThePackagesAsTarget()
     {
         var rule = new RuleDefinition
