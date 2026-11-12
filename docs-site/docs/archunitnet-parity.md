@@ -7,6 +7,8 @@ title: ArchUnitNET parity
 
 This page lists every type-level and slice rule kind of [ArchUnitNET](https://github.com/TNG/ArchUnitNET) and says how a pack expresses it, or why it does not. The version is pinned at `TngTech.ArchUnitNET` 0.13.2; the rows come from that package's public API. Member-level kinds are listed too, as `deferred`.
 
+If you are moving an ArchUnitNET test suite to packs, start with the [migration guide](migrating-from-archunitnet.md).
+
 The test project `tests/Ariadne.NET.Parity.Tests` checks the page. For each row in scope it runs the ArchUnitNET rule and the Ariadne pack on one small fixture project and compares the types each tool flags. A row is `covered` only when its harness case passes in CI.
 
 How the comparison works:
