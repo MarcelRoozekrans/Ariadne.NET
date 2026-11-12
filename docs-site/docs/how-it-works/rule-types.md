@@ -20,13 +20,13 @@ A rule is an entry in `rules:`. It has exactly one of `forbid`, `allowOnly`, `re
 | `require` | one of | `{ for: <selector>, layer, kind, accessibility, implements, is, isNot }`: every type that `for` selects must satisfy the requirement. At least one of `layer`, `kind`, `accessibility`, `implements`, `is` and `isNot` is needed. See [Require rules](#require-rules). |
 | `bannedPackages` | one of | `{ packages: [...], from: { assemblies: [...] } }`: no project in `from` may resolve a package that `packages` matches. Reported as `BannedPackage`. See [Banned packages](#banned-packages). |
 | `uniqueNames` | one of | `{ for: <target>, against: <target> }`: no type in `for` may share a simple name with a type in `against`. Reported as `NameCollision`. See [Unique names](#unique-names). |
-| `exceptions` | no | List of selectors, each with a required `because`. A source type that an exception matches is exempt from the rule. On a `bannedPackages` rule an exception takes `assemblies` only, and on a `uniqueNames` rule `namespaces` and `types` only. |
+| `exceptions` | no | List of selectors, each with a required `because`. A source type that an exception matches is exempt from the rule. On a `bannedPackages` rule an exception takes `assemblies` only, and on a `uniqueNames` rule `namespaces`, `types` and the type traits. |
 | `locked` | no, default `false` | A child pack cannot add exceptions to this rule. |
 | `allowEmpty` | no, default `false` | Accepts that the rule selects no type. See [Rules that select nothing](#rules-that-select-nothing). |
 
 A **target** is either `layers: [...]` or a [selector](03-rule-schema.md#selectors) made of `namespaces`, `assemblies`, `types`, `baseTypes`, `interfaces`, `attributes` and the [type traits](03-rule-schema.md#type-traits). `layers` may sit next to traits, which keeps the types of those layers that match every trait. Mixing `layers` with the other selector kinds in one target is a load error, and a target must select something.
 
-An exception takes `namespaces`, `assemblies`, `types` and the [type traits](03-rule-schema.md#type-traits) (at least one key) and a required `because`; the keys of one exception are AND-ed. On a `bannedPackages` rule an exception takes only `assemblies`, and on a `uniqueNames` rule `namespaces`, `types` and the traits. Exceptions exempt the source type, the same way for `forbid` and `allowOnly`. A negative predicate on a list trait is an exception that names the trait: "no type may depend on `Shop.Legacy.**`, except subtypes of `ILegacyAdapter`" is a `forbid` with this exception.
+An exception takes `namespaces`, `assemblies`, `types` and the [type traits](03-rule-schema.md#type-traits) (at least one key) and a required `because`; the keys of one exception are AND-ed. On a `bannedPackages` rule an exception takes only `assemblies`, and on a `uniqueNames` rule `namespaces`, `types` and the traits. Exceptions exempt the source type, the same way for `forbid` and `allowOnly`. A negative predicate on a list trait is an exception that names the trait: "no type may depend on `Shop.Legacy.**`, except types assignable to `ILegacyAdapter`" is a `forbid` with this exception, which exempts every depending type assignable to `ILegacyAdapter`.
 
 ```yaml
 rules:
@@ -129,7 +129,7 @@ rules:
 ```
 
 - **Each key is its own requirement.** In `is`, a type must match every key, and each key it fails is one violation. In `isNot`, a type must match none of the keys, and each key it matches is one violation. Within one key the values stay alternatives, so `isNot: { names: [A, B] }` means "matches neither A nor B".
-- **The message names the key.** It reads `Type 'OrderService' is selected by rule 'SHOP-DOMAIN-SEALED' and should be sealed but is not` for `is`, and `Type 'OrderImpl' is selected by rule 'SHOP-DOMAIN-SEALED' and should not have a name matching '*Impl' but is named 'OrderImpl'` for `isNot`. A boolean that is `false` reads in its positive form, so `is: { sealed: false }` reports `should not be sealed but is`.
+- **The message names the key.** It reads `Type 'OrderService' is selected by rule 'SHOP-DOMAIN-SEALED' and should be sealed but is not` for `is`, and `Type 'OrderImpl' is selected by rule 'SHOP-DOMAIN-SEALED' and should not have a name matching '*Impl' or '*Helper' but is named 'OrderImpl'` for `isNot`. A boolean that is `false` reads in its positive form, so `is: { sealed: false }` reports `should not be sealed but is`.
 - **They apply to every selected type, enums and delegates included.** The older keys `kind`, `accessibility` and `implements` stay as shorthand and keep skipping enums and delegates, so `kind: class` over an enum reports nothing while `is: { kinds: [class] }` over the same enum reports a violation.
 - **`NotExist`.** To say that no type may exist in a place, select the types and refuse all of them with `allowEmpty: true`, because an empty selection is then the goal and not a mistake:
 

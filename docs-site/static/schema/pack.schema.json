@@ -383,7 +383,7 @@
           ]
         }
       ],
-      "description": "A place where the rule does not apply. On a bannedPackages rule only assemblies, on a uniqueNames rule only namespaces and types. Type traits are accepted on every rule kind except bannedPackages.",
+      "description": "A place where the rule does not apply. On a bannedPackages rule only assemblies, on a uniqueNames rule namespaces, types and the type traits. Type traits are accepted on every rule kind except bannedPackages.",
       "properties": {
         "namespaces": {
           "$ref": "#/$defs/patternList"
