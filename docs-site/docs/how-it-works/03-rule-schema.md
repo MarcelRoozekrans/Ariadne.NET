@@ -183,7 +183,7 @@ Eight more keys select by what a type is and not by where it lives or what it re
 
 `sealed` and `abstract` describe classes. An interface, struct, enum or delegate is neither, so `sealed: false` matches it. To talk about classes only, add `kinds: [class, record]`.
 
-Traits work in the `for` of a `require` rule, in the `from` and `to` of `forbid` and `allowOnly`, in `is` and `isNot` of a `require` rule (see [Require rules](rule-types.md#require-rules)) and in `exceptions`, including the exceptions of an amendment. They do not work in layer definitions or in the `for` and `against` of `uniqueNames`, although a `uniqueNames` exception takes them. A `bannedPackages` exception does not take them. A selector with only traits is valid.
+Traits work in the `for` of a `require` rule, in the `from` and `to` of `forbid` and `allowOnly`, in the `allow` of `slices`, in `is` and `isNot` of a `require` rule (see [Require rules](rule-types.md#require-rules)) and in `exceptions`, including the exceptions of an amendment. They do not work in layer definitions or in the `for` and `against` of `uniqueNames`, although a `uniqueNames` exception takes them. A `bannedPackages` exception does not take them. A selector with only traits is valid.
 
 A target may have `layers` together with traits: a type must be in one of the layers and match every trait. `layers` next to `namespaces`, `assemblies`, `types`, `baseTypes`, `interfaces`, `attributes` or `members` is still a load error. So `{ layers: [Domain], kinds: [class, record] }` selects the classes and records of the Domain layer.
 

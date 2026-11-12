@@ -57,7 +57,7 @@ rules:
         because: DI registration wires the interface to its implementation.
 ```
 
-The C# model is `RuleDefinition`, with `Id`, `Because`, `Description`, `Kind` (`RuleKind.Forbid`, `RuleKind.AllowOnly`, `RuleKind.Require`, `RuleKind.BannedPackages` or `RuleKind.UniqueNames`), `From` and `To` (`TargetSelector`), `Require` (`RuleRequirement?`, with `Layer`, `Kind`, `Accessibility`, `Implements`, `Is` and `IsNot`), `Packages` (`IList<string>`), `Against` (`TargetSelector`), `Exceptions` (`IList<RuleException>`), `Locked` and `AllowEmpty`. For a `require` or `uniqueNames` rule `From` holds the `for` selector, and for a `bannedPackages` rule it holds `from`.
+The C# model is `RuleDefinition`, with `Id`, `Because`, `Description`, `Kind` (`RuleKind.Forbid`, `RuleKind.AllowOnly`, `RuleKind.Require`, `RuleKind.BannedPackages`, `RuleKind.UniqueNames` or `RuleKind.Slices`), `From` and `To` (`TargetSelector`), `Require` (`RuleRequirement?`, with `Layer`, `Kind`, `Accessibility`, `Implements`, `Is` and `IsNot`), `Packages` (`IList<string>`), `Against` (`TargetSelector`), `Slices` (`SliceDefinition?`, with `Matching`, `FreeOfCycles`, `Independent` and `Allow`), `Exceptions` (`IList<RuleException>`), `Locked` and `AllowEmpty`. For a `require` or `uniqueNames` rule `From` holds the `for` selector, and for a `bannedPackages` rule it holds `from`.
 
 ### Forbid and allowOnly
 
@@ -159,7 +159,7 @@ A rule, a component role or a layer that selects no type cannot fail, so a clean
 | `VacuousRule` | a component role that matches no type in its layer | `Role '<Name>' matches no type in layer '<Layer>' in the <n> project(s) loaded.` |
 | `VacuousLayer` | a layer that covers no type | `Layer '<Name>' covers no type in the <n> project(s) loaded.` |
 
-Only the subject side is checked: the `from` of `forbid`, `allowOnly`, `require` and `uniqueNames` (for the last two, the `for` selector). The `to`, `against` and `members` sides and the `exceptions` are never checked, since a rule about something that does not exist yet is still sound. A `bannedPackages` rule is vacuous only when it has a non-empty `from.assemblies` that matches no loaded project; without `from` it applies to every project. A rule or role whose subject resolves only through layers that are already reported as vacuous gets no second violation, because fixing the layer fixes it.
+Only the subject side is checked: the `from` of `forbid`, `allowOnly`, `require` and `uniqueNames` (for the last two, the `for` selector), and the `matching` patterns of `slices`. The `to`, `against` and `members` sides and the `exceptions` are never checked, since a rule about something that does not exist yet is still sound. A `bannedPackages` rule is vacuous only when it has a non-empty `from.assemblies` that matches no loaded project; without `from` it applies to every project. A rule or role whose subject resolves only through layers that are already reported as vacuous gets no second violation, because fixing the layer fixes it.
 
 Vacuity is relative to the projects loaded. A run on a single `.csproj` reports as vacuous every layer whose types the loaded projects neither declare nor reference, and the message says how many projects were loaded. A layer in another project still counts as covered when a loaded project references its types. A layer that holds only generated types is vacuous, since generated code is not analyzed. Validate the solution, or mark the rules and roles that belong to other projects.
 
@@ -237,11 +237,11 @@ rules:
   - id: SHOP-MODULES-ACYCLIC
     because: Modules form a hierarchy.
     slices:
-      matching: ["Shop.(**).Core", "Shop.(**).Public"]
+      matching: ["Shop.(**).Core.**", "Shop.(**).Public.**"]
       freeOfCycles: true
 ```
 
-With `Shop.(**).Core`, the namespace `Shop.Orders.Core.Models` is in slice `Orders`, and `Shop.Sales.Eu.Core` is in slice `Sales.Eu`.
+With `Shop.(**).Core.**`, the namespace `Shop.Orders.Core.Models` is in slice `Orders`, and `Shop.Sales.Eu.Core` is in slice `Sales.Eu`. Without the trailing `.**`, only types directly in `Shop.<x>.Core` would be in a slice, and `Shop.Orders.Core.Models` would be in none.
 
 **Which types have a slice.** Only the types that the projects of the run declare. A framework type or a NuGet type has no slice, whatever its namespace looks like, so `System.Foo.Core.Bar` is never a target in another slice. A nested type has the namespace of its outermost containing type. A type whose namespace matches no pattern has no slice, and a dependency between two types is checked only when both have one. Only type references count, not member uses.
 
