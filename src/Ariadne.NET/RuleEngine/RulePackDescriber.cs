@@ -66,10 +66,11 @@ public static class RulePackDescriber
             selector.BaseTypes,
             selector.Interfaces,
             selector.Attributes,
-            selector.Members);
+            selector.Members,
+            selector);
     }
 
-    /// <summary>The requirement members in the order layer, kind, accessibility, implements, joined by ", ", or <c>no requirement</c>.</summary>
+    /// <summary>The requirement members in the order layer, kind, accessibility, implements, is, isNot, joined by ", ", or <c>no requirement</c>.</summary>
     public static string Describe(RuleRequirement? requirement)
     {
         if (requirement is null)
@@ -98,6 +99,16 @@ public static class RulePackDescriber
             parts.Add($"implements {Describe(requirement.Implements)}");
         }
 
+        if (requirement.Is is not null)
+        {
+            parts.Add($"is {Describe(requirement.Is)}");
+        }
+
+        if (requirement.IsNot is not null)
+        {
+            parts.Add($"isNot {Describe(requirement.IsNot)}");
+        }
+
         return parts.Count > 0 ? string.Join(", ", parts) : "no requirement";
     }
 
@@ -108,7 +119,7 @@ public static class RulePackDescriber
         return string.Concat(char.ToLowerInvariant(name[0]).ToString(), name.AsSpan(1));
     }
 
-    // Kinds in the order layers, namespaces, assemblies, types, baseTypes, interfaces, attributes, members; kinds joined by "; ", values by ", ".
+    // Kinds in the order layers, namespaces, assemblies, types, baseTypes, interfaces, attributes, members, then the traits names, kinds, accessibility, assignableTo, sealed, abstract, static, nested; kinds joined by "; ", values by ", ".
     private static string Describe(
         IList<string> namespaces,
         IList<string> assemblies,
@@ -117,7 +128,8 @@ public static class RulePackDescriber
         IList<string>? baseTypes = null,
         IList<string>? interfaces = null,
         IList<string>? attributes = null,
-        IList<string>? members = null)
+        IList<string>? members = null,
+        TargetSelector? traits = null)
     {
         var parts = new List<string>();
         AddKind(parts, "layers", layers);
@@ -128,6 +140,18 @@ public static class RulePackDescriber
         AddKind(parts, "interfaces", interfaces);
         AddKind(parts, "attributes", attributes);
         AddKind(parts, "members", members);
+        if (traits is not null)
+        {
+            AddKind(parts, "names", traits.Names);
+            AddKind(parts, "kinds", traits.Kinds.Select(YamlSpelling).ToList());
+            AddKind(parts, "accessibility", traits.Accessibility);
+            AddKind(parts, "assignableTo", traits.AssignableTo);
+            AddFlag(parts, "sealed", traits.Sealed);
+            AddFlag(parts, "abstract", traits.Abstract);
+            AddFlag(parts, "static", traits.Static);
+            AddFlag(parts, "nested", traits.Nested);
+        }
+
         return parts.Count > 0 ? string.Join("; ", parts) : "no selectors";
     }
 
@@ -136,6 +160,14 @@ public static class RulePackDescriber
         if (values is { Count: > 0 })
         {
             parts.Add($"{label} {string.Join(", ", values)}");
+        }
+    }
+
+    private static void AddFlag(List<string> parts, string label, bool? value)
+    {
+        if (value is { } flag)
+        {
+            parts.Add(flag ? $"{label} true" : $"{label} false");
         }
     }
 }
