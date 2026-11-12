@@ -4,3 +4,4 @@ version: "1.0.0"
 author: fixture
 
 # No rule yet: a pack cannot group types into slices. Phase 4.3 adds PARITY-SNOTDEPENDONEACHOTHER here, a slices rule with independent: true, and deletes its KnownGaps entry.
+# The harness compares slices by full namespace, such as Parity.SNotDependOnEachOther.Broken.Orders: every namespace below Parity.SNotDependOnEachOther is its own slice.
