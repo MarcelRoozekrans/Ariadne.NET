@@ -103,7 +103,8 @@ internal static class PackYamlReader
         ("delegate", CSharpTypeKind.Delegate),
     ];
 
-    private static readonly string[] AccessibilityKeywords =
+    /// <summary>The six accessibility keywords of the accessibility trait, matched exactly.</summary>
+    internal static readonly string[] AccessibilityKeywords =
         ["public", "internal", "protected", "private", "protected internal", "private protected"];
 
     private static readonly string KindsNames = string.Join(", ", SelectableTypeKinds.Select(static k => $"'{k.Name}'"));

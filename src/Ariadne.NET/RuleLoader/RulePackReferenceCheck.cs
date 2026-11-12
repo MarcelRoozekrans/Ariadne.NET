@@ -104,6 +104,7 @@ internal static class RulePackReferenceCheck
             CheckTargetLayers(rule.Id, rule.From, layerNames, failures);
             CheckTargetLayers(rule.Id, rule.To, layerNames, failures);
             CheckTargetLayers(rule.Id, rule.Against, layerNames, failures);
+            CheckTraitsOf(rule, failures);
 
             if (rule.Require?.Layer is { } required && !Contains(layerNames, required))
             {
@@ -113,6 +114,76 @@ internal static class RulePackReferenceCheck
             if (rule.Kind == RuleKind.Require)
             {
                 CheckRequirement(rule, failures);
+            }
+        }
+    }
+
+    // The loader enforces these for a YAML pack. A pack built in code skips the loader, and the validator would throw on
+    // an unknown accessibility or a target mixing layers with code patterns, and an empty exception would exempt every
+    // type, so they are reported here. Amendment exceptions are merged in by now, so they are checked too.
+    private static void CheckTraitsOf(RuleDefinition rule, List<string> failures)
+    {
+        var id = PackText.Show(rule.Id);
+        CheckTarget($"the {(rule.Kind == RuleKind.Require ? "for" : "from")} of rule '{id}'", rule.From, failures);
+        CheckTarget($"the to of rule '{id}'", rule.To, failures);
+        CheckTarget($"the against of rule '{id}'", rule.Against, failures);
+        if (rule.Require is { } requirement)
+        {
+            if (requirement.Is is { } isCondition)
+            {
+                CheckTraitValues($"the is of rule '{id}'", isCondition.Kinds, isCondition.Accessibility, failures);
+            }
+
+            if (requirement.IsNot is { } isNotCondition)
+            {
+                CheckTraitValues($"the isNot of rule '{id}'", isNotCondition.Kinds, isNotCondition.Accessibility, failures);
+            }
+        }
+
+        for (var i = 0; i < rule.Exceptions.Count; i++)
+        {
+            var exception = rule.Exceptions[i];
+            var where = $"exceptions[{i}] of rule '{id}'";
+            if (exception is
+                {
+                    Namespaces.Count: 0, Assemblies.Count: 0, Types.Count: 0, Names.Count: 0, Kinds.Count: 0, Accessibility.Count: 0,
+                    AssignableTo.Count: 0, Sealed: null, Abstract: null, Static: null, Nested: null,
+                })
+            {
+                failures.Add($"{where} selects nothing; it needs at least one of namespaces, assemblies, types or a trait");
+            }
+
+            CheckTraitValues(where, exception.Kinds, exception.Accessibility, failures);
+        }
+    }
+
+    // TargetMatcher compiles a target only when it selects either layers or code patterns; traits may join both.
+    private static void CheckTarget(string where, TargetSelector target, List<string> failures)
+    {
+        if (target.Layers.Count > 0 && (target.Namespaces.Count > 0 || target.Assemblies.Count > 0 || target.Types.Count > 0
+                || target.BaseTypes.Count > 0 || target.Interfaces.Count > 0 || target.Attributes.Count > 0 || target.Members.Count > 0))
+        {
+            failures.Add($"{where} mixes layers with namespaces, assemblies, types, base types, interfaces, attributes or members");
+        }
+
+        CheckTraitValues(where, target.Kinds, target.Accessibility, failures);
+    }
+
+    private static void CheckTraitValues(string where, IList<CSharpTypeKind> kinds, IList<string> accessibility, List<string> failures)
+    {
+        foreach (var kind in kinds)
+        {
+            if (!Enum.IsDefined(kind))
+            {
+                failures.Add($"{where} has kind '{kind}', which is not a type kind");
+            }
+        }
+
+        foreach (var keyword in accessibility)
+        {
+            if (Array.IndexOf(PackYamlReader.AccessibilityKeywords, keyword) < 0)
+            {
+                failures.Add($"{where} has accessibility '{PackText.Show(keyword)}', which must be one of {string.Join(", ", PackYamlReader.AccessibilityKeywords)}");
             }
         }
     }
@@ -132,6 +203,12 @@ internal static class RulePackReferenceCheck
             && requirement.Is is null && requirement.IsNot is null)
         {
             failures.Add($"the requirement of rule '{id}' needs at least one of layer, kind, accessibility, implements, is, isNot");
+        }
+
+        if (requirement.Kind is { } kind && kind is not (CSharpTypeKind.Class or CSharpTypeKind.Interface or CSharpTypeKind.Record
+                or CSharpTypeKind.Struct or CSharpTypeKind.RecordStruct))
+        {
+            failures.Add($"the requirement of rule '{id}' has kind '{kind}', which must be Class, Interface, Record, Struct or RecordStruct");
         }
 
         CheckCondition(id, "is", requirement.Is, failures);
