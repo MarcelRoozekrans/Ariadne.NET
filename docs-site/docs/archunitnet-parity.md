@@ -80,8 +80,8 @@ Methods of `Classes().That()` and `Classes().Should()`.
 | `c-be-abstract` | `BeAbstract`, `NotBeAbstract` | `require` with `is: { abstract: true }`, `isNot` | `gap` | 4.2 |
 | `p-are-sealed` | `AreSealed`, `AreNotSealed` | `sealed: true`, `sealed: false` | `gap` | 4.2 |
 | `c-be-sealed` | `BeSealed`, `NotBeSealed` | `require` with `is: { sealed: true }`, `isNot` | `gap` | 4.2 |
-| `p-are-record` | `AreRecord`, `AreNotRecord` | `kinds: [record]` | `gap` | 4.2 |
-| `c-be-record` | `BeRecord`, `NotBeRecord` | `require` with `is: { kinds: [record] }`, `isNot` | `gap` | 4.2 |
+| `p-are-record` | `AreRecord`, `AreNotRecord` | `kinds: [record]` | `gap` | 4.2. `Classes()` holds no `record struct`, so neither polarity checks one, as the probes in `Clean` and `NotClean` show. |
+| `c-be-record` | `BeRecord`, `NotBeRecord` | `require` with `is: { kinds: [record] }`, `isNot` | `gap` | 4.2. `Classes()` holds no `record struct`, so neither polarity checks one, as the probes in `Clean` and `NotClean` show. |
 | `p-are-immutable` | `AreImmutable`, `AreNotImmutable` | — | `deferred` | member level, see #94 |
 | `c-be-immutable` | `BeImmutable`, `NotBeImmutable` | — | `deferred` | member level, see #94 |
 
