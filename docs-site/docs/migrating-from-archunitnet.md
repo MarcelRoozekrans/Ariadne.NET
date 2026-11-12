@@ -386,3 +386,370 @@ Where the two tools answer differently on purpose, the catalogue gives the fixtu
 - **Names: case.** ArchUnitNET ignores case in `HaveName` and the `HaveFullName` methods; Ariadne always keeps case. See [Names](archunitnet-parity.md#names-generic-arity-nested-types-and-case).
 
 ## Worked example: Daedalus.NET
+
+This section translates the architecture tests of [Daedalus.NET](https://github.com/MarcelRoozekrans/Daedalus.NET/tree/1dd470b7) at commit `1dd470b7` into one pack. Daedalus is a Clean Architecture solution with an agent adapter on top of [Thalos.NET](https://github.com/MarcelRoozekrans/Thalos.NET). The example is pinned to that commit; Phase 4.6 switches Daedalus to the pack and brings this section up to date.
+
+The tests come from four files:
+
+- `tests/Daedalus.Tests.Unit/Architecture/CleanArchitectureTests.cs`, 34 facts, most of them ArchUnitNET rules;
+- `tests/Daedalus.Tests.Unit/Architecture/NoEntityFrameworkTests.cs`, a scan of the restored package graphs;
+- `tests/Daedalus.Tests.Unit/Architecture/NuGetPackageRootPathTests.cs`, a text scan of MSBuild files;
+- `tests/Daedalus.Tests.Integration/Architecture/CleanArchitectureTests.cs`, a check of the running DI container.
+
+### The test map
+
+Every fact has one row. The Pack rule cell names the rules and layers of the [`daedalus` pack](#the-translated-pack) that replace it, or says `stays in C#` or `not needed`, with the reason.
+
+| Daedalus test | Pack rule | Notes |
+|---|---|---|
+| `DomainLayer_ShouldNotDependOn_ApplicationLayer` | `DAE-LAYER-DOMAIN` | Domain has no `allowedDependencies`. |
+| `DomainLayer_ShouldNotDependOn_InfrastructureLayer` | `DAE-LAYER-DOMAIN` | As above. |
+| `DomainLayer_ShouldNotDependOn_ApiLayer` | `DAE-LAYER-DOMAIN` | As above. |
+| `ApplicationLayer_ShouldNotDependOn_InfrastructureLayer` | `DAE-LAYER-APPLICATION` | Application may depend on Domain only. |
+| `ApplicationLayer_ShouldNotDependOn_ApiLayer` | `DAE-LAYER-APPLICATION` | As above. |
+| `InfrastructureLayer_ShouldNotDependOn_ApiLayer` | `DAE-LAYER-INFRASTRUCTURE` | Infrastructure may depend on Domain and Application. |
+| `DomainLayer_ShouldNotDependOn_Thalos` | `DAE-NO-THALOS-IN-DOMAIN` | `^Thalos(\.\|$)` becomes `Thalos.**`. |
+| `DomainLayer_ShouldNotDependOn_ZeroAllocOrm` | `DAE-NO-ORM-IN-DOMAIN` | `^ZeroAlloc\.ORM(\.\|$)` becomes `ZeroAlloc.ORM.**`. |
+| `DomainLayer_ShouldNotDependOn_ZeroAllocOutbox` | `DAE-NO-OUTBOX-IN-DOMAIN` | `^ZeroAlloc\.Outbox(\.\|$)` becomes `ZeroAlloc.Outbox.**`. |
+| `DomainLayer_ShouldNotDependOn_Cronos` | `DAE-NO-CRONOS-IN-DOMAIN` | `^Cronos(\.\|$)` becomes `Cronos.**`. |
+| `OnlySubagentRunExecutor_DependsOn_ISubagentRunner` | `DAE-ONE-SUBAGENT-SEAM` | `NotExist` over `DependOnAny` with ten `DoNotHaveFullName` exclusions becomes one `allowOnly` with the ten types as `from`. The fact was scoped to the solution's own assemblies; Ariadne checks only the solution's code, and an exception exempts the test projects, which ArchUnitNET did not load. |
+| `SubagentRunnerType_IsLoaded_SoTheSingleSeamRuleCoversIt` | `DAE-ONE-SUBAGENT-SEAM` | `requireTarget: true`: the run fails when no Daedalus code references `Thalos.ISubagentRunner`. `SubagentRunExecutor` and nine decorators in `Daedalus.Agents` do. |
+| `DomainLayer_ShouldNotDependOn_AgentsProject` | `DAE-LAYER-DOMAIN` | As the other Domain layer facts. |
+| `ApplicationLayer_ShouldNotDependOn_Thalos` | `DAE-NO-THALOS-IN-APPLICATION` | |
+| `ApplicationLayer_ShouldNotDependOn_AgentsProject` | `DAE-LAYER-APPLICATION` | |
+| `AgentsProject_ShouldNotDependOn_ApiLayer` | `DAE-LAYER-AGENTS` | Agents may depend on Domain, Application and Infrastructure. |
+| `Infrastructure_ShouldNotDependOn_Thalos` | `DAE-NO-THALOS-IN-INFRASTRUCTURE` | |
+| `WebLayer_ShouldNotDependOn_Thalos` | `DAE-NO-THALOS-IN-WEB` | |
+| `WebLayer_KeepsNoCopyOf_AnApplicationDto` | `DAE-WEB-NO-DTO-COPIES` | A reflection test becomes a `uniqueNames` rule. Both compare simple names with generic arity, so `PagedResultDto<T>` collides only with a generic type of the same name. |
+| `ApplicationDtoNames_CoverEveryDtoNamespace_TheNoCopyRuleIsLoadBearing` | `DAE-WEB-NO-DTO-COPIES` | The fact tested the C# helper `ApplicationDtoNames()`, which goes away. `against` is `Daedalus.Application.DTOs.**`, which covers the root namespace and every sub-namespace, and `requireTarget: true` fails the run when no type is declared there. The subject side, the Web types, is checked for vacuity on every run. |
+| `AgentsProject_DoesDependOn_Thalos_RulesAreLoadBearing` | `DAE-NO-THALOS-IN-DOMAIN`, `DAE-NO-THALOS-IN-APPLICATION`, `DAE-NO-THALOS-IN-INFRASTRUCTURE`, `DAE-NO-THALOS-IN-WEB` | Each sets `requireTarget: true`, so the run fails when no Daedalus code references a `Thalos.**` type. This proves Thalos is used somewhere, not that `Daedalus.Agents` uses it. That is enough here: the four rules flag every other layer that references Thalos. |
+| `OnlyAgentsProject_DependsOn_RagNet` | `DAE-RAGNET-ONLY-IN-AGENTS` | One `forbid` from the five layers the fact loops over. No `requireTarget`: see the next row. |
+| `MemoryRagNetAdapter_DoesDependOn_RagNet_RuleIsLoadBearing` | stays in C# | Daedalus reaches Rag.NET only through `Thalos.NET.Memory.RagNet`, and no Daedalus code names a `Rag.**` type, so `requireTarget` could never find the target. Keep a reflection check that `typeof(IVectorStore).Namespace` still starts with `Rag.`. |
+| `Endpoints_ShouldResideIn_ApiLayer` | `DAE-ENDPOINTS-IN-API` | `Classes()` holds records, so `kinds` is `[class, record]`. |
+| `RepositoryInterfaces_ShouldResideIn_ApplicationLayer` | `DAE-REPOSITORY-INTERFACES-IN-APPLICATION` | `HaveNameStartingWith("I").And().HaveNameEndingWith("Repository")` becomes `names: ["I*Repository"]`. |
+| `RepositoryImplementations_ShouldResideIn_InfrastructureLayer` | `DAE-REPOSITORIES-IN-INFRASTRUCTURE` | `AreNotAbstract()` becomes `abstract: false`, plus `static: false`, because ArchUnitNET reads a static class as abstract. Test doubles such as `RacingProjectRepository` live in the test projects, which ArchUnitNET did not load; an exception exempts them. |
+| `SkillsAssembly_IsLoaded_SoTheThalosRulesCoverIt` | not needed | The fact made ArchUnitNET load `Thalos.NET.Skills`. Ariadne reads every type the code references from the compilation, so there is nothing to load. No rule targets `Thalos.Skills` on its own; the Thalos rules cover it through `Thalos.**`. |
+| `ChannelsAssemblies_AreLoaded_SoTheThalosRulesCoverThem` | not needed | The same for `Thalos.NET.Channels` and `Thalos.NET.Channels.Telegram`. |
+| `ZeroAllocOrmAssembly_IsLoaded_SoTheDomainRuleCoversIt` | `DAE-NO-ORM-IN-DOMAIN` | `requireTarget: true`. `Daedalus.Infrastructure` and `Daedalus.Agents` use `ZeroAlloc.ORM`. |
+| `ZeroAllocOutboxAssembly_IsLoaded_SoTheDomainRuleCoversIt` | `DAE-NO-OUTBOX-IN-DOMAIN` | `requireTarget: true`. `Daedalus.Agents` uses `ZeroAlloc.Outbox`, for example in `RunSteps`. |
+| `CronosAssembly_IsLoaded_SoTheDomainRuleCoversIt` | `DAE-NO-CRONOS-IN-DOMAIN` | `requireTarget: true`. `ScheduleReconciler` and `ScheduledRunStore` in `Daedalus.Agents` use `Cronos`. |
+| `No_project_references_ZeroAlloc_Scheduling` | `DAE-NO-ZEROALLOC-SCHEDULING` | A `.csproj` text scan becomes `bannedPackages`. The rule also catches the package when it arrives transitively. |
+| `FluentValidation_is_absent_from_every_project_and_from_central_package_management` | `DAE-NO-FLUENTVALIDATION` | `bannedPackages` reads the restored package graph of each project. An entry in `Directory.Packages.props` that no project references is not covered; keep a text check if that matters. |
+| `CSharpFunctionalExtensions_is_absent_from_every_project_and_from_central_package_management` | `DAE-NO-CSHARPFUNCTIONALEXTENSIONS` | As above: `Directory.Packages.props` entries that no project references are not covered. |
+| `No_project_resolves_entity_framework` | `DAE-NO-ENTITY-FRAMEWORK` | From `NoEntityFrameworkTests.cs`. The fact read `obj/project.assets.json`, and so does `bannedPackages`; the projects must be restored. The prefix `Microsoft.EntityFrameworkCore` becomes `Microsoft.EntityFrameworkCore.**`. |
+| `Every_path_built_on_NuGetPackageRoot_ensures_its_trailing_slash` | stays in C# | From `NuGetPackageRootPathTests.cs`. A text scan of `.csproj`, `.props` and `.targets` files; no pack rule reads MSBuild text. |
+| `Every_validated_dto_has_a_registered_validation_adapter` | stays in C# | From the integration project. It needs the DI container the API host builds; a pack sees types and references, not registrations at run time. |
+
+The layer facts become four layers with `allowedDependencies`. A layer forbids every layer it does not list, so the pack is a little stricter than the facts: for example, Infrastructure may not depend on Agents or Web either. Daedalus's project references already rule those out. The API and Web layers have no facts of their own; they are in the pack so the other layers' lists can name them, and they list every layer their project can reach.
+
+### The translated pack
+
+One standalone schema 2 pack, layers selected by assembly, rule ids prefixed `DAE-`. Each `because` is the fact's `Because` text.
+
+```yaml title=".architecture/rules.yaml"
+schema: 2
+name: daedalus
+
+layers:
+  - name: Domain
+    id: DAE-LAYER-DOMAIN
+    because: Domain layer must be independent of the Application, Infrastructure and API layers; Daedalus.Agents is an adapter on top of Domain, never the other way round.
+    assemblies: [Daedalus.Domain]
+    allowedDependencies: []
+  - name: Application
+    id: DAE-LAYER-APPLICATION
+    because: Application layer should only depend on Domain, not on Infrastructure or the API layer; Application defines the DTOs the Agents adapter maps to, not vice versa.
+    assemblies: [Daedalus.Application]
+    allowedDependencies: [Domain]
+  - name: Infrastructure
+    id: DAE-LAYER-INFRASTRUCTURE
+    because: Infrastructure layer should not depend on API layer.
+    assemblies: [Daedalus.Infrastructure]
+    allowedDependencies: [Domain, Application]
+  - name: Agents
+    id: DAE-LAYER-AGENTS
+    because: The API composes Daedalus.Agents; the adapter must not reach back into the API host.
+    assemblies: [Daedalus.Agents]
+    allowedDependencies: [Domain, Application, Infrastructure]
+  - name: Api
+    id: DAE-LAYER-API
+    because: The API host composes every other layer.
+    assemblies: [Daedalus.Api]
+    allowedDependencies: [Domain, Application, Infrastructure, Agents]
+  - name: Web
+    id: DAE-LAYER-WEB
+    because: The WASM client builds on the Application DTOs.
+    assemblies: [Daedalus.Web]
+    allowedDependencies: [Domain, Application]
+
+rules:
+  # Thalos lives only in Daedalus.Agents and the API.
+  - id: DAE-NO-THALOS-IN-DOMAIN
+    because: Domain must not know the agent framework.
+    requireTarget: true
+    forbid:
+      from: { layers: [Domain] }
+      to: { namespaces: ["Thalos.**"] }
+  - id: DAE-NO-THALOS-IN-APPLICATION
+    because: Application DTOs are shared with the WASM client and must stay Thalos-free.
+    requireTarget: true
+    forbid:
+      from: { layers: [Application] }
+      to: { namespaces: ["Thalos.**"] }
+  - id: DAE-NO-THALOS-IN-INFRASTRUCTURE
+    because: Infrastructure stays free of Thalos; Daedalus.Agents is the one project that bridges the two.
+    requireTarget: true
+    forbid:
+      from: { layers: [Infrastructure] }
+      to: { namespaces: ["Thalos.**"] }
+  - id: DAE-NO-THALOS-IN-WEB
+    because: The WASM client talks to the agent API through Application DTOs only.
+    requireTarget: true
+    forbid:
+      from: { layers: [Web] }
+      to: { namespaces: ["Thalos.**"] }
+
+  # Frameworks Domain must not know.
+  - id: DAE-NO-ORM-IN-DOMAIN
+    because: Domain entities must stay persistence-ignorant; ZeroAlloc.ORM maps live in Infrastructure.
+    requireTarget: true
+    forbid:
+      from: { layers: [Domain] }
+      to: { namespaces: ["ZeroAlloc.ORM.**"] }
+  - id: DAE-NO-OUTBOX-IN-DOMAIN
+    because: Domain must stay ignorant of the outbox transport; step messages live in Daedalus.Agents.
+    requireTarget: true
+    forbid:
+      from: { layers: [Domain] }
+      to: { namespaces: ["ZeroAlloc.Outbox.**"] }
+  - id: DAE-NO-CRONOS-IN-DOMAIN
+    because: Domain must not parse cron expressions; that framework concern lives in Daedalus.Agents.
+    requireTarget: true
+    forbid:
+      from: { layers: [Domain] }
+      to: { namespaces: ["Cronos.**"] }
+
+  # One seam to the LLM.
+  - id: DAE-ONE-SUBAGENT-SEAM
+    because: SubagentRunExecutor, WorkflowNodeDispatcherFactory, BudgetedSubagentRunner, ReviewLensRunner, StandingInstructionsRunner, RunModeRunner, ReviewFindingsRunner, NodeSelectionRunner, WorkIntentRunner and FailedNodeUsageRunner are the only Daedalus types permitted to depend on Thalos' ISubagentRunner; every other caller must go through ISubagentRunExecutor instead.
+    requireTarget: true
+    allowOnly:
+      from:
+        types:
+          - Daedalus.Agents.Scheduling.SubagentRunExecutor
+          - Daedalus.Agents.Workflow.WorkflowNodeDispatcherFactory
+          - Daedalus.Agents.Workflow.BudgetedSubagentRunner
+          - Daedalus.Agents.Workflow.ReviewLensRunner
+          - Daedalus.Agents.Workflow.StandingInstructionsRunner
+          - Daedalus.Agents.Workflow.RunModeRunner
+          - Daedalus.Agents.Workflow.ReviewFindingsRunner
+          - Daedalus.Agents.Workflow.NodeSelectionRunner
+          - Daedalus.Agents.Workflow.WorkIntentRunner
+          - Daedalus.Agents.Workflow.FailedNodeUsageRunner
+      to: { types: [Thalos.ISubagentRunner] }
+    exceptions:
+      - assemblies: ["Daedalus.Tests.*"]
+        because: The rule covers the solution's production code; tests substitute the runner.
+
+  # Rag.NET is an implementation detail of Daedalus.Agents.
+  - id: DAE-RAGNET-ONLY-IN-AGENTS
+    because: No layer but Daedalus.Agents may know the vector store; Rag.NET lives behind Thalos' IMemoryIndex in Daedalus.Agents.
+    forbid:
+      from: { layers: [Domain, Application, Infrastructure, Api, Web] }
+      to: { namespaces: ["Rag.**"] }
+
+  # Where types live.
+  - id: DAE-ENDPOINTS-IN-API
+    because: Endpoints are API-layer concerns.
+    require:
+      for: { names: ["*Endpoints"], kinds: [class, record] }
+      layer: Api
+  - id: DAE-REPOSITORY-INTERFACES-IN-APPLICATION
+    because: Repository contracts belong in Application layer.
+    require:
+      for: { names: ["I*Repository"], kinds: [interface] }
+      layer: Application
+  - id: DAE-REPOSITORIES-IN-INFRASTRUCTURE
+    because: Repository implementations belong in Infrastructure layer.
+    require:
+      for: { names: ["*Repository"], kinds: [class, record], abstract: false, static: false }
+      layer: Infrastructure
+    exceptions:
+      - assemblies: ["Daedalus.Tests.*"]
+        because: Test doubles live next to the tests.
+
+  # The Web binds the Application DTOs and keeps no copy of its own.
+  - id: DAE-WEB-NO-DTO-COPIES
+    because: The Web binds Daedalus.Application.DTOs instead of copying them.
+    requireTarget: true
+    uniqueNames:
+      for: { layers: [Web] }
+      against: { namespaces: ["Daedalus.Application.DTOs.**"] }
+
+  # Packages that must not come back.
+  - id: DAE-NO-ZEROALLOC-SCHEDULING
+    because: ZeroAlloc.Scheduling is excluded by design; ScheduledRuns.NextRunAt is the source of truth and the sweep is idempotent, so durable job state buys nothing over the plain BackgroundService.
+    bannedPackages:
+      packages: ["ZeroAlloc.Scheduling.**"]
+  - id: DAE-NO-FLUENTVALIDATION
+    because: Phase 1.7 replaced FluentValidation with ZeroAlloc.Validation.
+    bannedPackages:
+      packages: ["FluentValidation.**"]
+  - id: DAE-NO-CSHARPFUNCTIONALEXTENSIONS
+    because: Phase 1.7 migrated every caller off CSharpFunctionalExtensions; it must not return.
+    bannedPackages:
+      packages: ["CSharpFunctionalExtensions.**"]
+  - id: DAE-NO-ENTITY-FRAMEWORK
+    because: Phase 3.5 removed EF Core; no project may resolve it again, directly or transitively.
+    bannedPackages:
+      packages:
+        - "Microsoft.EntityFrameworkCore.**"
+        - "Npgsql.EntityFrameworkCore.PostgreSQL"
+        - "ZeroAlloc.Outbox.EfCore"
+        - "ZeroAlloc.ValueObjects.EfCore"
+```
+
+The three facts that stay in C# remain tests. Without ArchUnitNET, the Rag.NET fact becomes a plain reflection assertion that `typeof(IVectorStore).Namespace` starts with `Rag.`.
+
+### Before and after
+
+#### A layer fact
+
+```csharp
+[Fact]
+public void DomainLayer_ShouldNotDependOn_ApplicationLayer()
+{
+    var rule = Types().That().Are(DomainTypes)
+        .Should().NotDependOnAny(ApplicationTypes)
+        .Because("Domain layer must be independent of Application layer");
+
+    rule.Check(Architecture);
+}
+```
+
+`DomainTypes` and `ApplicationTypes` select by assembly, so the layers do too. One layer list replaces every `X_ShouldNotDependOn_Y` fact for its layer.
+
+```yaml
+schema: 2
+name: daedalus-layers
+layers:
+  - name: Domain
+    id: DAE-LAYER-DOMAIN
+    because: Domain layer must be independent of Application layer.
+    assemblies: [Daedalus.Domain]
+    allowedDependencies: []
+  - name: Application
+    id: DAE-LAYER-APPLICATION
+    because: Application layer should only depend on Domain.
+    assemblies: [Daedalus.Application]
+    allowedDependencies: [Domain]
+```
+
+#### A namespace pattern
+
+```csharp
+private const string ThalosNamespacePattern = "^Thalos(\\.|$)";
+
+[Fact]
+public void DomainLayer_ShouldNotDependOn_Thalos()
+{
+    var rule = Types().That().Are(DomainTypes)
+        .Should().NotDependOnAnyTypesThat().ResideInNamespaceMatching(ThalosNamespacePattern)
+        .Because("Domain must not know the agent framework");
+
+    rule.Check(Architecture);
+}
+```
+
+The anchored regex becomes `Thalos.**`, which matches `Thalos` and every namespace below it, but not `ThalosX`. `requireTarget: true` replaces the `AgentsProject_DoesDependOn_Thalos_RulesAreLoadBearing` fact.
+
+```yaml
+schema: 2
+name: daedalus-thalos
+layers:
+  - name: Domain
+    id: DAE-LAYER-DOMAIN
+    because: Domain depends on no other layer.
+    assemblies: [Daedalus.Domain]
+rules:
+  - id: DAE-NO-THALOS-IN-DOMAIN
+    because: Domain must not know the agent framework.
+    requireTarget: true
+    forbid:
+      from: { layers: [Domain] }
+      to: { namespaces: ["Thalos.**"] }
+```
+
+#### The single seam
+
+```csharp
+[Fact]
+public void OnlySubagentRunExecutor_DependsOn_ISubagentRunner()
+{
+    var rule = Types().That().Are(DaedalusOwnTypes).And().DependOnAny(SubagentRunnerType)
+        .And().DoNotHaveFullName(typeof(SubagentRunExecutor).FullName!)
+        .And().DoNotHaveFullName(typeof(WorkflowNodeDispatcherFactory).FullName!)
+        // ... eight more exclusions ...
+        .Should().NotExist()
+        .Because("SubagentRunExecutor, ... are the only Daedalus types permitted to depend on Thalos' ISubagentRunner");
+
+    rule.Check(Architecture);
+}
+```
+
+"Every type that depends on X, except these, must not exist" is an `allowOnly`: the excluded types become `from`, and X becomes `to`. `requireTarget: true` replaces `SubagentRunnerType_IsLoaded_SoTheSingleSeamRuleCoversIt`.
+
+```yaml
+schema: 2
+name: daedalus-seam
+rules:
+  - id: DAE-ONE-SUBAGENT-SEAM
+    because: Only the executor and its decorators may depend on Thalos' ISubagentRunner; every other caller goes through ISubagentRunExecutor.
+    requireTarget: true
+    allowOnly:
+      from:
+        types:
+          - Daedalus.Agents.Scheduling.SubagentRunExecutor
+          - Daedalus.Agents.Workflow.WorkflowNodeDispatcherFactory
+          # ... eight more types ...
+      to: { types: [Thalos.ISubagentRunner] }
+    exceptions:
+      - assemblies: ["Daedalus.Tests.*"]
+        because: The rule covers the solution's production code; tests substitute the runner.
+```
+
+#### A placement rule with AreNotAbstract
+
+```csharp
+[Fact]
+public void RepositoryImplementations_ShouldResideIn_InfrastructureLayer()
+{
+    var rule = Classes().That().HaveNameEndingWith("Repository")
+        .And().AreNotAbstract()
+        .Should().ResideInAssembly(InfrastructureAssembly)
+        .Because("Repository implementations belong in Infrastructure layer");
+
+    rule.Check(Architecture);
+}
+```
+
+`ResideInAssembly` becomes a `require` with `layer`. `Classes()` holds records, so `kinds` lists both. ArchUnitNET reads a static class as abstract, so `static: false` keeps static classes out, as `AreNotAbstract()` did.
+
+```yaml
+schema: 2
+name: daedalus-repositories
+layers:
+  - name: Infrastructure
+    id: DAE-LAYER-INFRASTRUCTURE
+    because: Infrastructure depends on no other layer in this example.
+    assemblies: [Daedalus.Infrastructure]
+rules:
+  - id: DAE-REPOSITORIES-IN-INFRASTRUCTURE
+    because: Repository implementations belong in Infrastructure layer.
+    require:
+      for: { names: ["*Repository"], kinds: [class, record], abstract: false, static: false }
+      layer: Infrastructure
+    exceptions:
+      - assemblies: ["Daedalus.Tests.*"]
+        because: Test doubles live next to the tests.
+```

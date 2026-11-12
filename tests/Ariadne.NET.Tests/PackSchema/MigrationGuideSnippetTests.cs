@@ -2,6 +2,7 @@ using Ariadne.NET.Abstractions;
 using Ariadne.NET.RuleLoader;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using YamlDotNet.RepresentationModel;
 
 namespace Ariadne.NET.Tests.PackSchema;
 
@@ -67,6 +68,76 @@ public sealed class MigrationGuideSnippetTests
 
         return blocks;
     }
+
+    /// <summary>The exact header of the Daedalus test map on the guide.</summary>
+    private const string DaedalusMapHeader = "| Daedalus test | Pack rule | Notes |";
+
+    /// <summary>
+    /// The rows of the table in <paramref name="markdown"/> whose header is exactly <c>| Daedalus test | Pack rule | Notes |</c>,
+    /// as the first two cells with backticks stripped and surrounding spaces trimmed.
+    /// </summary>
+    internal static IReadOnlyList<(string Test, string PackRule)> DaedalusMap(string markdown)
+    {
+        ArgumentNullException.ThrowIfNull(markdown);
+
+        var rows = new List<(string Test, string PackRule)>();
+        var lines = markdown.Split('\n').Select(static l => l.TrimEnd('\r').Trim()).ToList();
+        var header = lines.IndexOf(DaedalusMapHeader);
+        if (header < 0)
+        {
+            return rows;
+        }
+
+        // Skip the header and the separator row; the table ends at the first line that is not a row.
+        foreach (var line in lines.Skip(header + 2).TakeWhile(static l => l.StartsWith('|')))
+        {
+            var cells = line.Trim('|').Split('|');
+            rows.Add((Strip(cells[0]), Strip(cells[1])));
+        }
+
+        return rows;
+    }
+
+    /// <summary>
+    /// The rule or layer ids in a Pack rule cell: the cell without backticks, split on <c>, </c>. A cell that reads
+    /// <c>stays in C#</c> or <c>not needed</c> names no id.
+    /// </summary>
+    internal static IReadOnlyList<string> PackRuleIds(string packRule)
+    {
+        ArgumentNullException.ThrowIfNull(packRule);
+
+        var cell = Strip(packRule);
+        if (string.Equals(cell, "stays in C#", StringComparison.Ordinal) || string.Equals(cell, "not needed", StringComparison.Ordinal))
+        {
+            return [];
+        }
+
+        return cell.Split(", ", StringSplitOptions.TrimEntries);
+    }
+
+    private static string Strip(string cell) => cell.Replace("`", string.Empty, StringComparison.Ordinal).Trim();
+
+    /// <summary>The worked example's pack: the one yaml block whose <c>name</c> is <c>daedalus</c>, as a YAML mapping.</summary>
+    private static List<YamlMappingNode> DaedalusPacks(string markdown) =>
+        YamlBlocks(markdown)
+            .Select(static block =>
+            {
+                var stream = new YamlStream();
+                using var reader = new StringReader(block);
+                stream.Load(reader);
+                return (YamlMappingNode)stream.Documents[0].RootNode;
+            })
+            .Where(static root => root.Children.TryGetValue(new YamlScalarNode("name"), out var name)
+                && string.Equals(((YamlScalarNode)name).Value, "daedalus", StringComparison.Ordinal))
+            .ToList();
+
+    private static IEnumerable<YamlMappingNode> Entries(YamlMappingNode pack, string key) =>
+        pack.Children.TryGetValue(new YamlScalarNode(key), out var list)
+            ? ((YamlSequenceNode)list).Children.Cast<YamlMappingNode>()
+            : [];
+
+    private static string? Scalar(YamlMappingNode node, string key) =>
+        node.Children.TryGetValue(new YamlScalarNode(key), out var value) ? ((YamlScalarNode)value).Value : null;
 
     public static TheoryData<int> BlockIndexes()
     {
@@ -143,5 +214,101 @@ public sealed class MigrationGuideSnippetTests
         var resolved = provider.GetRequiredService<IRulePackResolver>().Resolve(pack);
         resolved.IsSuccess.Should().BeTrue(
             $"yaml block {index} must resolve with its parents: {(resolved.IsSuccess ? string.Empty : resolved.Error.Message + " " + resolved.Error.Detail)}");
+    }
+
+    [Fact]
+    public void DaedalusMap_reads_the_map_table()
+    {
+        const string Sample = """
+            Intro text.
+
+            | Daedalus test | Pack rule | Notes |
+            |---|---|---|
+            | `First_fact` | `DAE-X` | A rule. |
+            | `Second_fact` | stays in C# | A reason. |
+            | `Third_fact` | `DAE-X`, `DAE-Y` | Two rules. |
+
+            | Other | Table | Here |
+            |---|---|---|
+            | `Not_a_row` | `DAE-Z` | Ignored. |
+            """;
+
+        var map = DaedalusMap(Sample);
+
+        map.Should().Equal(("First_fact", "DAE-X"), ("Second_fact", "stays in C#"), ("Third_fact", "DAE-X, DAE-Y"));
+        PackRuleIds(map[2].PackRule).Should().Equal("DAE-X", "DAE-Y");
+        PackRuleIds("`DAE-X`, `DAE-Y`").Should().Equal("DAE-X", "DAE-Y");
+        PackRuleIds("stays in C#").Should().BeEmpty();
+        PackRuleIds("not needed").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Daedalus_map_names_only_rules_of_the_pack()
+    {
+        var markdown = File.ReadAllText(PagePath);
+        var packs = DaedalusPacks(markdown);
+        packs.Should().ContainSingle("the worked example is one yaml block named daedalus");
+        var pack = packs[0];
+
+        var ruleIds = Entries(pack, "rules").Select(static r => Scalar(r, "id")!).ToList();
+        var knownIds = ruleIds.Concat(Entries(pack, "layers").Select(static l => Scalar(l, "id")!)).ToHashSet(StringComparer.Ordinal);
+
+        var map = DaedalusMap(markdown);
+        map.Should().HaveCountGreaterThanOrEqualTo(34, "the map has one row per Daedalus fact");
+
+        var mapped = map.SelectMany(static row => PackRuleIds(row.PackRule)).ToHashSet(StringComparer.Ordinal);
+        mapped.Should().BeSubsetOf(knownIds, "the map names only rule and layer ids of the daedalus pack");
+        ruleIds.Should().BeSubsetOf(mapped, "every rule of the daedalus pack answers a Daedalus fact");
+    }
+
+    [Fact]
+    public void Load_bearing_facts_map_to_rules_that_require_their_target()
+    {
+        var markdown = File.ReadAllText(PagePath);
+        var packs = DaedalusPacks(markdown);
+        packs.Should().ContainSingle();
+        var rules = Entries(packs[0], "rules").ToDictionary(static r => Scalar(r, "id")!, StringComparer.Ordinal);
+        var requiringTarget = rules
+            .Where(static r => string.Equals(Scalar(r.Value, "requireTarget"), "true", StringComparison.Ordinal))
+            .Select(static r => r.Key)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var map = DaedalusMap(markdown);
+        string[] markers = ["IsLoaded", "AreLoaded", "RulesAreLoadBearing", "RuleIsLoadBearing", "TheNoCopyRuleIsLoadBearing"];
+        var loadBearing = map
+            .Where(row => markers.Any(m => row.Test.Contains(m, StringComparison.Ordinal)))
+            .ToList();
+        loadBearing.Should().NotBeEmpty();
+        foreach (var (test, packRule) in loadBearing)
+        {
+            if (string.Equals(packRule, "stays in C#", StringComparison.Ordinal) || string.Equals(packRule, "not needed", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            PackRuleIds(packRule).Should().NotBeEmpty().And.BeSubsetOf(requiringTarget, $"{test} guards the target of the rules it maps to");
+        }
+
+        string Cell(string prefix) =>
+            map.Should().ContainSingle(row => row.Test.StartsWith(prefix, StringComparison.Ordinal), $"the map has one row for {prefix}").Which.PackRule;
+
+        Cell("MemoryRagNetAdapter_DoesDependOn_RagNet_RuleIsLoadBearing").Should().Be("stays in C#");
+        Cell("SkillsAssembly_IsLoaded").Should().Be("not needed");
+        Cell("ChannelsAssemblies_AreLoaded").Should().Be("not needed");
+        foreach (var prefix in new[]
+                 {
+                     "AgentsProject_DoesDependOn_Thalos", "SubagentRunnerType_IsLoaded", "ZeroAllocOrmAssembly_IsLoaded",
+                     "ZeroAllocOutboxAssembly_IsLoaded", "CronosAssembly_IsLoaded", "ApplicationDtoNames_Cover",
+                 })
+        {
+            PackRuleIds(Cell(prefix)).Should().NotBeEmpty().And.BeSubsetOf(requiringTarget, $"{prefix} maps to rules with requireTarget: true");
+        }
+
+        var uniqueNames = rules.Values.Where(static r => r.Children.ContainsKey(new YamlScalarNode("uniqueNames"))).ToList();
+        uniqueNames.Should().ContainSingle();
+        var against = (YamlMappingNode)((YamlMappingNode)uniqueNames[0].Children[new YamlScalarNode("uniqueNames")]).Children[new YamlScalarNode("against")];
+        against.Children.Keys.Cast<YamlScalarNode>().Select(static k => k.Value).Should().Equal("namespaces");
+        ((YamlSequenceNode)against.Children[new YamlScalarNode("namespaces")]).Children
+            .Cast<YamlScalarNode>().Select(static n => n.Value).Should().Equal("Daedalus.Application.DTOs.**");
     }
 }
