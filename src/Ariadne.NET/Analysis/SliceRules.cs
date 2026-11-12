@@ -18,6 +18,8 @@ internal static class SliceRules
     /// display string, so a type seen in several target frameworks of one project counts once. An exception exempts a source
     /// type only, and a target that <c>allow</c> selects is not a dependency. Edges are checked per target framework scope, and
     /// a violation found in several scopes is reported once, naming the frameworks that found it, or none when every scope did.
+    /// For a <c>freeOfCycles</c> rule it returns one <see cref="ViolationKind.SliceCycle"/> per slice edge whose two slices share
+    /// a strongly connected component of the scope's slice graph, through the earliest reference from the one to the other.
     /// </summary>
     /// <param name="layers">The layer map of the pack.</param>
     /// <param name="pack">The resolved pack.</param>
@@ -54,6 +56,10 @@ internal static class SliceRules
             if (slices.Independent)
             {
                 CheckIndependence(rule, scopes, perGraph, violations);
+            }
+            else
+            {
+                CheckCycles(rule, scopes, perGraph, violations);
             }
         }
 
@@ -99,6 +105,21 @@ internal static class SliceRules
         return exceptions;
     }
 
+    private static List<string> SortedNamed(List<string?> frameworks)
+    {
+        var named = new List<string>(frameworks.Count);
+        foreach (ref readonly var framework in CollectionsMarshal.AsSpan(frameworks))
+        {
+            if (framework is not null)
+            {
+                named.Add(framework);
+            }
+        }
+
+        named.Sort(StringComparer.Ordinal);
+        return named;
+    }
+
     private static void CheckIndependence(RuleDefinition rule, List<Scope> scopes, List<SliceEdges> perGraph, List<ArchitectureViolation> violations)
     {
         var merged = new Dictionary<(SlicedType Source, SlicedType Target), Merged>();
@@ -134,6 +155,52 @@ internal static class SliceRules
                 Message = string.Create(
                     CultureInfo.InvariantCulture,
                     $"Type '{key.Source.Display}' in slice '{key.Source.Slice}' depends on '{key.Target.Display}' in slice '{key.Target.Slice}', and rule '{rule.Id}' keeps slices independent{LayerRules.CountSuffix(entry.Count)}"),
+            });
+        }
+    }
+
+    private static void CheckCycles(RuleDefinition rule, List<Scope> scopes, List<SliceEdges> perGraph, List<ArchitectureViolation> violations)
+    {
+        var merged = new Dictionary<(string From, string To, string Cycle), CycleEdge>();
+        var order = new List<(string From, string To, string Cycle)>();
+        foreach (ref readonly var scope in CollectionsMarshal.AsSpan(scopes))
+        {
+            var graph = SliceGraph.Of(scope.Edges(perGraph));
+            var cycles = graph.Cycles();
+            foreach (ref readonly var edge in CollectionsMarshal.AsSpan(graph.Edges))
+            {
+                if (cycles[edge.From] is not { } cycle || !ReferenceEquals(cycle, cycles[edge.To]))
+                {
+                    continue;
+                }
+
+                var key = (graph.Names[edge.From], graph.Names[edge.To], cycle);
+                if (!merged.TryGetValue(key, out var entry))
+                {
+                    merged.Add(key, entry = new CycleEdge(edge.Source, edge.Target, edge.Location));
+                    order.Add(key);
+                }
+
+                entry.Add(edge, scope.Framework);
+            }
+        }
+
+        foreach (ref readonly var key in CollectionsMarshal.AsSpan(order))
+        {
+            var entry = merged[key];
+            violations.Add(new ArchitectureViolation
+            {
+                RuleId = rule.Id,
+                Kind = ViolationKind.SliceCycle,
+                SourceType = entry.Source.Display,
+                Target = entry.Target.Display,
+                Location = entry.Location,
+                Because = rule.Because,
+                ReferenceCount = entry.Count,
+                TargetFrameworks = entry.Frameworks.Count == scopes.Count ? [] : entry.SortedNamedFrameworks(),
+                Message = string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"Slice '{key.From}' depends on slice '{key.To}' (first through '{entry.Source.Display}' -> '{entry.Target.Display}'), and slices {key.Cycle} form a cycle, which rule '{rule.Id}' forbids"),
             });
         }
     }
@@ -342,20 +409,250 @@ internal static class SliceRules
             Frameworks.Add(framework);
         }
 
-        public List<string> SortedNamedFrameworks()
+        public List<string> SortedNamedFrameworks() => SortedNamed(Frameworks);
+    }
+
+    /// <summary>One edge between two slices of a scope: the number of references and the earliest of them.</summary>
+    private sealed class SliceEdge(int from, int to, SlicedType source, SlicedType target, Found found)
+    {
+        public int From { get; } = from;
+
+        public int To { get; } = to;
+
+        public SlicedType Source { get; private set; } = source;
+
+        public SlicedType Target { get; private set; } = target;
+
+        public SourceLocation Location { get; private set; } = found.Location;
+
+        public int Count { get; private set; } = found.Count;
+
+        public void Add(SlicedType source, SlicedType target, Found found)
         {
-            var named = new List<string>(Frameworks.Count);
-            foreach (ref readonly var framework in CollectionsMarshal.AsSpan(Frameworks))
+            Count += found.Count;
+            if (TypeGraphBuilder.Compare(found.Location, Location) < 0)
             {
-                if (framework is not null)
+                Source = source;
+                Target = target;
+                Location = found.Location;
+            }
+        }
+    }
+
+    /// <summary>The slices of one scope and the edges between them, in the order first seen.</summary>
+    private sealed class SliceGraph
+    {
+        private readonly Dictionary<string, int> _ids = new(StringComparer.Ordinal);
+        private readonly Dictionary<(int From, int To), SliceEdge> _index = [];
+
+        public List<string> Names { get; } = [];
+
+        public List<SliceEdge> Edges { get; } = [];
+
+        public static SliceGraph Of(List<((SlicedType Source, SlicedType Target) Key, Found Found)> pairs)
+        {
+            var graph = new SliceGraph();
+            foreach (ref readonly var pair in CollectionsMarshal.AsSpan(pairs))
+            {
+                var ((source, target), found) = pair;
+                var from = graph.IdOf(source.Slice);
+                var to = graph.IdOf(target.Slice);
+                if (graph._index.TryGetValue((from, to), out var edge))
                 {
-                    named.Add(framework);
+                    edge.Add(source, target, found);
+                }
+                else
+                {
+                    edge = new SliceEdge(from, to, source, target, found);
+                    graph._index.Add((from, to), edge);
+                    graph.Edges.Add(edge);
                 }
             }
 
-            named.Sort(StringComparer.Ordinal);
-            return named;
+            return graph;
         }
+
+        /// <summary>
+        /// Returns per slice the ordinally sorted, comma-separated names of its strongly connected component when that holds
+        /// two or more slices, else null. Slices of one component share one string instance.
+        /// </summary>
+        public string?[] Cycles()
+        {
+            var cycles = new string?[Names.Count];
+            if (Edges.Count > 1)
+            {
+                new Tarjan(this, cycles).Run();
+            }
+
+            return cycles;
+        }
+
+        /// <summary>Tarjan's strongly connected components, iterative, over the slice graph's edges in compressed rows.</summary>
+        private sealed class Tarjan
+        {
+            private readonly SliceGraph _graph;
+            private readonly string?[] _cycles;
+            private readonly int[] _offsets;
+            private readonly int[] _successors;
+            private readonly int[] _index;
+            private readonly int[] _low;
+            private readonly bool[] _onStack;
+            private readonly Stack<int> _stack = new();
+            private readonly Stack<(int Node, int Next)> _calls = new();
+            private int _next;
+
+            public Tarjan(SliceGraph graph, string?[] cycles)
+            {
+                _graph = graph;
+                _cycles = cycles;
+                var count = graph.Names.Count;
+                _offsets = new int[count + 1];
+                _successors = new int[graph.Edges.Count];
+                _index = new int[count];
+                _low = new int[count];
+                _onStack = new bool[count];
+                Array.Fill(_index, -1);
+                foreach (ref readonly var edge in CollectionsMarshal.AsSpan(graph.Edges))
+                {
+                    _offsets[edge.From + 1]++;
+                }
+
+                for (var i = 1; i <= count; i++)
+                {
+                    _offsets[i] += _offsets[i - 1];
+                }
+
+                var cursor = _offsets[..count];
+                foreach (ref readonly var edge in CollectionsMarshal.AsSpan(graph.Edges))
+                {
+                    _successors[cursor[edge.From]++] = edge.To;
+                }
+            }
+
+            public void Run()
+            {
+                for (var root = 0; root < _index.Length; root++)
+                {
+                    if (_index[root] < 0)
+                    {
+                        Visit(root);
+                    }
+                }
+            }
+
+            private void Visit(int root)
+            {
+                Enter(root);
+                while (_calls.Count > 0)
+                {
+                    var (node, next) = _calls.Pop();
+                    if (next < _offsets[node + 1])
+                    {
+                        _calls.Push((node, next + 1));
+                        var successor = _successors[next];
+                        if (_index[successor] < 0)
+                        {
+                            Enter(successor);
+                        }
+                        else if (_onStack[successor])
+                        {
+                            _low[node] = Math.Min(_low[node], _index[successor]);
+                        }
+
+                        continue;
+                    }
+
+                    if (_calls.TryPeek(out var caller))
+                    {
+                        _low[caller.Node] = Math.Min(_low[caller.Node], _low[node]);
+                    }
+
+                    if (_low[node] == _index[node])
+                    {
+                        PopComponent(node);
+                    }
+                }
+            }
+
+            private void Enter(int node)
+            {
+                _index[node] = _low[node] = _next++;
+                _stack.Push(node);
+                _onStack[node] = true;
+                _calls.Push((node, _offsets[node]));
+            }
+
+            private void PopComponent(int root)
+            {
+                var members = new List<int>();
+                int member;
+                do
+                {
+                    member = _stack.Pop();
+                    _onStack[member] = false;
+                    members.Add(member);
+                }
+                while (member != root);
+
+                if (members.Count < 2)
+                {
+                    return;
+                }
+
+                var names = new string[members.Count];
+                for (var i = 0; i < names.Length; i++)
+                {
+                    names[i] = _graph.Names[members[i]];
+                }
+
+                Array.Sort(names, StringComparer.Ordinal);
+                var cycle = string.Join(", ", names);
+                foreach (ref readonly var m in CollectionsMarshal.AsSpan(members))
+                {
+                    _cycles[m] = cycle;
+                }
+            }
+        }
+
+        private int IdOf(string slice)
+        {
+            if (!_ids.TryGetValue(slice, out var id))
+            {
+                _ids.Add(slice, id = Names.Count);
+                Names.Add(slice);
+            }
+
+            return id;
+        }
+    }
+
+    /// <summary>A slice edge of a cycle found in several scopes: the earliest reference, the highest count and the frameworks.</summary>
+    private sealed class CycleEdge(SlicedType source, SlicedType target, SourceLocation location)
+    {
+        public SlicedType Source { get; private set; } = source;
+
+        public SlicedType Target { get; private set; } = target;
+
+        public SourceLocation Location { get; private set; } = location;
+
+        public int Count { get; private set; }
+
+        public List<string?> Frameworks { get; } = [];
+
+        public void Add(SliceEdge edge, string? framework)
+        {
+            Count = Math.Max(Count, edge.Count);
+            if (TypeGraphBuilder.Compare(edge.Location, Location) < 0)
+            {
+                Source = edge.Source;
+                Target = edge.Target;
+                Location = edge.Location;
+            }
+
+            Frameworks.Add(framework);
+        }
+
+        public List<string> SortedNamedFrameworks() => SortedNamed(Frameworks);
     }
 
     /// <summary>
