@@ -45,14 +45,10 @@ internal sealed class Glob
         var segments = new List<string>(split.Length);
         foreach (var segment in split)
         {
-            if (segment.Length == 0)
+            var error = SegmentError(pattern, segment);
+            if (error is not null)
             {
-                return Result<Glob, string>.Failure($"pattern '{pattern}' has an empty segment");
-            }
-
-            if (!string.Equals(segment, AnySegments, StringComparison.Ordinal) && segment.Contains(AnySegments, StringComparison.Ordinal))
-            {
-                return Result<Glob, string>.Failure($"'**' must be a whole segment in '{pattern}'");
+                return Result<Glob, string>.Failure(error);
             }
 
             var isAny = string.Equals(segment, AnySegments, StringComparison.Ordinal);
@@ -65,6 +61,22 @@ internal sealed class Glob
         }
 
         return Result<Glob, string>.Success(new Glob([.. segments], dotted: true, ignoreCase));
+    }
+
+    /// <summary>Checks one segment of a dotted pattern, as <see cref="Dotted(string)"/> does.</summary>
+    /// <param name="pattern">The whole pattern, quoted in the message.</param>
+    /// <param name="segment">The segment to check.</param>
+    /// <returns><see langword="null"/> when the segment is valid, else a message for the loader.</returns>
+    internal static string? SegmentError(string pattern, string segment)
+    {
+        if (segment.Length == 0)
+        {
+            return $"pattern '{pattern}' has an empty segment";
+        }
+
+        return !string.Equals(segment, AnySegments, StringComparison.Ordinal) && segment.Contains(AnySegments, StringComparison.Ordinal)
+            ? $"'**' must be a whole segment in '{pattern}'"
+            : null;
     }
 
     /// <summary>Compiles a flat pattern, in which <c>*</c> matches any run of characters, dots included.</summary>
