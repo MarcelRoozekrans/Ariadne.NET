@@ -51,13 +51,23 @@ public sealed class BuiltinPackVacuityTests
 
     [Theory]
     [MemberData(nameof(PackNames))]
-    public void No_builtin_pack_rule_sets_allow_empty(string packName)
+    public void No_builtin_pack_rule_sets_allow_empty_except_the_module_slices_rule(string packName)
     {
         // Layers cannot carry the key because the loader rejects it, pinned by the loader test AllowEmpty_on_a_layer_is_an_unknown_key.
+        // MM-MODULES-INDEPENDENT is the one exemption: like the pack's roles, it describes a shape a solution may not have yet.
         var pack = Load(packName);
 
-        pack.Rules.Where(r => r.AllowEmpty).Select(r => r.Id)
+        pack.Rules.Where(r => r.AllowEmpty && !(string.Equals(packName, "modular-monolith", StringComparison.Ordinal) && string.Equals(r.Id, "MM-MODULES-INDEPENDENT", StringComparison.Ordinal))).Select(r => r.Id)
             .Should().BeEmpty($"pack '{packName}' must not exempt a rule from vacuity detection");
+    }
+
+    [Fact]
+    public void The_module_slices_rule_is_the_only_builtin_rule_that_allows_empty()
+    {
+        var exempt = Registry.GetAvailablePackNames()
+            .SelectMany(name => Load(name).Rules.Where(r => r.AllowEmpty).Select(r => $"{name}/{r.Id}"));
+
+        exempt.Should().Equal("modular-monolith/MM-MODULES-INDEPENDENT");
     }
 
     [Theory]

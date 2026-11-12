@@ -1,0 +1,4 @@
+schema: 2
+name: modular
+extends:
+  - builtin://modular-monolith
