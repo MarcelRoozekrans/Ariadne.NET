@@ -154,6 +154,48 @@ public class RulePackDescriberTests
     }
 
     [Fact]
+    public void Describe_SelectorWithTraits_NamesEachTraitAfterTheOtherKinds()
+    {
+        var selector = new TargetSelector
+        {
+            Namespaces = ["Shop.Domain.**"],
+            Names = ["*Service"],
+            Kinds = [CSharpTypeKind.Class, CSharpTypeKind.Enum, CSharpTypeKind.RecordStruct],
+            Accessibility = ["public", "protected internal"],
+            AssignableTo = ["**.Base"],
+            Sealed = true,
+            Abstract = false,
+            Static = false,
+            Nested = true,
+        };
+
+        RulePackDescriber.Describe(selector).Should().Be(
+            "namespaces Shop.Domain.**; names *Service; kinds class, enum, recordStruct; accessibility public, protected internal; "
+            + "assignableTo **.Base; sealed true; abstract false; static false; nested true");
+    }
+
+    [Fact]
+    public void Describe_TraitOnlySelector_IsNotNoSelectors()
+    {
+        RulePackDescriber.Describe(new TargetSelector { Sealed = true }).Should().Be("sealed true");
+    }
+
+    [Fact]
+    public void Describe_RequirementWithIsAndIsNot_ListsThemAfterImplements()
+    {
+        var requirement = new RuleRequirement
+        {
+            Kind = CSharpTypeKind.Class,
+            Implements = new TargetSelector { Interfaces = ["**.IDetector"] },
+            Is = new TargetSelector { Sealed = true },
+            IsNot = new TargetSelector { Names = ["*Impl", "*Helper"] },
+        };
+
+        RulePackDescriber.Describe(requirement).Should().Be(
+            "kind class, implements interfaces **.IDetector, is sealed true, isNot names *Impl, *Helper");
+    }
+
+    [Fact]
     public void Describe_NullRequirement_SaysNoRequirement()
     {
         RulePackDescriber.Describe((RuleRequirement?)null).Should().Be("no requirement");

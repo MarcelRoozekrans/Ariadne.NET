@@ -4,9 +4,9 @@ using Microsoft.CodeAnalysis;
 namespace Ariadne.NET.Analysis;
 
 /// <summary>
-/// Tests whether a type is selected by a rule target: a list of layers, or a namespace, assembly and type selector. The
-/// answer is cached per symbol, so a type that many edges touch is matched once. Like the layer map it uses, one instance
-/// serves one single-threaded check.
+/// Tests whether a type is selected by a rule target: a list of layers, or a namespace, assembly and type selector, either
+/// one narrowed by type-level traits. The answer is cached per symbol, so a type that many edges touch is matched once.
+/// Like the layer map it uses, one instance serves one single-threaded check.
 /// </summary>
 internal sealed class TargetMatcher
 {
@@ -31,7 +31,7 @@ internal sealed class TargetMatcher
     /// <param name="target">The target to compile.</param>
     /// <param name="layers">The layer map that resolves layer names.</param>
     /// <returns>The matcher.</returns>
-    /// <exception cref="ArgumentException">The target mixes layers with namespaces, assemblies or types, or layers with members.</exception>
+    /// <exception cref="ArgumentException">The target mixes layers with namespaces, assemblies, types, base types, interfaces, attributes or members. Layers with traits are allowed.</exception>
     public static TargetMatcher From(TargetSelector target, LayerMap layers)
     {
         ArgumentNullException.ThrowIfNull(target);
@@ -40,16 +40,20 @@ internal sealed class TargetMatcher
         if (target.Layers.Count > 0 && (target.Namespaces.Count > 0 || target.Assemblies.Count > 0 || target.Types.Count > 0
                 || target.BaseTypes.Count > 0 || target.Interfaces.Count > 0 || target.Attributes.Count > 0 || target.Members.Count > 0))
         {
-            throw new ArgumentException("A target selects either layers or namespaces, assemblies, types, base types, interfaces, attributes and members, not both.", nameof(target));
+            throw new ArgumentException("A target selects either layers or namespaces, assemblies, types, base types, interfaces, attributes and members, not both. Traits may join either.", nameof(target));
         }
 
         return new TargetMatcher(
             layers,
             new HashSet<string>(target.Layers, StringComparer.OrdinalIgnoreCase),
-            TypeSelector.From(target.Namespaces, target.Assemblies, target.Types, target.BaseTypes, target.Interfaces, target.Attributes, target.Members));
+            TypeSelector.From(target));
     }
 
-    /// <summary>Whether the type is selected. A target that holds <c>members</c> selects no type. A type covered by more than one layer is in none of them.</summary>
+    /// <summary>
+    /// Whether the type is selected. A target with layers selects a type in one of them that also matches the traits; a
+    /// target without layers selects a type its selector matches, and nothing when the selector is empty. A target that
+    /// holds <c>members</c> selects no type. A type covered by more than one layer is in none of them.
+    /// </summary>
     /// <param name="type">The type to test.</param>
     /// <returns>True when the type is selected.</returns>
     public bool Matches(INamedTypeSymbol type)
@@ -58,9 +62,11 @@ internal sealed class TargetMatcher
 
         if (!_cache.TryGetValue(type, out var matches))
         {
+            // With layers, the selector holds traits at most, and an empty one matches every type.
             matches = !_selector.HasMembers
-                && ((_layers.Count > 0 && _layerMap.LayerOf(type) is { } layer && _layers.Contains(layer))
-                    || (!_selector.IsEmpty && _selector.Matches(type, _layerMap.Names)));
+                && (_layers.Count > 0
+                    ? _layerMap.LayerOf(type) is { } layer && _layers.Contains(layer) && _selector.Matches(type, _layerMap.Names)
+                    : !_selector.IsEmpty && _selector.Matches(type, _layerMap.Names));
             _cache.Add(type, matches);
         }
 

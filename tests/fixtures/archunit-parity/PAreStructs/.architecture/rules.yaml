@@ -3,4 +3,20 @@ name: parity-p-are-structs
 version: "1.0.0"
 author: fixture
 
-# No rule yet: a selector has no kinds. Phase 4.2 adds PARITY-PARESTRUCTS and PARITY-PARESTRUCTS-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-PARESTRUCTS
+    because: Mirrors ArchUnitNET's AreStructs; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PAreStructs.**"]
+        kinds: [struct, recordStruct]
+      to:
+        namespaces: ["Parity.PAreStructs.Target.**"]
+  - id: PARITY-PARESTRUCTS-NOT
+    because: Mirrors ArchUnitNET's AreNotStructs; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PAreStructs.**"]
+        kinds: [class, interface, record, enum, delegate]
+      to:
+        namespaces: ["Parity.PAreStructs.Target.**"]

@@ -17,16 +17,28 @@ A rule is an entry in `rules:`. It has exactly one of `forbid`, `allowOnly`, `re
 | `description` | no | Free text. |
 | `forbid` | one of | `{ from: <target>, to: <target> }`: no type in `from` may depend on a type in `to`. Reported as `ForbiddenDependency`. |
 | `allowOnly` | one of | `{ from: <target>, to: <target> }`: a type in `to` may be depended on only by types in `from`, or by types in `to` itself. Any other source is reported as `DependencyNotPermitted`. |
-| `require` | one of | `{ for: <selector>, layer, kind, accessibility, implements }`: every type that `for` selects must satisfy the requirement. At least one of `layer`, `kind`, `accessibility` and `implements` is needed. See [Require rules](#require-rules). |
+| `require` | one of | `{ for: <selector>, layer, kind, accessibility, implements, is, isNot }`: every type that `for` selects must satisfy the requirement. At least one of `layer`, `kind`, `accessibility`, `implements`, `is` and `isNot` is needed. See [Require rules](#require-rules). |
 | `bannedPackages` | one of | `{ packages: [...], from: { assemblies: [...] } }`: no project in `from` may resolve a package that `packages` matches. Reported as `BannedPackage`. See [Banned packages](#banned-packages). |
 | `uniqueNames` | one of | `{ for: <target>, against: <target> }`: no type in `for` may share a simple name with a type in `against`. Reported as `NameCollision`. See [Unique names](#unique-names). |
-| `exceptions` | no | List of selectors, each with a required `because`. A source type that an exception matches is exempt from the rule. On a `bannedPackages` rule an exception takes `assemblies` only, and on a `uniqueNames` rule `namespaces` and `types` only. |
+| `exceptions` | no | List of selectors, each with a required `because`. A source type that an exception matches is exempt from the rule. On a `bannedPackages` rule an exception takes `assemblies` only, and on a `uniqueNames` rule `namespaces`, `types` and the type traits. |
 | `locked` | no, default `false` | A child pack cannot add exceptions to this rule. |
 | `allowEmpty` | no, default `false` | Accepts that the rule selects no type. See [Rules that select nothing](#rules-that-select-nothing). |
 
-A **target** is either `layers: [...]` or a [selector](03-rule-schema.md#selectors) made of `namespaces`, `assemblies`, `types`, `baseTypes`, `interfaces` and `attributes`. Mixing `layers` with selector kinds in one target is a load error, and a target must select something.
+A **target** is either `layers: [...]` or a [selector](03-rule-schema.md#selectors) made of `namespaces`, `assemblies`, `types`, `baseTypes`, `interfaces`, `attributes` and the [type traits](03-rule-schema.md#type-traits). `layers` may sit next to traits, which keeps the types of those layers that match every trait. Mixing `layers` with the other selector kinds in one target is a load error, and a target must select something.
 
-An exception takes `namespaces`, `assemblies` and `types` (at least one) and a required `because`; on a `bannedPackages` rule only `assemblies`, and on a `uniqueNames` rule only `namespaces` and `types`. Exceptions exempt the source type, the same way for `forbid` and `allowOnly`.
+An exception takes `namespaces`, `assemblies`, `types` and the [type traits](03-rule-schema.md#type-traits) (at least one key) and a required `because`; the keys of one exception are AND-ed. On a `bannedPackages` rule an exception takes only `assemblies`, and on a `uniqueNames` rule `namespaces`, `types` and the traits. Exceptions exempt the source type, the same way for `forbid` and `allowOnly`. A negative predicate on a list trait is an exception that names the trait: "no type may depend on `Shop.Legacy.**`, except types assignable to `ILegacyAdapter`" is a `forbid` with this exception, which exempts every depending type assignable to `ILegacyAdapter`.
+
+```yaml
+rules:
+  - id: SHOP-NO-LEGACY
+    because: Legacy code is being retired.
+    forbid:
+      from: { namespaces: ["Shop.**"] }
+      to: { namespaces: ["Shop.Legacy.**"] }
+    exceptions:
+      - assignableTo: ["Shop.Legacy.ILegacyAdapter"]
+        because: Adapters are the one way across.
+```
 
 Rules apply regardless of layers: a `forbid` between two types of the same layer still fires. As with layers, the engine reports one violation per rule, source type and target type, located at the first reference, with the number of references. Each carries the rule's `id` and `because`.
 
@@ -44,7 +56,7 @@ rules:
         because: DI registration wires the interface to its implementation.
 ```
 
-The C# model is `RuleDefinition`, with `Id`, `Because`, `Description`, `Kind` (`RuleKind.Forbid`, `RuleKind.AllowOnly`, `RuleKind.Require`, `RuleKind.BannedPackages` or `RuleKind.UniqueNames`), `From` and `To` (`TargetSelector`), `Require` (`RuleRequirement?`, with `Layer`, `Kind`, `Accessibility` and `Implements`), `Packages` (`IList<string>`), `Against` (`TargetSelector`), `Exceptions` (`IList<RuleException>`), `Locked` and `AllowEmpty`. For a `require` or `uniqueNames` rule `From` holds the `for` selector, and for a `bannedPackages` rule it holds `from`.
+The C# model is `RuleDefinition`, with `Id`, `Because`, `Description`, `Kind` (`RuleKind.Forbid`, `RuleKind.AllowOnly`, `RuleKind.Require`, `RuleKind.BannedPackages` or `RuleKind.UniqueNames`), `From` and `To` (`TargetSelector`), `Require` (`RuleRequirement?`, with `Layer`, `Kind`, `Accessibility`, `Implements`, `Is` and `IsNot`), `Packages` (`IList<string>`), `Against` (`TargetSelector`), `Exceptions` (`IList<RuleException>`), `Locked` and `AllowEmpty`. For a `require` or `uniqueNames` rule `From` holds the `for` selector, and for a `bannedPackages` rule it holds `from`.
 
 ### Forbid and allowOnly
 
@@ -79,6 +91,8 @@ A `forbid` or `allowOnly` rule constrains dependencies. A `require` rule constra
 | `kind` | `class`, `interface`, `record`, `struct` or `recordStruct`. | `TypeKindMismatch` |
 | `accessibility` | `public` or `internal`. Only `internal` is checked, because public is the default. | `AccessibilityMismatch` |
 | `implements` | A selector with `namespaces`, `assemblies` and `types` only. The type must implement an interface it matches, including interfaces it gets through a base class. | `MissingInterface` |
+| `is` | A selector that every selected type must match. See [is and isNot](#is-and-isnot). | `RequirementNotMet` |
+| `isNot` | A selector that no selected type may match. See [is and isNot](#is-and-isnot). | `RequirementNotMet` |
 
 Placement example: every implementation of a repository interface lives in Infrastructure, as an internal class.
 
@@ -99,6 +113,35 @@ rules:
 ```
 
 `interfaces` selects a type that implements a matching interface, and that includes an interface that extends one. `interface IOrderRepository : IRepository<Order>` is therefore selected by `**.I*Repository` too, and without the Domain exception it would be reported as `WrongLayer`, `TypeKindMismatch` and `AccessibilityMismatch`.
+
+#### is and isNot
+
+`is` and `isNot` take a selector with every key except `layers` and `members`: the [type traits](03-rule-schema.md#type-traits) and also `namespaces`, `assemblies`, `types`, `baseTypes`, `interfaces` and `attributes`.
+
+```yaml
+rules:
+  - id: SHOP-DOMAIN-SEALED
+    because: Domain classes are not extension points.
+    require:
+      for: { namespaces: ["Shop.Domain.**"], kinds: [class, record] }
+      is: { sealed: true }
+      isNot: { names: ["*Impl", "*Helper"] }
+```
+
+- **Each key is its own requirement.** In `is`, a type must match every key, and each key it fails is one violation. In `isNot`, a type must match none of the keys, and each key it matches is one violation. Within one key the values stay alternatives, so `isNot: { names: [A, B] }` means "matches neither A nor B".
+- **The message names the key.** It reads `Type 'OrderService' is selected by rule 'SHOP-DOMAIN-SEALED' and should be sealed but is not` for `is`, and `Type 'OrderImpl' is selected by rule 'SHOP-DOMAIN-SEALED' and should not have a name matching '*Impl' or '*Helper' but is named 'OrderImpl'` for `isNot`. A boolean that is `false` reads in its positive form, so `is: { sealed: false }` reports `should not be sealed but is`.
+- **They apply to every selected type, enums and delegates included.** The older keys `kind`, `accessibility` and `implements` stay as shorthand and keep skipping enums and delegates, so `kind: class` over an enum reports nothing while `is: { kinds: [class] }` over the same enum reports a violation.
+- **`NotExist`.** To say that no type may exist in a place, select the types and refuse all of them with `allowEmpty: true`, because an empty selection is then the goal and not a mistake:
+
+```yaml
+rules:
+  - id: SHOP-NO-LEGACY-NAMESPACE
+    because: The legacy namespace was removed.
+    allowEmpty: true
+    require:
+      for: { namespaces: ["Shop.Legacy.**"] }
+      isNot: { types: ["**"] }
+```
 
 A `require` rule yields one violation per selected type and failed requirement, with the rule's `id` and `because`. Exceptions exempt a type. A rule whose `for` selects no type is reported as vacuous; see [Rules that select nothing](#rules-that-select-nothing).
 

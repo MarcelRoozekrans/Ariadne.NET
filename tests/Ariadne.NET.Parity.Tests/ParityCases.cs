@@ -283,7 +283,7 @@ public static class ParityCases
             _ => Types().That().HaveName("OrderService").Or().HaveName("PaymentService")
                 .Should().NotDependOnAny(Types().That().ResideInNamespace("Parity.XOrWithinPredicate.Target"))),
 
-        // Phase 4.2 gaps: each has a KnownGaps entry and no rule in its kind's pack.
+        // Phase 4.2 cases: gaps until phase 4.2 added the traits and is and isNot. p-have-any-attributes:not stays a gap.
         new(
             "p-implement-interface:not",
             "PImplementInterface",
@@ -1057,7 +1057,7 @@ public static class ParityCases
             Projection.Types,
             _ => Types().That().ResideInNamespace("Parity.CHaveFullNameContaining.NotBroken")
                 .Or().ResideInNamespace("Parity.CHaveFullNameContaining.NotClean")
-                .Should().NotHaveFullNameContaining("NotBroken")),
+                .Should().NotHaveFullNameContaining("NotBroken.Pay")),
         new(
             "c-have-any-attributes",
             "CHaveAnyAttributes",

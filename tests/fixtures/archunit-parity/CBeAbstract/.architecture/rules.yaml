@@ -3,4 +3,20 @@ name: parity-c-be-abstract
 version: "1.0.0"
 author: fixture
 
-# No rule yet: require has no is or isNot, and a selector has no abstract. Phase 4.2 adds PARITY-CBEABSTRACT and PARITY-CBEABSTRACT-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-CBEABSTRACT
+    because: Mirrors ArchUnitNET's BeAbstract on Classes(); Broken and Clean must satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CBeAbstract.Broken", "Parity.CBeAbstract.Clean"]
+        kinds: [class, record]
+      is:
+        abstract: true
+  - id: PARITY-CBEABSTRACT-NOT
+    because: Mirrors ArchUnitNET's NotBeAbstract on Classes(); NotBroken and NotClean must not satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CBeAbstract.NotBroken", "Parity.CBeAbstract.NotClean"]
+        kinds: [class, record]
+      isNot:
+        abstract: true

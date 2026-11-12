@@ -226,7 +226,8 @@ public class BannedPackageRulesTests
     [Fact]
     public void ExceptionWithoutAssemblies_MatchesNothing()
     {
-        var pack = PackWith(["FluentValidation"], new TargetSelector(), new RuleException { Because = "Empty." });
+        // A package belongs to a project, so only assemblies can exempt it; type keys that would match every type do not.
+        var pack = PackWith(["FluentValidation"], new TargetSelector(), new RuleException { Namespaces = ["**"], Types = ["**"], Because = "No assemblies." });
 
         Check(pack, Project("App", "App", Direct("FluentValidation"))).Should().ContainSingle();
     }

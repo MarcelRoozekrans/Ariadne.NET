@@ -3,4 +3,18 @@ name: parity-c-be-private
 version: "1.0.0"
 author: fixture
 
-# No rule yet: require has no is or isNot, and its accessibility key checks only internal. Phase 4.2 adds PARITY-CBEPRIVATE and PARITY-CBEPRIVATE-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-CBEPRIVATE
+    because: Mirrors ArchUnitNET's BePrivate; Broken and Clean must satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CBePrivate.Broken", "Parity.CBePrivate.Clean"]
+      is:
+        accessibility: [private]
+  - id: PARITY-CBEPRIVATE-NOT
+    because: Mirrors ArchUnitNET's NotBePrivate; NotBroken and NotClean must not satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CBePrivate.NotBroken", "Parity.CBePrivate.NotClean"]
+      isNot:
+        accessibility: [private]

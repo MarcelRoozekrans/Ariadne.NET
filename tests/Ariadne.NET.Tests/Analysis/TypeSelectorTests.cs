@@ -1,3 +1,4 @@
+using Ariadne.NET.Abstractions;
 using Ariadne.NET.Analysis;
 using FluentAssertions;
 using Microsoft.CodeAnalysis;
@@ -251,5 +252,190 @@ public class TypeSelectorTests
 
         TypeSelector.From([], [], [], ["N.A"], [], []).Matches(Find(compilation, "N.B"), new TypeNames()).Should().BeTrue();
         TypeSelector.From([], [], [], ["N.A`1"], [], []).Matches(Find(compilation, "N.B"), new TypeNames()).Should().BeFalse();
+    }
+
+    private const string TraitSource = """
+        namespace N
+        {
+            public sealed class S { }
+            public abstract class A { }
+            public static class St { }
+            public class Outer { public class Inner { } private class Hidden { } protected internal class Pi { } }
+            public record R;
+            public sealed record Sr;
+            public record struct Rs;
+            public struct Sv { }
+            public enum E { One }
+            public delegate void D();
+            public interface I { }
+            public class Base { }
+            public class Impl : Base, I { }
+            public class Generic<T> { }
+        }
+        """;
+
+    private static readonly Lazy<CSharpCompilation> TraitCompilation = new(() => TestCompilation.Create(TraitSource));
+
+    private static readonly string[] Classes = ["S", "A", "St", "Outer", "Inner", "Hidden", "Pi", "R", "Sr", "Base", "Impl", "Generic"];
+
+    // The simple names of every type in namespace N, nested ones included, that the selector picks.
+    private static List<string> Selected(TargetSelector selector)
+    {
+        var compiled = TypeSelector.From(selector);
+        var names = new TypeNames();
+        var selected = new List<string>();
+        var pending = new Stack<INamedTypeSymbol>(TraitCompilation.Value.GlobalNamespace.GetNamespaceMembers().First(n => string.Equals(n.Name, "N", StringComparison.Ordinal)).GetTypeMembers());
+        while (pending.Count > 0)
+        {
+            var type = pending.Pop();
+            if (compiled.Matches(type, names))
+            {
+                selected.Add(type.Name);
+            }
+
+            foreach (var nested in type.GetTypeMembers())
+            {
+                pending.Push(nested);
+            }
+        }
+
+        return selected;
+    }
+
+    [Fact]
+    public void Names_match_the_innermost_simple_name()
+    {
+        Selected(new TargetSelector { Names = ["Inner"] }).Should().BeEquivalentTo("Inner");
+        Selected(new TargetSelector { Names = ["Gen*"] }).Should().BeEquivalentTo("Generic");
+        Selected(new TargetSelector { Names = ["Outer"] }).Should().BeEquivalentTo("Outer");
+        Selected(new TargetSelector { Names = ["Generic`1"] }).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Kinds_select_by_declared_kind()
+    {
+        Selected(new TargetSelector { Kinds = [CSharpTypeKind.Enum] }).Should().BeEquivalentTo("E");
+        Selected(new TargetSelector { Kinds = [CSharpTypeKind.Delegate] }).Should().BeEquivalentTo("D");
+        Selected(new TargetSelector { Kinds = [CSharpTypeKind.Record] }).Should().BeEquivalentTo("R", "Sr");
+        Selected(new TargetSelector { Kinds = [CSharpTypeKind.Struct, CSharpTypeKind.RecordStruct, CSharpTypeKind.Enum] })
+            .Should().BeEquivalentTo("Rs", "Sv", "E");
+        Selected(new TargetSelector { Kinds = [CSharpTypeKind.Struct] }).Should().BeEquivalentTo("Sv");
+        Selected(new TargetSelector { Kinds = [CSharpTypeKind.Interface] }).Should().BeEquivalentTo("I");
+        Selected(new TargetSelector { Kinds = [CSharpTypeKind.Class] }).Should().BeEquivalentTo(Classes.Except(["R", "Sr"], StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void Accessibility_selects_declared_accessibility()
+    {
+        Selected(new TargetSelector { Accessibility = ["private"] }).Should().BeEquivalentTo("Hidden");
+        Selected(new TargetSelector { Accessibility = ["protected internal"] }).Should().BeEquivalentTo("Pi");
+        Selected(new TargetSelector { Accessibility = ["public"] }).Should().Contain(["S", "Inner", "E", "D"]).And.NotContain(["Hidden", "Pi"]);
+        Selected(new TargetSelector { Accessibility = ["internal", "private protected", "protected"] }).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Unknown_accessibility_throws()
+    {
+        var act = () => TypeSelector.From(new TargetSelector { Accessibility = ["protected-internal"] });
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void AssignableTo_covers_self_bases_interfaces_and_object()
+    {
+        Selected(new TargetSelector { AssignableTo = ["**.Base"] }).Should().BeEquivalentTo("Base", "Impl");
+        Selected(new TargetSelector { AssignableTo = ["**.I"] }).Should().BeEquivalentTo("I", "Impl");
+        Selected(new TargetSelector { AssignableTo = ["System.Object"] }).Should().Contain(Classes).And.NotContain("I");
+        Selected(new TargetSelector { AssignableTo = ["N.Generic"] }).Should().BeEquivalentTo("Generic");
+    }
+
+    [Fact]
+    public void Sealed_counts_static_classes_abstract_does_not()
+    {
+        Selected(new TargetSelector { Sealed = true }).Should().BeEquivalentTo("S", "St", "Sr");
+        Selected(new TargetSelector { Abstract = true }).Should().BeEquivalentTo("A");
+        Selected(new TargetSelector { Static = true }).Should().BeEquivalentTo("St");
+        Selected(new TargetSelector { Static = false }).Should().NotContain("St").And.Contain(["S", "A", "E"]);
+    }
+
+    [Fact]
+    public void Non_class_kinds_are_neither_sealed_nor_abstract()
+    {
+        string[] others = ["I", "Sv", "Rs", "E", "D"];
+
+        Selected(new TargetSelector { Sealed = true }).Should().NotContain(others);
+        Selected(new TargetSelector { Abstract = true }).Should().NotContain(others);
+        Selected(new TargetSelector { Sealed = false }).Should().Contain(others).And.NotContain(["S", "St", "Sr"]);
+        Selected(new TargetSelector { Abstract = false }).Should().Contain(others).And.NotContain("A");
+    }
+
+    [Fact]
+    public void Nested_selects_types_with_a_containing_type()
+    {
+        Selected(new TargetSelector { Nested = true }).Should().BeEquivalentTo("Inner", "Hidden", "Pi");
+        Selected(new TargetSelector { Nested = false }).Should().NotContain(["Inner", "Hidden", "Pi"]).And.Contain("Outer");
+    }
+
+    [Fact]
+    public void Traits_and_globs_are_anded()
+    {
+        Selected(new TargetSelector { Types = ["N.Outer.*"], Accessibility = ["public"] }).Should().BeEquivalentTo("Inner");
+        Selected(new TargetSelector { Interfaces = ["**.I"], Sealed = true }).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Trait_only_selector_is_not_empty()
+    {
+        TypeSelector.From(new TargetSelector()).IsEmpty.Should().BeTrue();
+        TypeSelector.From(new TargetSelector { Names = ["X"] }).IsEmpty.Should().BeFalse();
+        TypeSelector.From(new TargetSelector { Kinds = [CSharpTypeKind.Class] }).IsEmpty.Should().BeFalse();
+        TypeSelector.From(new TargetSelector { Accessibility = ["public"] }).IsEmpty.Should().BeFalse();
+        TypeSelector.From(new TargetSelector { AssignableTo = ["**.I"] }).IsEmpty.Should().BeFalse();
+        TypeSelector.From(new TargetSelector { Sealed = false }).IsEmpty.Should().BeFalse();
+        TypeSelector.From(new TargetSelector { Abstract = true }).IsEmpty.Should().BeFalse();
+        TypeSelector.From(new TargetSelector { Static = true }).IsEmpty.Should().BeFalse();
+        TypeSelector.From(new TargetSelector { Nested = false }).IsEmpty.Should().BeFalse();
+        TypeSelector.From(new TargetSelector { Members = ["A.B.C"] }).IsEmpty.Should().BeTrue();
+    }
+
+    [Fact]
+    public void KindOf_maps_enum_and_delegate_and_leaves_ActualKind_alone()
+    {
+        var compilation = TraitCompilation.Value;
+
+        TypeTraits.KindOf(Find(compilation, "N.E")).Should().Be(CSharpTypeKind.Enum);
+        TypeTraits.KindOf(Find(compilation, "N.D")).Should().Be(CSharpTypeKind.Delegate);
+        TypeTraits.KindOf(Find(compilation, "N.Rs")).Should().Be(CSharpTypeKind.RecordStruct);
+        RoleRules.ActualKind(Find(compilation, "N.E")).Should().Be(CSharpTypeKind.Class);
+        RoleRules.ActualKind(Find(compilation, "N.D")).Should().Be(CSharpTypeKind.Class);
+    }
+
+    // Interim: measures with GC.GetAllocatedBytesForCurrentThread, as TargetMatcherTests does.
+    [Fact]
+    public void Trait_matching_allocates_nothing_once_names_are_built()
+    {
+        var impl = Find(TraitCompilation.Value, "N.Impl");
+        var names = new TypeNames();
+        var selector = TypeSelector.From(new TargetSelector
+        {
+            Names = ["Im*"],
+            Kinds = [CSharpTypeKind.Class],
+            Accessibility = ["public"],
+            AssignableTo = ["**.I"],
+            Sealed = false,
+            Abstract = false,
+            Static = false,
+            Nested = false,
+        });
+        selector.Matches(impl, names).Should().BeTrue();
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < 1_000; i++)
+        {
+            selector.Matches(impl, names);
+        }
+
+        (GC.GetAllocatedBytesForCurrentThread() - before).Should().Be(0);
     }
 }

@@ -3,4 +3,18 @@ name: parity-c-have-full-name-starting-with
 version: "1.0.0"
 author: fixture
 
-# No rule yet: require has no is or isNot. Phase 4.2 adds PARITY-CHAVEFULLNAMESTARTINGWITH and PARITY-CHAVEFULLNAMESTARTINGWITH-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-CHAVEFULLNAMESTARTINGWITH
+    because: Mirrors ArchUnitNET's HaveFullNameStartingWith with Clean.Order; Broken and Clean must start with it.
+    require:
+      for:
+        namespaces: ["Parity.CHaveFullNameStartingWith.Broken", "Parity.CHaveFullNameStartingWith.Clean"]
+      is:
+        types: ["Parity.CHaveFullNameStartingWith.Clean.Order*", "Parity.CHaveFullNameStartingWith.Clean.Order*.**"]
+  - id: PARITY-CHAVEFULLNAMESTARTINGWITH-NOT
+    because: Mirrors ArchUnitNET's NotHaveFullNameStartingWith with NotB; NotBroken and NotClean must not start with it.
+    require:
+      for:
+        namespaces: ["Parity.CHaveFullNameStartingWith.NotBroken", "Parity.CHaveFullNameStartingWith.NotClean"]
+      isNot:
+        types: ["Parity.CHaveFullNameStartingWith.NotB*", "Parity.CHaveFullNameStartingWith.NotB*.**"]

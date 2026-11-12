@@ -6,5 +6,7 @@ public enum CSharpTypeKind
     Interface,
     Record,
     Struct,
-    RecordStruct
+    RecordStruct,
+    Enum,
+    Delegate
 }

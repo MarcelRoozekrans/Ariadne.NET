@@ -1,0 +1,19 @@
+schema: 2
+name: x
+layers:
+  - name: Domain
+    id: X-L-DOMAIN
+    because: core
+    namespaces: ["**.Domain.**"]
+rules:
+  - id: X-R1
+    because: b
+    require:
+      for: { namespaces: ["Shop.**"] }
+      is: { assemblies: ["Shop.*"], baseTypes: ["**.EntityBase"], accessibility: [public, internal], assignableTo: ["**.IEntity"] }
+      isNot: { interfaces: ["**.IDisposable"], accessibility: [private, protected], nested: true }
+  - id: X-R2
+    because: b
+    require:
+      for: { layers: [Domain] }
+      isNot: { assemblies: ["Shop.Web"], baseTypes: ["**.ControllerBase"], assignableTo: ["**.IController"], nested: false }

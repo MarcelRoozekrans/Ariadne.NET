@@ -1,0 +1,6 @@
+schema: 2
+name: x
+componentRoles:
+  - name: Handler
+    layer: Application
+    typeKind: Delegate

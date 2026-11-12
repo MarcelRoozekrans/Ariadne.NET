@@ -3,4 +3,18 @@ name: parity-c-have-full-name-ending-with
 version: "1.0.0"
 author: fixture
 
-# No rule yet: require has no is or isNot. Phase 4.2 adds PARITY-CHAVEFULLNAMEENDINGWITH and PARITY-CHAVEFULLNAMEENDINGWITH-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-CHAVEFULLNAMEENDINGWITH
+    because: Mirrors ArchUnitNET's HaveFullNameEndingWith with Service; Broken and Clean must end with it.
+    require:
+      for:
+        namespaces: ["Parity.CHaveFullNameEndingWith.Broken", "Parity.CHaveFullNameEndingWith.Clean"]
+      is:
+        types: ["**.*Service"]
+  - id: PARITY-CHAVEFULLNAMEENDINGWITH-NOT
+    because: Mirrors ArchUnitNET's NotHaveFullNameEndingWith with Broken.PaymentService; NotBroken and NotClean must not end with it.
+    require:
+      for:
+        namespaces: ["Parity.CHaveFullNameEndingWith.NotBroken", "Parity.CHaveFullNameEndingWith.NotClean"]
+      isNot:
+        types: ["**.*Broken.PaymentService"]

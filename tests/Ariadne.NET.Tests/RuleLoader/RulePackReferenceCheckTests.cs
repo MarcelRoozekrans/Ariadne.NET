@@ -277,7 +277,39 @@ public class RulePackReferenceCheckTests
     public void RequireRule_WithAnEmptyRequirement_Fails()
     {
         Resolve(PackWithRequire(new RuleRequirement())).Error.Detail.Should()
-            .Contain("the requirement of rule 'R-1' needs at least one of layer, kind, accessibility, implements");
+            .Contain("the requirement of rule 'R-1' needs at least one of layer, kind, accessibility, implements, is, isNot");
+    }
+
+    [Fact]
+    public void RequireRule_WithOnlyIs_Passes()
+    {
+        Resolve(PackWithRequire(new RuleRequirement { Is = new TargetSelector { Sealed = true } })).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void RequireRule_WithOnlyIsNot_Passes()
+    {
+        Resolve(PackWithRequire(new RuleRequirement { IsNot = new TargetSelector { Types = ["**"] } })).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void RequireRule_WithAnEmptyIs_Fails()
+    {
+        Resolve(PackWithRequire(new RuleRequirement { Is = new TargetSelector() })).Error.Detail.Should()
+            .Contain("the is of rule 'R-1' selects nothing; it needs at least one selector key other than layers and members");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void RequireRule_ConditionWithLayersOrMembers_Fails(bool layers)
+    {
+        var condition = layers
+            ? new TargetSelector { Layers = ["Domain"], Sealed = true }
+            : new TargetSelector { Members = ["**.M"], Sealed = true };
+
+        Resolve(PackWithRequire(new RuleRequirement { IsNot = condition })).Error.Detail.Should()
+            .Contain("the isNot of rule 'R-1' has layers or members, which a condition does not take");
     }
 
     [Fact]
@@ -338,5 +370,248 @@ public class RulePackReferenceCheckTests
         var layer = new LayerDefinition { Name = "Domain", Id = "CODE-002", Because = "x" };
 
         Resolve(Pack([layer])).Error.Detail.Should().Contain("'CODE-002' is reserved");
+    }
+
+    private static RulePack PackWithRule(RuleDefinition rule) => new() { Name = "p", Layers = [Layer("Domain")], Rules = [rule] };
+
+    private static RuleDefinition ForbidRule(TargetSelector from, TargetSelector? to = null, params RuleException[] exceptions) => new()
+    {
+        Id = "R-1",
+        Because = "because",
+        Kind = RuleKind.Forbid,
+        From = from,
+        To = to ?? new TargetSelector { Types = ["**.T"] },
+        Exceptions = exceptions,
+    };
+
+    [Theory]
+    [InlineData("Public")]
+    [InlineData("protectedinternal")]
+    [InlineData("")]
+    public void TraitAccessibility_OutsideTheSixKeywords_Fails(string accessibility)
+    {
+        var rule = ForbidRule(new TargetSelector { Types = ["**.X"], Accessibility = [accessibility] });
+
+        var result = Resolve(PackWithRule(rule));
+
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Detail.Should().Be(
+            $"the from of rule 'R-1' has accessibility '{accessibility}', which must be one of public, internal, protected, private, protected internal, private protected");
+    }
+
+    [Fact]
+    public void TraitAccessibility_TheSixKeywords_Pass()
+    {
+        var keywords = new[] { "public", "internal", "protected", "private", "protected internal", "private protected" };
+        var rule = ForbidRule(new TargetSelector { Types = ["**.X"], Accessibility = keywords }, new TargetSelector { Types = ["**.T"], Accessibility = keywords });
+
+        Resolve(PackWithRule(rule)).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void TraitKinds_NotAnEnumValue_Fails()
+    {
+        var rule = ForbidRule(new TargetSelector { Types = ["**.X"] }, new TargetSelector { Types = ["**.T"], Kinds = [(CSharpTypeKind)42] });
+
+        Resolve(PackWithRule(rule)).Error.Detail.Should().Be("the to of rule 'R-1' has kind '42', which is not a type kind");
+    }
+
+    [Fact]
+    public void TraitKinds_EnumAndDelegate_Pass()
+    {
+        var rule = ForbidRule(new TargetSelector { Kinds = [CSharpTypeKind.Enum, CSharpTypeKind.Delegate] });
+
+        Resolve(PackWithRule(rule)).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void UniqueNamesAgainst_InvalidTraits_Fail()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "R-1",
+            Because = "because",
+            Kind = RuleKind.UniqueNames,
+            From = new TargetSelector { Layers = ["Domain"] },
+            Against = new TargetSelector { Layers = ["Domain"], Accessibility = ["open"] },
+        };
+
+        Resolve(PackWithRule(rule)).Error.Detail.Should().Contain("the against of rule 'R-1' has accessibility 'open'");
+    }
+
+    [Fact]
+    public void RequireFor_IsAndIsNot_InvalidTraits_Fail()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "R-1",
+            Because = "because",
+            Kind = RuleKind.Require,
+            From = new TargetSelector { Types = ["**.X"], Kinds = [(CSharpTypeKind)(-1)] },
+            Require = new RuleRequirement
+            {
+                Is = new TargetSelector { Accessibility = ["Public"] },
+                IsNot = new TargetSelector { Kinds = [(CSharpTypeKind)9] },
+            },
+        };
+
+        Resolve(PackWithRule(rule)).Error.Detail!.Split('\n').Should().Equal(
+            "the for of rule 'R-1' has kind '-1', which is not a type kind",
+            "the is of rule 'R-1' has accessibility 'Public', which must be one of public, internal, protected, private, protected internal, private protected",
+            "the isNot of rule 'R-1' has kind '9', which is not a type kind");
+    }
+
+    [Theory]
+    [InlineData(CSharpTypeKind.Enum)]
+    [InlineData(CSharpTypeKind.Delegate)]
+    [InlineData((CSharpTypeKind)42)]
+    public void RequireKind_NotBuildable_Fails(CSharpTypeKind kind)
+    {
+        Resolve(PackWithRequire(new RuleRequirement { Kind = kind })).Error.Detail.Should().Be(
+            $"the requirement of rule 'R-1' has kind '{kind}', which must be Class, Interface, Record, Struct or RecordStruct");
+    }
+
+    [Fact]
+    public void RequireKind_Buildable_Passes()
+    {
+        Resolve(PackWithRequire(new RuleRequirement { Kind = CSharpTypeKind.RecordStruct })).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Exception_InvalidTraits_Fail()
+    {
+        var rule = ForbidRule(
+            new TargetSelector { Types = ["**.X"] },
+            null,
+            new RuleException { Types = ["**.A"], Because = "a" },
+            new RuleException { Accessibility = ["friend"], Kinds = [(CSharpTypeKind)7], Because = "b" });
+
+        Resolve(PackWithRule(rule)).Error.Detail!.Split('\n').Should().Equal(
+            "exceptions[1] of rule 'R-1' has kind '7', which is not a type kind",
+            "exceptions[1] of rule 'R-1' has accessibility 'friend', which must be one of public, internal, protected, private, protected internal, private protected");
+    }
+
+    [Fact]
+    public void Exception_SelectingNothing_Fails()
+    {
+        var rule = ForbidRule(new TargetSelector { Types = ["**.X"] }, null, new RuleException { Because = "Empty." });
+
+        Resolve(PackWithRule(rule)).Error.Detail.Should().Be(
+            "exceptions[0] of rule 'R-1' selects nothing; it needs at least one of namespaces, assemblies, types or a trait");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Exception_WithOnlyATrait_Passes(bool nested)
+    {
+        var rule = ForbidRule(new TargetSelector { Types = ["**.X"] }, null, new RuleException { Nested = nested, Because = "Nested." });
+
+        Resolve(PackWithRule(rule)).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void AmendedException_InvalidTraits_Fail()
+    {
+        var parent = PackWithRule(ForbidRule(new TargetSelector { Types = ["**.X"] }));
+        var child = new RulePack
+        {
+            Name = "child",
+            RuleAmendments = [new RuleAmendment { Id = "R-1", Exceptions = [new RuleException { Accessibility = ["Internal"], Because = "x" }] }],
+        };
+
+        var result = new Ariadne.NET.RuleEngine.RulePackMerger().Merge([parent, child]);
+        result.IsSuccess.Should().BeTrue();
+
+        Resolve(result.Value).Error.Detail.Should().Contain("exceptions[0] of rule 'R-1' has accessibility 'Internal'");
+    }
+
+    [Theory]
+    [InlineData("namespaces")]
+    [InlineData("members")]
+    [InlineData("attributes")]
+    public void Target_MixingLayersWithGlobKeys_Fails(string key)
+    {
+        var to = key switch
+        {
+            "namespaces" => new TargetSelector { Layers = ["Domain"], Namespaces = ["X"] },
+            "members" => new TargetSelector { Layers = ["Domain"], Members = ["**.M"] },
+            _ => new TargetSelector { Layers = ["Domain"], Attributes = ["**.A"] },
+        };
+
+        Resolve(PackWithRule(ForbidRule(new TargetSelector { Types = ["**.X"] }, to))).Error.Detail.Should().Be(
+            "the to of rule 'R-1' mixes layers with namespaces, assemblies, types, base types, interfaces, attributes or members");
+    }
+
+    [Fact]
+    public void Target_LayersWithTraits_Passes()
+    {
+        var rule = ForbidRule(new TargetSelector { Layers = ["Domain"], Sealed = true, Accessibility = ["public"] });
+
+        Resolve(PackWithRule(rule)).IsSuccess.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UniqueNamesTarget_WithATrait_Fails(bool onAgainst)
+    {
+        var plain = new TargetSelector { Layers = ["Domain"] };
+        var withTrait = new TargetSelector { Layers = ["Domain"], Sealed = true };
+        var rule = new RuleDefinition
+        {
+            Id = "R-1",
+            Because = "because",
+            Kind = RuleKind.UniqueNames,
+            From = onAgainst ? plain : withTrait,
+            Against = onAgainst ? withTrait : plain,
+        };
+
+        Resolve(PackWithRule(rule)).Error.Detail.Should().Be(
+            $"the {(onAgainst ? "against" : "for")} of rule 'R-1' has 'sealed', which a uniqueNames target does not take");
+    }
+
+    [Fact]
+    public void RequireRule_ImplementsWithAKeyBeyondNamespacesAssembliesTypes_Fails()
+    {
+        var requirement = new RuleRequirement { Implements = new TargetSelector { Types = ["**.IX"], Names = ["Legacy*"], Interfaces = ["**.IY"] } };
+
+        Resolve(PackWithRequire(requirement)).Error.Detail!.Split('\n').Should().Equal(
+            "the implements of rule 'R-1' has 'interfaces', which implements does not take; it takes namespaces, assemblies, types",
+            "the implements of rule 'R-1' has 'names', which implements does not take; it takes namespaces, assemblies, types");
+    }
+
+    [Fact]
+    public void BannedPackagesException_WithATrait_Fails()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "R-1",
+            Because = "because",
+            Kind = RuleKind.BannedPackages,
+            Packages = ["Newtonsoft.Json"],
+            From = new TargetSelector { Layers = ["Domain"] },
+            Exceptions = [new RuleException { Assemblies = ["Shop.Domain"], Nested = true, Because = "x" }],
+        };
+
+        Resolve(PackWithRule(rule)).Error.Detail.Should().Be(
+            "exceptions[0] of rule 'R-1' has 'nested'; a package belongs to a project, so the exception of a bannedPackages rule names it by 'assemblies'");
+    }
+
+    [Fact]
+    public void UniqueNamesException_WithAssemblies_Fails()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "R-1",
+            Because = "because",
+            Kind = RuleKind.UniqueNames,
+            From = new TargetSelector { Layers = ["Domain"] },
+            Against = new TargetSelector { Layers = ["Domain"] },
+            Exceptions = [new RuleException { Assemblies = ["Shop.Domain"], Because = "x" }],
+        };
+
+        Resolve(PackWithRule(rule)).Error.Detail.Should().Be(
+            "exceptions[0] of rule 'R-1' has 'assemblies'; an exception of a uniqueNames rule excuses a type's name, so it takes 'types' or 'namespaces'");
     }
 }

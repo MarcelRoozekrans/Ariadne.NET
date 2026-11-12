@@ -142,7 +142,7 @@ public class RulePackTests
     {
         var requirement = new RuleRequirement { Implements = new TargetSelector { Interfaces = ["IFoo", null!] } };
 
-        new RuleRequirementValidator(new TargetSelectorValidator()).Validate(requirement).IsValid.Should().BeFalse();
+        new RuleRequirementValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new TargetSelectorValidator()).Validate(requirement).IsValid.Should().BeFalse();
     }
 
     [Fact]
@@ -213,12 +213,12 @@ public class RulePackTests
     }
 
     private static RuleDefinitionValidator RuleValidator() =>
-        new(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleRequirementValidator(new TargetSelectorValidator()), new TargetSelectorValidator(), new RuleExceptionValidator());
+        new(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleRequirementValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new TargetSelectorValidator()), new TargetSelectorValidator(), new RuleExceptionValidator());
 
     private static RulePackValidator PackValidator() => new(
         new LayerDefinitionValidator(),
         new ComponentRoleDefinitionValidator(),
-        new RuleDefinitionValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleRequirementValidator(new TargetSelectorValidator()), new TargetSelectorValidator(), new RuleExceptionValidator()),
+        new RuleDefinitionValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleRequirementValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new TargetSelectorValidator()), new TargetSelectorValidator(), new RuleExceptionValidator()),
         new LayerRetargetValidator(),
         new RuleAmendmentValidator(new RuleExceptionValidator()),
         new NamingConventionsValidator());

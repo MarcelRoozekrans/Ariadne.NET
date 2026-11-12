@@ -1,0 +1,59 @@
+schema: 2
+name: x
+layers:
+  - name: Domain
+    id: X-L-DOMAIN
+    because: core
+    namespaces: ["**.Domain.**"]
+  - name: Web
+    id: X-L-WEB
+    because: edge
+    namespaces: ["**.Web.**"]
+    allowedDependencies: [Domain]
+rules:
+  - id: X-R1
+    because: b
+    forbid:
+      from: { layers: [Web], sealed: true, names: ["*Controller"] }
+      to: { types: ["**.Clock"], kinds: [struct, recordStruct], accessibility: [public, "protected internal"], assignableTo: ["**.Base"], abstract: false, static: false, nested: false }
+    exceptions:
+      - names: ["*Io"]
+        kinds: [class, enum, delegate]
+        accessibility: [internal, "private protected"]
+        assignableTo: ["**.Base"]
+        sealed: false
+        abstract: true
+        static: false
+        nested: true
+        because: x
+      - sealed: true
+        because: only a trait
+  - id: X-R2
+    because: b
+    allowOnly:
+      from: { static: true }
+      to: { layers: [Domain], nested: false }
+  - id: X-R3
+    because: b
+    require:
+      for: { layers: [Domain], sealed: true }
+      is: { sealed: true, namespaces: ["Shop.Domain.**"], kinds: [class, record, interface] }
+      isNot: { names: ["*Impl", "*Helper"], attributes: ["**.Obsolete*"], static: true }
+  - id: X-R4
+    because: b
+    require:
+      for: { namespaces: ["Shop.**"] }
+      is: { abstract: true }
+  - id: X-R5
+    because: b
+    require:
+      for: { namespaces: ["Shop.**"] }
+      isNot: { types: ["**"] }
+  - id: X-R6
+    because: b
+    uniqueNames:
+      for: { layers: [Web] }
+      against: { layers: [Domain] }
+    exceptions:
+      - nested: true
+        because: nested types may repeat a name

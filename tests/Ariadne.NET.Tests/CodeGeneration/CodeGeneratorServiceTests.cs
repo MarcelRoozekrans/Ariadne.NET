@@ -25,6 +25,24 @@ public sealed class CodeGeneratorServiceTests
 
     private readonly CodeGeneratorService _sut = new();
 
+    [Theory]
+    [InlineData(CSharpTypeKind.Enum)]
+    [InlineData(CSharpTypeKind.Delegate)]
+    public void Generate_rejects_an_enum_or_delegate_role(CSharpTypeKind kind)
+    {
+        var pack = new RulePack
+        {
+            Name = "test",
+            ComponentRoles = [new ComponentRoleDefinition { Name = "Status", Layer = "Domain", TypeKind = kind }],
+            NamingConventions = new NamingConventions { Namespace = "{SolutionName}.{Layer}", FilePath = "{ComponentName}.cs" },
+        };
+        var request = new CodeGenerationRequest { SolutionName = "MyApp", Feature = "Orders", ComponentName = "Order", RoleName = "Status" };
+
+        var act = () => _sut.Generate(pack, request);
+
+        act.Should().Throw<ArgumentException>().WithMessage("*Status*").And.ParamName.Should().Be("resolvedPack");
+    }
+
     [Fact]
     public void Generate_Entity_ProducesPublicClass()
     {

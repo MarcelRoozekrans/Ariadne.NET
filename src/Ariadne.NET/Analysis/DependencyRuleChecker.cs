@@ -95,8 +95,7 @@ internal sealed class DependencyRuleChecker
         var exceptions = new TypeSelector[rule.Exceptions.Count];
         for (var i = 0; i < exceptions.Length; i++)
         {
-            var exception = rule.Exceptions[i];
-            exceptions[i] = TypeSelector.From(exception.Namespaces, exception.Assemblies, exception.Types);
+            exceptions[i] = TypeSelector.From(rule.Exceptions[i]);
         }
 
         return new Compiled(rule, TargetMatcher.From(rule.From, layers), TargetMatcher.From(rule.To, layers), exceptions, layers.Names);

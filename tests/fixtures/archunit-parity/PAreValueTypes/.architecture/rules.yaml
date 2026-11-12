@@ -3,4 +3,20 @@ name: parity-p-are-value-types
 version: "1.0.0"
 author: fixture
 
-# No rule yet: a selector has no kinds. Phase 4.2 adds PARITY-PAREVALUETYPES and PARITY-PAREVALUETYPES-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-PAREVALUETYPES
+    because: Mirrors ArchUnitNET's AreValueTypes; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PAreValueTypes.**"]
+        kinds: [struct, recordStruct, enum]
+      to:
+        namespaces: ["Parity.PAreValueTypes.Target.**"]
+  - id: PARITY-PAREVALUETYPES-NOT
+    because: Mirrors ArchUnitNET's AreNotValueTypes; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PAreValueTypes.**"]
+        kinds: [class, interface, record, delegate]
+      to:
+        namespaces: ["Parity.PAreValueTypes.Target.**"]

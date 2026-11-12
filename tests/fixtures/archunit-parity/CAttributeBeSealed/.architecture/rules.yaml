@@ -3,4 +3,20 @@ name: parity-c-attribute-be-sealed
 version: "1.0.0"
 author: fixture
 
-# No rule yet: require has no is or isNot, and a selector has no sealed. Phase 4.2 adds PARITY-CATTRIBUTEBESEALED and PARITY-CATTRIBUTEBESEALED-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-CATTRIBUTEBESEALED
+    because: Mirrors ArchUnitNET's BeSealed on Attributes(); Broken and Clean must satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CAttributeBeSealed.Broken", "Parity.CAttributeBeSealed.Clean"]
+        assignableTo: [System.Attribute]
+      is:
+        sealed: true
+  - id: PARITY-CATTRIBUTEBESEALED-NOT
+    because: Mirrors ArchUnitNET's NotBeSealed on Attributes(); NotBroken and NotClean must not satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CAttributeBeSealed.NotBroken", "Parity.CAttributeBeSealed.NotClean"]
+        assignableTo: [System.Attribute]
+      isNot:
+        sealed: true

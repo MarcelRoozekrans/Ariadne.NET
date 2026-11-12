@@ -3,4 +3,12 @@ name: parity-c-not-exist
 version: "1.0.0"
 author: fixture
 
-# No rule yet: require has no isNot. Phase 4.2 adds PARITY-CNOTEXIST here and deletes the KnownGaps entry.
+rules:
+  - id: PARITY-CNOTEXIST
+    because: Mirrors ArchUnitNET's NotExist; no type may reside in Broken.
+    allowEmpty: true
+    require:
+      for:
+        namespaces: ["Parity.CNotExist.Broken"]
+      isNot:
+        types: ["**"]

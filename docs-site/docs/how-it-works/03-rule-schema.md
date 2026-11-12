@@ -152,7 +152,7 @@ The `rules:` list holds `forbid`, `allowOnly`, `require`, `bannedPackages` and `
 
 ## Selectors
 
-A selector has up to eight lists: `layers`, `namespaces`, `assemblies`, `types`, the three code-feature keys below and `members` (see [Members](rule-types.md#members)). Values within one list are alternatives: any may match. When a selector has more than one list, a type must match each list it has. So `{ assemblies: [Daedalus.Agents], namespaces: ["**.Api.**"] }` means the Api namespaces inside the Agents assembly. A selector with no values is a load error.
+A selector has up to eight lists: `layers`, `namespaces`, `assemblies`, `types`, the three code-feature keys below and `members` (see [Members](rule-types.md#members)). It can also have eight [type traits](#type-traits). Values within one list are alternatives: any may match. When a selector has more than one list, a type must match each list it has. So `{ assemblies: [Daedalus.Agents], namespaces: ["**.Api.**"] }` means the Api namespaces inside the Agents assembly. A selector with no values is a load error.
 
 Matching is ordinal and case-sensitive, like C# names.
 
@@ -166,9 +166,30 @@ Matching is ordinal and case-sensitive, like C# names.
 
 The three keys work in the `for` of a `require` rule and in the targets of `forbid` and `allowOnly`. Like `namespaces`, `assemblies` and `types`, they cannot be mixed with `layers` in one target.
 
+### Type traits
+
+Eight more keys select by what a type is and not by where it lives or what it references. Like the other keys, values within one list are alternatives, the keys of one selector are AND-ed, and a boolean that is not set does not constrain.
+
+| Key | Type | Matches |
+|-----|------|---------|
+| `names` | list of flat globs | The innermost simple name, without namespace, containing types or generic arity. `*Service` matches `OrderService` and `OrderService<T>`. For `Outer.Inner`, `names: [Inner]` matches and `names: [Outer]` does not. A name pattern has no `.`. |
+| `kinds` | list of `class`, `interface`, `record`, `struct`, `recordStruct`, `enum`, `delegate` | The declared kind. `struct` does not include `recordStruct`. The values are exact and case-sensitive. |
+| `accessibility` | list of `public`, `internal`, `protected`, `private`, `protected internal`, `private protected` | The declared accessibility. The values are exact and case-sensitive. |
+| `assignableTo` | list of `types` globs | The type itself, any class in its base chain including `System.Object`, or any interface it implements or inherits. An interface has no base class, so it does not match `assignableTo: [System.Object]`. |
+| `sealed` | boolean | `true`: a class or record class declared `sealed`, or a `static` class. `false`: any other type. |
+| `abstract` | boolean | `true`: a class or record class declared `abstract`. A static class is not abstract. `false`: any other type. |
+| `static` | boolean | `true`: a `static` class. |
+| `nested` | boolean | `true`: a type with a containing type. |
+
+`sealed` and `abstract` describe classes. An interface, struct, enum or delegate is neither, so `sealed: false` matches it. To talk about classes only, add `kinds: [class, record]`.
+
+Traits work in the `for` of a `require` rule, in the `from` and `to` of `forbid` and `allowOnly`, in `is` and `isNot` of a `require` rule (see [Require rules](rule-types.md#require-rules)) and in `exceptions`, including the exceptions of an amendment. They do not work in layer definitions or in the `for` and `against` of `uniqueNames`, although a `uniqueNames` exception takes them. A `bannedPackages` exception does not take them. A selector with only traits is valid.
+
+A target may have `layers` together with traits: a type must be in one of the layers and match every trait. `layers` next to `namespaces`, `assemblies`, `types`, `baseTypes`, `interfaces`, `attributes` or `members` is still a load error. So `{ layers: [Domain], kinds: [class, record] }` selects the classes and records of the Domain layer.
+
 An empty pattern, or one with an empty segment such as `Shop..Domain`, is a load error.
 
-`TargetSelector` has `Layers`, `Namespaces`, `Assemblies`, `Types`, `BaseTypes`, `Interfaces`, `Attributes` and `Members`. `RuleException` has `Namespaces`, `Assemblies`, `Types` and a required `Because`.
+`TargetSelector` has `Layers`, `Namespaces`, `Assemblies`, `Types`, `BaseTypes`, `Interfaces`, `Attributes` and `Members`, and the traits `Names`, `Kinds` (`IList<CSharpTypeKind>`, which includes `Enum` and `Delegate`), `Accessibility`, `AssignableTo`, `Sealed`, `Abstract`, `Static` and `Nested` (`bool?`). `RuleException` has `Namespaces`, `Assemblies`, `Types`, the same eight traits and a required `Because`.
 
 ## `extends`
 

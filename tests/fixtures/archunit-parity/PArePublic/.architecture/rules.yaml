@@ -3,4 +3,20 @@ name: parity-p-are-public
 version: "1.0.0"
 author: fixture
 
-# No rule yet: a selector has no accessibility. Phase 4.2 adds PARITY-PAREPUBLIC and PARITY-PAREPUBLIC-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-PAREPUBLIC
+    because: Mirrors ArchUnitNET's ArePublic; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PArePublic.**"]
+        accessibility: [public]
+      to:
+        namespaces: ["Parity.PArePublic.Target.**"]
+  - id: PARITY-PAREPUBLIC-NOT
+    because: Mirrors ArchUnitNET's AreNotPublic; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PArePublic.**"]
+        accessibility: [internal, protected, private, "protected internal", "private protected"]
+      to:
+        namespaces: ["Parity.PArePublic.Target.**"]

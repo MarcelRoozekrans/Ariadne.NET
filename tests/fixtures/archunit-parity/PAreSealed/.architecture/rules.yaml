@@ -3,4 +3,22 @@ name: parity-p-are-sealed
 version: "1.0.0"
 author: fixture
 
-# No rule yet: a selector has no sealed. Phase 4.2 adds PARITY-PARESEALED and PARITY-PARESEALED-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-PARESEALED
+    because: Mirrors ArchUnitNET's AreSealed on Classes(); the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PAreSealed.**"]
+        kinds: [class, record]
+        sealed: true
+      to:
+        namespaces: ["Parity.PAreSealed.Target.**"]
+  - id: PARITY-PARESEALED-NOT
+    because: Mirrors ArchUnitNET's AreNotSealed on Classes(); the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PAreSealed.**"]
+        kinds: [class, record]
+        sealed: false
+      to:
+        namespaces: ["Parity.PAreSealed.Target.**"]

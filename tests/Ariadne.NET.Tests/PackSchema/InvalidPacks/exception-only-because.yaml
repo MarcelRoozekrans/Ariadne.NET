@@ -1,0 +1,15 @@
+schema: 2
+name: x
+layers:
+  - name: Domain
+    id: X-L-DOMAIN
+    because: core
+    namespaces: ["**.Domain.**"]
+rules:
+  - id: X-R1
+    because: b
+    forbid:
+      from: { namespaces: ["Shop.**"] }
+      to: { namespaces: ["System.IO.**"] }
+    exceptions:
+      - because: x

@@ -40,24 +40,38 @@ internal static class PackYamlReader
 
     private static readonly string[] KindKeys = ["from", "to"];
 
-    private static readonly string[] TargetKeys =
+    /// <summary>
+    /// The type-level trait keys. They select by what a type is rather than where it lives, so they may join 'layers', and
+    /// an exception takes them too.
+    /// </summary>
+    internal static readonly string[] TraitKeys =
+        ["names", "kinds", "accessibility", "assignableTo", "sealed", "abstract", "static", "nested"];
+
+    // The selector keys of a uniqueNames target, which does not take traits.
+    private static readonly string[] PlainTargetKeys =
         ["layers", "namespaces", "assemblies", "types", "baseTypes", "interfaces", "attributes"];
 
+    private static readonly string[] TargetKeys = [.. PlainTargetKeys, .. TraitKeys];
+
     // Members name APIs, so only the 'to' of forbid and allowOnly takes them.
-    private static readonly string[] ToKeys = [.. TargetKeys, "members"];
+    private static readonly string[] ToKeys = [.. PlainTargetKeys, "members", .. TraitKeys];
+
+    // What 'is' and 'isNot' check against the type itself: every selector key except 'layers' and 'members'.
+    private static readonly string[] ConditionKeys =
+        ["namespaces", "assemblies", "types", "baseTypes", "interfaces", "attributes", .. TraitKeys];
 
     private static readonly string[] BannedPackagesKeys = ["packages", "from"];
 
     private static readonly string[] UniqueNamesKeys = ["for", "against"];
 
-    private static readonly string[] RequireKeys = ["for", "layer", "kind", "accessibility", "implements"];
+    private static readonly string[] RequireKeys = ["for", "layer", "kind", "accessibility", "implements", "is", "isNot"];
 
     // What a type must implement is matched by name only: its namespace, assembly or full name.
     private static readonly string[] ImplementsKeys = ["namespaces", "assemblies", "types"];
 
     private static readonly string[] OtherSelectorKeys = ["namespaces", "assemblies", "types", "baseTypes", "interfaces", "attributes", "members"];
 
-    private static readonly string[] ExceptionKeys = ["namespaces", "assemblies", "types", "because"];
+    private static readonly string[] ExceptionKeys = ["namespaces", "assemblies", "types", .. TraitKeys, "because"];
 
     private const string RuleBodyKeys = "'forbid', 'allowOnly', 'require', 'bannedPackages' or 'uniqueNames'";
 
@@ -71,7 +85,33 @@ internal static class PackYamlReader
 
     private static readonly string[] NamingKeys = ["namespace", "filePath"];
 
-    private static readonly string TypeKindNames = string.Join(", ", Enum.GetNames<CSharpTypeKind>());
+    // kind and typeKind take the five kinds code can be built for; enum and delegate are only selectable, through kinds.
+    private static readonly CSharpTypeKind[] BuildableTypeKinds =
+        [CSharpTypeKind.Class, CSharpTypeKind.Interface, CSharpTypeKind.Record, CSharpTypeKind.Struct, CSharpTypeKind.RecordStruct];
+
+    private static readonly string TypeKindNames = string.Join(", ", BuildableTypeKinds.Select(static kind => kind.ToString()));
+
+    // The kinds trait selects every kind, spelled in camelCase and matched exactly, as the JSON Schema's enum does.
+    private static readonly (string Name, CSharpTypeKind Kind)[] SelectableTypeKinds =
+    [
+        ("class", CSharpTypeKind.Class),
+        ("interface", CSharpTypeKind.Interface),
+        ("record", CSharpTypeKind.Record),
+        ("struct", CSharpTypeKind.Struct),
+        ("recordStruct", CSharpTypeKind.RecordStruct),
+        ("enum", CSharpTypeKind.Enum),
+        ("delegate", CSharpTypeKind.Delegate),
+    ];
+
+    /// <summary>The six accessibility keywords of the accessibility trait, matched exactly.</summary>
+    internal static readonly string[] AccessibilityKeywords =
+        ["public", "internal", "protected", "private", "protected internal", "private protected"];
+
+    private static readonly string KindsNames = string.Join(", ", SelectableTypeKinds.Select(static k => $"'{k.Name}'"));
+
+    private static readonly string AccessibilityNames = string.Join(", ", AccessibilityKeywords.Select(static k => $"'{k}'"));
+
+    private static readonly string[] BooleanTraitKeys = ["sealed", "abstract", "static", "nested"];
 
     /// <summary>
     /// The most entries one read visits, counting a node again each time an alias reaches it. Aliases may nest, so a few
@@ -107,6 +147,8 @@ internal static class PackYamlReader
     private static bool IsNull(YamlScalarNode scalar) =>
         scalar.Style == ScalarStyle.Plain && scalar.Value is null or "" or "~" or "null" or "Null" or "NULL";
 
+    private static bool IsTrait(string key) => Array.IndexOf(TraitKeys, key) >= 0;
+
     private static bool OnlyKeys(Dictionary<string, Field> fields, string[] keys)
     {
         foreach (var key in fields.Keys)
@@ -132,6 +174,29 @@ internal static class PackYamlReader
         }
 
         return true;
+    }
+
+    // The traits read from one mapping. A list that was itself invalid is null and has already been reported.
+    private readonly record struct Traits(
+        List<string>? Names,
+        List<CSharpTypeKind>? Kinds,
+        List<string>? Accessibility,
+        List<string>? AssignableTo,
+        bool? Sealed,
+        bool? Abstract,
+        bool? Static,
+        bool? Nested)
+    {
+        // A boolean selects once it is written, whether true or false; a list selects once it holds a value.
+        public bool AnySelected(Dictionary<string, Field> fields) =>
+            Selected(fields, "names", Names?.Count)
+            || Selected(fields, "kinds", Kinds?.Count)
+            || Selected(fields, "accessibility", Accessibility?.Count)
+            || Selected(fields, "assignableTo", AssignableTo?.Count)
+            || Array.Exists(BooleanTraitKeys, fields.ContainsKey);
+
+        private static bool Selected(Dictionary<string, Field> fields, string key, int? count) =>
+            count > 0 || (count is null && fields.ContainsKey(key));
     }
 
     private readonly record struct Field(YamlScalarNode Key, YamlNode Value)
@@ -475,8 +540,8 @@ internal static class PackYamlReader
 
             var where = $"the uniqueNames of {ruleWhere}";
             var fields = Fields(map, UniqueNamesKeys, where);
-            var subject = ReadTarget(fields, "for", where, ruleWhere, map);
-            var against = ReadTarget(fields, "against", where, ruleWhere, map);
+            var subject = ReadTarget(fields, "for", where, ruleWhere, map, PlainTargetKeys);
+            var against = ReadTarget(fields, "against", where, ruleWhere, map, PlainTargetKeys);
             return subject is not null && against is not null ? (subject, against) : null;
         }
 
@@ -510,27 +575,43 @@ internal static class PackYamlReader
             var kind = ReadTypeKind(fields, where, "kind");
             var accessibility = ReadAccessibility(fields, where);
 
-            TargetSelector? implements = null;
-            if (fields.TryGetValue("implements", out var implementsField))
-            {
-                if (implementsField.Value is YamlMappingNode implementsMap)
-                {
-                    implements = ReadSelector(implementsMap, $"the implements of {ruleWhere}", ruleWhere, ImplementsKeys);
-                }
-                else
-                {
-                    Add(implementsField.Key, $"'implements' in {where} must be a mapping");
-                }
-            }
+            var implements = ReadRequireSelector(fields, "implements", where, ruleWhere, ImplementsKeys);
+            var condition = ReadRequireSelector(fields, "is", where, ruleWhere, ConditionKeys);
+            var negated = ReadRequireSelector(fields, "isNot", where, ruleWhere, ConditionKeys);
 
-            if (!fields.ContainsKey("layer") && !fields.ContainsKey("kind") && !fields.ContainsKey("accessibility") && !fields.ContainsKey("implements"))
+            if (!Array.Exists(RequireKeys, key => !string.Equals(key, "for", StringComparison.Ordinal) && fields.ContainsKey(key)))
             {
-                Add(map, $"{where} needs at least one of 'layer', 'kind', 'accessibility', 'implements'");
+                Add(map, $"{where} needs at least one of 'layer', 'kind', 'accessibility', 'implements', 'is', 'isNot'");
             }
 
             return _problems.Count == before && subject is not null
-                ? (subject, new RuleRequirement { Layer = layer, Kind = kind, Accessibility = accessibility, Implements = implements })
+                ? (subject, new RuleRequirement
+                {
+                    Layer = layer,
+                    Kind = kind,
+                    Accessibility = accessibility,
+                    Implements = implements,
+                    Is = condition,
+                    IsNot = negated,
+                })
                 : null;
+        }
+
+        // 'implements', 'is' or 'isNot': an optional selector under the require, with its own key set.
+        private TargetSelector? ReadRequireSelector(Dictionary<string, Field> fields, string key, string where, string ruleWhere, string[] keys)
+        {
+            if (!fields.TryGetValue(key, out var field))
+            {
+                return null;
+            }
+
+            if (field.Value is YamlMappingNode map)
+            {
+                return ReadSelector(map, $"the {key} of {ruleWhere}", ruleWhere, keys);
+            }
+
+            Add(field.Key, $"'{key}' in {where} must be a mapping");
+            return null;
         }
 
         private string? ReadAccessibility(Dictionary<string, Field> fields, string where)
@@ -575,12 +656,13 @@ internal static class PackYamlReader
 
             var where = $"the {field.Name} of {ruleWhere}";
             var fields = Fields(map, KindKeys, where);
-            var from = ReadTarget(fields, "from", where, ruleWhere, map);
-            var to = ReadTarget(fields, "to", where, ruleWhere, map);
+            var from = ReadTarget(fields, "from", where, ruleWhere, map, TargetKeys);
+            var to = ReadTarget(fields, "to", where, ruleWhere, map, ToKeys);
             return from is not null && to is not null ? (from, to) : null;
         }
 
-        private TargetSelector? ReadTarget(Dictionary<string, Field> kindFields, string key, string kindWhere, string ruleWhere, YamlMappingNode parent)
+        private TargetSelector? ReadTarget(
+            Dictionary<string, Field> kindFields, string key, string kindWhere, string ruleWhere, YamlMappingNode parent, string[] keys)
         {
             if (!kindFields.TryGetValue(key, out var field))
             {
@@ -594,51 +676,119 @@ internal static class PackYamlReader
                 return null;
             }
 
-            return ReadSelector(map, $"the {key} of {ruleWhere}", ruleWhere, string.Equals(key, "to", StringComparison.Ordinal) ? ToKeys : TargetKeys);
+            return ReadSelector(map, $"the {key} of {ruleWhere}", ruleWhere, keys);
         }
 
-        // One selector mapping. Only the given keys may appear; 'layers' stands alone, as it cannot mix with code patterns.
+        // One selector mapping. Only the given keys may appear; 'layers' cannot mix with code patterns, but may join traits.
         private TargetSelector? ReadSelector(YamlMappingNode map, string where, string ruleWhere, string[] keys)
         {
             var before = _problems.Count;
             var fields = Fields(map, keys, where);
-            var lists = new List<string>?[keys.Length];
-            var selectors = new (string Key, List<string>? Items)[keys.Length];
-            for (var i = 0; i < keys.Length; i++)
+            var listKeys = Array.FindAll(keys, static k => !IsTrait(k));
+            var lists = new List<string>?[listKeys.Length];
+            var selectors = new (string Key, List<string>? Items)[listKeys.Length];
+            for (var i = 0; i < listKeys.Length; i++)
             {
-                lists[i] = keys[i] switch
+                lists[i] = listKeys[i] switch
                 {
                     "layers" => StringList(fields, "layers", where),
                     "assemblies" => PatternList(fields, "assemblies", where, Glob.Flat),
                     "members" => PatternList(fields, "members", where, MemberPattern),
-                    _ => PatternList(fields, keys[i], where, Glob.Dotted),
+                    _ => PatternList(fields, listKeys[i], where, Glob.Dotted),
                 };
-                selectors[i] = (keys[i], lists[i]);
+                selectors[i] = (listKeys[i], lists[i]);
             }
 
+            var traits = ReadTraits(fields, where);
             if (fields.TryGetValue("layers", out var layersField) && OtherSelectorKeys.Any(fields.ContainsKey))
             {
-                var others = keys.Where(static k => !string.Equals(k, "layers", StringComparison.Ordinal)).ToArray();
+                var others = Array.FindAll(keys, static k => Array.IndexOf(OtherSelectorKeys, k) >= 0);
                 Add(layersField.Key, $"a target in {ruleWhere} cannot mix 'layers' with {JoinOr(others)}");
             }
-            else if (NoneSelected(fields, selectors))
+            else if (NoneSelected(fields, selectors) && !traits.AnySelected(fields))
             {
-                Add(map, $"{where} needs at least one of {string.Join(", ", keys.Select(static k => $"'{k}'"))}");
+                Add(map, $"{where} needs at least one of {JoinList(keys)}");
             }
 
             return _problems.Count == before
                 ? new TargetSelector
                 {
-                    Layers = ListFor(lists, keys, "layers"),
-                    Namespaces = ListFor(lists, keys, "namespaces"),
-                    Assemblies = ListFor(lists, keys, "assemblies"),
-                    Types = ListFor(lists, keys, "types"),
-                    BaseTypes = ListFor(lists, keys, "baseTypes"),
-                    Interfaces = ListFor(lists, keys, "interfaces"),
-                    Attributes = ListFor(lists, keys, "attributes"),
-                    Members = ListFor(lists, keys, "members"),
+                    Layers = ListFor(lists, listKeys, "layers"),
+                    Namespaces = ListFor(lists, listKeys, "namespaces"),
+                    Assemblies = ListFor(lists, listKeys, "assemblies"),
+                    Types = ListFor(lists, listKeys, "types"),
+                    BaseTypes = ListFor(lists, listKeys, "baseTypes"),
+                    Interfaces = ListFor(lists, listKeys, "interfaces"),
+                    Attributes = ListFor(lists, listKeys, "attributes"),
+                    Members = ListFor(lists, listKeys, "members"),
+                    Names = traits.Names ?? [],
+                    Kinds = traits.Kinds ?? [],
+                    Accessibility = traits.Accessibility ?? [],
+                    AssignableTo = traits.AssignableTo ?? [],
+                    Sealed = traits.Sealed,
+                    Abstract = traits.Abstract,
+                    Static = traits.Static,
+                    Nested = traits.Nested,
                 }
                 : null;
+        }
+
+        // The trait keys present in a mapping whose key set allows them; absent keys stay null.
+        private Traits ReadTraits(Dictionary<string, Field> fields, string where) => new(
+            PatternList(fields, "names", where, NamePattern),
+            ReadKinds(fields, where),
+            ReadAccessibilityList(fields, where),
+            PatternList(fields, "assignableTo", where, Glob.Dotted),
+            OptionalBool(fields, "sealed", where),
+            OptionalBool(fields, "abstract", where),
+            OptionalBool(fields, "static", where),
+            OptionalBool(fields, "nested", where));
+
+        private List<CSharpTypeKind>? ReadKinds(Dictionary<string, Field> fields, string where)
+        {
+            var values = StringList(fields, "kinds", where);
+            if (values is null)
+            {
+                return null;
+            }
+
+            var sequence = (YamlSequenceNode)fields["kinds"].Value;
+            var kinds = new List<CSharpTypeKind>(values.Count);
+            for (var i = 0; i < values.Count; i++)
+            {
+                var at = Array.FindIndex(SelectableTypeKinds, entry => string.Equals(entry.Name, values[i], StringComparison.Ordinal));
+                if (at < 0)
+                {
+                    Add(sequence.Children[i], $"kind '{PackText.Show(values[i])}' in {where} must be one of {KindsNames}");
+                    continue;
+                }
+
+                kinds.Add(SelectableTypeKinds[at].Kind);
+            }
+
+            return kinds.Count == values.Count ? kinds : null;
+        }
+
+        private List<string>? ReadAccessibilityList(Dictionary<string, Field> fields, string where)
+        {
+            var values = StringList(fields, "accessibility", where);
+            if (values is null)
+            {
+                return null;
+            }
+
+            var sequence = (YamlSequenceNode)fields["accessibility"].Value;
+            var valid = true;
+            for (var i = 0; i < values.Count; i++)
+            {
+                if (Array.IndexOf(AccessibilityKeywords, values[i]) < 0)
+                {
+                    Add(sequence.Children[i], $"accessibility '{PackText.Show(values[i])}' in {where} must be one of {AccessibilityNames}");
+                    valid = false;
+                }
+            }
+
+            return valid ? values : null;
         }
 
         private static List<string> ListFor(List<string>?[] lists, string[] keys, string key)
@@ -665,9 +815,11 @@ internal static class PackYamlReader
                 var namespaces = PatternList(fields, "namespaces", where, Glob.Dotted);
                 var assemblies = PatternList(fields, "assemblies", where, Glob.Flat);
                 var types = PatternList(fields, "types", where, Glob.Dotted);
+                var traits = ReadTraits(fields, where);
                 var because = RequiredString(fields, "because", where, map);
                 var misplaced = RejectMisplaced(fields, where, kind);
-                if (!misplaced && NoneSelected(fields, [("namespaces", namespaces), ("assemblies", assemblies), ("types", types)]))
+                if (!misplaced && NoneSelected(fields, [("namespaces", namespaces), ("assemblies", assemblies), ("types", types)])
+                    && !traits.AnySelected(fields))
                 {
                     var allowed = ExceptionKeyRules.Allowed(kind);
                     Add(map, allowed.Length == 1 ? $"{where} needs '{allowed[0]}'" : $"{where} needs at least one of {JoinList(allowed)}");
@@ -680,6 +832,14 @@ internal static class PackYamlReader
                         Namespaces = namespaces ?? [],
                         Assemblies = assemblies ?? [],
                         Types = types ?? [],
+                        Names = traits.Names ?? [],
+                        Kinds = traits.Kinds ?? [],
+                        Accessibility = traits.Accessibility ?? [],
+                        AssignableTo = traits.AssignableTo ?? [],
+                        Sealed = traits.Sealed,
+                        Abstract = traits.Abstract,
+                        Static = traits.Static,
+                        Nested = traits.Nested,
                         Because = because,
                     });
                 }
@@ -758,7 +918,7 @@ internal static class PackYamlReader
                 return null;
             }
 
-            foreach (var kind in Enum.GetValues<CSharpTypeKind>())
+            foreach (var kind in BuildableTypeKinds)
             {
                 if (string.Equals(kind.ToString(), value, StringComparison.OrdinalIgnoreCase))
                 {
@@ -979,6 +1139,12 @@ internal static class PackYamlReader
 
             return values;
         }
+
+        // A name is the type's innermost simple name, so a dot could never match.
+        private static Result<Glob, string> NamePattern(string pattern) =>
+            pattern.Contains('.', StringComparison.Ordinal)
+                ? Result<Glob, string>.Failure("a name pattern matches a type's simple name, so it cannot contain '.'")
+                : Glob.Flat(pattern);
 
         // A member name always has a type segment before the member, so a one-segment pattern could never match. A pattern
         // that starts with '**' can still span both segments. The reason does not quote the pattern: the problem line does.

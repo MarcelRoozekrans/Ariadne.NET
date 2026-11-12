@@ -143,4 +143,60 @@ public class TargetMatcherTests
         names.FullNameOf(line).Should().BeSameAs(names.FullNameOf(line));
         names.NamespaceOf(line).Should().BeSameAs(names.NamespaceOf(Find(compilation, "Shop.Domain.Order")));
     }
+
+    [Fact]
+    public void Layers_and_traits_intersect()
+    {
+        var compilation = TestCompilation.Create("""
+            namespace Shop.Domain { public sealed class S { } public abstract class A { } }
+            namespace Shop.Web { public sealed class Page { } }
+            """);
+        var pack = new RulePack
+        {
+            Name = "p",
+            Layers = [new LayerDefinition { Name = "L", Id = "L-L", Because = "L.", Namespaces = ["Shop.Domain"] }],
+        };
+        var matcher = TargetMatcher.From(new TargetSelector { Layers = ["L"], Sealed = true }, new LayerMap(pack));
+
+        matcher.Matches(Find(compilation, "Shop.Domain.S")).Should().BeTrue();
+        matcher.Matches(Find(compilation, "Shop.Domain.A")).Should().BeFalse();
+        matcher.Matches(Find(compilation, "Shop.Web.Page")).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Traits_alone_select_types()
+    {
+        var compilation = TestCompilation.Create(Source);
+        var matcher = TargetMatcher.From(new TargetSelector { Nested = true }, new LayerMap(Pack));
+
+        matcher.Matches(Find(compilation, "Shop.Domain.Order+Line")).Should().BeTrue();
+        matcher.Matches(Find(compilation, "Shop.Domain.Order")).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Layers_with_namespaces_still_throws()
+    {
+        var act = () => TargetMatcher.From(new TargetSelector { Layers = ["Domain"], Namespaces = ["Shop"], Sealed = true }, new LayerMap(Pack));
+
+        act.Should().Throw<ArgumentException>().WithParameterName("target");
+    }
+
+    [Fact]
+    public void Members_with_a_trait_test_the_containing_type()
+    {
+        var compilation = TestCompilation.Create("""
+            namespace Shop.Data
+            {
+                public sealed class SealedCommand { public int Execute() => 0; }
+                public class OpenCommand { public int Execute() => 0; }
+            }
+            """);
+        var matcher = TargetMatcher.From(new TargetSelector { Members = ["Shop.Data.*.Execute"], Sealed = true }, new LayerMap(Pack));
+
+        bool Matches(string type) =>
+            matcher.TryMatchMember(new MemberEdge(Find(compilation, "Shop.Data.OpenCommand"), Find(compilation, type).GetMembers("Execute")[0], default), out _);
+
+        Matches("Shop.Data.SealedCommand").Should().BeTrue();
+        Matches("Shop.Data.OpenCommand").Should().BeFalse();
+    }
 }

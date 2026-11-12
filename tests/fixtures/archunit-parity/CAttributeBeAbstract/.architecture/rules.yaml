@@ -3,4 +3,20 @@ name: parity-c-attribute-be-abstract
 version: "1.0.0"
 author: fixture
 
-# No rule yet: require has no is or isNot, and a selector has no abstract. Phase 4.2 adds PARITY-CATTRIBUTEBEABSTRACT and PARITY-CATTRIBUTEBEABSTRACT-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-CATTRIBUTEBEABSTRACT
+    because: Mirrors ArchUnitNET's BeAbstract on Attributes(); Broken and Clean must satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CAttributeBeAbstract.Broken", "Parity.CAttributeBeAbstract.Clean"]
+        assignableTo: [System.Attribute]
+      is:
+        abstract: true
+  - id: PARITY-CATTRIBUTEBEABSTRACT-NOT
+    because: Mirrors ArchUnitNET's NotBeAbstract on Attributes(); NotBroken and NotClean must not satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CAttributeBeAbstract.NotBroken", "Parity.CAttributeBeAbstract.NotClean"]
+        assignableTo: [System.Attribute]
+      isNot:
+        abstract: true

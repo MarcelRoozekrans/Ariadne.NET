@@ -152,15 +152,9 @@ public sealed class RulePackMerger : IRulePackMerger
         var rejected = false;
         foreach (var exception in amendment.Exceptions)
         {
-            (string Key, bool Used)[] keys =
-            [
-                ("namespaces", exception.Namespaces.Count > 0),
-                ("assemblies", exception.Assemblies.Count > 0),
-                ("types", exception.Types.Count > 0),
-            ];
-            foreach (var (key, used) in keys)
+            foreach (var key in ExceptionKeyRules.UsedKeys(exception))
             {
-                if (used && ExceptionKeyRules.Rejection(inherited.Kind, key) is { } reason)
+                if (ExceptionKeyRules.Rejection(inherited.Kind, key) is { } reason)
                 {
                     problems.Add($"pack '{PackText.Show(pack.Name)}' adds an exception to rule '{PackText.Show(inherited.Id)}' with '{key}'; {reason}");
                     rejected = true;

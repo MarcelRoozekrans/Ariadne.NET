@@ -135,7 +135,7 @@
     "selector": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Selects types by layer names, or by any mix of namespace, assembly, type, base type, interface and attribute patterns. layers cannot be combined with the other keys.",
+      "description": "Selects types by layer names, or by any mix of namespace, assembly, type, base type, interface and attribute patterns. layers cannot be combined with the other keys. Type traits (names, kinds, accessibility, assignableTo, sealed, abstract, static, nested) can be combined with every key, layers included.",
       "properties": {
         "layers": {
           "$ref": "#/$defs/patternList"
@@ -157,6 +157,30 @@
         },
         "attributes": {
           "$ref": "#/$defs/patternList"
+        },
+        "names": {
+          "$ref": "#/$defs/nameList"
+        },
+        "kinds": {
+          "$ref": "#/$defs/kindList"
+        },
+        "accessibility": {
+          "$ref": "#/$defs/accessibilityList"
+        },
+        "assignableTo": {
+          "$ref": "#/$defs/patternList"
+        },
+        "sealed": {
+          "type": "boolean"
+        },
+        "abstract": {
+          "type": "boolean"
+        },
+        "static": {
+          "type": "boolean"
+        },
+        "nested": {
+          "type": "boolean"
         }
       },
       "not": {
@@ -201,7 +225,7 @@
     "toSelector": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Like selector, plus members: member names the rule targets (forbid and allowOnly only). layers cannot be combined with the other keys.",
+      "description": "Like selector, plus members: member names the rule targets (forbid and allowOnly only). layers cannot be combined with the other keys. Type traits (names, kinds, accessibility, assignableTo, sealed, abstract, static, nested) can be combined with every key, layers included.",
       "properties": {
         "layers": {
           "$ref": "#/$defs/patternList"
@@ -226,6 +250,30 @@
         },
         "members": {
           "$ref": "#/$defs/patternList"
+        },
+        "names": {
+          "$ref": "#/$defs/nameList"
+        },
+        "kinds": {
+          "$ref": "#/$defs/kindList"
+        },
+        "accessibility": {
+          "$ref": "#/$defs/accessibilityList"
+        },
+        "assignableTo": {
+          "$ref": "#/$defs/patternList"
+        },
+        "sealed": {
+          "type": "boolean"
+        },
+        "abstract": {
+          "type": "boolean"
+        },
+        "static": {
+          "type": "boolean"
+        },
+        "nested": {
+          "type": "boolean"
         }
       },
       "not": {
@@ -293,9 +341,49 @@
           "required": [
             "types"
           ]
+        },
+        {
+          "required": [
+            "names"
+          ]
+        },
+        {
+          "required": [
+            "kinds"
+          ]
+        },
+        {
+          "required": [
+            "accessibility"
+          ]
+        },
+        {
+          "required": [
+            "assignableTo"
+          ]
+        },
+        {
+          "required": [
+            "sealed"
+          ]
+        },
+        {
+          "required": [
+            "abstract"
+          ]
+        },
+        {
+          "required": [
+            "static"
+          ]
+        },
+        {
+          "required": [
+            "nested"
+          ]
         }
       ],
-      "description": "A place where the rule does not apply. On a bannedPackages rule only assemblies, on a uniqueNames rule only namespaces and types.",
+      "description": "A place where the rule does not apply. On a bannedPackages rule only assemblies, on a uniqueNames rule namespaces, types and the type traits. Type traits are accepted on every rule kind except bannedPackages.",
       "properties": {
         "namespaces": {
           "$ref": "#/$defs/patternList"
@@ -309,6 +397,30 @@
         "because": {
           "$ref": "#/$defs/text",
           "description": "Why the exception exists."
+        },
+        "names": {
+          "$ref": "#/$defs/nameList"
+        },
+        "kinds": {
+          "$ref": "#/$defs/kindList"
+        },
+        "accessibility": {
+          "$ref": "#/$defs/accessibilityList"
+        },
+        "assignableTo": {
+          "$ref": "#/$defs/patternList"
+        },
+        "sealed": {
+          "type": "boolean"
+        },
+        "abstract": {
+          "type": "boolean"
+        },
+        "static": {
+          "type": "boolean"
+        },
+        "nested": {
+          "type": "boolean"
         }
       }
     },
@@ -334,7 +446,7 @@
       "required": [
         "for"
       ],
-      "description": "Types selected by for must satisfy at least one of layer, kind, accessibility and implements.",
+      "description": "Types selected by for must satisfy at least one of layer, kind, accessibility, implements, is and isNot.",
       "properties": {
         "for": {
           "$ref": "#/$defs/selector"
@@ -367,6 +479,14 @@
               "$ref": "#/$defs/patternList"
             }
           }
+        },
+        "is": {
+          "$ref": "#/$defs/conditionSelector",
+          "description": "The type must match every key of this condition; each key it does not match is one violation. The values within one key are alternatives."
+        },
+        "isNot": {
+          "$ref": "#/$defs/conditionSelector",
+          "description": "The type must match none of the keys of this condition; each key it matches is one violation, even when it does not match the condition as a whole. The values within one key are alternatives."
         }
       },
       "anyOf": [
@@ -388,6 +508,16 @@
         {
           "required": [
             "implements"
+          ]
+        },
+        {
+          "required": [
+            "is"
+          ]
+        },
+        {
+          "required": [
+            "isNot"
           ]
         }
       ]
@@ -424,10 +554,10 @@
       ],
       "properties": {
         "for": {
-          "$ref": "#/$defs/selector"
+          "$ref": "#/$defs/uniqueNamesSelector"
         },
         "against": {
-          "$ref": "#/$defs/selector"
+          "$ref": "#/$defs/uniqueNamesSelector"
         }
       }
     },
@@ -550,7 +680,15 @@
                 "items": {
                   "properties": {
                     "namespaces": false,
-                    "types": false
+                    "types": false,
+                    "names": false,
+                    "kinds": false,
+                    "accessibility": false,
+                    "assignableTo": false,
+                    "sealed": false,
+                    "abstract": false,
+                    "static": false,
+                    "nested": false
                   }
                 }
               }
@@ -687,6 +825,163 @@
           "description": "Assembly name globs the layer covers."
         }
       }
+    },
+    "nameList": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/text",
+        "pattern": "^[^.]*$",
+        "description": "A flat glob over a type's simple name; it cannot contain '.'."
+      },
+      "description": "Flat globs over the innermost simple name of a type, without arity."
+    },
+    "kindList": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "enum": [
+          "class",
+          "interface",
+          "record",
+          "struct",
+          "recordStruct",
+          "enum",
+          "delegate"
+        ]
+      },
+      "description": "Type kinds, matched case-sensitively."
+    },
+    "accessibilityList": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "enum": [
+          "public",
+          "internal",
+          "protected",
+          "private",
+          "protected internal",
+          "private protected"
+        ]
+      },
+      "description": "Declared accessibility, matched case-sensitively."
+    },
+    "uniqueNamesSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Selects types by layer names, or by any mix of namespace, assembly, type, base type, interface and attribute patterns. Type traits are not accepted here. layers cannot be combined with the other keys.",
+      "properties": {
+        "layers": {
+          "$ref": "#/$defs/patternList"
+        },
+        "namespaces": {
+          "$ref": "#/$defs/patternList"
+        },
+        "assemblies": {
+          "$ref": "#/$defs/patternList"
+        },
+        "types": {
+          "$ref": "#/$defs/patternList"
+        },
+        "baseTypes": {
+          "$ref": "#/$defs/patternList"
+        },
+        "interfaces": {
+          "$ref": "#/$defs/patternList"
+        },
+        "attributes": {
+          "$ref": "#/$defs/patternList"
+        }
+      },
+      "not": {
+        "required": [
+          "layers"
+        ],
+        "anyOf": [
+          {
+            "required": [
+              "namespaces"
+            ]
+          },
+          {
+            "required": [
+              "assemblies"
+            ]
+          },
+          {
+            "required": [
+              "types"
+            ]
+          },
+          {
+            "required": [
+              "baseTypes"
+            ]
+          },
+          {
+            "required": [
+              "interfaces"
+            ]
+          },
+          {
+            "required": [
+              "attributes"
+            ]
+          }
+        ]
+      },
+      "minProperties": 1
+    },
+    "conditionSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A condition on the type itself, for is and isNot: every selector key except layers and members, traits included.",
+      "properties": {
+        "namespaces": {
+          "$ref": "#/$defs/patternList"
+        },
+        "assemblies": {
+          "$ref": "#/$defs/patternList"
+        },
+        "types": {
+          "$ref": "#/$defs/patternList"
+        },
+        "baseTypes": {
+          "$ref": "#/$defs/patternList"
+        },
+        "interfaces": {
+          "$ref": "#/$defs/patternList"
+        },
+        "attributes": {
+          "$ref": "#/$defs/patternList"
+        },
+        "names": {
+          "$ref": "#/$defs/nameList"
+        },
+        "kinds": {
+          "$ref": "#/$defs/kindList"
+        },
+        "accessibility": {
+          "$ref": "#/$defs/accessibilityList"
+        },
+        "assignableTo": {
+          "$ref": "#/$defs/patternList"
+        },
+        "sealed": {
+          "type": "boolean"
+        },
+        "abstract": {
+          "type": "boolean"
+        },
+        "static": {
+          "type": "boolean"
+        },
+        "nested": {
+          "type": "boolean"
+        }
+      },
+      "minProperties": 1
     }
   }
 }

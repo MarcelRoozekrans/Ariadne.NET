@@ -12,7 +12,8 @@ internal static class UniqueNameRules
     /// Returns one violation per selected <c>for</c> type and colliding <c>against</c> type, located at the <c>for</c> type.
     /// Two types collide when their simple names are equal, compared case-sensitively with the generic arity and without the
     /// namespace; a nested type uses its own name. A type in both selections never collides with itself. A type that several
-    /// graphs hold, as a project does for each of its target frameworks, counts once. The violation's target is the colliding
+    /// graphs hold, as a project does for each of its target frameworks, counts once, as the first variant that no exception
+    /// excuses. The violation's target is the colliding
     /// type's full name without its assembly; when both full names are equal the message names the two assemblies.
     /// </summary>
     public static IReadOnlyList<ArchitectureViolation> Check(LayerMap layers, RulePack pack, IReadOnlyList<TypeGraph> graphs)
@@ -40,8 +41,7 @@ internal static class UniqueNameRules
         var exceptions = new TypeSelector[rule.Exceptions.Count];
         for (var i = 0; i < exceptions.Length; i++)
         {
-            var exception = rule.Exceptions[i];
-            exceptions[i] = TypeSelector.From(exception.Namespaces, exception.Assemblies, exception.Types);
+            exceptions[i] = TypeSelector.From(rule.Exceptions[i]);
         }
 
         var (againstByName, forTypes) = Collect(from, against, exceptions, layers, graphs);
@@ -77,7 +77,10 @@ internal static class UniqueNameRules
     private static (Dictionary<string, List<TypeId>> AgainstByName, List<ForType> ForTypes) Collect(
         TargetMatcher from, TargetMatcher against, TypeSelector[] exceptions, LayerMap layers, IReadOnlyList<TypeGraph> graphs)
     {
-        var seen = new HashSet<TypeId>();
+        // Each side counts a type once, but a for type only once it passes the exceptions: a target framework variant that
+        // an exception excuses, such as one declared sealed under a condition, must not hide a variant it does not excuse.
+        var seenAgainst = new HashSet<TypeId>();
+        var seenFor = new HashSet<TypeId>();
         var againstByName = new Dictionary<string, List<TypeId>>(StringComparer.Ordinal);
         var forTypes = new List<ForType>();
         foreach (var graph in graphs)
@@ -85,13 +88,8 @@ internal static class UniqueNameRules
             foreach (var type in graph.SourceTypes)
             {
                 var id = new TypeId(type.ContainingAssembly?.Name ?? string.Empty, type.ToDisplayString());
-                if (!seen.Add(id))
-                {
-                    continue;
-                }
-
                 var name = NameOf(type);
-                if (against.Matches(type))
+                if (against.Matches(type) && seenAgainst.Add(id))
                 {
                     if (!againstByName.TryGetValue(name, out var list))
                     {
@@ -101,7 +99,7 @@ internal static class UniqueNameRules
                     list.Add(id);
                 }
 
-                if (from.Matches(type) && !IsExcepted(exceptions, type, layers.Names))
+                if (from.Matches(type) && !IsExcepted(exceptions, type, layers.Names) && seenFor.Add(id))
                 {
                     forTypes.Add(new ForType(name, id, graph.SourceTypeLocations[type]));
                 }

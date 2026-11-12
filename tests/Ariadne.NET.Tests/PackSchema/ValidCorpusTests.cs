@@ -30,4 +30,27 @@ public class ValidCorpusTests
         PackSchemaHarness.LoaderAccepts(yaml).Should().BeTrue($"{relativePath} is a shipped pack");
         PackSchemaHarness.SchemaErrors(yaml).Should().BeEmpty($"{relativePath} must validate against the schema");
     }
+
+    public static TheoryData<string> ValidPacks()
+    {
+        var root = PackSchemaHarness.RepoRoot();
+        var dir = Path.Combine(root, "tests", "Ariadne.NET.Tests", "PackSchema", "ValidPacks");
+        var data = new TheoryData<string>();
+        foreach (var file in Directory.GetFiles(dir, "*.yaml").Order(StringComparer.Ordinal))
+        {
+            data.Add(Path.GetRelativePath(root, file));
+        }
+
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(ValidPacks))]
+    public void Valid_pack_is_accepted_by_schema_and_loader(string relativePath)
+    {
+        var yaml = File.ReadAllText(Path.Combine(PackSchemaHarness.RepoRoot(), relativePath));
+
+        PackSchemaHarness.LoaderAccepts(yaml).Should().BeTrue($"the loader must accept {relativePath}");
+        PackSchemaHarness.SchemaErrors(yaml).Should().BeEmpty($"the schema must accept {relativePath} too");
+    }
 }
