@@ -105,4 +105,15 @@ public sealed class RepoPackRuleTests
             Project("Ariadne.NET.Cli", "namespace Ariadne.NET.Cli { public class A { } }", new ResolvedPackage("YamlDotNet", "16.0.0", true, ["YamlDotNet"])))
             .Should().BeEmpty();
     }
+
+    [Fact]
+    public void ParityTestsReferencingNewtonsoftJsonThroughArchUnitNet_AreExempt()
+    {
+        Validate(
+            Project(
+                "Ariadne.NET.Parity.Tests",
+                "namespace Ariadne.NET.Parity.Tests { public class A { } }",
+                new ResolvedPackage("Newtonsoft.Json", "13.0.4", false, ["TngTech.ArchUnitNET", "Newtonsoft.Json"])))
+            .Should().BeEmpty();
+    }
 }

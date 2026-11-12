@@ -10,6 +10,8 @@ internal static class FixtureProjects
 {
     internal const string LockFileName = ".restore.lock";
     private const string MarkerFileName = ".restore-marker";
+    internal const string ParityLockFileName = ".parity-build.lock";
+    private const string ParityMarkerFileName = ".parity-build-marker";
 
     private static readonly string[] RestoreTargets =
     [
@@ -31,9 +33,14 @@ internal static class FixtureProjects
     private static readonly Lazy<string> RootFolder = new(FindRoot);
     private static readonly Lock RestoreGuard = new();
     private static bool _restored;
+    private static readonly Lock ParityGuard = new();
+    private static bool _parityBuilt;
 
     /// <summary>The <c>tests/fixtures</c> folder.</summary>
     public static string Root => RootFolder.Value;
+
+    /// <summary>The <c>tests/fixtures/archunit-parity</c> folder, which holds the ArchUnitNET parity fixtures.</summary>
+    public static string ParityRoot => Path("archunit-parity");
 
     /// <summary>Combines <paramref name="parts"/> onto <see cref="Root"/>.</summary>
     public static string Path(params string[] parts) =>
@@ -55,6 +62,58 @@ internal static class FixtureProjects
             RestoreUnderLock(Root);
             _restored = true;
         }
+    }
+
+    /// <summary>
+    /// Builds the ArchUnitNET parity fixtures, which ArchUnitNET reads as compiled assemblies. Runs once per process, under its
+    /// own exclusive file lock, and skips the build when the marker matches the newest source file and every fixture DLL
+    /// exists. Separate from <see cref="EnsureRestored"/>, so the other test projects never build the parity fixtures.
+    /// </summary>
+    internal static void EnsureParityBuilt()
+    {
+        lock (ParityGuard)
+        {
+            if (_parityBuilt)
+            {
+                return;
+            }
+
+            BuildParityUnderLock(ParityRoot);
+            _parityBuilt = true;
+        }
+    }
+
+    private static void BuildParityUnderLock(string parityRoot)
+    {
+        using var fileLock = TakeLock(System.IO.Path.Combine(parityRoot, ParityLockFileName));
+
+        var stamp = LatestSourceWrite(parityRoot).ToString(CultureInfo.InvariantCulture);
+        var markerPath = System.IO.Path.Combine(parityRoot, ParityMarkerFileName);
+        if (File.Exists(markerPath)
+            && string.Equals(File.ReadAllText(markerPath), stamp, StringComparison.Ordinal)
+            && ParityOutputsExist(parityRoot))
+        {
+            return;
+        }
+
+        Dotnet("build", System.IO.Path.Combine(parityRoot, "Parity.slnx"));
+        File.WriteAllText(markerPath, stamp);
+    }
+
+    /// <summary>True when every fixture kind under <paramref name="parityRoot"/> has its Debug <c>net10.0</c> DLL.</summary>
+    private static bool ParityOutputsExist(string parityRoot)
+    {
+        foreach (var project in Directory.EnumerateFiles(parityRoot, "*.csproj", SearchOption.AllDirectories))
+        {
+            var dll = System.IO.Path.Combine(
+                System.IO.Path.GetDirectoryName(project)!, "bin", "Debug", "net10.0", System.IO.Path.GetFileNameWithoutExtension(project) + ".dll");
+            if (!File.Exists(dll))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -166,7 +225,7 @@ internal static class FixtureProjects
         {
             var relative = System.IO.Path.GetRelativePath(root, file);
             var segments = relative.Split(System.IO.Path.DirectorySeparatorChar);
-            if (Array.Exists(segments, IsBuildOutput) || segments[0].StartsWith(".restore", StringComparison.Ordinal))
+            if (Array.Exists(segments, IsBuildOutput) || IsLockOrMarker(segments[^1]))
             {
                 continue;
             }
@@ -176,6 +235,13 @@ internal static class FixtureProjects
 
         return latest;
     }
+
+    /// <summary>
+    /// True for the lock and marker files of the restore and the parity build, wherever they sit: they change on every run, so
+    /// counting them would make each marker invalidate the other.
+    /// </summary>
+    internal static bool IsLockOrMarker(string fileName) =>
+        fileName.StartsWith(".restore", StringComparison.Ordinal) || fileName.StartsWith(".parity-", StringComparison.Ordinal);
 
     private static bool IsBuildOutput(string segment) =>
         string.Equals(segment, "bin", StringComparison.Ordinal) || string.Equals(segment, "obj", StringComparison.Ordinal);

@@ -203,7 +203,7 @@ public sealed class SolutionPathTests : IDisposable
             var relative = Path.GetRelativePath(from, file);
             var segments = relative.Split(Path.DirectorySeparatorChar);
             if (Array.Exists(segments, s => string.Equals(s, "bin", StringComparison.Ordinal) || string.Equals(s, "obj", StringComparison.Ordinal))
-                || segments[0].StartsWith(".restore", StringComparison.Ordinal))
+                || FixtureProjects.IsLockOrMarker(segments[^1]))
             {
                 continue;
             }

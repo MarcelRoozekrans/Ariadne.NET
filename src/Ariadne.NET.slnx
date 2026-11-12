@@ -6,6 +6,7 @@
   <Project Path="../tests/Ariadne.NET.Mcp.Tests/Ariadne.NET.Mcp.Tests.csproj" />
   <Project Path="../tests/Ariadne.NET.Workspaces.Tests/Ariadne.NET.Workspaces.Tests.csproj" />
   <Project Path="../tests/Ariadne.NET.Testing.Tests/Ariadne.NET.Testing.Tests.csproj" />
+  <Project Path="../tests/Ariadne.NET.Parity.Tests/Ariadne.NET.Parity.Tests.csproj" />
   <Project Path="Ariadne.NET.Abstractions/Ariadne.NET.Abstractions.csproj" />
   <Project Path="Ariadne.NET/Ariadne.NET.csproj" />
   <Project Path="Ariadne.NET.Workspaces/Ariadne.NET.Workspaces.csproj" />
