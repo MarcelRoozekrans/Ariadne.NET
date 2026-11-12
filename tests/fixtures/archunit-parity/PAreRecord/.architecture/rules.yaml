@@ -3,4 +3,20 @@ name: parity-p-are-record
 version: "1.0.0"
 author: fixture
 
-# No rule yet: a selector has no kinds. Phase 4.2 adds PARITY-PARERECORD and PARITY-PARERECORD-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-PARERECORD
+    because: Mirrors ArchUnitNET's AreRecord on Classes(); the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PAreRecord.**"]
+        kinds: [record]
+      to:
+        namespaces: ["Parity.PAreRecord.Target.**"]
+  - id: PARITY-PARERECORD-NOT
+    because: Mirrors ArchUnitNET's AreNotRecord on Classes(); the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PAreRecord.**"]
+        kinds: [class]
+      to:
+        namespaces: ["Parity.PAreRecord.Target.**"]

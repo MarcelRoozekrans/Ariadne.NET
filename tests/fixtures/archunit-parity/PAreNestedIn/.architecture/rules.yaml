@@ -3,4 +3,12 @@ name: parity-p-are-nested-in
 version: "1.0.0"
 author: fixture
 
-# No rule yet: a selector has no nested. Phase 4.2 adds PARITY-PARENESTEDIN here and deletes the KnownGaps entry.
+rules:
+  - id: PARITY-PARENESTEDIN
+    because: Mirrors ArchUnitNET's AreNestedIn; the types it selects must not depend on Target.
+    forbid:
+      from:
+        types: ["Parity.PAreNestedIn.Broken.Order.*"]
+        nested: true
+      to:
+        namespaces: ["Parity.PAreNestedIn.Target.**"]

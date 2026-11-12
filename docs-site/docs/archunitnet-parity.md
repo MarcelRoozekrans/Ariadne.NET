@@ -28,7 +28,7 @@ Each row has one of these statuses:
 | `out-of-scope` | Ariadne will not add it. The notes give the reason. |
 | `ariadne-only` | Ariadne has it and ArchUnitNET 0.13.2 does not. |
 
-A row pairs a positive method with its negation. The negation is the row's `:not` case. The Ariadne column names the [rule types](how-it-works/rule-types.md) and [selector keys](how-it-works/03-rule-schema.md#selectors) a pack uses. Keys written as `is`, `isNot`, `names`, `kinds`, `assignableTo`, `sealed`, `abstract`, `static` and `nested`, and an `accessibility` list in a selector, do not exist yet; phase 4.2 adds them.
+A row pairs a positive method with its negation. The negation is the row's `:not` case. The Ariadne column names the [rule types](how-it-works/rule-types.md) and [selector keys](how-it-works/03-rule-schema.md#selectors) a pack uses. Phase 4.2 added the keys `is`, `isNot`, `names`, `kinds`, `assignableTo`, `sealed`, `abstract`, `static` and `nested`, and the `accessibility` list in a selector.
 
 ## Type predicates
 
@@ -40,13 +40,13 @@ Methods of `Types().That()`.
 | `p-reside-in-assembly` | `ResideInAssembly`, `DoNotResideInAssembly` | `assemblies`; `:not` as an exception with `assemblies` | `covered` | `assemblies` takes the simple name; ArchUnitNET's string form takes the full display name, with version and culture. |
 | `p-reside-in-namespace-matching` | `ResideInNamespaceMatching`, `DoNotResideInNamespaceMatching` | — | `out-of-scope` | Ariadne patterns are globs; translate a regex with a glob form by hand. |
 | `p-reside-in-assembly-matching` | `ResideInAssemblyMatching`, `DoNotResideInAssemblyMatching` | — | `out-of-scope` | Ariadne patterns are globs; translate a regex with a glob form by hand. |
-| `p-implement-interface` | `ImplementInterface`, `ImplementAny`, `DoNotImplementInterface`, `DoNotImplementAny` | `interfaces`; `:not` as an exception with `assignableTo` | `gap` | 4.2, `:not` only |
-| `p-are-assignable-to` | `AreAssignableTo`, `AreNotAssignableTo` | `assignableTo`; `:not` as an exception with `assignableTo` | `gap` | 4.2 |
-| `p-are-enums` | `AreEnums`, `AreNotEnums` | `kinds: [enum]` | `gap` | 4.2 |
-| `p-are-structs` | `AreStructs`, `AreNotStructs` | `kinds: [struct, recordStruct]` | `gap` | 4.2 |
-| `p-are-value-types` | `AreValueTypes`, `AreNotValueTypes` | `kinds: [struct, recordStruct, enum]` | `gap` | 4.2 |
-| `p-are-nested` | `AreNested`, `AreNotNested` | `nested: true`, `nested: false` | `gap` | 4.2 |
-| `p-are-nested-in` | `AreNestedIn` | `nested: true` with `types` under the outer type | `gap` | 4.2 |
+| `p-implement-interface` | `ImplementInterface`, `ImplementAny`, `DoNotImplementInterface`, `DoNotImplementAny` | `interfaces`; `:not` as an exception with `assignableTo` | `covered` | |
+| `p-are-assignable-to` | `AreAssignableTo`, `AreNotAssignableTo` | `assignableTo`; `:not` as an exception with `assignableTo` | `covered` | |
+| `p-are-enums` | `AreEnums`, `AreNotEnums` | `kinds: [enum]`; `:not` as `kinds` with the other six kinds | `covered` | |
+| `p-are-structs` | `AreStructs`, `AreNotStructs` | `kinds: [struct, recordStruct]`; `:not` as `kinds: [class, interface, record, enum, delegate]` | `covered` | |
+| `p-are-value-types` | `AreValueTypes`, `AreNotValueTypes` | `kinds: [struct, recordStruct, enum]`; `:not` as `kinds: [class, interface, record, delegate]` | `covered` | |
+| `p-are-nested` | `AreNested`, `AreNotNested` | `nested: true`, `nested: false` | `covered` | |
+| `p-are-nested-in` | `AreNestedIn` | `nested: true` with `types: ["Ns.Outer.*"]` | `covered` | The `nested` trait keeps a namespace named like the outer type out. |
 | `p-have-member-with-name` | `HaveMemberWithName`, `HaveMethodMemberWithName`, `HavePropertyMemberWithName`, `HaveFieldMemberWithName`, `DoNotHaveMemberWithName`, `DoNotHaveMethodMemberWithName`, `DoNotHavePropertyMemberWithName`, `DoNotHaveFieldMemberWithName` | — | `deferred` | member level, see #94 |
 
 ## Type conditions
@@ -76,11 +76,11 @@ Methods of `Classes().That()` and `Classes().Should()`.
 
 | Id | ArchUnitNET | Ariadne | Status | Notes |
 |---|---|---|---|---|
-| `p-are-abstract` | `AreAbstract`, `AreNotAbstract` | `abstract: true`, `abstract: false` | `gap` | 4.2 |
+| `p-are-abstract` | `AreAbstract`, `AreNotAbstract` | `kinds: [class, record]` with `abstract: true`, `abstract: false` | `divergence` | ArchUnitNET reads a static class as abstract; Ariadne does not. See [p-are-abstract](#p-are-abstract). |
 | `c-be-abstract` | `BeAbstract`, `NotBeAbstract` | `require` with `is: { abstract: true }`, `isNot` | `gap` | 4.2 |
-| `p-are-sealed` | `AreSealed`, `AreNotSealed` | `sealed: true`, `sealed: false` | `gap` | 4.2 |
+| `p-are-sealed` | `AreSealed`, `AreNotSealed` | `kinds: [class, record]` with `sealed: true`, `sealed: false` | `covered` | Both tools count a static class as sealed. |
 | `c-be-sealed` | `BeSealed`, `NotBeSealed` | `require` with `is: { sealed: true }`, `isNot` | `gap` | 4.2 |
-| `p-are-record` | `AreRecord`, `AreNotRecord` | `kinds: [record]` | `gap` | 4.2. `Classes()` holds no `record struct`, so neither polarity checks one, as the probes in `Clean` and `NotClean` show. |
+| `p-are-record` | `AreRecord`, `AreNotRecord` | `kinds: [record]`; `:not` as `kinds: [class]` | `covered` | `Classes()` holds no `record struct`, so neither polarity checks one, as the probes in `Clean` and `NotClean` show. |
 | `c-be-record` | `BeRecord`, `NotBeRecord` | `require` with `is: { kinds: [record] }`, `isNot` | `gap` | 4.2. `Classes()` holds no `record struct`, so neither polarity checks one, as the probes in `Clean` and `NotClean` show. |
 | `p-are-immutable` | `AreImmutable`, `AreNotImmutable` | — | `deferred` | member level, see #94 |
 | `c-be-immutable` | `BeImmutable`, `NotBeImmutable` | — | `deferred` | member level, see #94 |
@@ -91,9 +91,9 @@ Methods of `Attributes().That()` and `Attributes().Should()`, which select attri
 
 | Id | ArchUnitNET | Ariadne | Status | Notes |
 |---|---|---|---|---|
-| `p-attribute-are-abstract` | `AreAbstract`, `AreNotAbstract` | `assignableTo: [System.Attribute]` with `abstract` | `gap` | 4.2 |
+| `p-attribute-are-abstract` | `AreAbstract`, `AreNotAbstract` | `assignableTo: [System.Attribute]` with `abstract` | `covered` | |
 | `c-attribute-be-abstract` | `BeAbstract`, `NotBeAbstract` | `require` for `assignableTo: [System.Attribute]` with `is: { abstract: true }`, `isNot` | `gap` | 4.2 |
-| `p-attribute-are-sealed` | `AreSealed`, `AreNotSealed` | `assignableTo: [System.Attribute]` with `sealed` | `gap` | 4.2 |
+| `p-attribute-are-sealed` | `AreSealed`, `AreNotSealed` | `assignableTo: [System.Attribute]` with `sealed` | `covered` | |
 | `c-attribute-be-sealed` | `BeSealed`, `NotBeSealed` | `require` for `assignableTo: [System.Attribute]` with `is: { sealed: true }`, `isNot` | `gap` | 4.2 |
 
 ## Object-level
@@ -114,12 +114,12 @@ Methods that every kind of object has, here applied to `Types()`.
 
 | Id | ArchUnitNET | Ariadne | Status | Notes |
 |---|---|---|---|---|
-| `p-are-public` | `ArePublic`, `AreNotPublic` | `accessibility: [public]` | `gap` | 4.2 |
-| `p-are-internal` | `AreInternal`, `AreNotInternal` | `accessibility: [internal]` | `gap` | 4.2 |
-| `p-are-protected` | `AreProtected`, `AreNotProtected` | `accessibility: [protected]` | `gap` | 4.2 |
-| `p-are-private` | `ArePrivate`, `AreNotPrivate` | `accessibility: [private]` | `gap` | 4.2 |
-| `p-are-protected-internal` | `AreProtectedInternal`, `AreNotProtectedInternal` | `accessibility: [protected internal]` | `gap` | 4.2 |
-| `p-are-private-protected` | `ArePrivateProtected`, `AreNotPrivateProtected` | `accessibility: [private protected]` | `gap` | 4.2 |
+| `p-are-public` | `ArePublic`, `AreNotPublic` | `accessibility: [public]`; `:not` as `accessibility` with the other five values | `covered` | |
+| `p-are-internal` | `AreInternal`, `AreNotInternal` | `accessibility: [internal]`; `:not` as `accessibility` with the other five values | `covered` | |
+| `p-are-protected` | `AreProtected`, `AreNotProtected` | `accessibility: [protected]`; `:not` as `accessibility` with the other five values | `covered` | |
+| `p-are-private` | `ArePrivate`, `AreNotPrivate` | `accessibility: [private]`; `:not` as `accessibility` with the other five values | `covered` | |
+| `p-are-protected-internal` | `AreProtectedInternal`, `AreNotProtectedInternal` | `accessibility: [protected internal]`; `:not` as `accessibility` with the other five values | `covered` | |
+| `p-are-private-protected` | `ArePrivateProtected`, `AreNotPrivateProtected` | `accessibility: [private protected]`; `:not` as `accessibility` with the other five values | `covered` | |
 | `c-be-public` | `BePublic`, `NotBePublic` | `require` with `is: { accessibility: [public] }`, `isNot` | `gap` | 4.2. Today's `require` accepts `accessibility: public` but checks only `internal`, so it flags nothing. |
 | `c-be-internal` | `BeInternal`, `NotBeInternal` | `require` with `accessibility: internal`; `:not` as `isNot: { accessibility: [internal] }` | `gap` | 4.2, `:not` only |
 | `c-be-protected` | `BeProtected`, `NotBeProtected` | `require` with `is: { accessibility: [protected] }`, `isNot` | `gap` | 4.2 |
@@ -246,6 +246,7 @@ ArchUnitNET joins predicates with `And()` and `Or()` and negates them with `Not`
 Here ArchUnitNET and Ariadne answer differently on purpose, mostly because one reads IL and the other source. Each entry names its fixture, the reason and the answer a developer would expect.
 
 - [c-be-kind](#c-be-kind)
+- [p-are-abstract](#p-are-abstract), [p-are-abstract:not](#p-are-abstract)
 - [c-only-depend-on](#c-only-depend-on)
 - [p-have-name](#p-have-name), [p-have-name:not](#p-have-name)
 - [p-have-name-ending-with](#p-have-name-ending-with), [p-have-name-ending-with:not](#p-have-name-ending-with)
@@ -260,6 +261,13 @@ Fixture `tests/fixtures/archunit-parity/CBeKind`, rule `Should().Be(Classes())` 
 
 - **Reason:** a record class compiles to a class, so ArchUnitNET's `Classes()` holds it. Ariadne reads source, where `record` is a kind of its own, so `kind: class` rejects a record.
 - **Expected:** ArchUnitNET's answer, since a record class is a class in C#. Phase 4.2's `is: { kinds: [class, record] }` expresses `Be(Classes())` exactly; today's `kind` takes one kind.
+
+### p-are-abstract
+
+Fixture `tests/fixtures/archunit-parity/PAreAbstract`, rule `Classes().That().AreAbstract()` against `forbid` from `{ kinds: [class, record], abstract: true }`. Both tools flag the abstract class `Broken.OrderBase`. Only ArchUnitNET flags the static class `Broken.Clock`. The `:not` case, `AreNotAbstract` against `abstract: false`, swaps it: both flag `NotBroken.OrderService` and the sealed `NotBroken.Shipment`, and only Ariadne flags `Broken.Clock`.
+
+- **Reason:** the compiler marks a static class `abstract sealed` in IL, so ArchUnitNET's `AreAbstract` holds it. Ariadne follows C#, where a static class is not abstract.
+- **Expected:** Ariadne's answer. C# does not let a static class be declared abstract, and a developer who writes `AreAbstract` does not mean static classes. Select those with `static: true`. `sealed` agrees: both tools count a static class as sealed, so `p-are-sealed` is `covered`.
 
 ### c-only-depend-on
 

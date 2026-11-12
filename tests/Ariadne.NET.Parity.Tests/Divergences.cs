@@ -22,6 +22,15 @@ public static class Divergences
     private const string CaseExpected =
         "Ariadne's: C# names are case-sensitive, so orderService is another type than OrderService.";
 
+    private const string StaticClass =
+        "IL marks a static class abstract sealed, so ArchUnitNET's AreAbstract holds it and AreNotAbstract leaves it out. "
+        + "Ariadne follows C#, where a static class is not abstract, so 'abstract: true' leaves it out and 'abstract: false' "
+        + "selects it.";
+
+    private const string StaticClassExpected =
+        "Ariadne's: a static class cannot be declared abstract in C#, and no developer writes AreAbstract to mean static. "
+        + "Select static classes with 'static: true'.";
+
     /// <summary>All divergence entries.</summary>
     public static IReadOnlyList<Divergence> Entries { get; } =
     [
@@ -91,5 +100,17 @@ public static class Divergences
             new HashSet<string>(StringComparer.Ordinal),
             Case,
             CaseExpected),
+        new(
+            "p-are-abstract",
+            new HashSet<string>(StringComparer.Ordinal) { "Parity.PAreAbstract.Broken.Clock" },
+            new HashSet<string>(StringComparer.Ordinal),
+            StaticClass,
+            StaticClassExpected),
+        new(
+            "p-are-abstract:not",
+            new HashSet<string>(StringComparer.Ordinal),
+            new HashSet<string>(StringComparer.Ordinal) { "Parity.PAreAbstract.Broken.Clock" },
+            StaticClass,
+            StaticClassExpected),
     ];
 }
