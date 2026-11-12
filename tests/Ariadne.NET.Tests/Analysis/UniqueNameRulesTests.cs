@@ -128,6 +128,17 @@ public class UniqueNameRulesTests
     }
 
     [Fact]
+    public void Exception_traits_suppress_matching_types_only()
+    {
+        var pack = PackWith(new RuleException { Kinds = [CSharpTypeKind.Record], Because = "Web DTO records may mirror domain names." });
+
+        Check(pack, """
+            namespace Shop.Domain { public class Order { } public class Invoice { } }
+            namespace Shop.Web { public record Order; public class Invoice { } }
+            """).Should().ContainSingle().Which.SourceType.Should().Be("Shop.Web.Invoice");
+    }
+
+    [Fact]
     public void NamesDifferByCase_DoNotCollide()
     {
         Check(Pack, """

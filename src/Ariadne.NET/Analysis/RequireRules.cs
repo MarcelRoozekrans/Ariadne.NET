@@ -11,7 +11,8 @@ internal static class RequireRules
     /// <summary>
     /// Returns one violation per rule, selected source type and failed requirement, located at the type. Placement is explicit:
     /// a type the rule selects that no layer covers, or that another layer covers, breaks <c>layer</c>. A type that several
-    /// layers cover is skipped for <c>layer</c>, because it is already a layer overlap. Enums and delegates are subjects of
+    /// layers cover is skipped for <c>layer</c>, because it is already a layer overlap. Each key of <c>is</c> and <c>isNot</c>
+    /// is checked on every selected type, enums and delegates included. Enums and delegates are otherwise subjects of
     /// <c>layer</c> only. An accessibility other than <c>internal</c> requires nothing.
     /// </summary>
     public static IReadOnlyList<ArchitectureViolation> Check(TypeGraph graph, LayerMap layers, RulePack pack) =>
@@ -69,8 +70,7 @@ internal static class RequireRules
         var exceptions = new TypeSelector[rule.Exceptions.Count];
         for (var i = 0; i < exceptions.Length; i++)
         {
-            var exception = rule.Exceptions[i];
-            exceptions[i] = TypeSelector.From(exception.Namespaces, exception.Assemblies, exception.Types);
+            exceptions[i] = TypeSelector.From(rule.Exceptions[i]);
         }
 
         TypeSelector? implements = null;
@@ -80,10 +80,10 @@ internal static class RequireRules
             implements = compiled.IsEmpty ? null : compiled;
         }
 
-        return new Compiled(rule, requirement, TargetMatcher.From(rule.From, layers), exceptions, implements);
+        return new Compiled(rule, requirement, TargetMatcher.From(rule.From, layers), exceptions, implements, RequireCondition.Compile(requirement.Is, requirement.IsNot));
     }
 
-    internal sealed class Compiled(RuleDefinition rule, RuleRequirement requirement, TargetMatcher from, TypeSelector[] exceptions, TypeSelector? implements)
+    internal sealed class Compiled(RuleDefinition rule, RuleRequirement requirement, TargetMatcher from, TypeSelector[] exceptions, TypeSelector? implements, RequireCondition[] conditions)
     {
         public TargetMatcher From { get; } = from;
 
@@ -105,6 +105,14 @@ internal static class RequireRules
             if (requirement.Layer is { } layer)
             {
                 CheckLayer(type, layer, in location, layers, violations);
+            }
+
+            foreach (var condition in conditions)
+            {
+                if (condition.Fails(type, layers.Names))
+                {
+                    Add(type, in location, violations, ViolationKind.RequirementNotMet, condition.Message(type, rule.Id, layers.Names));
+                }
             }
 
             // Enums and delegates were never subjects of the shape checks.

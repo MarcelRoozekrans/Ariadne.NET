@@ -54,21 +54,61 @@ internal sealed class TypeTraits
     {
         ArgumentNullException.ThrowIfNull(selector);
 
-        var accessibility = new Accessibility[selector.Accessibility.Count];
-        for (var i = 0; i < accessibility.Length; i++)
-        {
-            accessibility[i] = ParseAccessibility(selector.Accessibility[i]);
-        }
-
-        var traits = new TypeTraits(
-            Glob.CompileAll(selector.Names, Glob.Flat),
-            [.. selector.Kinds],
-            accessibility,
-            Glob.CompileAll(selector.AssignableTo, Glob.Dotted),
+        return Create(
+            selector.Names,
+            selector.Kinds,
+            selector.Accessibility,
+            selector.AssignableTo,
             selector.Sealed,
             selector.Abstract,
             selector.Static,
             selector.Nested);
+    }
+
+    /// <summary>Compiles the traits of a rule exception once. The loader validates the values, so an invalid one is a programming error.</summary>
+    /// <param name="exception">The exception whose trait members to compile.</param>
+    /// <returns>The traits.</returns>
+    /// <exception cref="ArgumentException">A name or type pattern is invalid, or an accessibility is not one of the six keywords.</exception>
+    public static TypeTraits From(RuleException exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+
+        return Create(
+            exception.Names,
+            exception.Kinds,
+            exception.Accessibility,
+            exception.AssignableTo,
+            exception.Sealed,
+            exception.Abstract,
+            exception.Static,
+            exception.Nested);
+    }
+
+    private static TypeTraits Create(
+        IList<string> names,
+        IList<CSharpTypeKind> kinds,
+        IList<string> accessibilityKeywords,
+        IList<string> assignableTo,
+        bool? sealedTrait,
+        bool? abstractTrait,
+        bool? staticTrait,
+        bool? nestedTrait)
+    {
+        var accessibility = new Accessibility[accessibilityKeywords.Count];
+        for (var i = 0; i < accessibility.Length; i++)
+        {
+            accessibility[i] = ParseAccessibility(accessibilityKeywords[i]);
+        }
+
+        var traits = new TypeTraits(
+            Glob.CompileAll(names, Glob.Flat),
+            [.. kinds],
+            accessibility,
+            Glob.CompileAll(assignableTo, Glob.Dotted),
+            sealedTrait,
+            abstractTrait,
+            staticTrait,
+            nestedTrait);
         return traits.IsEmpty ? None : traits;
     }
 

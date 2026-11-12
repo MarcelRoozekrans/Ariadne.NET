@@ -57,6 +57,20 @@ internal sealed class TypeSelector
             TypeTraits.From(selector));
     }
 
+    /// <summary>
+    /// Compiles a rule exception once: its <c>namespaces</c>, <c>assemblies</c> and <c>types</c> globs and its traits, all
+    /// AND-ed. The loader validates patterns and values, so an invalid one is a programming error.
+    /// </summary>
+    /// <param name="exception">The exception to compile.</param>
+    /// <returns>The selector.</returns>
+    /// <exception cref="ArgumentException">A pattern or an accessibility is invalid.</exception>
+    public static TypeSelector From(RuleException exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+
+        return Compile(exception.Namespaces, exception.Assemblies, exception.Types, [], [], [], [], TypeTraits.From(exception));
+    }
+
     /// <summary>Compiles the patterns once. The loader validates patterns, so an invalid one is a programming error.</summary>
     /// <param name="namespaces">Dotted namespace globs.</param>
     /// <param name="assemblies">Flat assembly-name globs.</param>
