@@ -22,7 +22,7 @@ This page is for a team that checks its architecture with [ArchUnitNET](https://
    dotnet add package Ariadne.NET.Testing
    ```
 
-2. Create the pack. `ariadne init` writes `.architecture/rules.yaml` from a built-in template, or write it by hand. A minimal pack with two layers and one rule:
+2. Create the pack. [`ariadne init`](getting-started.md#install-the-tool) writes `.architecture/rules.yaml` from a built-in template, or write it by hand. A minimal pack with two layers and one rule:
 
    ```yaml
    schema: 2
@@ -88,7 +88,7 @@ Methods of `That()`. Each becomes one key of a selector; several keys in one sel
 
 | ArchUnitNET | Pack YAML | Catalogue id |
 |---|---|---|
-| `ResideInNamespace("Ns")` | `namespaces: ["Ns"]`; add `"Ns.**"` to include child namespaces, which ArchUnitNET leaves out | `p-reside-in-namespace` |
+| `ResideInNamespace("Ns")` | `namespaces: ["Ns"]`; use `"Ns.**"` instead, which matches `Ns` and every namespace below it, where ArchUnitNET matches `Ns` only | `p-reside-in-namespace` |
 | `ResideInAssembly` | `assemblies: [Shop.Domain]`, the simple name | `p-reside-in-assembly` |
 | `ResideInNamespaceMatching`, `ResideInAssemblyMatching` | no regex; translate by hand, see [Translating patterns](#translating-patterns) | `p-reside-in-namespace-matching`, `p-reside-in-assembly-matching` |
 | `ImplementInterface`, `ImplementAny` | `interfaces: ["Ns.IName"]` | `p-implement-interface` |
@@ -119,7 +119,7 @@ Methods of `That()`. Each becomes one key of a selector; several keys in one sel
 
 ### Conditions
 
-Methods of `Should()`. Placement and shape become a `require` rule; the keys `is` and `isNot` take any selector key except `layers`, and each key is checked on its own. Dependencies become `forbid`, `allowOnly` or a layer.
+Methods of `Should()`. Placement and shape become a `require` rule; the keys `is` and `isNot` take every selector key except `layers` and `members`, and each key is checked on its own. Dependencies become `forbid`, `allowOnly` or a layer.
 
 | ArchUnitNET | Pack YAML | Catalogue id |
 |---|---|---|
@@ -132,7 +132,7 @@ Methods of `Should()`. Placement and shape become a `require` rule; the keys `is
 | `BeValueTypes` | `is: { kinds: [struct, recordStruct, enum] }` | `c-be-value-types` |
 | `BeNested` | `is: { nested: true }` | `c-be-nested` |
 | `BeNestedIn(Outer)` | `is: { nested: true, types: ["Ns.Outer.*"] }` | `c-be-nested-in` |
-| no type-level form | `is: { static: true }` | `c-be-static` |
+| none: 0.13.2 has no type-level `BeStatic` | `is: { static: true }` | `c-be-static` |
 | `BeAbstract` on `Classes()` | `for: { kinds: [class, record] }` with `is: { abstract: true }` | `c-be-abstract` |
 | `BeSealed` on `Classes()` | `for: { kinds: [class, record] }` with `is: { sealed: true }` | `c-be-sealed` |
 | `BeRecord` on `Classes()` | `for: { kinds: [class, record] }` with `is: { kinds: [record] }` | `c-be-record` |
@@ -164,14 +164,14 @@ ArchUnitNET negates a method with its `DoNot` or `Not` form. A pack negates in t
 
 | ArchUnitNET | Pack YAML | Catalogue id |
 |---|---|---|
-| `That().DoNot…`, such as `DoNotResideInNamespace` or `AreNotAssignableTo` | `exceptions: [{ namespaces: ["Ns"], because: "…" }]`, with the key of the positive form; a list trait such as `kinds` or `accessibility` can also list the other values instead | — |
+| `That().DoNot…`, such as `DoNotResideInNamespace` or `AreNotAssignableTo` | `exceptions: [{ namespaces: ["Ns"], because: "…" }]`, with the key of the positive form; a list trait such as `kinds` or `accessibility` can also list the other values instead. An exception takes only `namespaces`, `assemblies`, `types` and the type traits. `DoNotImplementInterface` uses `assignableTo`. `DoNotHaveAnyAttributes` and the negations of `attributes`, `interfaces` and `baseTypes` have no exception form, see #97 | — |
 | `Should().Not…`, such as `NotBeSealed` or `NotHaveName` | `isNot` with the key of the positive form, such as `isNot: { sealed: true }` | — |
 | `NotDependOnAny`, `NotDependOnAnyTypesThat` | `forbid: { from: …, to: … }` | `c-not-depend-on-any` |
 | `NotExist` | `require` with `isNot: { types: ["**"] }` and `allowEmpty: true` | `c-not-exist` |
 
 ### Slices
 
-`Slices().Matching(...)` and `MatchingWithPackages(...)` become a `slices` rule. See [Translating patterns](#slice-patterns) for the pattern.
+`Slices().Matching(...)` and `MatchingWithPackages(...)` become a `slices` rule. See [Slice patterns](#slice-patterns) for the pattern.
 
 | ArchUnitNET | Pack YAML | Catalogue id |
 |---|---|---|
@@ -197,7 +197,7 @@ These rows are `deferred` or `out-of-scope` in the catalogue. Keep such a check 
 
 | ArchUnitNET | Pack YAML | Catalogue id |
 |---|---|---|
-| `Exist` | none needed: every rule fails as `VacuousRule` when its subject selects nothing | `c-exist` |
+| `Exist` | for a fact that guards the target of another rule, set `requireTarget: true` on that rule, see [Vacuity replaces the "is loaded" facts](#vacuity-replaces-the-is-loaded-facts). Otherwise any rule with that selector as its subject fails as `VacuousRule` when it selects nothing | `c-exist` |
 | `DependOnAny` as a condition | none yet; dependency as a requirement, see #96 | `c-depend-on-any` |
 | `DependOnAny`, `OnlyDependOn` as a predicate | none yet; dependency as a selector, see #96 | `p-depend-on-any`, `p-only-depend-on` |
 | `CallAny`, `NotCallAny` | none yet; member level, see #94. A `forbid` with `members` in `to` already forbids calls to the members it names | `p-call-any`, `c-call-any` |
@@ -230,6 +230,10 @@ rules:
       from: { assemblies: [Shop.Domain] }
       to: { namespaces: ["Thalos.**"] }
 ```
+
+### An assembly name
+
+Assemblies are matched differently from namespaces. The whole assembly name is one string, and `*` matches any characters, dots included. There are no segments and no `**`. `ResideInAssemblyMatching(@"^Thalos(\.|$)")` selects the assembly `Thalos` and every assembly below it, but not `ThalosExtras`. List both: `assemblies: ["Thalos", "Thalos.*"]`. See [Selectors](how-it-works/03-rule-schema.md#selectors).
 
 ### Prefix, suffix and part of a name
 
@@ -357,7 +361,7 @@ layers:
 ArchUnitNET suites often have facts that only check that a type or assembly is loaded, so a rule about it does not pass on nothing. Ariadne checks this itself:
 
 - A rule whose subject selects no type fails the run as `VacuousRule`, and a layer that covers no type as `VacuousLayer`.
-- A `forbid`, `allowOnly` or `uniqueNames` rule with `requireTarget: true` also fails when its target matches no type declared or referenced in the solution. Set it where a rename of the target would silently end the rule, such as a single seam to an interface.
+- A `forbid`, `allowOnly` or `uniqueNames` rule with `requireTarget: true` also fails when its target matches no type declared or referenced in the solution (for `uniqueNames`, declared). Set it where a rename of the target would silently end the rule, such as a single seam to an interface.
 
 `requireTarget` proves that the solution uses the target somewhere, not which project does. A library that the solution reaches only transitively is never found, because the analysis sees the types that code writes; keep such a fact in C#. See [A target that matches nothing](how-it-works/rule-types.md#a-target-that-matches-nothing).
 
@@ -413,7 +417,7 @@ Every fact has one row. The Pack rule cell names the rules and layers of the [`d
 | `DomainLayer_ShouldNotDependOn_ZeroAllocOutbox` | `DAE-NO-OUTBOX-IN-DOMAIN` | `^ZeroAlloc\.Outbox(\.\|$)` becomes `ZeroAlloc.Outbox.**`. |
 | `DomainLayer_ShouldNotDependOn_Cronos` | `DAE-NO-CRONOS-IN-DOMAIN` | `^Cronos(\.\|$)` becomes `Cronos.**`. |
 | `OnlySubagentRunExecutor_DependsOn_ISubagentRunner` | `DAE-ONE-SUBAGENT-SEAM` | `NotExist` over `DependOnAny` with ten `DoNotHaveFullName` exclusions becomes one `allowOnly` with the ten types as `from`. The fact was scoped to the solution's own assemblies; Ariadne checks only the solution's code, and an exception exempts the test projects, which ArchUnitNET did not load. |
-| `SubagentRunnerType_IsLoaded_SoTheSingleSeamRuleCoversIt` | `DAE-ONE-SUBAGENT-SEAM` | `requireTarget: true`: the run fails when no Daedalus code references `Thalos.ISubagentRunner`. `SubagentRunExecutor` and nine decorators in `Daedalus.Agents` do. |
+| `SubagentRunnerType_IsLoaded_SoTheSingleSeamRuleCoversIt` | `DAE-ONE-SUBAGENT-SEAM` | `requireTarget: true`: the run fails when no Daedalus code references `Thalos.ISubagentRunner`. `SubagentRunExecutor` and nine other types in `Daedalus.Agents` do. |
 | `DomainLayer_ShouldNotDependOn_AgentsProject` | `DAE-LAYER-DOMAIN` | As the other Domain layer facts. |
 | `ApplicationLayer_ShouldNotDependOn_Thalos` | `DAE-NO-THALOS-IN-APPLICATION` | |
 | `ApplicationLayer_ShouldNotDependOn_AgentsProject` | `DAE-LAYER-APPLICATION` | |
@@ -433,7 +437,7 @@ Every fact has one row. The Pack rule cell names the rules and layers of the [`d
 | `ZeroAllocOrmAssembly_IsLoaded_SoTheDomainRuleCoversIt` | `DAE-NO-ORM-IN-DOMAIN` | `requireTarget: true`. `Daedalus.Infrastructure` and `Daedalus.Agents` use `ZeroAlloc.ORM`. |
 | `ZeroAllocOutboxAssembly_IsLoaded_SoTheDomainRuleCoversIt` | `DAE-NO-OUTBOX-IN-DOMAIN` | `requireTarget: true`. `Daedalus.Agents` uses `ZeroAlloc.Outbox`, for example in `RunSteps`. |
 | `CronosAssembly_IsLoaded_SoTheDomainRuleCoversIt` | `DAE-NO-CRONOS-IN-DOMAIN` | `requireTarget: true`. `ScheduleReconciler` and `ScheduledRunStore` in `Daedalus.Agents` use `Cronos`. |
-| `No_project_references_ZeroAlloc_Scheduling` | `DAE-NO-ZEROALLOC-SCHEDULING` | A `.csproj` text scan becomes `bannedPackages`. The rule also catches the package when it arrives transitively. |
+| `No_project_references_ZeroAlloc_Scheduling` | `DAE-NO-ZEROALLOC-SCHEDULING` | A `.csproj` text scan becomes `bannedPackages`. The pattern matches any package id that contains the name, as the scan did. The rule also catches the package when it arrives transitively. |
 | `FluentValidation_is_absent_from_every_project_and_from_central_package_management` | `DAE-NO-FLUENTVALIDATION` | `bannedPackages` reads the restored package graph of each project. An entry in `Directory.Packages.props` that no project references is not covered; keep a text check if that matters. |
 | `CSharpFunctionalExtensions_is_absent_from_every_project_and_from_central_package_management` | `DAE-NO-CSHARPFUNCTIONALEXTENSIONS` | As above: `Directory.Packages.props` entries that no project references are not covered. |
 | `No_project_resolves_entity_framework` | `DAE-NO-ENTITY-FRAMEWORK` | From `NoEntityFrameworkTests.cs`. The fact read `obj/project.assets.json`, and so does `bannedPackages`; the projects must be restored. The prefix `Microsoft.EntityFrameworkCore` becomes `Microsoft.EntityFrameworkCore.**`. |
@@ -444,7 +448,7 @@ The layer facts become four layers with `allowedDependencies`. A layer forbids e
 
 ### The translated pack
 
-One standalone schema 2 pack, layers selected by assembly, rule ids prefixed `DAE-`. Each `because` is the fact's `Because` text.
+One standalone schema 2 pack, layers selected by assembly, rule ids prefixed `DAE-`. Each `because` is taken from the fact's `Because` text or assertion message, merged where several facts become one layer.
 
 ```yaml title=".architecture/rules.yaml"
 schema: 2
@@ -590,15 +594,15 @@ rules:
   - id: DAE-NO-ZEROALLOC-SCHEDULING
     because: ZeroAlloc.Scheduling is excluded by design; ScheduledRuns.NextRunAt is the source of truth and the sweep is idempotent, so durable job state buys nothing over the plain BackgroundService.
     bannedPackages:
-      packages: ["ZeroAlloc.Scheduling.**"]
+      packages: ["**.*ZeroAlloc.Scheduling*.**"]
   - id: DAE-NO-FLUENTVALIDATION
     because: Phase 1.7 replaced FluentValidation with ZeroAlloc.Validation.
     bannedPackages:
-      packages: ["FluentValidation.**"]
+      packages: ["**.*FluentValidation*.**"]
   - id: DAE-NO-CSHARPFUNCTIONALEXTENSIONS
     because: Phase 1.7 migrated every caller off CSharpFunctionalExtensions; it must not return.
     bannedPackages:
-      packages: ["CSharpFunctionalExtensions.**"]
+      packages: ["**.*CSharpFunctionalExtensions*.**"]
   - id: DAE-NO-ENTITY-FRAMEWORK
     because: Phase 3.5 removed EF Core; no project may resolve it again, directly or transitively.
     bannedPackages:
