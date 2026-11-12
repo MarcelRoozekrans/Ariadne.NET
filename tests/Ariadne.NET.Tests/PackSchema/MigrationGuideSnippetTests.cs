@@ -66,6 +66,11 @@ public sealed class MigrationGuideSnippetTests
             body!.Add(line[strip..]);
         }
 
+        if (fence != 0)
+        {
+            throw new FormatException("The markdown has an unclosed code fence, so the blocks after it would be misread.");
+        }
+
         return blocks;
     }
 
@@ -181,6 +186,24 @@ public sealed class MigrationGuideSnippetTests
     }
 
     [Fact]
+    public void Strips_the_indent_of_a_fence_inside_a_list_item()
+    {
+        const string Sample = "1. Step:\n\n   ```yaml\n   schema: 2\n   layers:\n     - id: a\n   ```\n\nAfter.";
+
+        YamlBlocks(Sample).Should().Equal("schema: 2\nlayers:\n  - id: a");
+    }
+
+    [Fact]
+    public void Throws_on_an_unclosed_fence()
+    {
+        const string Sample = "```yaml\nschema: 2\nname: open\n";
+
+        var act = () => YamlBlocks(Sample);
+
+        act.Should().Throw<FormatException>().WithMessage("*unclosed*");
+    }
+
+    [Fact]
     public void Page_has_yaml_blocks()
     {
         File.Exists(PagePath).Should().BeTrue($"the migration guide lives at {PagePath}");
@@ -254,7 +277,8 @@ public sealed class MigrationGuideSnippetTests
         var knownIds = ruleIds.Concat(Entries(pack, "layers").Select(static l => Scalar(l, "id")!)).ToHashSet(StringComparer.Ordinal);
 
         var map = DaedalusMap(markdown);
-        map.Should().HaveCountGreaterThanOrEqualTo(34, "the map has one row per Daedalus fact");
+        map.Should().HaveCount(37, "the map has one row per Daedalus fact");
+        map.Select(static row => row.Test).Should().OnlyHaveUniqueItems("each Daedalus test is mapped once");
 
         var mapped = map.SelectMany(static row => PackRuleIds(row.PackRule)).ToHashSet(StringComparer.Ordinal);
         mapped.Should().BeSubsetOf(knownIds, "the map names only rule and layer ids of the daedalus pack");
