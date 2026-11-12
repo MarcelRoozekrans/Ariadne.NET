@@ -664,4 +664,68 @@ public class RulePackReferenceCheckTests
 
         Resolve(PackWithRule(SlicesRule(Slices(allow)))).Error.Detail.Should().Be(expected);
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UniqueNamesTarget_WithATrait_Fails(bool onAgainst)
+    {
+        var plain = new TargetSelector { Layers = ["Domain"] };
+        var withTrait = new TargetSelector { Layers = ["Domain"], Sealed = true };
+        var rule = new RuleDefinition
+        {
+            Id = "R-1",
+            Because = "because",
+            Kind = RuleKind.UniqueNames,
+            From = onAgainst ? plain : withTrait,
+            Against = onAgainst ? withTrait : plain,
+        };
+
+        Resolve(PackWithRule(rule)).Error.Detail.Should().Be(
+            $"the {(onAgainst ? "against" : "for")} of rule 'R-1' has 'sealed', which a uniqueNames target does not take");
+    }
+
+    [Fact]
+    public void RequireRule_ImplementsWithAKeyBeyondNamespacesAssembliesTypes_Fails()
+    {
+        var requirement = new RuleRequirement { Implements = new TargetSelector { Types = ["**.IX"], Names = ["Legacy*"], Interfaces = ["**.IY"] } };
+
+        Resolve(PackWithRequire(requirement)).Error.Detail!.Split('\n').Should().Equal(
+            "the implements of rule 'R-1' has 'interfaces', which implements does not take; it takes namespaces, assemblies, types",
+            "the implements of rule 'R-1' has 'names', which implements does not take; it takes namespaces, assemblies, types");
+    }
+
+    [Fact]
+    public void BannedPackagesException_WithATrait_Fails()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "R-1",
+            Because = "because",
+            Kind = RuleKind.BannedPackages,
+            Packages = ["Newtonsoft.Json"],
+            From = new TargetSelector { Layers = ["Domain"] },
+            Exceptions = [new RuleException { Assemblies = ["Shop.Domain"], Nested = true, Because = "x" }],
+        };
+
+        Resolve(PackWithRule(rule)).Error.Detail.Should().Be(
+            "exceptions[0] of rule 'R-1' has 'nested'; a package belongs to a project, so the exception of a bannedPackages rule names it by 'assemblies'");
+    }
+
+    [Fact]
+    public void UniqueNamesException_WithAssemblies_Fails()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "R-1",
+            Because = "because",
+            Kind = RuleKind.UniqueNames,
+            From = new TargetSelector { Layers = ["Domain"] },
+            Against = new TargetSelector { Layers = ["Domain"] },
+            Exceptions = [new RuleException { Assemblies = ["Shop.Domain"], Because = "x" }],
+        };
+
+        Resolve(PackWithRule(rule)).Error.Detail.Should().Be(
+            "exceptions[0] of rule 'R-1' has 'assemblies'; an exception of a uniqueNames rule excuses a type's name, so it takes 'types' or 'namespaces'");
+    }
 }

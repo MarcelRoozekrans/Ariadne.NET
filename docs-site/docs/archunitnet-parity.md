@@ -59,7 +59,7 @@ Methods of `Types().Should()`.
 | `c-reside-in-assembly` | `ResideInAssembly`, `NotResideInAssembly` | `require` with `layer`, a layer selecting by `assemblies`; `:not` as `isNot: { assemblies }` | `covered` | |
 | `c-reside-in-namespace-matching` | `ResideInNamespaceMatching`, `NotResideInNamespaceMatching` | — | `out-of-scope` | Ariadne patterns are globs; translate a regex with a glob form by hand. |
 | `c-reside-in-assembly-matching` | `ResideInAssemblyMatching`, `NotResideInAssemblyMatching` | — | `out-of-scope` | Ariadne patterns are globs; translate a regex with a glob form by hand. |
-| `c-implement-interface` | `ImplementInterface`, `ImplementAny`, `ImplementAnyInterfacesThat`, `NotImplementInterface`, `NotImplementAny`, `NotImplementAnyInterfacesThat` | `require` with `implements`; `:not` as `isNot: { interfaces }` | `covered` | |
+| `c-implement-interface` | `ImplementInterface`, `ImplementAny`, `ImplementAnyInterfacesThat`, `NotImplementInterface`, `NotImplementAny`, `NotImplementAnyInterfacesThat` | `require` with `is: { interfaces }`, `isNot` | `covered` | The older `implements` on `require` skips enums and delegates; `is` checks them, as the enum `Broken.OrderStatus` shows. |
 | `c-be-assignable-to` | `BeAssignableTo`, `BeAssignableToTypesThat`, `NotBeAssignableTo`, `NotBeAssignableToTypesThat` | `require` with `is: { assignableTo }`, `isNot: { assignableTo }` | `covered` | |
 | `c-be-enums` | `BeEnums`, `NotBeEnums` | `require` with `is: { kinds: [enum] }`, `isNot` | `covered` | |
 | `c-be-structs` | `BeStructs`, `NotBeStructs` | `require` with `is: { kinds: [struct, recordStruct] }`, `isNot` | `covered` | |
@@ -106,7 +106,7 @@ Methods that every kind of object has, here applied to `Types()`.
 |---|---|---|---|---|
 | `p-are` | `Are`, `AreNot` | `types`; `:not` as an exception with `types` | `covered` | |
 | `c-be` | `Be`, `BeTypesThat`, `NotBe` | `require` with `is: { types }`, `isNot: { types }` | `covered` | |
-| `c-be-kind` | `Be(Classes())`, `Be(Interfaces())`, `NotBe(Interfaces())` | `require` with `kind`; `:not` as `isNot: { kinds }` | `divergence` | `kind: class` leaves out records, which `Classes()` holds; see [c-be-kind](#c-be-kind). The `:not` case agrees. |
+| `c-be-kind` | `Be(Classes())`, `Be(Interfaces())`, `NotBe(Interfaces())` | `require` with `kind`; `:not` as `isNot: { kinds }` | `divergence` | `kind: class` leaves out records, which `Classes()` holds, and skips enums and delegates, which `Be(Classes())` fails; `is: { kinds: [class, record] }` checks both. See [c-be-kind](#c-be-kind). The `:not` case agrees. |
 | `c-exist` | `Exist` | `VacuousRule` | `out-of-scope` | Every Ariadne rule already fails when its subject selects nothing. That failure names no type, so there is nothing to compare. |
 | `c-not-exist` | `NotExist` | `require` with `isNot: { types: ["**"] }` and `allowEmpty: true` | `covered` | `allowEmpty: true` keeps the rule from failing as vacuous once the namespace is empty. |
 
@@ -121,7 +121,7 @@ Methods that every kind of object has, here applied to `Types()`.
 | `p-are-protected-internal` | `AreProtectedInternal`, `AreNotProtectedInternal` | `accessibility: [protected internal]`; `:not` as `accessibility` with the other five values | `covered` | |
 | `p-are-private-protected` | `ArePrivateProtected`, `AreNotPrivateProtected` | `accessibility: [private protected]`; `:not` as `accessibility` with the other five values | `covered` | |
 | `c-be-public` | `BePublic`, `NotBePublic` | `require` with `is: { accessibility: [public] }`, `isNot` | `covered` | The older `accessibility: public` on `require` checks nothing, because it checks only `internal`; `is` checks `public`. |
-| `c-be-internal` | `BeInternal`, `NotBeInternal` | `require` with `accessibility: internal`; `:not` as `isNot: { accessibility: [internal] }` | `covered` | |
+| `c-be-internal` | `BeInternal`, `NotBeInternal` | `require` with `is: { accessibility: [internal] }`, `isNot` | `covered` | The older `accessibility: internal` on `require` skips enums and delegates; `is` checks them, as the public enum `Broken.OrderStatus` shows. |
 | `c-be-protected` | `BeProtected`, `NotBeProtected` | `require` with `is: { accessibility: [protected] }`, `isNot` | `covered` | |
 | `c-be-private` | `BePrivate`, `NotBePrivate` | `require` with `is: { accessibility: [private] }`, `isNot` | `covered` | |
 | `c-be-protected-internal` | `BeProtectedInternal`, `NotBeProtectedInternal` | `require` with `is: { accessibility: [protected internal] }`, `isNot` | `covered` | |
@@ -266,7 +266,7 @@ Here ArchUnitNET and Ariadne answer differently on purpose, mostly because one r
 Fixture `tests/fixtures/archunit-parity/CBeKind`, rule `Should().Be(Classes())` against `require` with `kind: class`. Both tools flag the interface `Broken.IOrderService` and the struct `Broken.Money`. Only Ariadne flags the record `Broken.Ledger`.
 
 - **Reason:** a record class compiles to a class, so ArchUnitNET's `Classes()` holds it. Ariadne reads source, where `record` is a kind of its own, so `kind: class` rejects a record.
-- **Expected:** ArchUnitNET's answer, since a record class is a class in C#. `is: { kinds: [class, record] }` expresses `Be(Classes())` exactly; the older `kind` key takes one kind. The `:not` case, `NotBe(Interfaces())` against `isNot: { kinds: [interface] }`, agrees.
+- **Expected:** ArchUnitNET's answer, since a record class is a class in C#. `is: { kinds: [class, record] }` expresses `Be(Classes())` exactly; the older `kind` key takes one kind and skips enums and delegates, which ArchUnitNET's `Be(Classes())` fails. The `:not` case, `NotBe(Interfaces())` against `isNot: { kinds: [interface] }`, agrees.
 
 ### p-are-abstract
 

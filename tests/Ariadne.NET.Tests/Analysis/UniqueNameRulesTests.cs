@@ -117,6 +117,22 @@ public class UniqueNameRulesTests
     }
 
     [Fact]
+    public void TargetFrameworkVariant_ExceptedInTheFirst_IsStillCheckedInTheNext()
+    {
+        var pack = PackWith(new RuleException { Sealed = true, Because = "Sealed web types may mirror domain names." });
+        var excepted = TestCompilation.Create("""
+            namespace Shop.Domain { public class Order { } }
+            namespace Shop.Web { public sealed class Order { } }
+            """);
+        var checkedVariant = TestCompilation.Create("""
+            namespace Shop.Domain { public class Order { } }
+            namespace Shop.Web { public class Order { } }
+            """);
+
+        Check(pack, excepted, checkedVariant).Should().ContainSingle().Which.SourceType.Should().Be("Shop.Web.Order");
+    }
+
+    [Fact]
     public void Exception_NamingForType_Suppresses()
     {
         var pack = PackWith(new RuleException { Types = ["Shop.Web.Order"], Because = "Legacy name." });

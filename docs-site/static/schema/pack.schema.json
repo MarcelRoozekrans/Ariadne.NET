@@ -482,11 +482,11 @@
         },
         "is": {
           "$ref": "#/$defs/conditionSelector",
-          "description": "The type must match this condition."
+          "description": "The type must match every key of this condition; each key it does not match is one violation. The values within one key are alternatives."
         },
         "isNot": {
           "$ref": "#/$defs/conditionSelector",
-          "description": "The type must not match this condition."
+          "description": "The type must match none of the keys of this condition; each key it matches is one violation, even when it does not match the condition as a whole. The values within one key are alternatives."
         }
       },
       "anyOf": [
