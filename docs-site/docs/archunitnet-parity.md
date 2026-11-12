@@ -156,7 +156,7 @@ Methods that every kind of object has, here applied to `Types()`.
 | `c-have-full-name-ending-with` | `HaveFullNameEndingWith`, `NotHaveFullNameEndingWith` | `require` with `is: { types: ["**.*Suffix"] }`, `isNot` | `divergence` | Ariadne ignores generic arity and matches with case. See [c-have-full-name-ending-with](#c-have-full-name-ending-with). |
 | `c-have-full-name-containing` | `HaveFullNameContaining`, `NotHaveFullNameContaining` | `require` with `is: { types: ["**.*Part*.**"] }`, `isNot` | `divergence` | Ariadne matches with case; ArchUnitNET ignores it. A part that spans a dot splits at it, as in `**.*NotBroken.Pay*.**`. See [c-have-full-name-containing](#c-have-full-name-containing). |
 | `c-have-full-name-matching` | `HaveFullNameMatching`, `NotHaveFullNameMatching` | — | `out-of-scope` | Ariadne patterns are globs; translate a regex with a glob form by hand. |
-| `c-have-assembly-qualified-name` | `HaveAssemblyQualifiedName`, `HaveAssemblyQualifiedNameStartingWith`, `HaveAssemblyQualifiedNameEndingWith`, `HaveAssemblyQualifiedNameContaining`, `HaveAssemblyQualifiedNameMatching` and their `Not` forms | — | `out-of-scope` | `assemblies` plus `types` express it. |
+| `c-have-assembly-qualified-name` | `HaveAssemblyQualifiedName`, `HaveAssemblyQualifiedNameStartingWith`, `HaveAssemblyQualifiedNameEndingWith`, `HaveAssemblyQualifiedNameContaining`, `HaveAssemblyQualifiedNameMatching` and their `Not` forms | — | `out-of-scope` | `assemblies` plus `types` express the positive forms. For a `Not` form, narrow `for` with one key and put the other in `isNot`: `isNot` with both keys rejects a type that matches either, not only one that matches both. |
 
 ### Dependencies
 

@@ -88,7 +88,7 @@ Methods of `That()`. Each becomes one key of a selector; several keys in one sel
 
 | ArchUnitNET | Pack YAML | Catalogue id |
 |---|---|---|
-| `ResideInNamespace("Ns")` | `namespaces: ["Ns"]`; use `"Ns.**"` instead, which matches `Ns` and every namespace below it, where ArchUnitNET matches `Ns` only | `p-reside-in-namespace` |
+| `ResideInNamespace("Ns")` | `namespaces: ["Ns"]`, which matches `Ns` only, as ArchUnitNET does. `"Ns.**"` also matches every namespace below `Ns`; that widens the rule, so use it only when you mean to change what the rule selects | `p-reside-in-namespace` |
 | `ResideInAssembly` | `assemblies: [Shop.Domain]`, the simple name | `p-reside-in-assembly` |
 | `ResideInNamespaceMatching`, `ResideInAssemblyMatching` | no regex; translate by hand, see [Translating patterns](#translating-patterns) | `p-reside-in-namespace-matching`, `p-reside-in-assembly-matching` |
 | `ImplementInterface`, `ImplementAny` | `interfaces: ["Ns.IName"]` | `p-implement-interface` |
@@ -165,7 +165,7 @@ ArchUnitNET negates a method with its `DoNot` or `Not` form. A pack negates in t
 | ArchUnitNET | Pack YAML | Catalogue id |
 |---|---|---|
 | `That().DoNot…`, such as `DoNotResideInNamespace` or `AreNotAssignableTo` | `exceptions: [{ namespaces: ["Ns"], because: "…" }]`, with the key of the positive form; a list trait such as `kinds` or `accessibility` can also list the other values instead. An exception takes only `namespaces`, `assemblies`, `types` and the type traits. `DoNotImplementInterface` uses `assignableTo`. `DoNotHaveAnyAttributes` and the negations of `attributes`, `interfaces` and `baseTypes` have no exception form, see #97 | — |
-| `Should().Not…`, such as `NotBeSealed` or `NotHaveName` | `isNot` with the key of the positive form, such as `isNot: { sealed: true }` | — |
+| `Should().Not…`, such as `NotBeSealed` or `NotHaveName` | `isNot` with the key of the positive form, such as `isNot: { sealed: true }`. Each `isNot` key fails a type it matches on its own, so a positive form that needs two keys does not negate by copying both into `isNot`: `NotHaveAssemblyQualifiedName` rejects a type only when its assembly and its name both match, but `isNot: { assemblies: […], types: […] }` rejects a type that matches either. Narrow `for` with one key and put the other in `isNot`, such as `for: { assemblies: [Shop.Domain] }` with `isNot: { types: ["Shop.Domain.Order"] }` | — |
 | `NotDependOnAny`, `NotDependOnAnyTypesThat` | `forbid: { from: …, to: … }` | `c-not-depend-on-any` |
 | `NotExist` | `require` with `isNot: { types: ["**"] }` and `allowEmpty: true` | `c-not-exist` |
 
@@ -426,9 +426,9 @@ Every fact has one row. The Pack rule cell names the rules and layers of the [`d
 | `WebLayer_ShouldNotDependOn_Thalos` | `DAE-NO-THALOS-IN-WEB` | |
 | `WebLayer_KeepsNoCopyOf_AnApplicationDto` | `DAE-WEB-NO-DTO-COPIES` | A reflection test becomes a `uniqueNames` rule. Both compare simple names with generic arity, so `PagedResultDto<T>` collides only with a generic type of the same name. |
 | `ApplicationDtoNames_CoverEveryDtoNamespace_TheNoCopyRuleIsLoadBearing` | `DAE-WEB-NO-DTO-COPIES` | The fact tested the C# helper `ApplicationDtoNames()`, which goes away. `against` is `Daedalus.Application.DTOs.**`, which covers the root namespace and every sub-namespace, and `requireTarget: true` fails the run when no type is declared there. The subject side, the Web types, is checked for vacuity on every run. |
-| `AgentsProject_DoesDependOn_Thalos_RulesAreLoadBearing` | `DAE-NO-THALOS-IN-DOMAIN`, `DAE-NO-THALOS-IN-APPLICATION`, `DAE-NO-THALOS-IN-INFRASTRUCTURE`, `DAE-NO-THALOS-IN-WEB` | Each sets `requireTarget: true`, so the run fails when no Daedalus code references a `Thalos.**` type. This proves Thalos is used somewhere, not that `Daedalus.Agents` uses it. That is enough here: the four rules flag every other layer that references Thalos. |
+| `AgentsProject_DoesDependOn_Thalos_RulesAreLoadBearing` | `DAE-NO-THALOS-IN-DOMAIN`, `DAE-NO-THALOS-IN-APPLICATION`, `DAE-NO-THALOS-IN-INFRASTRUCTURE`, `DAE-NO-THALOS-IN-WEB` | Each sets `requireTarget: true`, so the run fails when no Daedalus code references a `Thalos.**` type. This proves the `Thalos.**` pattern still matches real types, which is what kept the four rules from passing vacuously, but not that `Daedalus.Agents` is the code that references them. The four rules do not cover the API, where Thalos is allowed, so an API reference to Thalos satisfies `requireTarget` even after `Daedalus.Agents` stops using Thalos. The fact's narrower guarantee, that `Daedalus.Agents` itself depends on Thalos, is lost; keep a C# check if you need it. |
 | `OnlyAgentsProject_DependsOn_RagNet` | `DAE-RAGNET-ONLY-IN-AGENTS` | One `forbid` from the five layers the fact loops over. No `requireTarget`: see the next row. |
-| `MemoryRagNetAdapter_DoesDependOn_RagNet_RuleIsLoadBearing` | stays in C# | Daedalus reaches Rag.NET only through `Thalos.NET.Memory.RagNet`, and no Daedalus code names a `Rag.**` type, so `requireTarget` could never find the target. Keep a reflection check that `typeof(IVectorStore).Namespace` still starts with `Rag.`. |
+| `MemoryRagNetAdapter_DoesDependOn_RagNet_RuleIsLoadBearing` | stays in C# | Daedalus reaches Rag.NET only through `Thalos.NET.Memory.RagNet`, and no Daedalus code names a `Rag.**` type, so `requireTarget` could never find the target. A reflection check that `typeof(IVectorStore).Namespace` still starts with `Rag.` keeps one half of the fact: the `Rag.**` pattern still names Rag.NET's namespace, so the `forbid` rule cannot pass because the pattern went stale. It is a weaker proxy: the namespace comes from the assembly that declares `IVectorStore`, so the check still passes after `Thalos.NET.Memory.RagNet` drops Rag.NET. The fact also asserted that the adapter depends on Rag.NET; to keep that, check the adapter assembly itself, for example that its referenced assemblies include a Rag.NET one. |
 | `Endpoints_ShouldResideIn_ApiLayer` | `DAE-ENDPOINTS-IN-API` | `Classes()` holds records, so `kinds` is `[class, record]`. |
 | `RepositoryInterfaces_ShouldResideIn_ApplicationLayer` | `DAE-REPOSITORY-INTERFACES-IN-APPLICATION` | `HaveNameStartingWith("I").And().HaveNameEndingWith("Repository")` becomes `names: ["I*Repository"]`. |
 | `RepositoryImplementations_ShouldResideIn_InfrastructureLayer` | `DAE-REPOSITORIES-IN-INFRASTRUCTURE` | `AreNotAbstract()` becomes `abstract: false`, plus `static: false`, because ArchUnitNET reads a static class as abstract. Test doubles such as `RacingProjectRepository` live in the test projects, which ArchUnitNET did not load; an exception exempts them. |
@@ -440,7 +440,7 @@ Every fact has one row. The Pack rule cell names the rules and layers of the [`d
 | `No_project_references_ZeroAlloc_Scheduling` | `DAE-NO-ZEROALLOC-SCHEDULING` | A `.csproj` text scan becomes `bannedPackages`. The pattern matches any package id that contains the name, as the scan did. The rule also catches the package when it arrives transitively. |
 | `FluentValidation_is_absent_from_every_project_and_from_central_package_management` | `DAE-NO-FLUENTVALIDATION` | `bannedPackages` reads the restored package graph of each project. An entry in `Directory.Packages.props` that no project references is not covered; keep a text check if that matters. |
 | `CSharpFunctionalExtensions_is_absent_from_every_project_and_from_central_package_management` | `DAE-NO-CSHARPFUNCTIONALEXTENSIONS` | As above: `Directory.Packages.props` entries that no project references are not covered. |
-| `No_project_resolves_entity_framework` | `DAE-NO-ENTITY-FRAMEWORK` | From `NoEntityFrameworkTests.cs`. The fact read `obj/project.assets.json`, and so does `bannedPackages`; the projects must be restored. The prefix `Microsoft.EntityFrameworkCore` becomes `Microsoft.EntityFrameworkCore.**`. |
+| `No_project_resolves_entity_framework` | `DAE-NO-ENTITY-FRAMEWORK` | From `NoEntityFrameworkTests.cs`. The fact read `obj/project.assets.json`, and so does `bannedPackages`; the projects must be restored. The prefix `Microsoft.EntityFrameworkCore` becomes `Microsoft.EntityFrameworkCore*.**`: the `*` matches the rest of the segment, as the prefix check did, so `Microsoft.EntityFrameworkCoreExtra` is caught too, and the trailing `**` still matches `Microsoft.EntityFrameworkCore` itself. |
 | `Every_path_built_on_NuGetPackageRoot_ensures_its_trailing_slash` | stays in C# | From `NuGetPackageRootPathTests.cs`. A text scan of `.csproj`, `.props` and `.targets` files; no pack rule reads MSBuild text. |
 | `Every_validated_dto_has_a_registered_validation_adapter` | stays in C# | From the integration project. It needs the DI container the API host builds; a pack sees types and references, not registrations at run time. |
 
@@ -607,13 +607,13 @@ rules:
     because: Phase 3.5 removed EF Core; no project may resolve it again, directly or transitively.
     bannedPackages:
       packages:
-        - "Microsoft.EntityFrameworkCore.**"
+        - "Microsoft.EntityFrameworkCore*.**"
         - "Npgsql.EntityFrameworkCore.PostgreSQL"
         - "ZeroAlloc.Outbox.EfCore"
         - "ZeroAlloc.ValueObjects.EfCore"
 ```
 
-The three facts that stay in C# remain tests. Without ArchUnitNET, the Rag.NET fact becomes a plain reflection assertion that `typeof(IVectorStore).Namespace` starts with `Rag.`.
+The three facts that stay in C# remain tests. Without ArchUnitNET, the Rag.NET fact becomes plain reflection. A check that `typeof(IVectorStore).Namespace` starts with `Rag.` proves only that the `Rag.**` pattern is not stale; a check on the adapter assembly's references is needed to prove that the adapter still depends on Rag.NET.
 
 ### Before and after
 
