@@ -143,7 +143,7 @@ internal static class LayerRules
     {
         ArgumentNullException.ThrowIfNull(violation);
 
-        if (violation.Kind is not (ViolationKind.DependencyNotAllowed or ViolationKind.ForbiddenDependency or ViolationKind.DependencyNotPermitted))
+        if (violation.Kind is not (ViolationKind.DependencyNotAllowed or ViolationKind.ForbiddenDependency or ViolationKind.DependencyNotPermitted or ViolationKind.SliceDependency))
         {
             return violation with { ReferenceCount = count };
         }
@@ -156,7 +156,7 @@ internal static class LayerRules
     }
 
     // The message names the count only when the source type references the target more than once.
-    private static string CountSuffix(int count) =>
+    internal static string CountSuffix(int count) =>
         count > 1 ? string.Create(CultureInfo.InvariantCulture, $" {count} times") : string.Empty;
 
     // Located violations first, then the unlocated ones.

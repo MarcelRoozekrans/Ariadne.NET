@@ -3,5 +3,11 @@ name: parity-s-not-depend-on-each-other
 version: "1.0.0"
 author: fixture
 
-# No rule yet: a pack cannot group types into slices. Phase 4.3 adds PARITY-SNOTDEPENDONEACHOTHER here, a slices rule with independent: true, and deletes its KnownGaps entry.
 # The harness compares slices by full namespace, such as Parity.SNotDependOnEachOther.Broken.Orders: every namespace below Parity.SNotDependOnEachOther is its own slice.
+# Broken.Orders.Internal is a slice of its own under (**), as under ArchUnitNET, so Broken.Orders depending on it is a violation.
+rules:
+  - id: PARITY-SNOTDEPENDONEACHOTHER
+    because: Mirrors ArchUnitNET's Slices().Matching("Parity.SNotDependOnEachOther.(**)").Should().NotDependOnEachOther().
+    slices:
+      matching: ["Parity.SNotDependOnEachOther.(**)"]
+      independent: true

@@ -190,13 +190,13 @@ Methods that every kind of object has, here applied to `Types()`.
 
 ## Slices
 
-`Slices().Matching(...)` and `Slices().MatchingWithPackages(...)` group types into slices by a namespace pattern; `Should()` then checks the slices against each other. Phase 4.3 adds slice rules to packs.
+`Slices().Matching(...)` and `Slices().MatchingWithPackages(...)` group types into slices by a namespace pattern; `Should()` then checks the slices against each other. A pack writes them as a [`slices` rule](how-it-works/rule-types.md#slices).
 
 | Id | ArchUnitNET | Ariadne | Status | Notes |
 |---|---|---|---|---|
-| `s-free-of-cycles` | `Matching`, `BeFreeOfCycles` | — | `gap` | 4.3 |
-| `s-not-depend-on-each-other` | `Matching`, `NotDependOnEachOther` | — | `gap` | 4.3 |
-| `s-matching-with-packages` | `MatchingWithPackages` | — | `gap` | 4.3 |
+| `s-free-of-cycles` | `Matching`, `BeFreeOfCycles` | `slices` with `matching` and `freeOfCycles: true` | `covered` | Translate `X.(*)` and `X.(**)` to `X.(**)`: ArchUnitNET's capture takes every namespace below `X`, each as its own slice, and Ariadne's `(**)` does the same. One violation per slice edge in a cycle. |
+| `s-not-depend-on-each-other` | `Matching`, `NotDependOnEachOther` | `slices` with `matching` and `independent: true` | `covered` | Translate `X.(*)` and `X.(**)` to `X.(**)`. ArchUnitNET ignores a suffix after `(*)`, so `X.(*).Suffix` also becomes `X.(**)`. A pack written as `X.(*).**` folds `X.A.Internal` into slice `A`, so `A` depending on it is no violation; under ArchUnitNET and `X.(**)` it is. |
+| `s-matching-with-packages` | `MatchingWithPackages` | `slices` with `matching` and `independent: true` | `covered` | Same translation as `Matching`. The two differ only in how ArchUnitNET names a slice, by full namespace or by the captured text; Ariadne names it by the captured text. |
 
 ## Member level
 

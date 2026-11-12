@@ -1,6 +1,6 @@
 schema: 2
 name: modular-monolith
-version: "1.0.0"
+version: "1.1.0"
 author: platform-team
 
 layers:
@@ -34,6 +34,15 @@ layers:
       - Module.Public
       - Module.Core
       - Module.Infrastructure
+
+rules:
+  - id: MM-MODULES-INDEPENDENT
+    because: A module may use another module only through that module's public API.
+    allowEmpty: true
+    slices:
+      matching: ["**.(*).Public.**", "**.(*).Core.**", "**.(*).Infrastructure.**"]
+      independent: true
+      allow: { layers: [Module.Public] }
 
 componentRoles:
   - name: ModuleContract

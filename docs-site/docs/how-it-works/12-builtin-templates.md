@@ -6,7 +6,7 @@ sidebar_position: 12
 
 Ten templates ship as embedded YAML resources, all in schema 2.
 
-Every layer of a standalone template has an `id` with a pack prefix (`CA-` for clean-architecture, `ONION-`, `HEX-`, `LAY-`, `MS-`, `ED-`, `VS-` and `MM-` for the others, as in `CA-LAYER-DOMAIN`), a `because` written for that architecture, and a namespace selector of the form `**.<Segment>.**`. `Domain` in clean-architecture is `**.Domain.**`, which matches `Shop.Domain` and `Shop.Orders.Domain.Entities`. A solution whose namespaces do not follow that naming retargets the layers; see [Rule Schema](03-rule-schema.md#extends). None of the built-in packs defines `rules` yet.
+Every layer of a standalone template has an `id` with a pack prefix (`CA-` for clean-architecture, `ONION-`, `HEX-`, `LAY-`, `MS-`, `ED-`, `VS-` and `MM-` for the others, as in `CA-LAYER-DOMAIN`), a `because` written for that architecture, and a namespace selector of the form `**.<Segment>.**`. `Domain` in clean-architecture is `**.Domain.**`, which matches `Shop.Domain` and `Shop.Orders.Domain.Entities`. A solution whose namespaces do not follow that naming retargets the layers; see [Rule Schema](03-rule-schema.md#extends). Only `modular-monolith` defines `rules`: one slices rule that keeps modules out of each other's internals.
 
 The templates fall into two categories:
 
@@ -183,7 +183,32 @@ graph TD
     Module.Core --> Module.Public
 ```
 
-The layers select `**.Public.**`, `**.Core.**`, `**.Infrastructure.**` and `**.Host.**`, so `Orders.Core` and `Billing.Core` are one layer, and `Orders.Core` may depend on `Billing.Core`. The pack does not isolate modules from each other. A rule type for module isolation is tracked in [issue #32](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/32).
+The layers select `**.Public.**`, `**.Core.**`, `**.Infrastructure.**` and `**.Host.**`, so `Orders.Core` and `Billing.Core` are one layer, and the layer rules alone would let `Orders.Core` depend on `Billing.Core`. The pack's one rule, `MM-MODULES-INDEPENDENT`, keeps modules apart:
+
+```yaml
+rules:
+  - id: MM-MODULES-INDEPENDENT
+    because: A module may use another module only through that module's public API.
+    allowEmpty: true
+    slices:
+      matching: ["**.(*).Public.**", "**.(*).Core.**", "**.(*).Infrastructure.**"]
+      independent: true
+      allow: { layers: [Module.Public] }
+```
+
+It is a [slices rule](rule-types.md#slices). The module is the namespace segment before `Public`, `Core` or `Infrastructure`, so `Shop.Orders.Core.OrderService` is in slice `Orders` and `Shop.Billing.Public.IInvoicing` in slice `Billing`. What it allows and what it reports:
+
+| From | To | Result |
+|------|----|--------|
+| `Orders.Core` | `Orders.Public` (own module) | allowed: same slice |
+| `Billing.Core` | `Orders.Public` (another module's public API) | allowed by `allow` |
+| `Orders.Core` or `Orders.Infrastructure` | `Billing.Core` or `Billing.Infrastructure` | `SliceDependency` violation |
+| `Host` | any module's `Public`, `Core` or `Infrastructure` | allowed: the host is in no slice |
+| `Shop.SharedKernel` | anything | allowed: shared code outside the `Public`, `Core` and `Infrastructure` shape has no slice and is free to use |
+
+Inside one module the layer rules still apply, so `Orders.Core` may not use `Orders.Infrastructure`. `allowEmpty: true` matches the pack's roles: a solution with no namespace in this shape gets no vacuity error for the rule. A team that has a type that must reach into another module adds it to the rule's `exceptions` in its own pack, with an entry that has only `id: MM-MODULES-INDEPENDENT` and `exceptions`. Extending the rule's `allow` from a child pack is not possible yet; it is tracked in #103.
+
+Cycles between modules through their public APIs are not reported: `Orders.Core` may use `Billing.Public` while `Billing.Core` uses `Orders.Public`, because `allow` removes those edges before the check. A team that wants module dependencies to form no cycle adds its own rule with `freeOfCycles: true` over the same patterns, without `allow`.
 
 ## Composable Add-on Templates
 

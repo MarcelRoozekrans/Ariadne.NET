@@ -1,0 +1,26 @@
+schema: 2
+name: x
+layers:
+  - name: Public
+    id: X-L-PUBLIC
+    because: public surface
+    namespaces: ["**.Public.**"]
+rules:
+  - id: X-R1
+    because: Modules stay independent.
+    allowEmpty: true
+    slices:
+      matching: ["Shop.(*).**", "Lib.(**).Core"]
+      independent: true
+      allow:
+        layers: [Public]
+        sealed: false
+    exceptions:
+      - types: ["Shop.Orders.Legacy.**"]
+        because: Removed in the next release.
+  - id: X-R2
+    because: Modules form a hierarchy.
+    slices:
+      matching: ["Shop.(*)"]
+      freeOfCycles: true
+      allow: { namespaces: ["Shop.*.Public.**"], assemblies: ["Shop.Shared"] }

@@ -155,6 +155,22 @@ public sealed class SolutionPathTests : IDisposable
     }
 
     [Fact]
+    public void DotnetStartInfo_LeavesOutTheMSBuildThisProcessRegistered()
+    {
+        MSBuildLocatorRegistration.EnsureRegistered().Should().BeNull();
+        Environment.GetEnvironmentVariable("MSBUILD_EXE_PATH").Should().NotBeNullOrEmpty("registering an SDK pins its MSBuild in this process");
+
+        var info = FixtureProjects.DotnetStartInfo("restore", "Shop.slnx");
+
+        foreach (var variable in FixtureProjects.MSBuildLocatorVariables)
+        {
+            info.Environment.ContainsKey(variable).Should().BeFalse(variable);
+        }
+
+        info.ArgumentList.Should().Equal("restore", "Shop.slnx");
+    }
+
+    [Fact]
     public void RestoreUnderLock_MissingAssetsFile_RestoresAgain()
     {
         FixtureProjects.EnsureRestored();

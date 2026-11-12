@@ -1,0 +1,12 @@
+# A capture is accepted only in matching, and only a slices rule rejects it elsewhere, which the schema cannot tell from a plain glob.
+schema: 2
+name: x
+rules:
+  - id: X-R1
+    because: b
+    slices:
+      matching: ["Shop.(*).**"]
+      independent: true
+    exceptions:
+      - namespaces: ["Shop.(*).Legacy"]
+        because: y

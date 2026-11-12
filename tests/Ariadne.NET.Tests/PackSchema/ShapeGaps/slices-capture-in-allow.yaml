@@ -1,0 +1,11 @@
+# A capture is accepted only in matching, a rule about pattern text that the schema leaves to the loader.
+schema: 2
+name: x
+rules:
+  - id: X-R1
+    because: b
+    slices:
+      matching: ["Shop.(*).**"]
+      independent: true
+      allow:
+        namespaces: ["Shop.(*).Public"]

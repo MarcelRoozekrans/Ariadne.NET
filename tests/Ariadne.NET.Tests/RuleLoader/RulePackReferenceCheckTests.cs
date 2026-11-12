@@ -551,6 +551,136 @@ public class RulePackReferenceCheckTests
         Resolve(PackWithRule(rule)).IsSuccess.Should().BeTrue();
     }
 
+    private static RuleDefinition SlicesRule(SliceDefinition? slices) => new()
+    {
+        Id = "R-1",
+        Because = "because",
+        Kind = RuleKind.Slices,
+        From = new TargetSelector(),
+        Slices = slices,
+    };
+
+    private static SliceDefinition Slices(TargetSelector? allow = null, string pattern = "Shop.(*).**", bool independent = true) => new()
+    {
+        Matching = [pattern],
+        Independent = independent,
+        FreeOfCycles = !independent,
+        Allow = allow,
+    };
+
+    [Fact]
+    public void Slices_rule_with_known_layer_in_allow_passes()
+    {
+        Resolve(PackWithRule(SlicesRule(Slices(new TargetSelector { Layers = ["domain"] })))).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Unknown_layer_in_allow_is_invalid()
+    {
+        Resolve(PackWithRule(SlicesRule(Slices(new TargetSelector { Layers = ["Ghost"] })))).Error.Detail
+            .Should().Be("rule 'R-1' refers to unknown layer 'Ghost'");
+    }
+
+    [Fact]
+    public void Slices_rule_without_slices_is_invalid()
+    {
+        Resolve(PackWithRule(SlicesRule(null))).Error.Detail.Should().Be("rule 'R-1' is a slices rule and has no slices");
+    }
+
+    [Fact]
+    public void Slices_rule_with_an_invalid_pattern_is_invalid()
+    {
+        Resolve(PackWithRule(SlicesRule(Slices(pattern: "Shop.**")))).Error.Detail.Should().Be(
+            "the slices of rule 'R-1' has an invalid pattern: pattern 'Shop.**' must have exactly one capture, (*) or (**)");
+    }
+
+    [Fact]
+    public void Slices_rule_with_both_conditions_is_invalid()
+    {
+        var slices = new SliceDefinition { Matching = ["Shop.(*)"], Independent = true, FreeOfCycles = true };
+
+        Resolve(PackWithRule(SlicesRule(slices))).Error.Detail.Should().Be(
+            "the slices of rule 'R-1' must set exactly one of freeOfCycles and independent to true");
+    }
+
+    [Fact]
+    public void Slices_rule_with_empty_matching_is_invalid()
+    {
+        var slices = new SliceDefinition { Matching = [], Independent = true };
+
+        Resolve(PackWithRule(SlicesRule(slices))).Error.Detail.Should().Be("the slices of rule 'R-1' needs at least one entry in matching");
+    }
+
+    [Fact]
+    public void Slices_rule_with_a_null_matching_entry_is_invalid()
+    {
+        var slices = new SliceDefinition { Matching = ["Shop.(*)", null!], Independent = true };
+
+        Resolve(PackWithRule(SlicesRule(slices))).Error.Detail.Should().Be("the slices of rule 'R-1' has a null entry in matching");
+    }
+
+    [Fact]
+    public void Slices_rule_with_null_matching_is_invalid()
+    {
+        var slices = new SliceDefinition { Matching = null!, Independent = true };
+
+        Resolve(PackWithRule(SlicesRule(slices))).Error.Detail.Should().Be("the slices of rule 'R-1' needs at least one entry in matching");
+    }
+
+    [Fact]
+    public void Capture_in_an_exception_of_a_slices_rule_is_invalid()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "R-1",
+            Because = "because",
+            Kind = RuleKind.Slices,
+            From = new TargetSelector(),
+            Slices = Slices(),
+            Exceptions = [new RuleException { Namespaces = ["Shop.(*).Legacy"], Because = "x" }],
+        };
+
+        Resolve(PackWithRule(rule)).Error.Detail.Should().Be(
+            "exceptions[0] of rule 'R-1' has a pattern with a capture; a capture, (*) or (**), is only accepted in the matching of a slices rule");
+    }
+
+    [Fact]
+    public void Capture_in_an_amendment_exception_of_a_slices_rule_is_invalid()
+    {
+        var pack = new RulePack
+        {
+            Name = "child",
+            Extends = ["builtin://modular-monolith"],
+            RuleAmendments = [new RuleAmendment { Id = "MM-MODULES-INDEPENDENT", Exceptions = [new RuleException { Namespaces = ["Shop.(**).Legacy"], Because = "x" }] }],
+        };
+
+        Resolve(pack).Error.Detail.Should().Be(
+            "exceptions[0] of rule 'MM-MODULES-INDEPENDENT' has a pattern with a capture; a capture, (*) or (**), is only accepted in the matching of a slices rule");
+    }
+
+    [Fact]
+    public void Capture_in_the_allow_of_a_slices_rule_is_invalid()
+    {
+        Resolve(PackWithRule(SlicesRule(Slices(new TargetSelector { Namespaces = ["Shop.(**).Public"] })))).Error.Detail.Should().Be(
+            "the allow of rule 'R-1' has a pattern with a capture; a capture, (*) or (**), is only accepted in the matching of a slices rule");
+    }
+
+    [Theory]
+    [InlineData("members", "the allow of rule 'R-1' has members, which it does not take")]
+    [InlineData("empty", "the allow of rule 'R-1' selects nothing; it needs at least one selector key")]
+    [InlineData("mixed", "the allow of rule 'R-1' mixes layers with namespaces, assemblies, types, base types, interfaces, attributes or members")]
+    public void Slices_rule_with_an_unusable_allow_is_invalid(string shape, string expected)
+    {
+        var allow = shape switch
+        {
+            "members" => new TargetSelector { Members = ["**.Get"] },
+            "empty" => new TargetSelector(),
+            _ => new TargetSelector { Layers = ["Domain"], Namespaces = ["X"] },
+        };
+
+        Resolve(PackWithRule(SlicesRule(Slices(allow)))).Error.Detail.Should().Be(expected);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

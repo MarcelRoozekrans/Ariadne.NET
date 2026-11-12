@@ -48,7 +48,7 @@
       "items": {
         "$ref": "#/$defs/rule"
       },
-      "description": "List of forbid, allowOnly, require, bannedPackages and uniqueNames rules. In a child pack an entry with only id and exceptions adds exceptions to an inherited rule."
+      "description": "List of forbid, allowOnly, require, bannedPackages, uniqueNames and slices rules. In a child pack an entry with only id and exceptions adds exceptions to an inherited rule."
     },
     "componentRoles": {
       "type": "array",
@@ -638,6 +638,9 @@
         },
         "uniqueNames": {
           "$ref": "#/$defs/uniqueNamesBody"
+        },
+        "slices": {
+          "$ref": "#/$defs/slicesBody"
         }
       },
       "oneOf": [
@@ -664,6 +667,11 @@
         {
           "required": [
             "uniqueNames"
+          ]
+        },
+        {
+          "required": [
+            "slices"
           ]
         }
       ],
@@ -982,6 +990,147 @@
         }
       },
       "minProperties": 1
+    },
+    "sliceAllowSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Like a forbid to selector without members: the targets a slice may depend on. At least one key. layers cannot be combined with the other selector keys.",
+      "properties": {
+        "layers": {
+          "$ref": "#/$defs/patternList"
+        },
+        "namespaces": {
+          "$ref": "#/$defs/patternList"
+        },
+        "assemblies": {
+          "$ref": "#/$defs/patternList"
+        },
+        "types": {
+          "$ref": "#/$defs/patternList"
+        },
+        "baseTypes": {
+          "$ref": "#/$defs/patternList"
+        },
+        "interfaces": {
+          "$ref": "#/$defs/patternList"
+        },
+        "attributes": {
+          "$ref": "#/$defs/patternList"
+        },
+        "names": {
+          "$ref": "#/$defs/nameList"
+        },
+        "kinds": {
+          "$ref": "#/$defs/kindList"
+        },
+        "accessibility": {
+          "$ref": "#/$defs/accessibilityList"
+        },
+        "assignableTo": {
+          "$ref": "#/$defs/patternList"
+        },
+        "sealed": {
+          "type": "boolean"
+        },
+        "abstract": {
+          "type": "boolean"
+        },
+        "static": {
+          "type": "boolean"
+        },
+        "nested": {
+          "type": "boolean"
+        }
+      },
+      "not": {
+        "required": [
+          "layers"
+        ],
+        "anyOf": [
+          {
+            "required": [
+              "namespaces"
+            ]
+          },
+          {
+            "required": [
+              "assemblies"
+            ]
+          },
+          {
+            "required": [
+              "types"
+            ]
+          },
+          {
+            "required": [
+              "baseTypes"
+            ]
+          },
+          {
+            "required": [
+              "interfaces"
+            ]
+          },
+          {
+            "required": [
+              "attributes"
+            ]
+          }
+        ]
+      },
+      "minProperties": 1
+    },
+    "slicesBody": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Cuts the code into slices by the one capture of each matching pattern and checks them. Exactly one of freeOfCycles and independent, set to true.",
+      "required": [
+        "matching"
+      ],
+      "properties": {
+        "matching": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/text"
+          },
+          "description": "Dotted glob patterns with exactly one capture, (*) for one segment or (**) for one or more, as a whole segment. The captured text names the slice. The first matching pattern wins."
+        },
+        "freeOfCycles": {
+          "const": true,
+          "description": "Slices may depend on each other, but not in a cycle."
+        },
+        "independent": {
+          "const": true,
+          "description": "Slices may not depend on each other at all, except on what allow selects. Also rules out cycles, except through targets that allow selects."
+        },
+        "allow": {
+          "$ref": "#/$defs/sliceAllowSelector"
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "freeOfCycles"
+          ],
+          "not": {
+            "required": [
+              "independent"
+            ]
+          }
+        },
+        {
+          "required": [
+            "independent"
+          ],
+          "not": {
+            "required": [
+              "freeOfCycles"
+            ]
+          }
+        }
+      ]
     }
   }
 }

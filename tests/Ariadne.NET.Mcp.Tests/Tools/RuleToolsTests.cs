@@ -168,7 +168,7 @@ public class RuleToolsTests
             .GetCustomAttribute<DescriptionAttribute>()!;
 
         attribute.Description.Should().Be(
-            "Get the forbid, allowOnly, require, bannedPackages and uniqueNames rules of the resolved pack, each with its id, targets, requirement, packages, against selector, exceptions and because. A forbid or allowOnly target may select members.");
+            "Get the forbid, allowOnly, require, bannedPackages, uniqueNames and slices rules of the resolved pack, each with its id, targets, requirement, packages, against selector, slices, exceptions and because. A forbid or allowOnly target may select members.");
     }
 
     private sealed class FixedHelper(RulePack pack) : IRuleResolutionHelper

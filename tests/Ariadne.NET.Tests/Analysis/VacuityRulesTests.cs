@@ -220,6 +220,49 @@ public class VacuityRulesTests
         v.Message.Should().Be("Rule 'R-PKG' selects no type: its 'from.assemblies' matches none of the 1 project(s) loaded.");
     }
 
+    private static RuleDefinition SlicesRule(string pattern, bool allowEmpty = false, params RuleException[] exceptions) => new()
+    {
+        Id = "R-SLICES",
+        Because = "Because R-SLICES.",
+        Kind = RuleKind.Slices,
+        From = new TargetSelector(),
+        Slices = new SliceDefinition { Matching = [pattern], Independent = true },
+        AllowEmpty = allowEmpty,
+        Exceptions = exceptions,
+    };
+
+    [Fact]
+    public void Slices_rule_selecting_no_type_is_vacuous()
+    {
+        var v = Check(Pack([], [SlicesRule("Nowhere.(*).**")]), TwoLayers).Should().ContainSingle().Subject;
+
+        v.Kind.Should().Be(ViolationKind.VacuousRule);
+        v.RuleId.Should().Be("R-SLICES");
+        v.SourceType.Should().Be("R-SLICES");
+        v.Because.Should().Be("Because R-SLICES.");
+        v.Message.Should().Be("Rule 'R-SLICES' selects no type: its 'matching' patterns place no type in a slice in the 1 project(s) loaded.");
+    }
+
+    [Fact]
+    public void Slices_rule_selecting_no_type_is_not_vacuous_unless_allowEmpty()
+    {
+        Check(Pack([], [SlicesRule("Nowhere.(*).**", allowEmpty: true)]), TwoLayers).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Slices_rule_with_one_slice_is_not_vacuous()
+    {
+        Check(Pack([], [SlicesRule("Shop.(*).**")]), "namespace Shop.Orders { public class A { } }").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Slices_rule_whose_only_sliced_type_is_excepted_is_not_vacuous()
+    {
+        var rule = SlicesRule("Shop.(*).**", exceptions: new RuleException { Types = ["Shop.Orders.A"], Because = "Excepted." });
+
+        Check(Pack([], [rule]), "namespace Shop.Orders { public class A { } }").Should().BeEmpty();
+    }
+
     [Fact]
     public void Violations_have_no_location_and_the_expected_kinds()
     {

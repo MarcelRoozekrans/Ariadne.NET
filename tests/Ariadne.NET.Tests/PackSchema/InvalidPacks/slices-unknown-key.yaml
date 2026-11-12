@@ -1,0 +1,9 @@
+schema: 2
+name: x
+rules:
+  - id: X-R1
+    because: b
+    slices:
+      matching: ["Shop.(*).**"]
+      independent: true
+      cycles: true

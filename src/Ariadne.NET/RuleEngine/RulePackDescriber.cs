@@ -30,6 +30,7 @@ public static class RulePackDescriber
             RuleKind.Require => "require",
             RuleKind.BannedPackages => "bannedPackages",
             RuleKind.UniqueNames => "uniqueNames",
+            RuleKind.Slices => "slices",
             _ => rule.Kind.ToString(),
         };
         var target = rule.Kind switch
@@ -39,7 +40,10 @@ public static class RulePackDescriber
             RuleKind.UniqueNames => $"against {Describe(rule.Against)}",
             _ => Describe(rule.To),
         };
-        var lines = new List<string> { $"{rule.Id} {kind} {Describe(rule.From)} -> {target}" };
+        var head = rule.Kind == RuleKind.Slices
+            ? $"{rule.Id} {kind} {Describe(rule.Slices)}"
+            : $"{rule.Id} {kind} {Describe(rule.From)} -> {target}";
+        var lines = new List<string> { head };
         if (rule.Exceptions.Count > 0)
         {
             lines.Add($"{rule.Exceptions.Count} exception(s)");
@@ -52,6 +56,19 @@ public static class RulePackDescriber
 
         lines.Add(rule.Because);
         return lines;
+    }
+
+    /// <summary>The <c>matching</c> patterns, the condition and the <c>allow</c> selector of a slices rule, as <c>matching A, B -> independent; allow …</c>.</summary>
+    public static string Describe(SliceDefinition? slices)
+    {
+        if (slices is null)
+        {
+            return "no slices";
+        }
+
+        var condition = slices.Independent ? "independent" : slices.FreeOfCycles ? "freeOfCycles" : "no condition";
+        var text = $"matching {string.Join(", ", slices.Matching)} -> {condition}";
+        return slices.Allow is null ? text : $"{text}; allow {Describe(slices.Allow)}";
     }
 
     /// <summary>The selector kinds that are set, joined by "; ", or <c>no selectors</c>.</summary>

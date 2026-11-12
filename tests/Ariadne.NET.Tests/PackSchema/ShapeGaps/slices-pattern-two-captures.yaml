@@ -1,0 +1,9 @@
+# A pattern needs exactly one capture, which JSON Schema cannot count inside a string.
+schema: 2
+name: x
+rules:
+  - id: X-R1
+    because: b
+    slices:
+      matching: ["Shop.(*).(**)"]
+      independent: true

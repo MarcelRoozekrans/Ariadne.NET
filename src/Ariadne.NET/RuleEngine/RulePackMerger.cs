@@ -139,6 +139,7 @@ public sealed class RulePackMerger : IRulePackMerger
                 Require = inherited.Require,
                 Packages = inherited.Packages,
                 Against = inherited.Against,
+                Slices = inherited.Slices,
                 Exceptions = [.. inherited.Exceptions, .. amendment.Exceptions],
                 Locked = inherited.Locked,
                 AllowEmpty = inherited.AllowEmpty,

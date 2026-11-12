@@ -228,4 +228,20 @@ public class SarifReportWriterTests
         FluentActions.Invoking(() => SarifReportWriter.Write(new MemoryStream(), null!, context)).Should().Throw<ArgumentNullException>();
         FluentActions.Invoking(() => SarifReportWriter.Write(new MemoryStream(), Empty(), null!)).Should().Throw<ArgumentNullException>();
     }
+
+    [Theory]
+    [InlineData(ViolationKind.SliceDependency)]
+    [InlineData(ViolationKind.SliceCycle)]
+    public void Write_UnlocatedSliceViolation_LocatesItsSourceAsAType(ViolationKind kind)
+    {
+        var report = new ArchitectureReport { Violations = [Violation("r", "p", null) with { Kind = kind }], Projects = [], TypesChecked = 1 };
+        var json = Render(report);
+        SarifSchema.Validate(json).Should().BeEmpty();
+        using var doc = JsonDocument.Parse(json);
+
+        var logical = doc.RootElement.GetProperty("runs")[0].GetProperty("results")[0].GetProperty("locations")[0].GetProperty("logicalLocations")[0];
+
+        logical.GetProperty("name").GetString().Should().Be("Shop.Domain.Order");
+        logical.GetProperty("kind").GetString().Should().Be("type");
+    }
 }

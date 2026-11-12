@@ -8,7 +8,7 @@ This page is the reference for the `rules:` list of a [schema 2 pack](03-rule-sc
 
 ## Rules
 
-A rule is an entry in `rules:`. It has exactly one of `forbid`, `allowOnly`, `require`, `bannedPackages` or `uniqueNames`.
+A rule is an entry in `rules:`. It has exactly one of `forbid`, `allowOnly`, `require`, `bannedPackages`, `uniqueNames` or `slices`.
 
 | Key | Required | Meaning |
 |-----|----------|---------|
@@ -20,6 +20,7 @@ A rule is an entry in `rules:`. It has exactly one of `forbid`, `allowOnly`, `re
 | `require` | one of | `{ for: <selector>, layer, kind, accessibility, implements, is, isNot }`: every type that `for` selects must satisfy the requirement. At least one of `layer`, `kind`, `accessibility`, `implements`, `is` and `isNot` is needed. See [Require rules](#require-rules). |
 | `bannedPackages` | one of | `{ packages: [...], from: { assemblies: [...] } }`: no project in `from` may resolve a package that `packages` matches. Reported as `BannedPackage`. See [Banned packages](#banned-packages). |
 | `uniqueNames` | one of | `{ for: <target>, against: <target> }`: no type in `for` may share a simple name with a type in `against`. Reported as `NameCollision`. See [Unique names](#unique-names). |
+| `slices` | one of | `{ matching: [...], freeOfCycles or independent, allow }`: cuts the code into slices and keeps them free of cycles or independent. Reported as `SliceCycle` or `SliceDependency`. See [Slices](#slices). |
 | `exceptions` | no | List of selectors, each with a required `because`. A source type that an exception matches is exempt from the rule. On a `bannedPackages` rule an exception takes `assemblies` only, and on a `uniqueNames` rule `namespaces`, `types` and the type traits. |
 | `locked` | no, default `false` | A child pack cannot add exceptions to this rule. |
 | `allowEmpty` | no, default `false` | Accepts that the rule selects no type. See [Rules that select nothing](#rules-that-select-nothing). |
@@ -56,7 +57,7 @@ rules:
         because: DI registration wires the interface to its implementation.
 ```
 
-The C# model is `RuleDefinition`, with `Id`, `Because`, `Description`, `Kind` (`RuleKind.Forbid`, `RuleKind.AllowOnly`, `RuleKind.Require`, `RuleKind.BannedPackages` or `RuleKind.UniqueNames`), `From` and `To` (`TargetSelector`), `Require` (`RuleRequirement?`, with `Layer`, `Kind`, `Accessibility`, `Implements`, `Is` and `IsNot`), `Packages` (`IList<string>`), `Against` (`TargetSelector`), `Exceptions` (`IList<RuleException>`), `Locked` and `AllowEmpty`. For a `require` or `uniqueNames` rule `From` holds the `for` selector, and for a `bannedPackages` rule it holds `from`.
+The C# model is `RuleDefinition`, with `Id`, `Because`, `Description`, `Kind` (`RuleKind.Forbid`, `RuleKind.AllowOnly`, `RuleKind.Require`, `RuleKind.BannedPackages`, `RuleKind.UniqueNames` or `RuleKind.Slices`), `From` and `To` (`TargetSelector`), `Require` (`RuleRequirement?`, with `Layer`, `Kind`, `Accessibility`, `Implements`, `Is` and `IsNot`), `Packages` (`IList<string>`), `Against` (`TargetSelector`), `Slices` (`SliceDefinition?`, with `Matching`, `FreeOfCycles`, `Independent` and `Allow`), `Exceptions` (`IList<RuleException>`), `Locked` and `AllowEmpty`. For a `require` or `uniqueNames` rule `From` holds the `for` selector, and for a `bannedPackages` rule it holds `from`.
 
 ### Forbid and allowOnly
 
@@ -154,10 +155,11 @@ A rule, a component role or a layer that selects no type cannot fail, so a clean
 | `VacuousRule` | a `forbid` or `allowOnly` rule whose `from` selects no type | `Rule '<id>' selects no type: its 'from' selector matches nothing in the <n> project(s) loaded.` |
 | `VacuousRule` | a `require` or `uniqueNames` rule whose `for` selects no type | `Rule '<id>' selects no type: its 'for' selector matches nothing in the <n> project(s) loaded.` |
 | `VacuousRule` | a `bannedPackages` rule whose `from.assemblies` matches no loaded project | `Rule '<id>' selects no type: its 'from.assemblies' matches none of the <n> project(s) loaded.` |
+| `VacuousRule` | a `slices` rule whose `matching` patterns place no type in a slice | `Rule '<id>' selects no type: its 'matching' patterns place no type in a slice in the <n> project(s) loaded.` |
 | `VacuousRule` | a component role that matches no type in its layer | `Role '<Name>' matches no type in layer '<Layer>' in the <n> project(s) loaded.` |
 | `VacuousLayer` | a layer that covers no type | `Layer '<Name>' covers no type in the <n> project(s) loaded.` |
 
-Only the subject side is checked: the `from` of `forbid`, `allowOnly`, `require` and `uniqueNames` (for the last two, the `for` selector). The `to`, `against` and `members` sides and the `exceptions` are never checked, since a rule about something that does not exist yet is still sound. A `bannedPackages` rule is vacuous only when it has a non-empty `from.assemblies` that matches no loaded project; without `from` it applies to every project. A rule or role whose subject resolves only through layers that are already reported as vacuous gets no second violation, because fixing the layer fixes it.
+Only the subject side is checked: the `from` of `forbid`, `allowOnly`, `require` and `uniqueNames` (for the last two, the `for` selector), and the `matching` patterns of `slices`. The `to`, `against` and `members` sides and the `exceptions` are never checked, since a rule about something that does not exist yet is still sound. A `bannedPackages` rule is vacuous only when it has a non-empty `from.assemblies` that matches no loaded project; without `from` it applies to every project. A rule or role whose subject resolves only through layers that are already reported as vacuous gets no second violation, because fixing the layer fixes it.
 
 Vacuity is relative to the projects loaded. A run on a single `.csproj` reports as vacuous every layer whose types the loaded projects neither declare nor reference, and the message says how many projects were loaded. A layer in another project still counts as covered when a loaded project references its types. A layer that holds only generated types is vacuous, since generated code is not analyzed. Validate the solution, or mark the rules and roles that belong to other projects.
 
@@ -202,6 +204,59 @@ rules:
 ```
 
 The check is one-way: it reports the `for` type only. It compares the simple name case-sensitively, ignores the namespace and counts generic arity, so `Result` and `Result<T>` differ. A nested type uses its own name, a type in both selections never collides with itself, and the types of all projects of the run are compared.
+
+### Slices
+
+A `slices` rule cuts the types of the solution into slices by a capture in a namespace pattern, and then checks how the slices depend on each other. It is the rule for a modular monolith: every module is a slice, and the rule keeps the modules apart.
+
+```yaml
+rules:
+  - id: SHOP-MODULES-INDEPENDENT
+    because: A module is reached only through its Public namespace.
+    slices:
+      matching: ["Shop.(*).**"]
+      independent: true
+      allow: { namespaces: ["Shop.*.Public.**"] }
+```
+
+| Key | Required | Meaning |
+|-----|----------|---------|
+| `matching` | yes | A non-empty list of namespace patterns. Each has exactly one capture. |
+| `freeOfCycles` | one of | `true`: slices may depend on each other, but not in a cycle. |
+| `independent` | one of | `true`: slices may not depend on each other at all, except on what `allow` selects. A dependency cycle then shows up as the dependencies it consists of, not as a `SliceCycle`. |
+| `allow` | no | A selector with the keys of the `to` of a `forbid` rule, `layers` included and `members` excluded, and at least one key. A dependency on a type it selects is not reported. |
+
+Exactly one of `freeOfCycles` and `independent` is set, and it must be `true`: leave a condition out instead of writing `false`.
+
+**Captures.** The pattern is a dotted glob in which one segment is `(*)` or `(**)`. `(*)` captures exactly one segment and `(**)` one or more. The capture must be a whole segment, so `Shop.Ord(*)` is a load error, and a pattern needs exactly one. A capture never matches zero segments. The captured text is the name of the slice. `(*)` and `(**)` are accepted only in `matching`; in a slices rule the loader rejects them in `allow` and in `exceptions`. In every other rule they stay ordinary glob text.
+
+Two tie-breaks decide the capture when a pattern could match a namespace in more than one way. The earliest capture start wins. For `(**)`, the shortest capture that lets the rest of the pattern match wins. When several patterns match a namespace, the first one in list order names the slice. Two patterns that capture the same text name one slice.
+
+```yaml
+rules:
+  - id: SHOP-MODULES-ACYCLIC
+    because: Modules form a hierarchy.
+    slices:
+      matching: ["Shop.(**).Core.**", "Shop.(**).Public.**"]
+      freeOfCycles: true
+```
+
+With `Shop.(**).Core.**`, the namespace `Shop.Orders.Core.Models` is in slice `Orders`, and `Shop.Sales.Eu.Core` is in slice `Sales.Eu`. Without the trailing `.**`, only types directly in `Shop.<x>.Core` would be in a slice, and `Shop.Orders.Core.Models` would be in none.
+
+**Which types have a slice.** Only the types that the projects of the run declare. A framework type or a NuGet type has no slice, whatever its namespace looks like, so `System.Foo.Core.Bar` is never a target in another slice. A nested type has the namespace of its outermost containing type. A type whose namespace matches no pattern has no slice, and a dependency between two types is checked only when both have one. Only type references count, not member uses.
+
+**`independent` and `freeOfCycles`.** Under `independent`, each dependency from a type in one slice to a type in another is a `SliceDependency` violation, one per source and target type, unless `allow` selects the target. Under `freeOfCycles`, slice-to-slice dependencies are fine until they form a cycle. A `SliceCycle` violation is one per slice edge inside a cycle, and its message names every slice of the cycle. A slice that only points into a cycle is not part of it, and its edge is not reported. The types that `allow` selects are left out of the cycle check as well.
+
+**Exceptions** exempt the source type, as in `forbid`: an excepted type keeps its slice and still counts as a target of other slices.
+
+**Across projects.** Slices are not bound to a project. The edges of all projects of the run are combined, so a cycle `Orders` to `Billing` to `Orders` is found even when three projects each hold one edge. A project built for several target frameworks is checked once per framework, together with the projects that name none, and a violation found in several frameworks is reported once with its `TargetFrameworks`.
+
+| Kind | Reported for | Message |
+|------|--------------|---------|
+| `SliceDependency` | a type in a slice that depends on a type in another slice, under `independent` | `Type '<source>' in slice '<a>' depends on '<target>' in slice '<b>', and rule '<id>' keeps slices independent` |
+| `SliceCycle` | a slice edge that lies inside a cycle, under `freeOfCycles` | `Slice '<a>' depends on slice '<b>' (first through '<source>' -> '<target>'), and slices <list> form a cycle, which rule '<id>' forbids` |
+
+A slices rule that places no type in a slice is reported as `VacuousRule`; see [Rules that select nothing](#rules-that-select-nothing).
 
 ### Members
 

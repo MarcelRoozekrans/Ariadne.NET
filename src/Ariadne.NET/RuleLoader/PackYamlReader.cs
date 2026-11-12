@@ -34,7 +34,7 @@ internal static class PackYamlReader
     private static readonly string[] RetargetKeys = ["name", "namespaces", "assemblies"];
 
     private static readonly string[] RuleKeys =
-        ["id", "because", "description", "forbid", "allowOnly", "require", "bannedPackages", "uniqueNames", "exceptions", "locked", "allowEmpty"];
+        ["id", "because", "description", "forbid", "allowOnly", "require", "bannedPackages", "uniqueNames", "slices", "exceptions", "locked", "allowEmpty"];
 
     private static readonly string[] AmendmentKeys = ["id", "exceptions"];
 
@@ -64,6 +64,8 @@ internal static class PackYamlReader
 
     private static readonly string[] UniqueNamesKeys = ["for", "against"];
 
+    private static readonly string[] SlicesKeys = ["matching", "freeOfCycles", "independent", "allow"];
+
     private static readonly string[] RequireKeys = ["for", "layer", "kind", "accessibility", "implements", "is", "isNot"];
 
     // What a type must implement is matched by name only: its namespace, assembly or full name.
@@ -73,10 +75,19 @@ internal static class PackYamlReader
 
     private static readonly string[] ExceptionKeys = ["namespaces", "assemblies", "types", .. TraitKeys, "because"];
 
-    private const string RuleBodyKeys = "'forbid', 'allowOnly', 'require', 'bannedPackages' or 'uniqueNames'";
+    private const string RuleBodyKeys = "'forbid', 'allowOnly', 'require', 'bannedPackages', 'uniqueNames' or 'slices'";
+
+    // A capture names a slice, so only the 'matching' of a slices rule takes one; anywhere else it would match nothing.
+    private const string CaptureOutsideMatching = "a capture, (*) or (**), is only accepted in the 'matching' of a slices rule";
 
     private readonly record struct RuleBody(
-        RuleKind Kind, TargetSelector From, TargetSelector To, RuleRequirement? Require, List<string> Packages, TargetSelector Against);
+        RuleKind Kind,
+        TargetSelector From,
+        TargetSelector To,
+        RuleRequirement? Require,
+        List<string> Packages,
+        TargetSelector Against,
+        SliceDefinition? Slices = null);
 
     private static readonly string[] RoleKeys =
     [
@@ -209,6 +220,9 @@ internal static class PackYamlReader
     {
         private readonly List<PackProblem> _problems = [];
         private bool _hasExtends;
+
+        // Set while a slices rule is read, so the patterns of its exceptions and 'allow' reject a capture.
+        private bool _inSlicesRule;
         private int _visited;
         private bool _exhausted;
 
@@ -395,9 +409,10 @@ internal static class PackYamlReader
             var before = _problems.Count;
             var fields = Fields(map, RuleKeys, where);
             var id = RequiredString(fields, "id", where, map);
-            var exceptionKind = fields.ContainsKey("bannedPackages") ? RuleKind.BannedPackages
-                : fields.ContainsKey("uniqueNames") ? RuleKind.UniqueNames
-                : RuleKind.Forbid;
+            var exceptionKind = ExceptionKind(fields);
+
+            // An amendment has no 'slices' key, so this stays false on the early return below.
+            _inSlicesRule = exceptionKind == RuleKind.Slices;
             var exceptions = ReadExceptions(fields, where, exceptionKind);
 
             if (fields.ContainsKey("exceptions") && OnlyKeys(fields, AmendmentKeys))
@@ -421,6 +436,7 @@ internal static class PackYamlReader
             var allowEmpty = OptionalBool(fields, "allowEmpty", where);
 
             var body = ReadRuleBody(fields, map, where);
+            _inSlicesRule = false;
             if (_problems.Count == before && id is not null && because is not null && body is { } read)
             {
                 rules.Add(new RuleDefinition
@@ -434,6 +450,7 @@ internal static class PackYamlReader
                     Require = read.Require,
                     Packages = read.Packages,
                     Against = read.Against,
+                    Slices = read.Slices,
                     Exceptions = exceptions,
                     Locked = locked ?? false,
                     AllowEmpty = allowEmpty ?? false,
@@ -441,7 +458,14 @@ internal static class PackYamlReader
             }
         }
 
-        // Exactly one of forbid, allowOnly, require, bannedPackages or uniqueNames.
+        // The kind whose exception keys apply; forbid, allowOnly and require share them.
+        private static RuleKind ExceptionKind(Dictionary<string, Field> fields) =>
+            fields.ContainsKey("bannedPackages") ? RuleKind.BannedPackages
+            : fields.ContainsKey("uniqueNames") ? RuleKind.UniqueNames
+            : fields.ContainsKey("slices") ? RuleKind.Slices
+            : RuleKind.Forbid;
+
+        // Exactly one of forbid, allowOnly, require, bannedPackages, uniqueNames or slices.
         private RuleBody? ReadRuleBody(Dictionary<string, Field> fields, YamlMappingNode map, string where)
         {
             var hasForbid = fields.TryGetValue("forbid", out var forbid);
@@ -449,12 +473,20 @@ internal static class PackYamlReader
             var hasRequire = fields.TryGetValue("require", out var require);
             var hasBanned = fields.TryGetValue("bannedPackages", out var banned);
             var hasUnique = fields.TryGetValue("uniqueNames", out var unique);
-            var count = (hasForbid ? 1 : 0) + (hasAllowOnly ? 1 : 0) + (hasRequire ? 1 : 0) + (hasBanned ? 1 : 0) + (hasUnique ? 1 : 0);
+            var hasSlices = fields.TryGetValue("slices", out var slices);
+            var count = (hasForbid ? 1 : 0) + (hasAllowOnly ? 1 : 0) + (hasRequire ? 1 : 0) + (hasBanned ? 1 : 0) + (hasUnique ? 1 : 0)
+                + (hasSlices ? 1 : 0);
             if (count != 1)
             {
                 YamlNode at = count == 0
                     ? map
-                    : Latest(hasForbid ? forbid.Key : null, hasAllowOnly ? allowOnly.Key : null, hasRequire ? require.Key : null, hasBanned ? banned.Key : null, hasUnique ? unique.Key : null);
+                    : Latest(
+                        hasForbid ? forbid.Key : null,
+                        hasAllowOnly ? allowOnly.Key : null,
+                        hasRequire ? require.Key : null,
+                        hasBanned ? banned.Key : null,
+                        hasUnique ? unique.Key : null,
+                        hasSlices ? slices.Key : null);
                 Add(at, $"{where} must have exactly one of {RuleBodyKeys}");
                 return null;
             }
@@ -477,6 +509,14 @@ internal static class PackYamlReader
             {
                 return ReadUniqueNames(in unique, where) is { } uniqueRule
                     ? new RuleBody(RuleKind.UniqueNames, uniqueRule.For, new TargetSelector(), null, [], uniqueRule.Against)
+                    : null;
+            }
+
+            if (hasSlices)
+            {
+                // A slices rule selects through its patterns, so from, to and against stay empty, as uniqueNames leaves to.
+                return ReadSlices(in slices, where) is { } sliceRule
+                    ? new RuleBody(RuleKind.Slices, new TargetSelector(), new TargetSelector(), null, [], new TargetSelector(), sliceRule)
                     : null;
             }
 
@@ -528,6 +568,92 @@ internal static class PackYamlReader
             }
 
             return _problems.Count == before && packages is not null ? (packages, from) : null;
+        }
+
+        private SliceDefinition? ReadSlices(in Field field, string ruleWhere)
+        {
+            if (field.Value is not YamlMappingNode map)
+            {
+                Add(field.Key, $"'slices' in {ruleWhere} must be a mapping");
+                return null;
+            }
+
+            var where = $"the slices of {ruleWhere}";
+            var before = _problems.Count;
+            var fields = Fields(map, SlicesKeys, where);
+            var matching = ReadMatching(fields, where, map);
+            var freeOfCycles = OptionalBool(fields, "freeOfCycles", where);
+            var independent = OptionalBool(fields, "independent", where);
+            CheckCondition(fields, where, map, freeOfCycles, independent);
+
+            TargetSelector? allow = null;
+            if (fields.TryGetValue("allow", out var allowField))
+            {
+                if (allowField.Value is YamlMappingNode allowMap)
+                {
+                    // The keys of a forbid 'to' without 'members': a slice depends on types, so a member use cannot be allowed.
+                    allow = ReadSelector(allowMap, $"the allow of {ruleWhere}", ruleWhere, TargetKeys);
+                }
+                else
+                {
+                    Add(allowField.Key, $"'allow' in {where} must be a mapping");
+                }
+            }
+
+            return _problems.Count == before && matching is not null
+                ? new SliceDefinition { Matching = matching, FreeOfCycles = freeOfCycles ?? false, Independent = independent ?? false, Allow = allow }
+                : null;
+        }
+
+        // A non-empty list of slice patterns; each needs exactly one capture, as a whole segment.
+        private List<string>? ReadMatching(Dictionary<string, Field> fields, string where, YamlMappingNode map)
+        {
+            var matching = StringList(fields, "matching", where);
+            if (matching is { Count: 0 } || (matching is null && !fields.ContainsKey("matching")))
+            {
+                Add(fields.TryGetValue("matching", out var matchingField) ? matchingField.Key : map, $"{where} needs at least one entry in 'matching'");
+                return null;
+            }
+
+            if (matching is null)
+            {
+                return null;
+            }
+
+            var sequence = (YamlSequenceNode)fields["matching"].Value;
+            for (var i = 0; i < matching.Count; i++)
+            {
+                if (SlicePattern.Validate(matching[i]) is { } reason)
+                {
+                    AddInvalidPattern(sequence.Children[i], matching[i], where, reason);
+                }
+            }
+
+            return matching;
+        }
+
+        // Exactly one of freeOfCycles and independent, and it must be true: independent rules out cycles except through targets that allow selects.
+        private void CheckCondition(Dictionary<string, Field> fields, string where, YamlMappingNode map, bool? freeOfCycles, bool? independent)
+        {
+            if (freeOfCycles == false)
+            {
+                Add(fields["freeOfCycles"].Key, $"'freeOfCycles' in {where} must be true; leave it out instead");
+            }
+
+            if (independent == false)
+            {
+                Add(fields["independent"].Key, $"'independent' in {where} must be true; leave it out instead");
+            }
+
+            if (freeOfCycles == true && independent == true)
+            {
+                Add(Later(fields["freeOfCycles"].Key, fields["independent"].Key),
+                    $"{where} must have only one of 'freeOfCycles' and 'independent'; 'independent' rules out cycles except through targets that allow selects");
+            }
+            else if (!fields.ContainsKey("freeOfCycles") && !fields.ContainsKey("independent"))
+            {
+                Add(map, $"{where} needs 'freeOfCycles: true' or 'independent: true'");
+            }
         }
 
         private (TargetSelector For, TargetSelector Against)? ReadUniqueNames(in Field field, string ruleWhere)
@@ -1127,17 +1253,28 @@ internal static class PackYamlReader
             var sequence = (YamlSequenceNode)fields[key].Value;
             for (var i = 0; i < values.Count; i++)
             {
+                if (_inSlicesRule && SlicePattern.HasCapture(values[i]))
+                {
+                    AddInvalidPattern(sequence.Children[i], values[i], where, CaptureOutsideMatching);
+                    continue;
+                }
+
                 var glob = compile(values[i]);
                 if (!glob.IsSuccess)
                 {
-                    // The glob's reason quotes the pattern too; it is shown the same way as the pattern itself.
-                    var shown = PackText.Show(values[i]);
-                    var reason = glob.Error.Replace($"'{values[i]}'", $"'{shown}'", StringComparison.Ordinal);
-                    Add(sequence.Children[i], $"'{shown}' in {where} is not a valid pattern: {PackText.Escape(reason)}");
+                    AddInvalidPattern(sequence.Children[i], values[i], where, glob.Error);
                 }
             }
 
             return values;
+        }
+
+        // The reason may quote the pattern too; it is shown the same way as the pattern itself.
+        private void AddInvalidPattern(YamlNode node, string pattern, string where, string reason)
+        {
+            var shown = PackText.Show(pattern);
+            var shownReason = reason.Replace($"'{pattern}'", $"'{shown}'", StringComparison.Ordinal);
+            Add(node, $"'{shown}' in {where} is not a valid pattern: {PackText.Escape(shownReason)}");
         }
 
         // A name is the type's innermost simple name, so a dot could never match.

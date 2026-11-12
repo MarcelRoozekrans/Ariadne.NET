@@ -1,0 +1,11 @@
+schema: 2
+name: x
+rules:
+  - id: X-R1
+    because: b
+    forbid:
+      from: { layers: [A] }
+      to: { layers: [B] }
+    slices:
+      matching: ["Shop.(*).**"]
+      independent: true
