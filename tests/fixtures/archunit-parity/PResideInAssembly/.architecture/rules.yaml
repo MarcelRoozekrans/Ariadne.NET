@@ -1,0 +1,22 @@
+schema: 2
+name: parity-p-reside-in-assembly
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-PRESIDEINASSEMBLY
+    because: Mirrors ArchUnitNET's ResideInAssembly; the types it selects must not depend on Target.
+    forbid:
+      from: { assemblies: ["Parity.PResideInAssembly.Other"] }
+      to:
+        namespaces: ["Parity.PResideInAssembly.Target.**"]
+  - id: PARITY-PRESIDEINASSEMBLY-NOT
+    because: Mirrors ArchUnitNET's DoNotResideInAssembly; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PResideInAssembly.**"]
+      to:
+        namespaces: ["Parity.PResideInAssembly.Target.**"]
+    exceptions:
+      - assemblies: ["Parity.PResideInAssembly.Other"]
+        because: DoNotResideInAssembly leaves these types out.

@@ -1,0 +1,6 @@
+schema: 2
+name: parity-c-have-full-name-ending-with
+version: "1.0.0"
+author: fixture
+
+# No rule yet: require has no is or isNot. Phase 4.2 adds PARITY-CHAVEFULLNAMEENDINGWITH and PARITY-CHAVEFULLNAMEENDINGWITH-NOT here and deletes their KnownGaps entries.

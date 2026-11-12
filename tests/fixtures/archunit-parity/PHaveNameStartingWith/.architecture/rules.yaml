@@ -1,0 +1,22 @@
+schema: 2
+name: parity-p-have-name-starting-with
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-PHAVENAMESTARTINGWITH
+    because: Mirrors ArchUnitNET's HaveNameStartingWith; the types it selects must not depend on Target.
+    forbid:
+      from: { types: ["**.Order*"] }
+      to:
+        namespaces: ["Parity.PHaveNameStartingWith.Target.**"]
+  - id: PARITY-PHAVENAMESTARTINGWITH-NOT
+    because: Mirrors ArchUnitNET's DoNotHaveNameStartingWith; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PHaveNameStartingWith.**"]
+      to:
+        namespaces: ["Parity.PHaveNameStartingWith.Target.**"]
+    exceptions:
+      - types: ["**.Order*"]
+        because: DoNotHaveNameStartingWith leaves these types out.

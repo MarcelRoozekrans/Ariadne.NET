@@ -1,0 +1,12 @@
+schema: 2
+name: parity-c-be-internal
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-CBEINTERNAL
+    because: Mirrors ArchUnitNET's BeInternal; Broken and Clean must be internal.
+    require:
+      for:
+        namespaces: ["Parity.CBeInternal.Broken", "Parity.CBeInternal.Clean"]
+      accessibility: internal

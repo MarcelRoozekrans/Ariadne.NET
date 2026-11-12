@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Ariadne.NET.Tests.Shared;
 
@@ -10,6 +12,8 @@ internal static class FixtureProjects
 {
     internal const string LockFileName = ".restore.lock";
     private const string MarkerFileName = ".restore-marker";
+    internal const string ParityLockFileName = ".parity-build.lock";
+    private const string ParityMarkerFileName = ".parity-build-marker";
 
     private static readonly string[] RestoreTargets =
     [
@@ -31,9 +35,21 @@ internal static class FixtureProjects
     private static readonly Lazy<string> RootFolder = new(FindRoot);
     private static readonly Lock RestoreGuard = new();
     private static bool _restored;
+    private static readonly Lock ParityGuard = new();
+    private static bool _parityBuilt;
 
     /// <summary>The <c>tests/fixtures</c> folder.</summary>
     public static string Root => RootFolder.Value;
+
+    /// <summary>The <c>tests/fixtures/archunit-parity</c> folder, which holds the ArchUnitNET parity fixtures.</summary>
+    public static string ParityRoot => Path("archunit-parity");
+
+    /// <summary>
+    /// The Debug <c>net10.0</c> output folder of the parity fixture project in <paramref name="projectFolder"/>, where the
+    /// parity build puts its DLL.
+    /// </summary>
+    public static string ParityOutput(string projectFolder) =>
+        System.IO.Path.Combine(projectFolder, "bin", "Debug", "net10.0");
 
     /// <summary>Combines <paramref name="parts"/> onto <see cref="Root"/>.</summary>
     public static string Path(params string[] parts) =>
@@ -58,6 +74,58 @@ internal static class FixtureProjects
     }
 
     /// <summary>
+    /// Builds the ArchUnitNET parity fixtures, which ArchUnitNET reads as compiled assemblies. Runs once per process, under its
+    /// own exclusive file lock, and skips the build when the marker matches the <see cref="SourceStamp"/> of the sources and
+    /// every fixture DLL exists. Separate from <see cref="EnsureRestored"/>, so the other test projects never build the parity fixtures.
+    /// </summary>
+    internal static void EnsureParityBuilt()
+    {
+        lock (ParityGuard)
+        {
+            if (_parityBuilt)
+            {
+                return;
+            }
+
+            BuildParityUnderLock(ParityRoot);
+            _parityBuilt = true;
+        }
+    }
+
+    private static void BuildParityUnderLock(string parityRoot)
+    {
+        using var fileLock = TakeLock(System.IO.Path.Combine(parityRoot, ParityLockFileName));
+
+        var stamp = SourceStamp(parityRoot);
+        var markerPath = System.IO.Path.Combine(parityRoot, ParityMarkerFileName);
+        if (File.Exists(markerPath)
+            && string.Equals(File.ReadAllText(markerPath), stamp, StringComparison.Ordinal)
+            && ParityOutputsExist(parityRoot))
+        {
+            return;
+        }
+
+        Dotnet("build", System.IO.Path.Combine(parityRoot, "Parity.slnx"));
+        File.WriteAllText(markerPath, stamp);
+    }
+
+    /// <summary>True when every fixture kind under <paramref name="parityRoot"/> has its Debug <c>net10.0</c> DLL.</summary>
+    private static bool ParityOutputsExist(string parityRoot)
+    {
+        foreach (var project in Directory.EnumerateFiles(parityRoot, "*.csproj", SearchOption.AllDirectories))
+        {
+            var dll = System.IO.Path.Combine(
+                ParityOutput(System.IO.Path.GetDirectoryName(project)!), System.IO.Path.GetFileNameWithoutExtension(project) + ".dll");
+            if (!File.Exists(dll))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// Takes the lock, then restores unless the marker says the fixtures are already restored. Bypasses the once-per-process
     /// guard. <paramref name="root"/> is a fixtures folder: the real one, or a copy that a test can damage.
     /// </summary>
@@ -65,7 +133,7 @@ internal static class FixtureProjects
     {
         using var fileLock = TakeLock(System.IO.Path.Combine(root, LockFileName));
 
-        var stamp = LatestSourceWrite(root).ToString(CultureInfo.InvariantCulture);
+        var stamp = SourceStamp(root);
         var markerPath = System.IO.Path.Combine(root, MarkerFileName);
         if (File.Exists(markerPath)
             && string.Equals(File.ReadAllText(markerPath), stamp, StringComparison.Ordinal)
@@ -159,28 +227,46 @@ internal static class FixtureProjects
             ? ex.HResult == unchecked((int)0x80070020)
             : ex.HResult is 11 or 35;
 
-    private static long LatestSourceWrite(string root)
+    /// <summary>
+    /// Identifies the sources under <paramref name="root"/>: the newest write time, the file count and a hash of the sorted
+    /// relative paths, so an edit, an added file, a deleted file and a rename all change it. Build output, lock and marker
+    /// files do not count.
+    /// </summary>
+    internal static string SourceStamp(string root)
     {
         var latest = 0L;
+        var paths = new List<string>();
         foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
         {
             var relative = System.IO.Path.GetRelativePath(root, file);
             var segments = relative.Split(System.IO.Path.DirectorySeparatorChar);
-            if (Array.Exists(segments, IsBuildOutput) || segments[0].StartsWith(".restore", StringComparison.Ordinal))
+            if (Array.Exists(segments, IsBuildOutput) || IsLockOrMarker(segments[^1]))
             {
                 continue;
             }
 
             latest = Math.Max(latest, File.GetLastWriteTimeUtc(file).Ticks);
+            paths.Add(string.Join('/', segments));
         }
 
-        return latest;
+        paths.Sort(StringComparer.Ordinal);
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', paths))));
+        return string.Create(CultureInfo.InvariantCulture, $"{latest}:{paths.Count}:{hash}");
     }
+
+    /// <summary>
+    /// True for the lock and marker files of the restore and the parity build, wherever they sit: they change on every run, so
+    /// counting them would make each marker invalidate the other.
+    /// </summary>
+    /// <remarks>Lock and marker files only live at fixture roots, so matching the file name alone cannot skip a source file.</remarks>
+    internal static bool IsLockOrMarker(string fileName) =>
+        fileName.StartsWith(".restore", StringComparison.Ordinal) || fileName.StartsWith(".parity-", StringComparison.Ordinal);
 
     private static bool IsBuildOutput(string segment) =>
         string.Equals(segment, "bin", StringComparison.Ordinal) || string.Equals(segment, "obj", StringComparison.Ordinal);
 
-    private static void Dotnet(string verb, string target, params string[] extra)
+    /// <summary>Runs <c>dotnet</c> with <paramref name="verb"/>, <paramref name="target"/> and <paramref name="extra"/>; throws with its output when it fails or takes over five minutes.</summary>
+    internal static void Dotnet(string verb, string target, params string[] extra)
     {
         var info = new ProcessStartInfo("dotnet")
         {

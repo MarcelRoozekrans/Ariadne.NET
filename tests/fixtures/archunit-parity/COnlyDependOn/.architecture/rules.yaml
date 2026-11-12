@@ -1,0 +1,22 @@
+schema: 2
+name: parity-c-only-depend-on
+version: "1.0.0"
+author: fixture
+
+# ArchUnitNET's OnlyDependOn fails a type for a dependency on a type of the loaded assemblies outside the allowed set;
+# framework types such as System.Object and System.Text.StringBuilder do not count. A layer checks only dependencies on
+# types some layer covers, so Helpers, which no layer covers, is the recorded divergence.
+layers:
+  - name: Subject
+    id: PARITY-CONLYDEPENDON
+    because: Mirrors ArchUnitNET's OnlyDependOn; Broken and Clean may depend only on Target.
+    namespaces: ["Parity.COnlyDependOn.Broken", "Parity.COnlyDependOn.Clean"]
+    allowedDependencies: [Allowed]
+  - name: Allowed
+    id: PARITY-CONLYDEPENDON-ALLOWED
+    because: The types the subject may depend on.
+    namespaces: ["Parity.COnlyDependOn.Target"]
+  - name: Forbidden
+    id: PARITY-CONLYDEPENDON-FORBIDDEN
+    because: Types the subject may not depend on.
+    namespaces: ["Parity.COnlyDependOn.Forbidden"]

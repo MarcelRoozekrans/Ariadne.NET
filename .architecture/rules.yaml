@@ -85,6 +85,9 @@ rules:
         members: ["System.Console.*"]
   - id: ARIADNE-NO-NEWTONSOFT-JSON
     because: The repository serializes with System.Text.Json, which stays trim and Native AOT safe; Newtonsoft.Json relies on reflection and would break the AOT smoke test.
-    description: "No project references Newtonsoft.Json, directly or transitively"
+    description: "No project but the parity tests references Newtonsoft.Json, directly or transitively"
     bannedPackages:
       packages: ["Newtonsoft.Json"]
+    exceptions:
+      - assemblies: ["Ariadne.NET.Parity.Tests"]
+        because: The parity harness runs ArchUnitNET, which depends on Newtonsoft.Json, as the reference to compare against; the test project is never trimmed, published or packed.

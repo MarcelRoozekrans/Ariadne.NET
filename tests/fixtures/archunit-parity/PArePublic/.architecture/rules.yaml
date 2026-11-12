@@ -1,0 +1,6 @@
+schema: 2
+name: parity-p-are-public
+version: "1.0.0"
+author: fixture
+
+# No rule yet: a selector has no accessibility. Phase 4.2 adds PARITY-PAREPUBLIC and PARITY-PAREPUBLIC-NOT here and deletes their KnownGaps entries.

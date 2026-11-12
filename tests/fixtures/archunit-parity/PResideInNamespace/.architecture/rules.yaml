@@ -1,0 +1,22 @@
+schema: 2
+name: parity-p-reside-in-namespace
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-PRESIDEINNAMESPACE
+    because: Mirrors ArchUnitNET's ResideInNamespace; the types it selects must not depend on Target.
+    forbid:
+      from: { namespaces: ["Parity.PResideInNamespace.Broken"] }
+      to:
+        namespaces: ["Parity.PResideInNamespace.Target.**"]
+  - id: PARITY-PRESIDEINNAMESPACE-NOT
+    because: Mirrors ArchUnitNET's DoNotResideInNamespace; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PResideInNamespace.**"]
+      to:
+        namespaces: ["Parity.PResideInNamespace.Target.**"]
+    exceptions:
+      - namespaces: ["Parity.PResideInNamespace.NotClean"]
+        because: DoNotResideInNamespace leaves these types out.

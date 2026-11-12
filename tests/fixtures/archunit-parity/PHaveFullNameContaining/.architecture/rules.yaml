@@ -1,0 +1,22 @@
+schema: 2
+name: parity-p-have-full-name-containing
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-PHAVEFULLNAMECONTAINING
+    because: Mirrors ArchUnitNET's HaveFullNameContaining; the types it selects must not depend on Target.
+    forbid:
+      from: { types: ["**.*Order*.**"] }
+      to:
+        namespaces: ["Parity.PHaveFullNameContaining.Target.**"]
+  - id: PARITY-PHAVEFULLNAMECONTAINING-NOT
+    because: Mirrors ArchUnitNET's DoNotHaveFullNameContaining; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PHaveFullNameContaining.**"]
+      to:
+        namespaces: ["Parity.PHaveFullNameContaining.Target.**"]
+    exceptions:
+      - types: ["**.*NotClean*.**"]
+        because: DoNotHaveFullNameContaining leaves these types out.

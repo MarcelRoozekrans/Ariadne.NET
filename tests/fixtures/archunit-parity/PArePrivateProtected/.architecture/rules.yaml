@@ -1,0 +1,6 @@
+schema: 2
+name: parity-p-are-private-protected
+version: "1.0.0"
+author: fixture
+
+# No rule yet: a selector has no accessibility. Phase 4.2 adds PARITY-PAREPRIVATEPROTECTED and PARITY-PAREPRIVATEPROTECTED-NOT here and deletes their KnownGaps entries.

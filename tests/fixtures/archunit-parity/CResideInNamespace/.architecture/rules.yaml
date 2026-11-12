@@ -1,0 +1,18 @@
+schema: 2
+name: parity-c-reside-in-namespace
+version: "1.0.0"
+author: fixture
+
+layers:
+  - name: Home
+    id: PARITY-CRESIDEINNAMESPACE-HOME
+    because: The namespace the rule requires; exact, as ArchUnitNET's ResideInNamespace is.
+    namespaces: ["Parity.CResideInNamespace.Clean"]
+
+rules:
+  - id: PARITY-CRESIDEINNAMESPACE
+    because: Mirrors ArchUnitNET's ResideInNamespace condition; Broken and Clean must reside in Clean.
+    require:
+      for:
+        namespaces: ["Parity.CResideInNamespace.Broken", "Parity.CResideInNamespace.Clean"]
+      layer: Home

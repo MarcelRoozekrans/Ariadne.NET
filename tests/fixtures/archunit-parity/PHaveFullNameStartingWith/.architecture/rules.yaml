@@ -1,0 +1,22 @@
+schema: 2
+name: parity-p-have-full-name-starting-with
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-PHAVEFULLNAMESTARTINGWITH
+    because: Mirrors ArchUnitNET's HaveFullNameStartingWith; the types it selects must not depend on Target.
+    forbid:
+      from: { types: ["Parity.PHaveFullNameStartingWith.Broken.Order*", "Parity.PHaveFullNameStartingWith.Broken.Order*.**"] }
+      to:
+        namespaces: ["Parity.PHaveFullNameStartingWith.Target.**"]
+  - id: PARITY-PHAVEFULLNAMESTARTINGWITH-NOT
+    because: Mirrors ArchUnitNET's DoNotHaveFullNameStartingWith; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PHaveFullNameStartingWith.**"]
+      to:
+        namespaces: ["Parity.PHaveFullNameStartingWith.Target.**"]
+    exceptions:
+      - types: ["Parity.PHaveFullNameStartingWith.NotCl*", "Parity.PHaveFullNameStartingWith.NotCl*.**"]
+        because: DoNotHaveFullNameStartingWith leaves these types out.

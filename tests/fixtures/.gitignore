@@ -2,3 +2,5 @@
 **/obj/
 .restore.lock
 .restore-marker
+.parity-build.lock
+.parity-build-marker

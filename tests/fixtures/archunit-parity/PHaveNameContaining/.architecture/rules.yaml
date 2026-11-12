@@ -1,0 +1,22 @@
+schema: 2
+name: parity-p-have-name-containing
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-PHAVENAMECONTAINING
+    because: Mirrors ArchUnitNET's HaveNameContaining; the types it selects must not depend on Target.
+    forbid:
+      from: { types: ["**.*Order*"] }
+      to:
+        namespaces: ["Parity.PHaveNameContaining.Target.**"]
+  - id: PARITY-PHAVENAMECONTAINING-NOT
+    because: Mirrors ArchUnitNET's DoNotHaveNameContaining; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PHaveNameContaining.**"]
+      to:
+        namespaces: ["Parity.PHaveNameContaining.Target.**"]
+    exceptions:
+      - types: ["**.*Order*"]
+        because: DoNotHaveNameContaining leaves these types out.

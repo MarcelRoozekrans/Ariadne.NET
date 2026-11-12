@@ -1,0 +1,6 @@
+schema: 2
+name: parity-p-are-assignable-to
+version: "1.0.0"
+author: fixture
+
+# No rule yet: a selector has no assignableTo, and an exception cannot name it. Phase 4.2 adds PARITY-PAREASSIGNABLETO and PARITY-PAREASSIGNABLETO-NOT here and deletes their KnownGaps entries.
