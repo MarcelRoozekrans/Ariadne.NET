@@ -17,4 +17,10 @@ public sealed class RuleRequirement
 
     /// <summary>A selector for an interface the type must implement, including interfaces it gets through a base class.</summary>
     public TargetSelector? Implements { get; init; }
+
+    /// <summary>A selector the type must match. Allows every selector key except <c>layers</c> and <c>members</c>.</summary>
+    public TargetSelector? Is { get; init; }
+
+    /// <summary>A selector the type must not match. Allows every selector key except <c>layers</c> and <c>members</c>.</summary>
+    public TargetSelector? IsNot { get; init; }
 }
