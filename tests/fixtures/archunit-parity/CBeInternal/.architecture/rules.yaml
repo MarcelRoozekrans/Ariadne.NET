@@ -9,7 +9,8 @@ rules:
     require:
       for:
         namespaces: ["Parity.CBeInternal.Broken", "Parity.CBeInternal.Clean"]
-      accessibility: internal
+      is:
+        accessibility: [internal]
   - id: PARITY-CBEINTERNAL-NOT
     because: Mirrors ArchUnitNET's NotBeInternal; NotBroken and NotClean must not be internal.
     require:
