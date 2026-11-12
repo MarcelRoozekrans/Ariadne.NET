@@ -126,5 +126,17 @@ public static class KnownGaps
         new("c-have-full-name-containing:not", "4.2", "No 'isNot' on require."),
         new("c-have-any-attributes", "4.2", "No 'is' on require; 'attributes' is a selector key only."),
         new("c-have-any-attributes:not", "4.2", "No 'isNot' on require."),
+        new(
+            "s-free-of-cycles",
+            "4.3",
+            "No slices rule: a pack cannot group types into slices by a namespace capture or forbid cycles between them."),
+        new(
+            "s-not-depend-on-each-other",
+            "4.3",
+            "No slices rule: a pack cannot group types into slices by a namespace capture or keep slices independent."),
+        new(
+            "s-matching-with-packages",
+            "4.3",
+            "No slices rule: a pack cannot group types into slices by a namespace capture or keep slices independent."),
     ];
 }

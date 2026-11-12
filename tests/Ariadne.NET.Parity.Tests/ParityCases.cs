@@ -1,5 +1,6 @@
 using ArchUnitNET.Domain;
 using static ArchUnitNET.Fluent.ArchRuleDefinition;
+using static ArchUnitNET.Fluent.Slices.SliceRuleDefinition;
 
 namespace Ariadne.NET.Parity.Tests;
 
@@ -1074,6 +1075,33 @@ public static class ParityCases
             a => Types().That().ResideInNamespace("Parity.CHaveAnyAttributes.NotBroken")
                 .Or().ResideInNamespace("Parity.CHaveAnyAttributes.NotClean")
                 .Should().NotHaveAnyAttributes(AttributeOf(a, "Parity.CHaveAnyAttributes.Target.AuditedAttribute"))),
+
+        // Phase 4.3 gaps: each has a KnownGaps entry and no rule in its kind's pack. The pattern spans the kind, so every
+        // namespace below Parity.<Kind> is its own slice and slice names start with the Broken or Clean namespace.
+        new(
+            "s-free-of-cycles",
+            "SFreeOfCycles",
+            "Parity.SFreeOfCycles",
+            "PARITY-SFREEOFCYCLES",
+            Projection.Slices,
+            _ => Slices().Matching("Parity.SFreeOfCycles.(**)").Should().BeFreeOfCycles(),
+            "Parity.SFreeOfCycles.(**)"),
+        new(
+            "s-not-depend-on-each-other",
+            "SNotDependOnEachOther",
+            "Parity.SNotDependOnEachOther",
+            "PARITY-SNOTDEPENDONEACHOTHER",
+            Projection.Slices,
+            _ => Slices().Matching("Parity.SNotDependOnEachOther.(**)").Should().NotDependOnEachOther(),
+            "Parity.SNotDependOnEachOther.(**)"),
+        new(
+            "s-matching-with-packages",
+            "SMatchingWithPackages",
+            "Parity.SMatchingWithPackages",
+            "PARITY-SMATCHINGWITHPACKAGES",
+            Projection.Slices,
+            _ => Slices().MatchingWithPackages("Parity.SMatchingWithPackages.(**)").Should().NotDependOnEachOther(),
+            "Parity.SMatchingWithPackages.(**)"),
     ];
 
     // The second assembly of the PResideInAssembly kind, by its simple name.

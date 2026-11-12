@@ -67,4 +67,7 @@
   <Project Path="CHaveFullNameEndingWith/Parity.CHaveFullNameEndingWith.csproj" />
   <Project Path="CHaveFullNameContaining/Parity.CHaveFullNameContaining.csproj" />
   <Project Path="CHaveAnyAttributes/Parity.CHaveAnyAttributes.csproj" />
+  <Project Path="SFreeOfCycles/Parity.SFreeOfCycles.csproj" />
+  <Project Path="SNotDependOnEachOther/Parity.SNotDependOnEachOther.csproj" />
+  <Project Path="SMatchingWithPackages/Parity.SMatchingWithPackages.csproj" />
 </Solution>

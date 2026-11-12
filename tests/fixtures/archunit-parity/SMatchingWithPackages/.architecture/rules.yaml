@@ -1,0 +1,6 @@
+schema: 2
+name: parity-s-matching-with-packages
+version: "1.0.0"
+author: fixture
+
+# No rule yet: a pack cannot group types into slices. Phase 4.3 adds PARITY-SMATCHINGWITHPACKAGES here, a slices rule with independent: true, and deletes its KnownGaps entry.
