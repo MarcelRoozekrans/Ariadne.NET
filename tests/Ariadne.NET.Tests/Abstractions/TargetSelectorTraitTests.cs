@@ -67,6 +67,27 @@ public sealed class TargetSelectorTraitTests
         PropertyNames(result).Should().Contain("AssignableTo");
     }
 
+    [Fact]
+    public void Code_built_role_and_require_reject_enum_and_delegate()
+    {
+        var roleValidator = new ComponentRoleDefinitionValidator();
+        var requirementValidator = new RuleRequirementValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new TargetSelectorValidator());
+
+        foreach (var kind in new[] { CSharpTypeKind.Enum, CSharpTypeKind.Delegate })
+        {
+            PropertyNames(roleValidator.Validate(new ComponentRoleDefinition { Name = "R", Layer = "L", TypeKind = kind }))
+                .Should().Contain("TypeKind");
+            PropertyNames(requirementValidator.Validate(new RuleRequirement { Kind = kind }))
+                .Should().Contain("Kind");
+        }
+
+        foreach (var kind in new[] { CSharpTypeKind.Class, CSharpTypeKind.Interface, CSharpTypeKind.Record, CSharpTypeKind.Struct, CSharpTypeKind.RecordStruct })
+        {
+            roleValidator.Validate(new ComponentRoleDefinition { Name = "R", Layer = "L", TypeKind = kind }).IsValid.Should().BeTrue();
+            requirementValidator.Validate(new RuleRequirement { Kind = kind }).IsValid.Should().BeTrue();
+        }
+    }
+
     private static List<string> PropertyNames(ZeroAlloc.Validation.ValidationResult result)
     {
         var names = new List<string>();

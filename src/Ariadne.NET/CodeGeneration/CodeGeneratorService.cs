@@ -33,6 +33,8 @@ public sealed class CodeGeneratorService : ICodeGeneratorService
                 nameof(request));
         }
 
+        EnsureGeneratable(role);
+
         var resolvedNamespace = ResolveTemplate(
             resolvedPack.NamingConventions.Namespace,
             request,
@@ -75,6 +77,16 @@ public sealed class CodeGeneratorService : ICodeGeneratorService
             .Replace("{Feature}", request.Feature, StringComparison.OrdinalIgnoreCase)
             .Replace("{Layer}", layer, StringComparison.OrdinalIgnoreCase)
             .Replace("{ComponentName}", request.ComponentName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void EnsureGeneratable(ComponentRoleDefinition role)
+    {
+        if (role.TypeKind is CSharpTypeKind.Enum or CSharpTypeKind.Delegate)
+        {
+            throw new ArgumentException(
+                $"Role '{role.Name}' has type kind {role.TypeKind}, which cannot be generated.",
+                nameof(role));
+        }
     }
 
     private static string DetermineTypeName(string componentName, CSharpTypeKind typeKind)

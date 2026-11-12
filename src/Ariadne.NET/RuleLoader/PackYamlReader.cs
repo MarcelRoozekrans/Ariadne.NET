@@ -71,7 +71,11 @@ internal static class PackYamlReader
 
     private static readonly string[] NamingKeys = ["namespace", "filePath"];
 
-    private static readonly string TypeKindNames = string.Join(", ", Enum.GetNames<CSharpTypeKind>());
+    // kind and typeKind take the five kinds code can be built for; enum and delegate are only selectable, through kinds.
+    private static readonly CSharpTypeKind[] BuildableTypeKinds =
+        [CSharpTypeKind.Class, CSharpTypeKind.Interface, CSharpTypeKind.Record, CSharpTypeKind.Struct, CSharpTypeKind.RecordStruct];
+
+    private static readonly string TypeKindNames = string.Join(", ", BuildableTypeKinds.Select(static kind => kind.ToString()));
 
     /// <summary>
     /// The most entries one read visits, counting a node again each time an alias reaches it. Aliases may nest, so a few
@@ -758,7 +762,7 @@ internal static class PackYamlReader
                 return null;
             }
 
-            foreach (var kind in Enum.GetValues<CSharpTypeKind>())
+            foreach (var kind in BuildableTypeKinds)
             {
                 if (string.Equals(kind.ToString(), value, StringComparison.OrdinalIgnoreCase))
                 {
