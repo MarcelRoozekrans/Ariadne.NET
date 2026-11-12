@@ -191,6 +191,7 @@ public static class ParityCases
             "PARITY-PHAVEFULLNAME",
             Projection.Types,
             _ => Types().That().HaveFullName("Parity.PHaveFullName.Broken.OrderService")
+                .Or().HaveFullName("Parity.PHaveFullName.Broken.Outer.OrderService")
                 .Should().NotDependOnAny(Types().That().ResideInNamespace("Parity.PHaveFullName.Target"))),
         new(
             "p-have-full-name:not",

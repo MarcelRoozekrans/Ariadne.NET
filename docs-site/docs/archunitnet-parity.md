@@ -133,15 +133,15 @@ Methods that every kind of object has, here applied to `Types()`.
 
 | Id | ArchUnitNET | Ariadne | Status | Notes |
 |---|---|---|---|---|
-| `p-have-name` | `HaveName`, `DoNotHaveName` | `types: ["**.Name"]`; `:not` as an exception with `types` | `covered` | |
-| `p-have-name-starting-with` | `HaveNameStartingWith`, `DoNotHaveNameStartingWith` | `types: ["**.Prefix*"]`; `:not` as an exception with `types` | `covered` | |
-| `p-have-name-ending-with` | `HaveNameEndingWith`, `DoNotHaveNameEndingWith` | `types: ["**.*Suffix"]`; `:not` as an exception with `types` | `covered` | |
-| `p-have-name-containing` | `HaveNameContaining`, `DoNotHaveNameContaining` | `types: ["**.*Part*"]`; `:not` as an exception with `types` | `covered` | |
+| `p-have-name` | `HaveName`, `DoNotHaveName` | `types: ["**.Name"]`; `:not` as an exception with `types` | `divergence` | Ariadne ignores generic arity and matches with case; ArchUnitNET reads ``OrderService`1`` and ignores case. See [p-have-name](#p-have-name). |
+| `p-have-name-starting-with` | `HaveNameStartingWith`, `DoNotHaveNameStartingWith` | `types: ["**.Prefix*"]`; `:not` as an exception with `types` | `covered` | The tools agree on a generic type, whose arity comes after the matched part, on a nested type, which both match by its own name, and on case, which both keep. |
+| `p-have-name-ending-with` | `HaveNameEndingWith`, `DoNotHaveNameEndingWith` | `types: ["**.*Suffix"]`; `:not` as an exception with `types` | `divergence` | Ariadne ignores generic arity; ArchUnitNET reads ``OrderService`1``. See [p-have-name-ending-with](#p-have-name-ending-with). |
+| `p-have-name-containing` | `HaveNameContaining`, `DoNotHaveNameContaining` | `types: ["**.*Part*"]`; `:not` as an exception with `types` | `covered` | The tools agree on a generic type, whose arity comes after the matched part, on a nested type, which both match by its own name, and on case, which both keep. |
 | `p-have-name-matching` | `HaveNameMatching`, `DoNotHaveNameMatching` | — | `out-of-scope` | Ariadne patterns are globs; translate a regex with a glob form by hand. |
-| `p-have-full-name` | `HaveFullName`, `DoNotHaveFullName` | `types: ["Ns.Name"]`; `:not` as an exception with `types` | `covered` | |
-| `p-have-full-name-starting-with` | `HaveFullNameStartingWith`, `DoNotHaveFullNameStartingWith` | `types: ["Ns.Prefix*", "Ns.Prefix*.**"]`; `:not` as an exception with `types` | `covered` | |
-| `p-have-full-name-ending-with` | `HaveFullNameEndingWith`, `DoNotHaveFullNameEndingWith` | `types: ["**.*Suffix"]`; `:not` as an exception with `types` | `covered` | |
-| `p-have-full-name-containing` | `HaveFullNameContaining`, `DoNotHaveFullNameContaining` | `types: ["**.*Part*.**"]`; `:not` as an exception with `types` | `covered` | |
+| `p-have-full-name` | `HaveFullName`, `DoNotHaveFullName` | `types: ["Ns.Name"]`; `:not` as an exception with `types` | `divergence` | Ariadne ignores generic arity, joins nested types with `.` and matches with case. See [p-have-full-name](#p-have-full-name). |
+| `p-have-full-name-starting-with` | `HaveFullNameStartingWith`, `DoNotHaveFullNameStartingWith` | `types: ["Ns.Prefix*", "Ns.Prefix*.**"]`; `:not` as an exception with `types` | `divergence` | ArchUnitNET ignores case. See [p-have-full-name-starting-with](#p-have-full-name-starting-with). |
+| `p-have-full-name-ending-with` | `HaveFullNameEndingWith`, `DoNotHaveFullNameEndingWith` | `types: ["**.*Suffix"]`; `:not` as an exception with `types` | `divergence` | Ariadne ignores generic arity; ArchUnitNET ignores case. See [p-have-full-name-ending-with](#p-have-full-name-ending-with). |
+| `p-have-full-name-containing` | `HaveFullNameContaining`, `DoNotHaveFullNameContaining` | `types: ["**.*Part*.**"]`; `:not` as an exception with `types` | `divergence` | ArchUnitNET ignores case. See [p-have-full-name-containing](#p-have-full-name-containing). |
 | `p-have-full-name-matching` | `HaveFullNameMatching`, `DoNotHaveFullNameMatching` | — | `out-of-scope` | Ariadne patterns are globs; translate a regex with a glob form by hand. |
 | `p-have-assembly-qualified-name` | `HaveAssemblyQualifiedName`, `HaveAssemblyQualifiedNameStartingWith`, `HaveAssemblyQualifiedNameEndingWith`, `HaveAssemblyQualifiedNameContaining`, `HaveAssemblyQualifiedNameMatching` and their `DoNot` forms | — | `out-of-scope` | `assemblies` plus `types` express it. |
 | `c-have-name` | `HaveName`, `NotHaveName` | `require` with `is: { names }`, `isNot: { names }` | `gap` | 4.2 |
@@ -247,6 +247,12 @@ Here ArchUnitNET and Ariadne answer differently on purpose, mostly because one r
 
 - [c-be-kind](#c-be-kind)
 - [c-only-depend-on](#c-only-depend-on)
+- [p-have-name](#p-have-name), [p-have-name:not](#p-have-name)
+- [p-have-name-ending-with](#p-have-name-ending-with), [p-have-name-ending-with:not](#p-have-name-ending-with)
+- [p-have-full-name](#p-have-full-name)
+- [p-have-full-name-starting-with](#p-have-full-name-starting-with)
+- [p-have-full-name-ending-with](#p-have-full-name-ending-with)
+- [p-have-full-name-containing](#p-have-full-name-containing)
 
 ### c-be-kind
 
@@ -261,3 +267,39 @@ Fixture `tests/fixtures/archunit-parity/COnlyDependOn`, rule `Should().OnlyDepen
 
 - **Reason:** `OnlyDependOn` fails a dependency on any type of the loaded assemblies outside the allowed set. The layer check is open-world: it does not check a dependency on a type no layer covers. Framework types are outside the loaded assemblies, so they count for neither tool, although ArchUnitNET 0.13.2 names `System.Object` in its failure message.
 - **Expected:** ArchUnitNET's answer, for a developer who wrote `OnlyDependOn`. In a pack, cover the namespace with a layer that is not in `allowedDependencies`, as the fixture does for `Forbidden`, and Ariadne flags the dependency too.
+
+### Names: generic arity, nested types and case
+
+Three differences in how the tools read a type's name, measured against ArchUnitNET 0.13.2:
+
+- **Generic arity.** ArchUnitNET reads the metadata name, so `OrderService<T>` is named ``OrderService`1``. Ariadne matches `types` globs against the source name without arity, so `OrderService<T>` is `OrderService`. `HaveNameStartingWith` and `HaveNameContaining` agree because the arity sits at the end; `HaveName`, `HaveNameEndingWith`, `HaveFullName` and `HaveFullNameEndingWith` do not.
+- **Nested types.** ArchUnitNET joins a nested type to its outer type with `+`, as in `Outer+OrderService`; Ariadne joins them with `.`. `HaveName` reads the nested type's own name in both tools, so only `HaveFullName` with a dotted name differs.
+- **Case.** ArchUnitNET 0.13.2 ignores case in `HaveName`, `HaveFullName`, `HaveFullNameStartingWith`, `HaveFullNameEndingWith` and `HaveFullNameContaining`, and keeps it in `HaveNameStartingWith`, `HaveNameEndingWith` and `HaveNameContaining`. Ariadne's `types` globs always keep case.
+
+**Expected:** Ariadne's answer in all three. In C# the type is named `OrderService`, a developer writes `Outer.OrderService`, and `orderService` is another type than `OrderService`. Neither tool can select `OrderService` and leave out `OrderService<T>` by name; phase 4.2's `names` key reads the name without arity too.
+
+The fixtures are the name kinds under `tests/fixtures/archunit-parity`; the probes `OrderService<T>`, `Outer.<Name>` and a lowercase name sit in each kind's `Broken` namespace.
+
+#### p-have-name
+
+Fixture `PHaveName`, `HaveName("OrderService")` against `types: ["**.OrderService"]`. Only ArchUnitNET flags `Broken.orderService`; only Ariadne flags ``Broken.OrderService`1``. Both flag `Broken.Outer.OrderService`. The `:not` case, `DoNotHaveName`, swaps the two: only ArchUnitNET flags ``Broken.OrderService`1`` and only Ariadne flags `Broken.orderService`.
+
+#### p-have-name-ending-with
+
+Fixture `PHaveNameEndingWith`, `HaveNameEndingWith("Service")` against `types: ["**.*Service"]`. Only Ariadne flags ``Broken.OrderService`1``; in the `:not` case only ArchUnitNET flags it. Both keep case, so neither selects `Broken.Invoiceservice`, and both flag the nested `Broken.Outer.AuditService`.
+
+#### p-have-full-name
+
+Fixture `PHaveFullName`, `HaveFullName("….Broken.OrderService")` or `HaveFullName("….Broken.Outer.OrderService")` against `types` with the same two names. Only ArchUnitNET flags `Broken.orderService`. Only Ariadne flags ``Broken.OrderService`1`` and `Broken.Outer.OrderService`, whose ArchUnitNET full name is `….Broken.Outer+OrderService`. The `:not` case agrees.
+
+#### p-have-full-name-starting-with
+
+Fixture `PHaveFullNameStartingWith`, `HaveFullNameStartingWith("….Broken.Order")` against `types: ["….Broken.Order*", "….Broken.Order*.**"]`. Only ArchUnitNET flags `Broken.orderLine`. Both flag ``Broken.OrderService`1`` and the nested `Broken.OrderBox.Item`. The `:not` case agrees.
+
+#### p-have-full-name-ending-with
+
+Fixture `PHaveFullNameEndingWith`, `HaveFullNameEndingWith("Service")` against `types: ["**.*Service"]`. Only ArchUnitNET flags `Broken.Invoiceservice`; only Ariadne flags ``Broken.OrderService`1``. Both flag the nested `Broken.Outer.AuditService`. The `:not` case agrees.
+
+#### p-have-full-name-containing
+
+Fixture `PHaveFullNameContaining`, `HaveFullNameContaining("Order")` against `types: ["**.*Order*.**"]`. Only ArchUnitNET flags `Broken.Backorder`. Both flag ``Broken.OrderService`1`` and the nested `Broken.Outer.OrderLine`. The `:not` case agrees.

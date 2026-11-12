@@ -7,7 +7,7 @@ rules:
   - id: PARITY-PHAVEFULLNAME
     because: Mirrors ArchUnitNET's HaveFullName; the types it selects must not depend on Target.
     forbid:
-      from: { types: ["Parity.PHaveFullName.Broken.OrderService"] }
+      from: { types: ["Parity.PHaveFullName.Broken.OrderService", "Parity.PHaveFullName.Broken.Outer.OrderService"] }
       to:
         namespaces: ["Parity.PHaveFullName.Target.**"]
   - id: PARITY-PHAVEFULLNAME-NOT
