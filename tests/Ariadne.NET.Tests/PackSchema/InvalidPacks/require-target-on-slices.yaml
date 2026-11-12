@@ -1,0 +1,9 @@
+schema: 2
+name: x
+rules:
+  - id: X-R1
+    because: b
+    requireTarget: true
+    slices:
+      matching: ["Shop.(*)"]
+      freeOfCycles: true
