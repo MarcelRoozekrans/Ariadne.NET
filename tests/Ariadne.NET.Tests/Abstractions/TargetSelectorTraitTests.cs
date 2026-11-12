@@ -62,9 +62,10 @@ public sealed class TargetSelectorTraitTests
         exception.Static.Should().BeNull();
         exception.Nested.Should().BeNull();
 
-        var result = new RuleExceptionValidator().Validate(new RuleException { Because = "x", AssignableTo = [null!] });
+        var result = new RuleExceptionValidator().Validate(
+            new RuleException { Because = "x", Names = [null!], Accessibility = [null!], AssignableTo = [null!] });
         result.IsValid.Should().BeFalse();
-        PropertyNames(result).Should().Contain("AssignableTo");
+        PropertyNames(result).Should().Contain(["Names", "Accessibility", "AssignableTo"]);
     }
 
     [Fact]

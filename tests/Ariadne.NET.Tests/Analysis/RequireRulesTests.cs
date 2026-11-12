@@ -341,6 +341,15 @@ public class RequireRulesTests
     }
 
     [Fact]
+    public void IsNot_false_reads_as_the_positive_condition()
+    {
+        var pack = ConditionPack(InN, new RuleRequirement { IsNot = new TargetSelector { Sealed = false } });
+
+        Check("namespace N { public class Open { } public sealed class Closed { } }", pack)
+            .Should().ContainSingle().Which.Message.Should().Be("Type 'Open' is selected by rule 'R' and should be sealed but is not");
+    }
+
+    [Fact]
     public void RequirementNotMet_is_13() => ((int)ViolationKind.RequirementNotMet).Should().Be(13);
 
     private static IReadOnlyList<ArchitectureViolation> Check(string source, RulePack pack)
