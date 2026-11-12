@@ -3,5 +3,10 @@ name: parity-s-free-of-cycles
 version: "1.0.0"
 author: fixture
 
-# No rule yet: a pack cannot group types into slices. Phase 4.3 adds PARITY-SFREEOFCYCLES here, a slices rule with freeOfCycles: true, and deletes its KnownGaps entry.
 # The harness compares slices by full namespace, such as Parity.SFreeOfCycles.Broken.Orders: every namespace below Parity.SFreeOfCycles is its own slice.
+rules:
+  - id: PARITY-SFREEOFCYCLES
+    because: Mirrors ArchUnitNET's Slices().Matching("Parity.SFreeOfCycles.(**)").Should().BeFreeOfCycles().
+    slices:
+      matching: ["Parity.SFreeOfCycles.(**)"]
+      freeOfCycles: true

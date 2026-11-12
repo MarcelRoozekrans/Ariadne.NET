@@ -3,6 +3,11 @@ name: parity-s-matching-with-packages
 version: "1.0.0"
 author: fixture
 
-# No rule yet: a pack cannot group types into slices. Phase 4.3 adds PARITY-SMATCHINGWITHPACKAGES here, a slices rule with independent: true, and deletes its KnownGaps entry.
 # The harness compares slices by full namespace, such as Parity.SMatchingWithPackages.Broken.Orders: every namespace below Parity.SMatchingWithPackages is its own slice.
 # MatchingWithPackages and Matching cut the same slices here and differ only in how ArchUnitNET names them: by full namespace, or by the captured remainder.
+rules:
+  - id: PARITY-SMATCHINGWITHPACKAGES
+    because: Mirrors ArchUnitNET's Slices().MatchingWithPackages("Parity.SMatchingWithPackages.(**)").Should().NotDependOnEachOther().
+    slices:
+      matching: ["Parity.SMatchingWithPackages.(**)"]
+      independent: true
