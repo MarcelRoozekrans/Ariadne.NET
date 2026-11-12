@@ -362,7 +362,7 @@ public class RulePackValidationTests
     [InlineData(RuleKind.Forbid, true)]
     [InlineData(RuleKind.AllowOnly, true)]
     [InlineData(RuleKind.UniqueNames, true)]
-    public void Validator_rejects_requireTarget_on_require(RuleKind kind, bool valid)
+    public void Validator_allows_requireTarget_only_on_target_kinds(RuleKind kind, bool valid)
     {
         var validator = new RuleDefinitionValidator(
             new TargetSelectorValidator(),
