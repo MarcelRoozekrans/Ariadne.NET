@@ -1,3 +1,15 @@
 <Solution>
   <Project Path="CNotDependOnAny/Parity.CNotDependOnAny.csproj" />
+  <Project Path="PResideInNamespace/Parity.PResideInNamespace.csproj" />
+  <Project Path="PResideInAssembly/Parity.PResideInAssembly.csproj" />
+  <Project Path="PResideInAssembly/Other/Parity.PResideInAssembly.Other.csproj" />
+  <Project Path="PAre/Parity.PAre.csproj" />
+  <Project Path="PHaveName/Parity.PHaveName.csproj" />
+  <Project Path="PHaveNameStartingWith/Parity.PHaveNameStartingWith.csproj" />
+  <Project Path="PHaveNameEndingWith/Parity.PHaveNameEndingWith.csproj" />
+  <Project Path="PHaveNameContaining/Parity.PHaveNameContaining.csproj" />
+  <Project Path="PHaveFullName/Parity.PHaveFullName.csproj" />
+  <Project Path="PHaveFullNameStartingWith/Parity.PHaveFullNameStartingWith.csproj" />
+  <Project Path="PHaveFullNameEndingWith/Parity.PHaveFullNameEndingWith.csproj" />
+  <Project Path="PHaveFullNameContaining/Parity.PHaveFullNameContaining.csproj" />
 </Solution>

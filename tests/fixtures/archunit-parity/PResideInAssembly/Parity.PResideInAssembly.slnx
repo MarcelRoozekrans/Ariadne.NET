@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Parity.PResideInAssembly.csproj" />
+  <Project Path="Other/Parity.PResideInAssembly.Other.csproj" />
+</Solution>

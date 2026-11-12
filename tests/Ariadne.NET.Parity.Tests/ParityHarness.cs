@@ -33,9 +33,15 @@ internal static class ParityHarness
     private static readonly Lazy<ServiceProvider> Services = new(
         () => new ServiceCollection().AddAriadneNETServices().BuildServiceProvider(), LazyThreadSafetyMode.ExecutionAndPublication);
 
-    /// <summary>The fixture project of <paramref name="kind"/>.</summary>
-    public static string KindProject(string kind) =>
-        Path.Combine(FixtureProjects.ParityRoot, kind, $"Parity.{kind}.csproj");
+    /// <summary>
+    /// What Ariadne checks for <paramref name="kind"/>: the kind's <c>Parity.&lt;Kind&gt;.slnx</c> when it has one, for a kind
+    /// that needs a second assembly, else its one project.
+    /// </summary>
+    public static string KindProject(string kind)
+    {
+        var solution = Path.Combine(FixtureProjects.ParityRoot, kind, $"Parity.{kind}.slnx");
+        return File.Exists(solution) ? solution : Path.Combine(FixtureProjects.ParityRoot, kind, $"Parity.{kind}.csproj");
+    }
 
     /// <summary>The pack of <paramref name="kind"/>.</summary>
     public static string KindPack(string kind) =>
@@ -224,7 +230,9 @@ internal static class ParityHarness
             throw new FileNotFoundException($"The parity fixture '{kind}' has no build output.", Path.Combine(output, dll));
         }
 
-        var architecture = new ArchLoader().LoadFilteredDirectory(output, dll, SearchOption.TopDirectoryOnly).Build();
+        // Parity.<Kind>*.dll also takes the kind's second assembly, such as Parity.PResideInAssembly.Other.dll, which the
+        // build copies next to the kind's own. No kind references another, so no other kind's DLL sits in this folder.
+        var architecture = new ArchLoader().LoadFilteredDirectory(output, $"Parity.{kind}*.dll", SearchOption.TopDirectoryOnly).Build();
         var namespaces = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var type in architecture.Types)
         {

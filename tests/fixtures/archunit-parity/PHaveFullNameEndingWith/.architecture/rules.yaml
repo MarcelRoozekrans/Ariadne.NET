@@ -1,0 +1,22 @@
+schema: 2
+name: parity-p-have-full-name-ending-with
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-PHAVEFULLNAMEENDINGWITH
+    because: Mirrors ArchUnitNET's HaveFullNameEndingWith; the types it selects must not depend on Target.
+    forbid:
+      from: { types: ["**.*Service"] }
+      to:
+        namespaces: ["Parity.PHaveFullNameEndingWith.Target.**"]
+  - id: PARITY-PHAVEFULLNAMEENDINGWITH-NOT
+    because: Mirrors ArchUnitNET's DoNotHaveFullNameEndingWith; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PHaveFullNameEndingWith.**"]
+      to:
+        namespaces: ["Parity.PHaveFullNameEndingWith.Target.**"]
+    exceptions:
+      - types: ["**.*Clean.PaymentService"]
+        because: DoNotHaveFullNameEndingWith leaves these types out.

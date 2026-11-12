@@ -36,8 +36,8 @@ Methods of `Types().That()`.
 
 | Id | ArchUnitNET | Ariadne | Status | Notes |
 |---|---|---|---|---|
-| `p-reside-in-namespace` | `ResideInNamespace`, `DoNotResideInNamespace` | `namespaces`; `:not` as an exception with `namespaces` | `covered` | |
-| `p-reside-in-assembly` | `ResideInAssembly`, `DoNotResideInAssembly` | `assemblies`; `:not` as an exception with `assemblies` | `covered` | |
+| `p-reside-in-namespace` | `ResideInNamespace`, `DoNotResideInNamespace` | `namespaces`; `:not` as an exception with `namespaces` | `covered` | The namespace alone, without `.**`: ArchUnitNET does not include child namespaces. |
+| `p-reside-in-assembly` | `ResideInAssembly`, `DoNotResideInAssembly` | `assemblies`; `:not` as an exception with `assemblies` | `covered` | `assemblies` takes the simple name; ArchUnitNET's string form takes the full display name, with version and culture. |
 | `p-reside-in-namespace-matching` | `ResideInNamespaceMatching`, `DoNotResideInNamespaceMatching` | — | `out-of-scope` | Ariadne patterns are globs; translate a regex with a glob form by hand. |
 | `p-reside-in-assembly-matching` | `ResideInAssemblyMatching`, `DoNotResideInAssemblyMatching` | — | `out-of-scope` | Ariadne patterns are globs; translate a regex with a glob form by hand. |
 | `p-implement-interface` | `ImplementInterface`, `ImplementAny`, `DoNotImplementInterface`, `DoNotImplementAny` | `interfaces`; `:not` as an exception with `assignableTo` | `gap` | 4.2, `:not` only |

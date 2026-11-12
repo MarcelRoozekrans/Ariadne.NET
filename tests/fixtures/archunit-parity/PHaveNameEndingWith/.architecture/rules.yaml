@@ -1,0 +1,22 @@
+schema: 2
+name: parity-p-have-name-ending-with
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-PHAVENAMEENDINGWITH
+    because: Mirrors ArchUnitNET's HaveNameEndingWith; the types it selects must not depend on Target.
+    forbid:
+      from: { types: ["**.*Service"] }
+      to:
+        namespaces: ["Parity.PHaveNameEndingWith.Target.**"]
+  - id: PARITY-PHAVENAMEENDINGWITH-NOT
+    because: Mirrors ArchUnitNET's DoNotHaveNameEndingWith; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PHaveNameEndingWith.**"]
+      to:
+        namespaces: ["Parity.PHaveNameEndingWith.Target.**"]
+    exceptions:
+      - types: ["**.*Service"]
+        because: DoNotHaveNameEndingWith leaves these types out.

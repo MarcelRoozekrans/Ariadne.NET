@@ -1,0 +1,22 @@
+schema: 2
+name: parity-p-have-full-name
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-PHAVEFULLNAME
+    because: Mirrors ArchUnitNET's HaveFullName; the types it selects must not depend on Target.
+    forbid:
+      from: { types: ["Parity.PHaveFullName.Broken.OrderService"] }
+      to:
+        namespaces: ["Parity.PHaveFullName.Target.**"]
+  - id: PARITY-PHAVEFULLNAME-NOT
+    because: Mirrors ArchUnitNET's DoNotHaveFullName; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PHaveFullName.**"]
+      to:
+        namespaces: ["Parity.PHaveFullName.Target.**"]
+    exceptions:
+      - types: ["Parity.PHaveFullName.NotClean.PaymentService"]
+        because: DoNotHaveFullName leaves these types out.

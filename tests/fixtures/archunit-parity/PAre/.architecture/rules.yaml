@@ -1,0 +1,22 @@
+schema: 2
+name: parity-p-are
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-PARE
+    because: Mirrors ArchUnitNET's Are; the types it selects must not depend on Target.
+    forbid:
+      from: { types: ["Parity.PAre.Broken.OrderService", "Parity.PAre.Clean.Ledger"] }
+      to:
+        namespaces: ["Parity.PAre.Target.**"]
+  - id: PARITY-PARE-NOT
+    because: Mirrors ArchUnitNET's AreNot; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PAre.**"]
+      to:
+        namespaces: ["Parity.PAre.Target.**"]
+    exceptions:
+      - types: ["Parity.PAre.NotClean.ShipmentService"]
+        because: AreNot leaves these types out.

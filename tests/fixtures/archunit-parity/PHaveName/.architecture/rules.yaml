@@ -1,0 +1,22 @@
+schema: 2
+name: parity-p-have-name
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-PHAVENAME
+    because: Mirrors ArchUnitNET's HaveName; the types it selects must not depend on Target.
+    forbid:
+      from: { types: ["**.OrderService"] }
+      to:
+        namespaces: ["Parity.PHaveName.Target.**"]
+  - id: PARITY-PHAVENAME-NOT
+    because: Mirrors ArchUnitNET's DoNotHaveName; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PHaveName.**"]
+      to:
+        namespaces: ["Parity.PHaveName.Target.**"]
+    exceptions:
+      - types: ["**.OrderService"]
+        because: DoNotHaveName leaves these types out.
