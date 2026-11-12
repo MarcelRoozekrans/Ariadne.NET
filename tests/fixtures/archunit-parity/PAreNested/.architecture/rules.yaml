@@ -1,0 +1,6 @@
+schema: 2
+name: parity-p-are-nested
+version: "1.0.0"
+author: fixture
+
+# No rule yet: a selector has no nested. Phase 4.2 adds PARITY-PARENESTED and PARITY-PARENESTED-NOT here and deletes their KnownGaps entries.

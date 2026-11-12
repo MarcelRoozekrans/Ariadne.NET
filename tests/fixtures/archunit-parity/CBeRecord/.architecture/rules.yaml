@@ -1,0 +1,6 @@
+schema: 2
+name: parity-c-be-record
+version: "1.0.0"
+author: fixture
+
+# No rule yet: require has no is or isNot, and a selector has no kinds. Phase 4.2 adds PARITY-CBERECORD and PARITY-CBERECORD-NOT here and deletes their KnownGaps entries.

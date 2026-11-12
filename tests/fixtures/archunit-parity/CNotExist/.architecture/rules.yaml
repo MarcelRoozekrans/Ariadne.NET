@@ -1,0 +1,6 @@
+schema: 2
+name: parity-c-not-exist
+version: "1.0.0"
+author: fixture
+
+# No rule yet: require has no isNot. Phase 4.2 adds PARITY-CNOTEXIST here and deletes the KnownGaps entry.

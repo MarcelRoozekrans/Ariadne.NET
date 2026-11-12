@@ -1,0 +1,6 @@
+schema: 2
+name: parity-c-be-nested-in
+version: "1.0.0"
+author: fixture
+
+# No rule yet: require has no is, and a selector has no nested. Phase 4.2 adds PARITY-CBENESTEDIN here and deletes the KnownGaps entry.

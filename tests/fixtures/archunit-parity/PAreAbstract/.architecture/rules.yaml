@@ -1,0 +1,6 @@
+schema: 2
+name: parity-p-are-abstract
+version: "1.0.0"
+author: fixture
+
+# No rule yet: a selector has no abstract. Phase 4.2 adds PARITY-PAREABSTRACT and PARITY-PAREABSTRACT-NOT here and deletes their KnownGaps entries.

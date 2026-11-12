@@ -1,0 +1,6 @@
+schema: 2
+name: parity-p-attribute-are-sealed
+version: "1.0.0"
+author: fixture
+
+# No rule yet: a selector has no sealed. Phase 4.2 adds PARITY-PATTRIBUTEARESEALED and PARITY-PATTRIBUTEARESEALED-NOT here and deletes their KnownGaps entries.

@@ -1,0 +1,6 @@
+schema: 2
+name: parity-c-be-protected
+version: "1.0.0"
+author: fixture
+
+# No rule yet: require has no is or isNot, and its accessibility key checks only internal. Phase 4.2 adds PARITY-CBEPROTECTED and PARITY-CBEPROTECTED-NOT here and deletes their KnownGaps entries.
