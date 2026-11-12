@@ -23,12 +23,12 @@ public static class Divergences
         "Ariadne's: C# names are case-sensitive, so orderService is another type than OrderService.";
 
     private const string StaticClass =
-        "IL marks a static class abstract sealed, so ArchUnitNET's AreAbstract holds it and AreNotAbstract leaves it out. "
-        + "Ariadne follows C#, where a static class is not abstract, so 'abstract: true' leaves it out and 'abstract: false' "
-        + "selects it.";
+        "IL marks a static class abstract sealed, so ArchUnitNET's AreAbstract and BeAbstract hold it and AreNotAbstract "
+        + "leaves it out. Ariadne follows C#, where a static class is not abstract, so 'abstract: true' leaves it out and "
+        + "'abstract: false' selects it.";
 
     private const string StaticClassExpected =
-        "Ariadne's: a static class cannot be declared abstract in C#, and no developer writes AreAbstract to mean static. "
+        "Ariadne's: a static class cannot be declared abstract in C#, and no developer writes AreAbstract or BeAbstract to mean static. "
         + "Select static classes with 'static: true'.";
 
     /// <summary>All divergence entries.</summary>
@@ -40,8 +40,8 @@ public static class Divergences
             new HashSet<string>(StringComparer.Ordinal) { "Parity.CBeKind.Broken.Ledger" },
             "A record class compiles to a class, so ArchUnitNET's Classes() holds it. Ariadne reads source, where record is its "
             + "own kind, so 'kind: class' rejects a record.",
-            "ArchUnitNET's: a record class is a class in C#. Phase 4.2's 'is: { kinds: [class, record] }' expresses Be(Classes()) "
-            + "exactly; today's 'kind' takes one kind."),
+            "ArchUnitNET's: a record class is a class in C#. 'is: { kinds: [class, record] }' expresses Be(Classes()) "
+            + "exactly; the older 'kind' key takes one kind."),
         new(
             "c-only-depend-on",
             new HashSet<string>(StringComparer.Ordinal) { "Parity.COnlyDependOn.Broken.AuditTrail" },
@@ -110,6 +110,12 @@ public static class Divergences
             "p-are-abstract:not",
             new HashSet<string>(StringComparer.Ordinal),
             new HashSet<string>(StringComparer.Ordinal) { "Parity.PAreAbstract.Broken.Clock" },
+            StaticClass,
+            StaticClassExpected),
+        new(
+            "c-be-abstract",
+            new HashSet<string>(StringComparer.Ordinal),
+            new HashSet<string>(StringComparer.Ordinal) { "Parity.CBeAbstract.Broken.Clock" },
             StaticClass,
             StaticClassExpected),
     ];

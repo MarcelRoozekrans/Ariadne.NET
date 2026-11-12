@@ -10,3 +10,10 @@ rules:
       for:
         namespaces: ["Parity.CBeKind.Broken", "Parity.CBeKind.Clean"]
       kind: class
+  - id: PARITY-CBEKIND-NOT
+    because: Mirrors ArchUnitNET's NotBe with Interfaces(); NotBroken and NotClean must not be interfaces.
+    require:
+      for:
+        namespaces: ["Parity.CBeKind.NotBroken", "Parity.CBeKind.NotClean"]
+      isNot:
+        kinds: [interface]

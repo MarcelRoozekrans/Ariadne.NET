@@ -3,4 +3,12 @@ name: parity-c-be-nested-in
 version: "1.0.0"
 author: fixture
 
-# No rule yet: require has no is, and a selector has no nested. Phase 4.2 adds PARITY-CBENESTEDIN here and deletes the KnownGaps entry.
+rules:
+  - id: PARITY-CBENESTEDIN
+    because: Mirrors ArchUnitNET's BeNestedIn with Broken.Order; Broken and Clean must be nested in Order.
+    require:
+      for:
+        namespaces: ["Parity.CBeNestedIn.Broken", "Parity.CBeNestedIn.Clean"]
+      is:
+        nested: true
+        types: ["Parity.CBeNestedIn.Broken.Order.*"]

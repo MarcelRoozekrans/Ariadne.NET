@@ -3,4 +3,18 @@ name: parity-c-have-name
 version: "1.0.0"
 author: fixture
 
-# No rule yet: require has no is or isNot, and a selector has no names. Phase 4.2 adds PARITY-CHAVENAME and PARITY-CHAVENAME-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-CHAVENAME
+    because: Mirrors ArchUnitNET's HaveName("OrderService"); Broken and Clean must satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CHaveName.Broken", "Parity.CHaveName.Clean"]
+      is:
+        names: ["OrderService"]
+  - id: PARITY-CHAVENAME-NOT
+    because: Mirrors ArchUnitNET's NotHaveName("OrderService"); NotBroken and NotClean must not satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CHaveName.NotBroken", "Parity.CHaveName.NotClean"]
+      isNot:
+        names: ["OrderService"]

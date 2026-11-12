@@ -16,3 +16,10 @@ rules:
       for:
         namespaces: ["Parity.CResideInNamespace.Broken", "Parity.CResideInNamespace.Clean"]
       layer: Home
+  - id: PARITY-CRESIDEINNAMESPACE-NOT
+    because: Mirrors ArchUnitNET's NotResideInNamespace; NotBroken and NotClean must not reside in NotBroken.
+    require:
+      for:
+        namespaces: ["Parity.CResideInNamespace.NotBroken", "Parity.CResideInNamespace.NotClean"]
+      isNot:
+        namespaces: ["Parity.CResideInNamespace.NotBroken"]

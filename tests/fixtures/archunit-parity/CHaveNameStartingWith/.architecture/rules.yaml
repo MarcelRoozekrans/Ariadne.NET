@@ -3,4 +3,18 @@ name: parity-c-have-name-starting-with
 version: "1.0.0"
 author: fixture
 
-# No rule yet: require has no is or isNot, and a selector has no names. Phase 4.2 adds PARITY-CHAVENAMESTARTINGWITH and PARITY-CHAVENAMESTARTINGWITH-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-CHAVENAMESTARTINGWITH
+    because: Mirrors ArchUnitNET's HaveNameStartingWith("Order"); Broken and Clean must satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CHaveNameStartingWith.Broken", "Parity.CHaveNameStartingWith.Clean"]
+      is:
+        names: ["Order*"]
+  - id: PARITY-CHAVENAMESTARTINGWITH-NOT
+    because: Mirrors ArchUnitNET's NotHaveNameStartingWith("Order"); NotBroken and NotClean must not satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CHaveNameStartingWith.NotBroken", "Parity.CHaveNameStartingWith.NotClean"]
+      isNot:
+        names: ["Order*"]

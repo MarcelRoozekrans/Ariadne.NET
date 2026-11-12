@@ -3,4 +3,18 @@ name: parity-c-be-nested
 version: "1.0.0"
 author: fixture
 
-# No rule yet: require has no is or isNot, and a selector has no nested. Phase 4.2 adds PARITY-CBENESTED and PARITY-CBENESTED-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-CBENESTED
+    because: Mirrors ArchUnitNET's BeNested; Broken and Clean must satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CBeNested.Broken", "Parity.CBeNested.Clean"]
+      is:
+        nested: true
+  - id: PARITY-CBENESTED-NOT
+    because: Mirrors ArchUnitNET's NotBeNested; NotBroken and NotClean must not satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CBeNested.NotBroken", "Parity.CBeNested.NotClean"]
+      isNot:
+        nested: true

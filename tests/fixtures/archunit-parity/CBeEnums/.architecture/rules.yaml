@@ -3,4 +3,18 @@ name: parity-c-be-enums
 version: "1.0.0"
 author: fixture
 
-# No rule yet: require has no is or isNot, and a selector has no kinds. Phase 4.2 adds PARITY-CBEENUMS and PARITY-CBEENUMS-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-CBEENUMS
+    because: Mirrors ArchUnitNET's BeEnums; Broken and Clean must satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CBeEnums.Broken", "Parity.CBeEnums.Clean"]
+      is:
+        kinds: [enum]
+  - id: PARITY-CBEENUMS-NOT
+    because: Mirrors ArchUnitNET's NotBeEnums; NotBroken and NotClean must not satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CBeEnums.NotBroken", "Parity.CBeEnums.NotClean"]
+      isNot:
+        kinds: [enum]

@@ -3,4 +3,18 @@ name: parity-c-be
 version: "1.0.0"
 author: fixture
 
-# No rule yet: require has no is or isNot. Phase 4.2 adds PARITY-CBE and PARITY-CBE-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-CBE
+    because: Mirrors ArchUnitNET's Be with Clean.Ledger and Clean.InvoiceService; Broken and Clean must be one of them.
+    require:
+      for:
+        namespaces: ["Parity.CBe.Broken", "Parity.CBe.Clean"]
+      is:
+        types: ["Parity.CBe.Clean.Ledger", "Parity.CBe.Clean.InvoiceService"]
+  - id: PARITY-CBE-NOT
+    because: Mirrors ArchUnitNET's NotBe with NotBroken.Shipment; NotBroken and NotClean must not be it.
+    require:
+      for:
+        namespaces: ["Parity.CBe.NotBroken", "Parity.CBe.NotClean"]
+      isNot:
+        types: ["Parity.CBe.NotBroken.Shipment"]

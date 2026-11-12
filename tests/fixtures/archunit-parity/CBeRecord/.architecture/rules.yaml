@@ -3,4 +3,20 @@ name: parity-c-be-record
 version: "1.0.0"
 author: fixture
 
-# No rule yet: require has no is or isNot, and a selector has no kinds. Phase 4.2 adds PARITY-CBERECORD and PARITY-CBERECORD-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-CBERECORD
+    because: Mirrors ArchUnitNET's BeRecord on Classes(); Broken and Clean must satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CBeRecord.Broken", "Parity.CBeRecord.Clean"]
+        kinds: [class, record]
+      is:
+        kinds: [record]
+  - id: PARITY-CBERECORD-NOT
+    because: Mirrors ArchUnitNET's NotBeRecord on Classes(); NotBroken and NotClean must not satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CBeRecord.NotBroken", "Parity.CBeRecord.NotClean"]
+        kinds: [class, record]
+      isNot:
+        kinds: [record]
