@@ -24,8 +24,9 @@ internal static class ParityHarness
     private static readonly ConcurrentDictionary<string, Lazy<Architecture>> Architectures = new(StringComparer.Ordinal);
     private static readonly ConcurrentDictionary<string, Lazy<ArchitectureReport>> Reports = new(StringComparer.Ordinal);
 
-    // Canonical names of every loaded type that carries CompilerGeneratedAttribute, so SourceTypesOnly can drop them by name.
-    private static readonly ConcurrentDictionary<string, byte> CompilerGenerated = new(StringComparer.Ordinal);
+    // Per kind, the canonical names of the loaded types that carry CompilerGeneratedAttribute, so SourceTypesOnly can drop
+    // them by name.
+    private static readonly ConcurrentDictionary<string, IReadOnlySet<string>> CompilerGenerated = new(StringComparer.Ordinal);
 
     // Canonical type name to namespace, per kind, for projecting Ariadne's source types onto slices.
     private static readonly ConcurrentDictionary<string, IReadOnlyDictionary<string, string>> Namespaces = new(StringComparer.Ordinal);
@@ -72,7 +73,7 @@ internal static class ParityHarness
         var names = failed.Select(o => o is IType type
             ? type.FullName
             : throw new InvalidOperationException($"Case '{c.Id}': ArchUnitNET reported a {o?.GetType().Name ?? "null"}, not a type."));
-        return SourceTypesOnly(names).Select(TypeNames.Canonical).ToHashSet(StringComparer.Ordinal);
+        return SourceTypesOnly(c.Kind, names).Select(TypeNames.Canonical).ToHashSet(StringComparer.Ordinal);
     }
 
     /// <summary>What Ariadne flags for <paramref name="c"/>, from the kind's cached report.</summary>
@@ -123,19 +124,17 @@ internal static class ParityHarness
     }
 
     /// <summary>
-    /// Drops compiler-generated types: names with a <c>&lt;</c>, and types of any fixture kind that carry
-    /// <c>CompilerGeneratedAttribute</c>. Loads every kind's architecture first, so the result does not depend on which
-    /// kinds were loaded before.
+    /// Drops compiler-generated types from names ArchUnitNET reported for <paramref name="kind"/>: names with a <c>&lt;</c>,
+    /// and types of the kind's assemblies that carry <c>CompilerGeneratedAttribute</c>. Every name the kind's architecture
+    /// holds starts with <c>Parity.&lt;Kind&gt;.</c>, so the kind's own set is the only one that can hold such a name.
     /// </summary>
-    public static IEnumerable<string> SourceTypesOnly(IEnumerable<string> names)
+    public static IEnumerable<string> SourceTypesOnly(string kind, IEnumerable<string> names)
     {
+        ArgumentNullException.ThrowIfNull(kind);
         ArgumentNullException.ThrowIfNull(names);
-        foreach (var kind in ParityCases.All.Select(c => c.Kind).Distinct(StringComparer.Ordinal))
-        {
-            ArchitectureOf(kind);
-        }
-
-        return names.Where(n => !n.Contains('<', StringComparison.Ordinal) && !CompilerGenerated.ContainsKey(TypeNames.Canonical(n)));
+        ArchitectureOf(kind);
+        var generated = CompilerGenerated[kind];
+        return names.Where(n => !n.Contains('<', StringComparison.Ordinal) && !generated.Contains(TypeNames.Canonical(n)));
     }
 
     /// <summary>True when the pack of <paramref name="kind"/> defines a rule or layer with id <paramref name="ruleId"/>.</summary>
@@ -223,7 +222,7 @@ internal static class ParityHarness
     private static Architecture Load(string kind)
     {
         // A path-based load reads the DLL with Mono.Cecil instead of loading it into the test process, which would lock it.
-        var output = Path.Combine(FixtureProjects.ParityRoot, kind, "bin", "Debug", "net10.0");
+        var output = FixtureProjects.ParityOutput(Path.Combine(FixtureProjects.ParityRoot, kind));
         var dll = $"Parity.{kind}.dll";
         if (!File.Exists(Path.Combine(output, dll)))
         {
@@ -232,22 +231,37 @@ internal static class ParityHarness
 
         // Parity.<Kind>*.dll also takes the kind's second assembly, such as Parity.PResideInAssembly.Other.dll, which the
         // build copies next to the kind's own. No kind references another, so no other kind's DLL sits in this folder.
+        // The filter is a prefix, so Parity.PAre*.dll would also take the DLL of a kind such as PAreAbstract if one were
+        // ever copied here; check that only the kind's own assemblies were loaded.
         var architecture = new ArchLoader().LoadFilteredDirectory(output, $"Parity.{kind}*.dll", SearchOption.TopDirectoryOnly).Build();
+        var foreign = architecture.Assemblies.Select(a => a.Name.Split(',')[0]).Where(n => !IsKindAssembly(n, kind)).ToList();
+        if (foreign.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"The parity fixture '{kind}' loaded assemblies of another kind: {string.Join(", ", foreign)}.");
+        }
+
         var namespaces = new Dictionary<string, string>(StringComparer.Ordinal);
+        var generated = new HashSet<string>(StringComparer.Ordinal);
         foreach (var type in architecture.Types)
         {
             var canonical = TypeNames.Canonical(type.FullName);
             if (IsCompilerGenerated(type))
             {
-                CompilerGenerated.TryAdd(canonical, 0);
+                generated.Add(canonical);
             }
 
             namespaces[canonical] = type.Namespace.FullName;
         }
 
         Namespaces[kind] = namespaces;
+        CompilerGenerated[kind] = generated;
         return architecture;
     }
+
+    /// <summary>True when <paramref name="assemblyName"/> is <c>Parity.&lt;Kind&gt;</c> or one of its second assemblies, <c>Parity.&lt;Kind&gt;.&lt;Name&gt;</c>.</summary>
+    internal static bool IsKindAssembly(string assemblyName, string kind) =>
+        IsIn(assemblyName, "Parity." + kind);
 
     private static bool IsCompilerGenerated(IType type) =>
         type.IsCompilerGenerated

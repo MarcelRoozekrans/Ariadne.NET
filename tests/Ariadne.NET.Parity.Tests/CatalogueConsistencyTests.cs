@@ -15,6 +15,12 @@ public sealed class CatalogueConsistencyTests
     private static IReadOnlyList<CatalogueRow> Rows => ParityCatalogue.Load(ParityCatalogue.PagePath);
 
     [Fact]
+    public void Row_ids_are_unique()
+    {
+        Rows.Select(r => r.Id).Should().OnlyHaveUniqueItems("a row id names one row, which its cases and links rely on");
+    }
+
+    [Fact]
     public void Every_in_scope_row_has_a_case_and_every_case_a_row()
     {
         var inScopeRows = Rows.Where(r => InScope.Contains(r.Status)).Select(r => r.Id);

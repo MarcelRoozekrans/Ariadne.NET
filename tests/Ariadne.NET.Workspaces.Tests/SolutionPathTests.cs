@@ -176,6 +176,34 @@ public sealed class SolutionPathTests : IDisposable
     }
 
     [Fact]
+    public void SourceStamp_ChangesOnDeleteAndRename_NotOnBuildOutput()
+    {
+        var root = Directory.CreateDirectory(Path.Combine(_dir, "stamp")).FullName;
+        var a = Path.Combine(root, "A.cs");
+        var b = Path.Combine(root, "B.cs");
+        File.WriteAllText(a, "a");
+        File.WriteAllText(b, "b");
+        // The newest write is the same throughout, so only the file list can change the stamp.
+        var newest = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(a, newest.AddMinutes(-1));
+        File.SetLastWriteTimeUtc(b, newest);
+        var original = FixtureProjects.SourceStamp(root);
+
+        Directory.CreateDirectory(Path.Combine(root, "bin"));
+        File.WriteAllText(Path.Combine(root, "bin", "A.dll"), "dll");
+        File.WriteAllText(Path.Combine(root, ".parity-build-marker"), "marker");
+        FixtureProjects.SourceStamp(root).Should().Be(original);
+
+        var renamed = Path.Combine(root, "C.cs");
+        File.Move(a, renamed);
+        var afterRename = FixtureProjects.SourceStamp(root);
+        afterRename.Should().NotBe(original);
+
+        File.Delete(renamed);
+        FixtureProjects.SourceStamp(root).Should().NotBe(original).And.NotBe(afterRename);
+    }
+
+    [Fact]
     public void IsSharingViolation_TrueForAHeldLock()
     {
         var lockPath = Path.Combine(_dir, "held.lock");
@@ -195,14 +223,16 @@ public sealed class SolutionPathTests : IDisposable
         FixtureProjects.IsSharingViolation(new IOException("There is not enough space on the disk.", unchecked((int)0x80070070))).Should().BeFalse();
     }
 
-    // Copies the fixture sources, keeping the fixture-local Directory.Build files so the import chain still stops there.
+    // Copies the fixture sources, keeping the fixture-local Directory.Build files so the import chain still stops there. The
+    // ArchUnitNET parity fixtures are left out: no restore target lies under them.
     private static void CopySources(string from, string to)
     {
         foreach (var file in Directory.EnumerateFiles(from, "*", SearchOption.AllDirectories))
         {
             var relative = Path.GetRelativePath(from, file);
             var segments = relative.Split(Path.DirectorySeparatorChar);
-            if (Array.Exists(segments, s => string.Equals(s, "bin", StringComparison.Ordinal) || string.Equals(s, "obj", StringComparison.Ordinal))
+            if (string.Equals(segments[0], "archunit-parity", StringComparison.Ordinal)
+                || Array.Exists(segments, s => string.Equals(s, "bin", StringComparison.Ordinal) || string.Equals(s, "obj", StringComparison.Ordinal))
                 || FixtureProjects.IsLockOrMarker(segments[^1]))
             {
                 continue;

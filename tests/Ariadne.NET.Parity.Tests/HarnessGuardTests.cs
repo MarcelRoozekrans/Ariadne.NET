@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Ariadne.NET.Abstractions;
 using Ariadne.NET.Analysis;
 using Ariadne.NET.Testing;
@@ -144,6 +143,17 @@ public sealed class HarnessGuardTests
     }
 
     [Theory]
+    [InlineData("Parity.PAre", "PAre", true)]
+    [InlineData("Parity.PResideInAssembly.Other", "PResideInAssembly", true)]
+    [InlineData("Parity.PAreAbstract", "PAre", false)]
+    [InlineData("Parity.PAreAbstract.Other", "PAre", false)]
+    public void Kind_assembly_is_the_kind_or_below_it(string assembly, string kind, bool expected)
+    {
+        // The ArchUnitNET load filter Parity.PAre*.dll also matches Parity.PAreAbstract.dll; this check rejects it.
+        ParityHarness.IsKindAssembly(assembly, kind).Should().Be(expected);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void Slice_projection_yields_full_namespaces(bool withPackages)
@@ -253,7 +263,7 @@ public sealed class HarnessGuardTests
                     File.WriteAllText(Path.Combine([folder, .. relative.Split('/')]), content);
                 }
 
-                Restore(copy.Project);
+                FixtureProjects.Dotnet("restore", copy.Project);
                 return copy;
             }
             catch
@@ -288,32 +298,6 @@ public sealed class HarnessGuardTests
                 }
 
                 CopyFolder(dir, Path.Combine(target, name));
-            }
-        }
-
-        private static void Restore(string project)
-        {
-            var info = new ProcessStartInfo("dotnet")
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-            };
-            info.ArgumentList.Add("restore");
-            info.ArgumentList.Add(project);
-            using var process = Process.Start(info) ?? throw new InvalidOperationException("Could not start dotnet.");
-            var stdout = process.StandardOutput.ReadToEndAsync();
-            var stderr = process.StandardError.ReadToEndAsync();
-            if (!process.WaitForExit(TimeSpan.FromMinutes(5)))
-            {
-                process.Kill(entireProcessTree: true);
-                throw new TimeoutException($"dotnet restore {project} did not finish within 5 minutes.");
-            }
-
-            if (process.ExitCode != 0)
-            {
-                throw new InvalidOperationException(
-                    $"dotnet restore {project} exited with code {process.ExitCode}.{Environment.NewLine}{stdout.GetAwaiter().GetResult()}{stderr.GetAwaiter().GetResult()}");
             }
         }
     }
