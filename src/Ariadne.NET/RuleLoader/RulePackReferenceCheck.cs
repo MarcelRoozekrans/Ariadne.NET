@@ -127,6 +127,13 @@ internal static class RulePackReferenceCheck
         CheckTarget($"the {(rule.Kind == RuleKind.Require ? "for" : "from")} of rule '{id}'", rule.From, failures);
         CheckTarget($"the to of rule '{id}'", rule.To, failures);
         CheckTarget($"the against of rule '{id}'", rule.Against, failures);
+        if (rule.Kind == RuleKind.UniqueNames)
+        {
+            // The loader keeps traits out of a uniqueNames target; TargetMatcher would narrow the collisions by them.
+            RejectKeys($"the for of rule '{id}'", rule.From, PackYamlReader.TraitKeys, "which a uniqueNames target does not take", failures);
+            RejectKeys($"the against of rule '{id}'", rule.Against, PackYamlReader.TraitKeys, "which a uniqueNames target does not take", failures);
+        }
+
         if (rule.Require is { } requirement)
         {
             if (requirement.Is is { } isCondition)
@@ -154,6 +161,52 @@ internal static class RulePackReferenceCheck
             }
 
             CheckTraitValues(where, exception.Kinds, exception.Accessibility, failures);
+
+            // BannedPackageRules reads only assemblies and UniqueNameRules never assemblies, so another key would widen or
+            // void the exception.
+            foreach (var key in ExceptionKeyRules.UsedKeys(exception))
+            {
+                if (ExceptionKeyRules.Rejection(rule.Kind, key) is { } reason)
+                {
+                    failures.Add($"{where} has '{key}'; {reason}");
+                }
+            }
+        }
+    }
+
+    // The YAML key of each set selector key, in the loader's order.
+    private static IEnumerable<string> SetKeys(TargetSelector selector)
+    {
+        (string Key, bool Set)[] keys =
+        [
+            ("layers", selector.Layers.Count > 0),
+            ("namespaces", selector.Namespaces.Count > 0),
+            ("assemblies", selector.Assemblies.Count > 0),
+            ("types", selector.Types.Count > 0),
+            ("baseTypes", selector.BaseTypes.Count > 0),
+            ("interfaces", selector.Interfaces.Count > 0),
+            ("attributes", selector.Attributes.Count > 0),
+            ("members", selector.Members.Count > 0),
+            ("names", selector.Names.Count > 0),
+            ("kinds", selector.Kinds.Count > 0),
+            ("accessibility", selector.Accessibility.Count > 0),
+            ("assignableTo", selector.AssignableTo.Count > 0),
+            ("sealed", selector.Sealed is not null),
+            ("abstract", selector.Abstract is not null),
+            ("static", selector.Static is not null),
+            ("nested", selector.Nested is not null),
+        ];
+        return keys.Where(static k => k.Set).Select(static k => k.Key);
+    }
+
+    private static void RejectKeys(string where, TargetSelector selector, string[] rejected, string reason, List<string> failures)
+    {
+        foreach (var key in SetKeys(selector))
+        {
+            if (Array.IndexOf(rejected, key) >= 0)
+            {
+                failures.Add($"{where} has '{key}', {reason}");
+            }
         }
     }
 
@@ -221,10 +274,21 @@ internal static class RulePackReferenceCheck
             failures.Add($"the requirement of rule '{id}' has accessibility '{PackText.Show(accessibility)}', which must be public or internal");
         }
 
-        if (requirement.Implements is { } implements
-            && implements.Namespaces.Count == 0 && implements.Assemblies.Count == 0 && implements.Types.Count == 0)
+        if (requirement.Implements is { } implements)
         {
-            failures.Add($"the implements of rule '{id}' needs at least one of namespaces, assemblies, types");
+            if (implements.Namespaces.Count == 0 && implements.Assemblies.Count == 0 && implements.Types.Count == 0)
+            {
+                failures.Add($"the implements of rule '{id}' needs at least one of namespaces, assemblies, types");
+            }
+
+            // RequireRules compiles only these three, so another key would be dropped and widen the requirement.
+            foreach (var key in SetKeys(implements))
+            {
+                if (key is not ("namespaces" or "assemblies" or "types"))
+                {
+                    failures.Add($"the implements of rule '{id}' has '{key}', which implements does not take; it takes namespaces, assemblies, types");
+                }
+            }
         }
     }
 
