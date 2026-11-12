@@ -514,14 +514,7 @@ public sealed class SolutionLoaderTests : IDisposable
 
     private static void Restore(string project)
     {
-        var info = new System.Diagnostics.ProcessStartInfo("dotnet")
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        };
-        info.ArgumentList.Add("restore");
-        info.ArgumentList.Add(project);
+        var info = FixtureProjects.DotnetStartInfo("restore", project);
         using var process = System.Diagnostics.Process.Start(info)!;
         var output = process.StandardOutput.ReadToEndAsync();
         var error = process.StandardError.ReadToEndAsync();

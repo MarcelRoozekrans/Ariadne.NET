@@ -31,6 +31,13 @@ internal static class FixtureProjects
         "modular/Modular.slnx",
     ];
 
+    /// <summary>
+    /// The variables MSBuildLocator sets in a process that registers an SDK. They pin that SDK's MSBuild, so a child <c>dotnet</c>
+    /// that resolves another SDK starts worker nodes it cannot connect to: it exits 1 without output, and the orphaned nodes keep its
+    /// output open until they time out after 15 minutes.
+    /// </summary>
+    internal static readonly string[] MSBuildLocatorVariables = ["MSBUILD_EXE_PATH", "MSBuildExtensionsPath", "MSBuildSDKsPath"];
+
     private static readonly TimeSpan LockTimeout = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan ProcessTimeout = TimeSpan.FromMinutes(5);
     private static readonly Lazy<string> RootFolder = new(FindRoot);
@@ -266,8 +273,11 @@ internal static class FixtureProjects
     private static bool IsBuildOutput(string segment) =>
         string.Equals(segment, "bin", StringComparison.Ordinal) || string.Equals(segment, "obj", StringComparison.Ordinal);
 
-    /// <summary>Runs <c>dotnet</c> with <paramref name="verb"/>, <paramref name="target"/> and <paramref name="extra"/>; throws with its output when it fails or takes over five minutes.</summary>
-    internal static void Dotnet(string verb, string target, params string[] extra)
+    /// <summary>
+    /// Starts <c>dotnet</c> with <paramref name="args"/> and redirected output, in this process's environment without
+    /// <see cref="MSBuildLocatorVariables"/>.
+    /// </summary>
+    internal static ProcessStartInfo DotnetStartInfo(params string[] args)
     {
         var info = new ProcessStartInfo("dotnet")
         {
@@ -275,13 +285,23 @@ internal static class FixtureProjects
             RedirectStandardError = true,
             UseShellExecute = false,
         };
-        info.ArgumentList.Add(verb);
-        info.ArgumentList.Add(target);
-        foreach (var arg in extra)
+        foreach (var arg in args)
         {
             info.ArgumentList.Add(arg);
         }
 
+        foreach (var variable in MSBuildLocatorVariables)
+        {
+            info.Environment.Remove(variable);
+        }
+
+        return info;
+    }
+
+    /// <summary>Runs <c>dotnet</c> with <paramref name="verb"/>, <paramref name="target"/> and <paramref name="extra"/>; throws with its output when it fails or takes over five minutes.</summary>
+    internal static void Dotnet(string verb, string target, params string[] extra)
+    {
+        var info = DotnetStartInfo([verb, target, .. extra]);
         using var process = Process.Start(info) ?? throw new InvalidOperationException("Could not start dotnet.");
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
