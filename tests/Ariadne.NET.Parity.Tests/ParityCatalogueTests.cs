@@ -69,8 +69,48 @@ public sealed class ParityCatalogueTests
         {
             r.Id.Should().MatchRegex("^[pcsx]-[a-z0-9-]+$");
             Statuses.Should().Contain(r.Status, "row {0} must use a known status", r.Id);
+            NotesMatchStatus(r).Should().BeTrue("row {0} with status {1} has notes '{2}'", r.Id, r.Status, r.Notes);
         });
         rows.Should().NotContain(r => r.Notes.Contains("#<issue>", StringComparison.Ordinal));
         File.ReadAllLines(ParityCatalogue.PagePath).Should().Contain("## Divergences");
+    }
+
+    [Fact]
+    public void Parse_keeps_an_empty_last_cell_written_without_spaces()
+    {
+        const string markdown = """
+            | Id | ArchUnitNET | Ariadne | Status | Notes |
+            |---|---|---|---|---|
+            | `p-x` | `X` | `types` | `covered` ||
+            """;
+
+        var row = ParityCatalogue.Parse(markdown).Should().ContainSingle().Subject;
+
+        row.Status.Should().Be("covered");
+        row.Notes.Should().BeEmpty();
+    }
+
+    // gap names its phase, deferred links an issue, out-of-scope gives a reason.
+    private static bool NotesMatchStatus(CatalogueRow row) => row.Status switch
+    {
+        "gap" => row.Notes.StartsWith("4.2", StringComparison.Ordinal)
+            || row.Notes.StartsWith("4.3", StringComparison.Ordinal)
+            || row.Notes.StartsWith("unplanned", StringComparison.Ordinal),
+        "deferred" => HasIssueLink(row.Notes),
+        "out-of-scope" => row.Notes.Length > 0,
+        _ => true,
+    };
+
+    private static bool HasIssueLink(string notes)
+    {
+        for (var i = notes.IndexOf('#', StringComparison.Ordinal); i >= 0; i = notes.IndexOf('#', i + 1))
+        {
+            if (i + 1 < notes.Length && char.IsAsciiDigit(notes[i + 1]))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

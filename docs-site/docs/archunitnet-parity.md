@@ -120,7 +120,7 @@ Methods that every kind of object has, here applied to `Types()`.
 | `p-are-private` | `ArePrivate`, `AreNotPrivate` | `accessibility: [private]` | `gap` | 4.2 |
 | `p-are-protected-internal` | `AreProtectedInternal`, `AreNotProtectedInternal` | `accessibility: [protected internal]` | `gap` | 4.2 |
 | `p-are-private-protected` | `ArePrivateProtected`, `AreNotPrivateProtected` | `accessibility: [private protected]` | `gap` | 4.2 |
-| `c-be-public` | `BePublic`, `NotBePublic` | `require` with `is: { accessibility: [public] }`, `isNot` | `gap` | 4.2 |
+| `c-be-public` | `BePublic`, `NotBePublic` | `require` with `is: { accessibility: [public] }`, `isNot` | `gap` | 4.2. Today's `require` accepts `accessibility: public` but checks only `internal`, so it flags nothing. |
 | `c-be-internal` | `BeInternal`, `NotBeInternal` | `require` with `accessibility: internal`; `:not` as `isNot: { accessibility: [internal] }` | `gap` | 4.2, `:not` only |
 | `c-be-protected` | `BeProtected`, `NotBeProtected` | `require` with `is: { accessibility: [protected] }`, `isNot` | `gap` | 4.2 |
 | `c-be-private` | `BePrivate`, `NotBePrivate` | `require` with `is: { accessibility: [private] }`, `isNot` | `gap` | 4.2 |

@@ -103,8 +103,9 @@ internal static class ParityCatalogue
 
     private static List<string> Cells(string line)
     {
-        var inner = line.Trim('|');
-        return [.. inner.Split('|').Select(c => c.Trim())];
+        var start = line.StartsWith('|') ? 1 : 0;
+        var end = line.Length > start && line.EndsWith('|') ? line.Length - 1 : line.Length;
+        return [.. line[start..end].Split('|').Select(c => c.Trim())];
     }
 
     private static string StripBackticks(string cell) => cell.Replace("`", string.Empty, StringComparison.Ordinal).Trim();
