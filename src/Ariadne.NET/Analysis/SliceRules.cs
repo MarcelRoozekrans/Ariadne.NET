@@ -16,7 +16,7 @@ internal static class SliceRules
     /// different slices, with the number of references and the location of the first. Only source types of the run have a
     /// slice, targets included; a nested type sits in its outermost type's slice. A type is identified by its assembly name and
     /// display string, so a type seen in several target frameworks of one project counts once. An exception exempts a source
-    /// type only, and a target that <c>allow</c> selects is not a dependency. Edges are checked per target framework scope, and
+    /// type only, evaluated for each target framework variant, and a target that <c>allow</c> selects is not a dependency. Edges are checked per target framework scope, and
     /// a violation found in several scopes is reported once, naming the frameworks that found it, or none when every scope did.
     /// For a <c>freeOfCycles</c> rule it returns one <see cref="ViolationKind.SliceCycle"/> per slice edge and component: one for each
     /// edge whose two slices share a strongly connected component of the scope's slice graph, through the earliest reference from the one to the other.
@@ -261,6 +261,7 @@ internal static class SliceRules
     {
         private readonly Dictionary<TypeId, SlicedType> _byId = [];
         private readonly Dictionary<INamedTypeSymbol, SlicedType?> _bySymbol = new(SymbolEqualityComparer.Default);
+        private readonly Dictionary<INamedTypeSymbol, bool> _exceptedBySymbol = new(SymbolEqualityComparer.Default);
 
         public void Collect(IReadOnlyList<(TypeGraph Graph, string? TargetFramework)> graphs)
         {
@@ -279,7 +280,7 @@ internal static class SliceRules
                         var id = IdOf(type);
                         if (!_byId.TryGetValue(id, out sliced))
                         {
-                            _byId.Add(id, sliced = new SlicedType(id.Display, slice, IsExcepted(type)));
+                            _byId.Add(id, sliced = new SlicedType(id.Display, slice));
                         }
                     }
 
@@ -304,6 +305,18 @@ internal static class SliceRules
             return sliced;
         }
 
+        // Exemption belongs to the symbol, not the shared identity: a target framework variant can carry an attribute or a
+        // modifier that another variant lacks, and the exception must not carry over between them.
+        public bool IsExceptedSource(INamedTypeSymbol type)
+        {
+            if (!_exceptedBySymbol.TryGetValue(type, out var excepted))
+            {
+                _exceptedBySymbol.Add(type, excepted = IsExcepted(type));
+            }
+
+            return excepted;
+        }
+
         private static TypeId IdOf(INamedTypeSymbol type) => new(type.ContainingAssembly?.Name ?? string.Empty, type.ToDisplayString());
 
         private bool IsExcepted(INamedTypeSymbol type)
@@ -321,13 +334,11 @@ internal static class SliceRules
     }
 
     /// <summary>A source type with a slice; one instance per type identity, so instances compare by reference.</summary>
-    private sealed class SlicedType(string display, string slice, bool excepted)
+    private sealed class SlicedType(string display, string slice)
     {
         public string Display { get; } = display;
 
         public string Slice { get; } = slice;
-
-        public bool Excepted { get; } = excepted;
     }
 
     /// <summary>The counted edges of one graph, aggregated per source and target type, in the order first seen.</summary>
@@ -343,7 +354,8 @@ internal static class SliceRules
             var result = new SliceEdges();
             foreach (var edge in graph.Edges)
             {
-                if (sliced.Find(edge.Source) is not { Excepted: false } source
+                if (sliced.Find(edge.Source) is not { } source
+                    || sliced.IsExceptedSource(edge.Source)
                     || sliced.Find(edge.Target) is not { } target
                     || string.Equals(source.Slice, target.Slice, StringComparison.Ordinal)
                     || allow?.Matches(edge.Target) == true)

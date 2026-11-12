@@ -192,6 +192,26 @@ public class SliceRulesTests
         violations.Should().ContainSingle().Which.TargetFrameworks.Should().Equal("net8.0");
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Exception_is_evaluated_for_each_framework_variant_of_the_source(bool exceptedFirst)
+    {
+        var pack = PackWith(Independent([ShopModules], exceptions: new RuleException { Sealed = true, Because = "Sealed variants are legacy." }));
+        var excepted = (TestCompilation.Create("""
+            namespace Shop.Billing { public class B { } }
+            namespace Shop.Orders { public sealed class A { public Shop.Billing.B? X; } }
+            """), "net8.0");
+        var checkedVariant = (TestCompilation.Create("""
+            namespace Shop.Billing { public class B { } }
+            namespace Shop.Orders { public class A { public Shop.Billing.B? X; } }
+            """), "net10.0");
+
+        var violations = exceptedFirst ? Check(pack, excepted, checkedVariant) : Check(pack, checkedVariant, excepted);
+
+        violations.Should().ContainSingle().Which.TargetFrameworks.Should().Equal("net10.0");
+    }
+
     [Fact]
     public void Single_target_project_counts_in_every_framework_scope()
     {
