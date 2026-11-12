@@ -21,6 +21,7 @@ internal sealed class TypeTraits
     private readonly bool? _abstract;
     private readonly bool? _static;
     private readonly bool? _nested;
+    private readonly bool _isEmpty;
 
     private TypeTraits(
         Glob[] names,
@@ -40,11 +41,12 @@ internal sealed class TypeTraits
         _abstract = abstractTrait;
         _static = staticTrait;
         _nested = nestedTrait;
+        _isEmpty = names.Length == 0 && kinds.Length == 0 && accessibility.Length == 0 && assignableTo.Length == 0
+            && sealedTrait is null && abstractTrait is null && staticTrait is null && nestedTrait is null;
     }
 
-    /// <summary>Whether no trait is set, so the traits match every type.</summary>
-    public bool IsEmpty => _names.Length == 0 && _kinds.Length == 0 && _accessibility.Length == 0 && _assignableTo.Length == 0
-        && _sealed is null && _abstract is null && _static is null && _nested is null;
+    /// <summary>Whether no trait is set, so the traits match every type. Computed once.</summary>
+    public bool IsEmpty => _isEmpty;
 
     /// <summary>Compiles the traits of a selector once. The loader validates the values, so an invalid one is a programming error.</summary>
     /// <param name="selector">The selector whose trait members to compile.</param>
@@ -139,15 +141,27 @@ internal sealed class TypeTraits
         ArgumentNullException.ThrowIfNull(type);
         ArgumentNullException.ThrowIfNull(names);
 
-        // The cheap symbol flags first, the name lookups last.
+        return FlagsMatch(type) && AssignableMatches(type, names);
+    }
+
+    /// <summary>
+    /// Whether the type matches every set trait that reads only the type itself: everything but <c>assignableTo</c>, which
+    /// walks the base chain and interfaces. Callers test this before their own walks, as it is cheap.
+    /// </summary>
+    /// <param name="type">The type to test.</param>
+    /// <returns>True when those traits match.</returns>
+    public bool FlagsMatch(INamedTypeSymbol type)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+
+        // The symbol flags first, the name glob last.
         return NestedMatches(type)
             && StaticMatches(type)
             && SealedMatches(type)
             && AbstractMatches(type)
             && KindMatches(type)
             && AccessibilityMatches(type)
-            && NameMatches(type)
-            && AssignableMatches(type, names);
+            && NameMatches(type);
     }
 
     /// <summary>Whether a <c>names</c> glob matches the innermost simple name, arity left out. True when <c>names</c> is unset.</summary>
