@@ -1,0 +1,13 @@
+schema: 2
+name: parity-c-not-depend-on-any
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-CNOTDEPENDONANY
+    because: Mirrors ArchUnitNET's NotDependOnAny; Broken and Clean must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.CNotDependOnAny.Broken.**", "Parity.CNotDependOnAny.Clean.**"]
+      to:
+        namespaces: ["Parity.CNotDependOnAny.Target.**"]

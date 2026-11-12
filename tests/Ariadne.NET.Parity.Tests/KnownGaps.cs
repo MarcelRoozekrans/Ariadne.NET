@@ -1,0 +1,11 @@
+namespace Ariadne.NET.Parity.Tests;
+
+/// <summary>
+/// The cases Ariadne cannot express yet. Each gap case's fixture must still fail ArchUnitNET's rule, and its pack must not
+/// hold the case's rule, so an entry cannot outlive the gap it records.
+/// </summary>
+public static class KnownGaps
+{
+    /// <summary>All gap entries.</summary>
+    public static IReadOnlyList<KnownGap> Entries { get; } = [];
+}
