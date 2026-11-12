@@ -612,6 +612,22 @@ public class RulePackReferenceCheckTests
     }
 
     [Fact]
+    public void Slices_rule_with_a_null_matching_entry_is_invalid()
+    {
+        var slices = new SliceDefinition { Matching = ["Shop.(*)", null!], Independent = true };
+
+        Resolve(PackWithRule(SlicesRule(slices))).Error.Detail.Should().Be("the slices of rule 'R-1' has a null entry in matching");
+    }
+
+    [Fact]
+    public void Slices_rule_with_null_matching_is_invalid()
+    {
+        var slices = new SliceDefinition { Matching = null!, Independent = true };
+
+        Resolve(PackWithRule(SlicesRule(slices))).Error.Detail.Should().Be("the slices of rule 'R-1' needs at least one entry in matching");
+    }
+
+    [Fact]
     public void Capture_in_an_exception_of_a_slices_rule_is_invalid()
     {
         var rule = new RuleDefinition

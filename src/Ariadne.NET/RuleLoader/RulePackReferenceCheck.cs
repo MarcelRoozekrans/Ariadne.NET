@@ -140,12 +140,17 @@ internal static class RulePackReferenceCheck
             return;
         }
 
-        if (slices.Matching.Count == 0)
+        // SliceRules compiles every entry, so a null list or entry would throw there after the resolve succeeded.
+        if (slices.Matching is null or { Count: 0 })
         {
             failures.Add($"the slices of rule '{id}' needs at least one entry in matching");
         }
+        else if (slices.Matching.Contains(null!))
+        {
+            failures.Add($"the slices of rule '{id}' has a null entry in matching");
+        }
 
-        foreach (var pattern in slices.Matching)
+        foreach (var pattern in slices.Matching ?? [])
         {
             if (pattern is not null && SlicePattern.Validate(pattern) is { } reason)
             {
