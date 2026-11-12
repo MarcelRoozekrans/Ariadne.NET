@@ -12,7 +12,7 @@ internal static class VacuityRules
     /// <summary>
     /// Returns one violation per vacuous layer, rule and role, without a location. A layer is found when it selects any source
     /// type or edge target of any graph; a layer with no namespaces and assemblies is never found. A forbid, allowOnly, require
-    /// or uniqueNames rule is found when its <c>from</c> matches a source type. A bannedPackages rule is found when its
+    /// or uniqueNames rule is found when its <c>from</c> matches a source type, and a slices rule when its patterns place a source type in a slice. A bannedPackages rule is found when its
     /// <c>from.assemblies</c> is empty or selects a project. A role is found when a role match holds it. An element marked
     /// <c>allowEmpty</c> is skipped, as is a rule whose <c>from</c> names only vacuous layers and a role in a vacuous layer,
     /// since the layer is reported instead.
@@ -85,8 +85,7 @@ internal static class VacuityRules
     {
         foreach (var rule in pack.Rules)
         {
-            // A slices rule selects through its patterns and leaves 'from' empty, which would always look vacuous here.
-            if (rule.Kind == RuleKind.Slices || rule.AllowEmpty || NamesOnlyVacuousLayers(rule.From, vacuousLayers) || !IsVacuous(rule, map, graphs, projects))
+            if (rule.AllowEmpty || NamesOnlyVacuousLayers(rule.From, vacuousLayers) || !IsVacuous(rule, map, graphs, projects))
             {
                 continue;
             }
@@ -105,6 +104,7 @@ internal static class VacuityRules
     private static string Cause(RuleDefinition rule, int count) => rule.Kind switch
     {
         RuleKind.BannedPackages => string.Create(CultureInfo.InvariantCulture, $"its 'from.assemblies' matches none of the {count} project(s) loaded"),
+        RuleKind.Slices => string.Create(CultureInfo.InvariantCulture, $"its 'matching' patterns place no type in a slice in the {count} project(s) loaded"),
         RuleKind.Require or RuleKind.UniqueNames => string.Create(CultureInfo.InvariantCulture, $"its 'for' selector matches nothing in the {count} project(s) loaded"),
         _ => string.Create(CultureInfo.InvariantCulture, $"its 'from' selector matches nothing in the {count} project(s) loaded"),
     };
@@ -186,6 +186,12 @@ internal static class VacuityRules
             }
 
             return true;
+        }
+
+        // A slices rule selects through its patterns and leaves 'from' empty; one slice is enough, though it cannot fail.
+        if (rule.Kind == RuleKind.Slices)
+        {
+            return !SliceRules.PlacesAnyType(rule, graphs);
         }
 
         var from = TargetMatcher.From(rule.From, map);

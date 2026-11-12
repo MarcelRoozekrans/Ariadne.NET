@@ -87,4 +87,22 @@ public class TextReportWriterTests
         text.Should().EndWith(
             "  [ForbiddenDependency] Ns.A pack shop-rules\n    msg\n    Rule SHOP-NO-INFRA: Storage can change without touching the domain.\n");
     }
+
+    [Theory]
+    [InlineData(ViolationKind.SliceDependency)]
+    [InlineData(ViolationKind.SliceCycle)]
+    public void Write_SliceViolation_ShowsItsKind(ViolationKind kind)
+    {
+        var root = Path.GetFullPath("/repo");
+        var violation = new ArchitectureViolation
+        {
+            RuleId = "R-SLICES",
+            Kind = kind,
+            SourceType = "Shop.Orders.A",
+            Message = "Slices.",
+            Location = new SourceLocation(Path.Combine(root, "src", "A.cs"), 3, 5),
+        };
+
+        Render(Report(violation), root).Should().Contain($"  [{kind}] src/A.cs:3\n    Slices.\n");
+    }
 }

@@ -50,4 +50,17 @@ public enum ViolationKind
     /// condition. There is one violation per key, located at the type.
     /// </summary>
     RequirementNotMet = 13,
+
+    /// <summary>
+    /// A slice depends on another slice in a cycle that a slices rule with <c>freeOfCycles</c> forbids. There is one violation
+    /// per slice edge inside the cycle, located at the earliest reference from the one slice to the other; the source and
+    /// target are that reference's types, and the reference count is the number of references between the two slices.
+    /// </summary>
+    SliceCycle = 14,
+
+    /// <summary>
+    /// A type in one slice depends on a type in another slice that a slices rule with <c>independent</c> keeps apart, and the
+    /// rule's <c>allow</c> does not select the target. There is one violation per source and target type, located at the first reference.
+    /// </summary>
+    SliceDependency = 15,
 }

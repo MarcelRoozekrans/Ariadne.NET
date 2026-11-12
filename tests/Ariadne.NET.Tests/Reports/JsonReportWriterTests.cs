@@ -191,4 +191,31 @@ public class JsonReportWriterTests
         FluentActions.Invoking(() => JsonReportWriter.Write(new MemoryStream(), null!, context)).Should().Throw<ArgumentNullException>();
         FluentActions.Invoking(() => JsonReportWriter.Write(new MemoryStream(), Empty(), null!)).Should().Throw<ArgumentNullException>();
     }
+
+    [Theory]
+    [InlineData(ViolationKind.SliceDependency, "SliceDependency")]
+    [InlineData(ViolationKind.SliceCycle, "SliceCycle")]
+    public void Write_SliceViolation_NamesItsKind(ViolationKind kind, string expected)
+    {
+        var report = new ArchitectureReport
+        {
+            Violations =
+            [
+                new ArchitectureViolation
+                {
+                    RuleId = "R-SLICES",
+                    Kind = kind,
+                    SourceType = "Shop.Orders.A",
+                    Target = "Shop.Billing.B",
+                    Message = "Slices.",
+                    Location = new SourceLocation(Path.Combine(Root, "src", "A.cs"), 3, 5),
+                },
+            ],
+            Projects = [],
+            TypesChecked = 2,
+        };
+        using var doc = JsonDocument.Parse(Render(report));
+
+        doc.RootElement.GetProperty("violations")[0].GetProperty("kind").GetString().Should().Be(expected);
+    }
 }
