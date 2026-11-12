@@ -79,6 +79,7 @@ Both kinds carry the rule's `id` and `because`. A rule whose `from` matches no t
 | `TypeKindMismatch` | The type is not of the required kind | The rule says `class` but the type is a `record` |
 | `AccessibilityMismatch` | The rule asks for `internal` and the type is not | The rule says `internal` but the type is `public` |
 | `MissingInterface` | The type implements no interface that the `implements` selector matches, including interfaces it gets through a base class | A repository that implements no `I*Repository` |
+| `RequirementNotMet` | The type fails a key of `is`, or matches a key of `isNot`; one violation per key | A domain class that is not `sealed` |
 
 The violation carries the rule's `id` and `because`. A `require` rule whose `for` matches no type is reported as vacuous.
 
@@ -117,6 +118,7 @@ ArchitectureReport
   │     ├── Kind: ViolationKind              (DependencyNotAllowed, ForbiddenDependency,
   │     │                                     DependencyNotPermitted, LayerOverlap, TypeKindMismatch,
   │     │                                     AccessibilityMismatch, MissingInterface, WrongLayer,
+  │     │                                     RequirementNotMet,
   │     │                                     BannedPackage, NameCollision, VacuousRule, VacuousLayer)
   │     ├── SourceType: string               (fully qualified name; for a vacuous violation the layer name, rule id or role name)
   │     ├── Target: string?                  (the type depended on, absent for role, require and overlap checks)
