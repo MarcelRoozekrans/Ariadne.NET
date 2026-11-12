@@ -25,5 +25,12 @@ public sealed class RuleDefinition
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool AllowEmpty { get; init; }
 
+    /// <summary>
+    /// The slices of a <see cref="RuleKind.Slices"/> rule: namespace patterns with one capture each, <c>(*)</c> for exactly
+    /// one segment or <c>(**)</c> for one or more, and whether the slices must be free of cycles or independent.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SliceDefinition? Slices { get; init; }
+
     internal bool HasNoNullEntries<T>(IList<T>? items) => NullEntries.None(items);
 }

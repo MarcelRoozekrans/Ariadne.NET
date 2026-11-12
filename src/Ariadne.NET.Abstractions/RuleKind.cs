@@ -17,4 +17,9 @@ public enum RuleKind
 
     /// <summary>Types matching From must not share a simple name with types matching <see cref="RuleDefinition.Against"/>.</summary>
     UniqueNames = 5,
+
+    /// <summary>
+    /// Namespaces captured by <see cref="RuleDefinition.Slices"/> form slices that must be free of cycles or independent of each other.
+    /// </summary>
+    Slices = 6,
 }

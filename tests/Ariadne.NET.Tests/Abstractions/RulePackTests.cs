@@ -213,12 +213,12 @@ public class RulePackTests
     }
 
     private static RuleDefinitionValidator RuleValidator() =>
-        new(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleRequirementValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new TargetSelectorValidator()), new TargetSelectorValidator(), new RuleExceptionValidator());
+        new(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleRequirementValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new TargetSelectorValidator()), new TargetSelectorValidator(), new RuleExceptionValidator(), new SliceDefinitionValidator(new TargetSelectorValidator()));
 
     private static RulePackValidator PackValidator() => new(
         new LayerDefinitionValidator(),
         new ComponentRoleDefinitionValidator(),
-        new RuleDefinitionValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleRequirementValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new TargetSelectorValidator()), new TargetSelectorValidator(), new RuleExceptionValidator()),
+        new RuleDefinitionValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleRequirementValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new TargetSelectorValidator()), new TargetSelectorValidator(), new RuleExceptionValidator(), new SliceDefinitionValidator(new TargetSelectorValidator())),
         new LayerRetargetValidator(),
         new RuleAmendmentValidator(new RuleExceptionValidator()),
         new NamingConventionsValidator());
