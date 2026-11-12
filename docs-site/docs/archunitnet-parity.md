@@ -245,6 +245,9 @@ ArchUnitNET joins predicates with `And()` and `Or()` and negates them with `Not`
 
 Here ArchUnitNET and Ariadne answer differently on purpose, mostly because one reads IL and the other source. Each entry names its fixture, the reason and the answer a developer would expect.
 
+- [c-be-kind](#c-be-kind)
+- [c-only-depend-on](#c-only-depend-on)
+
 ### c-be-kind
 
 Fixture `tests/fixtures/archunit-parity/CBeKind`, rule `Should().Be(Classes())` against `require` with `kind: class`. Both tools flag the interface `Broken.IOrderService` and the struct `Broken.Money`. Only Ariadne flags the record `Broken.Ledger`.

@@ -78,6 +78,7 @@ Expected failures are values, not exceptions. The loader, resolver, registry, `T
 - One type per file (MA0048) — this is why records/enums each have their own file.
 - `ConfigureAwait(false)` on awaits.
 - Tests: xUnit + FluentAssertions (+ NSubstitute in `Ariadne.NET.Tests`). Test folders mirror the source namespaces (Abstractions types are tested under `tests/Ariadne.NET.Tests/Abstractions/`, the validator under `Analysis/`); `tests/Ariadne.NET.Workspaces.Tests` loads the fixture solutions in `tests/fixtures`; `tests/Ariadne.NET.Testing.Tests` covers `ArchitectureCheck` (xUnit, project reference, so its own `Microsoft.Build.Framework` line); MCP tool tests construct the real services directly rather than via DI.
+- `tests/Ariadne.NET.Parity.Tests` runs ArchUnitNET 0.13.2 and Ariadne side by side on `tests/fixtures/archunit-parity` (built, not only restored, by `FixtureProjects.EnsureParityBuilt`); the catalogue `docs-site/docs/archunitnet-parity.md` is checked against `ParityCases`, `KnownGaps` and `Divergences`; a phase closes a gap by adding the pack rule and deleting its entry.
 
 ## Docs
 
