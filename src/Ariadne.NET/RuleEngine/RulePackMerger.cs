@@ -157,6 +157,14 @@ public sealed class RulePackMerger : IRulePackMerger
                 ("namespaces", exception.Namespaces.Count > 0),
                 ("assemblies", exception.Assemblies.Count > 0),
                 ("types", exception.Types.Count > 0),
+                ("names", exception.Names.Count > 0),
+                ("kinds", exception.Kinds.Count > 0),
+                ("accessibility", exception.Accessibility.Count > 0),
+                ("assignableTo", exception.AssignableTo.Count > 0),
+                ("sealed", exception.Sealed is not null),
+                ("abstract", exception.Abstract is not null),
+                ("static", exception.Static is not null),
+                ("nested", exception.Nested is not null),
             ];
             foreach (var (key, used) in keys)
             {

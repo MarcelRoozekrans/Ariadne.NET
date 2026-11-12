@@ -253,6 +253,22 @@ public class RulePackMergerTests
     }
 
     [Fact]
+    public void Amendment_TraitOnBannedPackagesRule_Fails()
+    {
+        var result = Amend(BannedRule(), new RuleException { Because = "x", Sealed = true, Names = ["*Legacy"] });
+
+        Problems(result).Should().HaveCount(2).And.Satisfy(
+            p => p.StartsWith("pack 'child' adds an exception to rule 'B1' with 'names'", StringComparison.Ordinal),
+            p => p.StartsWith("pack 'child' adds an exception to rule 'B1' with 'sealed'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Amendment_TraitOnUniqueNamesRule_Merges()
+    {
+        Amend(UniqueRule(), new RuleException { Because = "x", Nested = true }).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
     public void Amendment_AllowedKeysForEachKind_Merge()
     {
         Amend(BannedRule(), new RuleException { Because = "x", Assemblies = ["X.Y"] }).IsSuccess.Should().BeTrue();

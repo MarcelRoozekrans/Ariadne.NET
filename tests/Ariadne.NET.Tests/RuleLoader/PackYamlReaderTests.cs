@@ -346,7 +346,7 @@ public class PackYamlReaderTests
 
         Problems(yaml).Should().Equal(
             new PackProblem(4, 5, "layer 'Domain' needs at least one of 'namespaces', 'assemblies'"),
-            new PackProblem(15, 9, "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'assemblies', 'types'"));
+            new PackProblem(15, 9, "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'assemblies', 'types', 'names', 'kinds', 'accessibility', 'assignableTo', 'sealed', 'abstract', 'static', 'nested'"));
     }
 
     [Fact]
@@ -364,7 +364,7 @@ public class PackYamlReaderTests
             """;
 
         Problems(yaml).Should().Equal(
-            new PackProblem(8, 11, "the to of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'members'"));
+            new PackProblem(8, 11, "the to of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'members', 'names', 'kinds', 'accessibility', 'assignableTo', 'sealed', 'abstract', 'static', 'nested'"));
     }
 
     [Fact]
@@ -1076,7 +1076,7 @@ public class PackYamlReaderTests
         var yaml = RequireHead + "    require:\n      for: { types: [\"**.X\"] }\n";
 
         Problems(yaml).Should().Equal(
-            new PackProblem(7, 7, "the require of rule 'SH-001' needs at least one of 'layer', 'kind', 'accessibility', 'implements'"));
+            new PackProblem(7, 7, "the require of rule 'SH-001' needs at least one of 'layer', 'kind', 'accessibility', 'implements', 'is', 'isNot'"));
     }
 
     [Fact]
@@ -1484,7 +1484,7 @@ public class PackYamlReaderTests
     {
         var yaml = RequireHead + "    uniqueNames:\n      for: { layers: [Web] }\n      against: { layers: [Application] }\n    exceptions:\n      - because: Old.\n";
 
-        Problems(yaml).Should().Equal(new PackProblem(10, 9, "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'types'"));
+        Problems(yaml).Should().Equal(new PackProblem(10, 9, "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'types', 'names', 'kinds', 'accessibility', 'assignableTo', 'sealed', 'abstract', 'static', 'nested'"));
     }
 
     [Fact]
@@ -1493,6 +1493,370 @@ public class PackYamlReaderTests
         var yaml = RequireHead + "    require:\n      for: { layers: [Domain], types: [\"**.X\"] }\n      layer: Domain\n";
 
         Problems(yaml).Should().ContainSingle().Which.Message.Should().Contain("cannot mix 'layers' with 'namespaces'");
+    }
+
+    private const string TraitNames =
+        "'names', 'kinds', 'accessibility', 'assignableTo', 'sealed', 'abstract', 'static', 'nested'";
+
+    [Fact]
+    public void Reads_every_trait()
+    {
+        var yaml = RequireHead + """
+                require:
+                  for: { names: ["*Service"], kinds: [class, enum], accessibility: [public, "protected internal"], assignableTo: ["**.Base"], sealed: true, abstract: false, static: false, nested: true }
+                  layer: Domain
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var subject = result.Value.Rules.Should().ContainSingle().Subject.From;
+        subject.Names.Should().Equal("*Service");
+        subject.Kinds.Should().Equal(CSharpTypeKind.Class, CSharpTypeKind.Enum);
+        subject.Accessibility.Should().Equal("public", "protected internal");
+        subject.AssignableTo.Should().Equal("**.Base");
+        subject.Sealed.Should().BeTrue();
+        subject.Abstract.Should().BeFalse();
+        subject.Static.Should().BeFalse();
+        subject.Nested.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Reads_every_kind_in_kinds()
+    {
+        var yaml = RequireHead + """
+                require:
+                  for: { kinds: [class, interface, record, struct, recordStruct, enum, delegate] }
+                  layer: Domain
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        result.Value.Rules.Should().ContainSingle().Which.From.Kinds.Should().Equal(
+            CSharpTypeKind.Class, CSharpTypeKind.Interface, CSharpTypeKind.Record, CSharpTypeKind.Struct,
+            CSharpTypeKind.RecordStruct, CSharpTypeKind.Enum, CSharpTypeKind.Delegate);
+    }
+
+    [Fact]
+    public void Reads_traits_in_from_and_to()
+    {
+        var yaml = RequireHead + """
+                forbid:
+                  from: { namespaces: ["Shop.**"], static: true }
+                  to: { types: ["**.Clock"], kinds: [struct] }
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var rule = result.Value.Rules.Should().ContainSingle().Subject;
+        rule.From.Static.Should().BeTrue();
+        rule.To.Kinds.Should().Equal(CSharpTypeKind.Struct);
+    }
+
+    [Fact]
+    public void Trait_only_selector_loads()
+    {
+        var yaml = RequireHead + "    require:\n      for: { sealed: false }\n      layer: Domain\n";
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        result.Value.Rules.Should().ContainSingle().Which.From.Sealed.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Reads_exception_traits()
+    {
+        var yaml = """
+            schema: 2
+            name: shop
+            extends: [builtin://clean-architecture]
+            rules:
+              - id: SH-001
+                because: x
+                forbid:
+                  from: { namespaces: ["Shop.**"] }
+                  to: { namespaces: ["System.IO.**"] }
+                exceptions:
+                  - assignableTo: ["**.Base"]
+                    sealed: true
+                    because: Bases may.
+                  - kinds: [enum]
+                    because: Enums may.
+              - id: CA-001
+                exceptions:
+                  - assignableTo: ["**.Base"]
+                    sealed: true
+                    because: Bases may.
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var exceptions = result.Value.Rules.Should().ContainSingle().Subject.Exceptions;
+        exceptions.Should().HaveCount(2);
+        exceptions[0].AssignableTo.Should().Equal("**.Base");
+        exceptions[0].Sealed.Should().BeTrue();
+        exceptions[0].Because.Should().Be("Bases may.");
+        exceptions[1].Kinds.Should().Equal(CSharpTypeKind.Enum);
+        var amended = result.Value.RuleAmendments.Should().ContainSingle().Subject.Exceptions.Should().ContainSingle().Subject;
+        amended.AssignableTo.Should().Equal("**.Base");
+        amended.Sealed.Should().BeTrue();
+        amended.Because.Should().Be("Bases may.");
+    }
+
+    [Fact]
+    public void Reads_every_trait_in_an_exception()
+    {
+        var yaml = RequireHead + """
+                forbid:
+                  from: { namespaces: ["Shop.**"] }
+                  to: { namespaces: ["System.IO.**"] }
+                exceptions:
+                  - names: ["*Io"]
+                    kinds: [class]
+                    accessibility: [internal]
+                    assignableTo: ["**.Base"]
+                    sealed: false
+                    abstract: true
+                    static: false
+                    nested: false
+                    because: x
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var exception = result.Value.Rules.Should().ContainSingle().Subject.Exceptions.Should().ContainSingle().Subject;
+        exception.Names.Should().Equal("*Io");
+        exception.Kinds.Should().Equal(CSharpTypeKind.Class);
+        exception.Accessibility.Should().Equal("internal");
+        exception.AssignableTo.Should().Equal("**.Base");
+        exception.Sealed.Should().BeFalse();
+        exception.Abstract.Should().BeTrue();
+        exception.Static.Should().BeFalse();
+        exception.Nested.Should().BeFalse();
+    }
+
+    [Fact]
+    public void BannedPackages_exception_with_a_trait_fails()
+    {
+        var yaml = RequireHead + """
+                bannedPackages:
+                  packages: [FluentValidation]
+                exceptions:
+                  - sealed: true
+                    because: Old.
+            """;
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(9, 9, "'sealed' is not accepted in exceptions[0] of rule 'SH-001'; a package belongs to a project, so the exception of a bannedPackages rule names it by 'assemblies'"));
+    }
+
+    [Fact]
+    public void UniqueNames_exception_with_a_trait_reads()
+    {
+        var yaml = RequireHead + """
+                uniqueNames:
+                  for: { layers: [Web] }
+                  against: { layers: [Application] }
+                exceptions:
+                  - nested: true
+                    because: Nested types may repeat a name.
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        result.Value.Rules.Should().ContainSingle().Which.Exceptions.Should().ContainSingle().Which.Nested.Should().BeTrue();
+    }
+
+    [Fact]
+    public void UniqueNames_target_with_a_trait_fails()
+    {
+        var yaml = RequireHead + "    uniqueNames:\n      for: { layers: [Web], sealed: true }\n      against: { layers: [Application] }\n";
+
+        Problems(yaml).Should().ContainSingle().Which.Message.Should().StartWith("unknown key 'sealed' in the for of rule 'SH-001'");
+    }
+
+    [Fact]
+    public void Reads_is_and_isNot()
+    {
+        var yaml = RequireHead + """
+                require:
+                  for: { namespaces: ["Shop.**"] }
+                  is: { sealed: true, namespaces: ["Shop.Domain.**"], kinds: [class, record] }
+                  isNot: { names: ["*Impl", "*Helper"], attributes: ["**.Obsolete*"] }
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var requirement = result.Value.Rules.Should().ContainSingle().Subject.Require!;
+        requirement.Is!.Sealed.Should().BeTrue();
+        requirement.Is.Namespaces.Should().Equal("Shop.Domain.**");
+        requirement.Is.Kinds.Should().Equal(CSharpTypeKind.Class, CSharpTypeKind.Record);
+        requirement.IsNot!.Names.Should().Equal("*Impl", "*Helper");
+        requirement.IsNot.Attributes.Should().Equal("**.Obsolete*");
+        requirement.Layer.Should().BeNull();
+    }
+
+    [Fact]
+    public void Require_with_only_is_loads()
+    {
+        var yaml = RequireHead + "    require:\n      for: { namespaces: [\"Shop.**\"] }\n      is: { abstract: true }\n";
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        result.Value.Rules.Should().ContainSingle().Which.Require!.Is!.Abstract.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Require_with_only_isNot_loads()
+    {
+        var yaml = RequireHead + "    allowEmpty: true\n    require:\n      for: { namespaces: [\"Shop.**\"] }\n      isNot: { types: [\"**\"] }\n";
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        result.Value.Rules.Should().ContainSingle().Which.Require!.IsNot!.Types.Should().Equal("**");
+    }
+
+    [Fact]
+    public void Is_must_be_a_mapping()
+    {
+        var yaml = RequireHead + "    require:\n      for: { namespaces: [\"Shop.**\"] }\n      is: sealed\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(8, 7, "'is' in the require of rule 'SH-001' must be a mapping"));
+    }
+
+    [Fact]
+    public void Empty_is_names_every_condition_key()
+    {
+        var yaml = RequireHead + "    require:\n      for: { namespaces: [\"Shop.**\"] }\n      is: {}\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(8, 11,
+            "the is of rule 'SH-001' needs at least one of 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', " + TraitNames));
+    }
+
+    [Fact]
+    public void Layers_with_traits_loads()
+    {
+        var yaml = RequireHead + "    require:\n      for: { layers: [Domain], sealed: true, names: [\"*Service\"] }\n      layer: Domain\n";
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var subject = result.Value.Rules.Should().ContainSingle().Subject.From;
+        subject.Layers.Should().Equal("Domain");
+        subject.Sealed.Should().BeTrue();
+        subject.Names.Should().Equal("*Service");
+    }
+
+    [Fact]
+    public void Layers_with_namespaces_still_fails()
+    {
+        var yaml = RequireHead + "    require:\n      for: { layers: [Domain], sealed: true, namespaces: [\"Shop.**\"] }\n      layer: Domain\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(7, 14,
+            "a target in rule 'SH-001' cannot mix 'layers' with 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces' or 'attributes'"));
+    }
+
+    [Theory]
+    [InlineData("kinds: [enumeration]", 17,
+        "kind 'enumeration' in the for of rule 'SH-001' must be one of 'class', 'interface', 'record', 'struct', 'recordStruct', 'enum', 'delegate'")]
+    [InlineData("kinds: [Class]", 17,
+        "kind 'Class' in the for of rule 'SH-001' must be one of 'class', 'interface', 'record', 'struct', 'recordStruct', 'enum', 'delegate'")]
+    [InlineData("accessibility: [friend]", 25,
+        "accessibility 'friend' in the for of rule 'SH-001' must be one of 'public', 'internal', 'protected', 'private', 'protected internal', 'private protected'")]
+    [InlineData("sealed: yes", 9, "'sealed' in the for of rule 'SH-001' must be true or false")]
+    [InlineData("abstract: \"true\"", 9, "'abstract' in the for of rule 'SH-001' must be true or false")]
+    [InlineData("static: [true]", 9, "'static' in the for of rule 'SH-001' must be true or false")]
+    [InlineData("nested: 1", 9, "'nested' in the for of rule 'SH-001' must be true or false")]
+    [InlineData("names: [\"a.b\"]", 17,
+        "'a.b' in the for of rule 'SH-001' is not a valid pattern: a name pattern matches a type's simple name, so it cannot contain '.'")]
+    [InlineData("assignableTo: [\"a..b\"]", 24, "'a..b' in the for of rule 'SH-001' is not a valid pattern: pattern 'a..b' has an empty segment")]
+    [InlineData("kinds: class", 9, "'kinds' in the for of rule 'SH-001' must be a list of strings")]
+    public void Rejects_bad_trait_values(string entry, int column, string message)
+    {
+        var yaml = RequireHead + $"    require:\n      for:\n        types: [\"**.X\"]\n        {entry}\n      layer: Domain\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(9, column, message));
+    }
+
+    [Fact]
+    public void Rejects_layers_in_is()
+    {
+        var yaml = RequireHead + "    require:\n      for: { namespaces: [\"Shop.**\"] }\n      is: { layers: [L], sealed: true }\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(8, 13, "unknown key 'layers' in the is of rule 'SH-001'"));
+    }
+
+    [Fact]
+    public void Rejects_members_in_isNot()
+    {
+        var yaml = RequireHead + "    require:\n      for: { namespaces: [\"Shop.**\"] }\n      isNot: { members: [\"**.M\"], sealed: true }\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(8, 16,
+            "'members' is not accepted in the isNot of rule 'SH-001'; it names APIs and only the 'to' of a 'forbid' or 'allowOnly' rule takes it"));
+    }
+
+    [Fact]
+    public void Kind_enum_keeps_the_five_values()
+    {
+        var yaml = RequireHead + "    require:\n      for: { types: [\"**.X\"] }\n      kind: enum\n";
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(8, 7, "kind 'enum' in the require of rule 'SH-001' must be one of Class, Interface, Record, Struct, RecordStruct"));
+    }
+
+    [Fact]
+    public void Role_typeKind_delegate_keeps_the_five_values()
+    {
+        var yaml = "schema: 2\nname: shop\ncomponentRoles:\n  - name: Handler\n    layer: Application\n    typeKind: Delegate\n";
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(6, 5, "typeKind 'Delegate' in role 'Handler' must be one of Class, Interface, Record, Struct, RecordStruct"));
+    }
+
+    [Fact]
+    public void Require_needs_a_condition()
+    {
+        var yaml = RequireHead + "    require:\n      for: { types: [\"**.X\"] }\n";
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(7, 7, "the require of rule 'SH-001' needs at least one of 'layer', 'kind', 'accessibility', 'implements', 'is', 'isNot'"));
+    }
+
+    [Theory]
+    [InlineData("names: []")]
+    [InlineData("kinds: []")]
+    [InlineData("accessibility: []")]
+    [InlineData("assignableTo: []")]
+    public void Empty_trait_list_is_an_error(string entry)
+    {
+        var yaml = RequireHead + $"    require:\n      for: {{ {entry} }}\n      layer: Domain\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(7, 12,
+            "the for of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', " + TraitNames));
+    }
+
+    [Fact]
+    public void Exception_with_only_because_names_the_traits()
+    {
+        var yaml = RequireHead + """
+                forbid:
+                  from: { namespaces: ["Shop.**"] }
+                  to: { namespaces: ["System.IO.**"] }
+                exceptions:
+                  - because: x
+            """;
+
+        Problems(yaml).Should().Equal(new PackProblem(10, 9,
+            "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'assemblies', 'types', " + TraitNames));
     }
 
     private static IReadOnlyList<PackProblem> Problems(string yaml)
