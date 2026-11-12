@@ -159,6 +159,43 @@ public class ForbidRulesTests
     }
 
     [Fact]
+    public void Exception_traits_exempt_subtypes()
+    {
+        const string Source = """
+            namespace T { public class X { } }
+            namespace N
+            {
+                public class Base { public T.X? A; }
+                public class Derived : Base { public T.X? B; }
+                public class Other { public T.X? C; }
+            }
+            """;
+        var exception = new RuleException { AssignableTo = ["N.Base"], Because = "The hierarchy may use T." };
+
+        var forbid = PackWith(Rule(new TargetSelector { Namespaces = ["N.**"] }, new TargetSelector { Namespaces = ["T.**"] }, exception));
+        Check(Source, forbid).Should().ContainSingle().Which.SourceType.Should().Be("N.Other");
+
+        var require = new RulePack
+        {
+            Name = "test",
+            Rules =
+            [
+                new RuleDefinition
+                {
+                    Id = "R",
+                    Because = "Because R.",
+                    Kind = RuleKind.Require,
+                    From = new TargetSelector { Namespaces = ["N.**"] },
+                    Require = new RuleRequirement { Is = new TargetSelector { Sealed = true } },
+                    Exceptions = [exception],
+                },
+            ],
+        };
+        var graph = TypeGraphBuilder.Build(TestCompilation.Create(Source), new HashSet<SyntaxTree>(), CancellationToken.None);
+        RequireRules.Check(graph, new LayerMap(require), require).Should().ContainSingle().Which.SourceType.Should().Be("N.Other");
+    }
+
+    [Fact]
     public void TargetMixingLayersAndNamespaces_Throws()
     {
         var pack = PackWith(Rule(new TargetSelector { Layers = ["Domain"], Namespaces = ["Web.**"] }, new TargetSelector { Namespaces = ["Web.**"] }));

@@ -222,6 +222,127 @@ public class RequireRulesTests
         kinds.Should().BeEquivalentTo([ViolationKind.WrongLayer, ViolationKind.TypeKindMismatch, ViolationKind.AccessibilityMismatch]);
     }
 
+    private static RulePack ConditionPack(TargetSelector from, RuleRequirement requirement, bool allowEmpty = false) => new()
+    {
+        Name = "test",
+        Rules =
+        [
+            new RuleDefinition
+            {
+                Id = "R",
+                Because = "Because R.",
+                Kind = RuleKind.Require,
+                From = from,
+                Require = requirement,
+                AllowEmpty = allowEmpty,
+            },
+        ],
+    };
+
+    private static readonly TargetSelector InN = new() { Namespaces = ["N.**"] };
+
+    [Fact]
+    public void Is_reports_one_violation_per_failed_key()
+    {
+        var pack = ConditionPack(new TargetSelector { Namespaces = ["N"] }, new RuleRequirement { Is = new TargetSelector { Sealed = true, Names = ["*Service"] } });
+
+        var violations = Check("namespace N { public class OrderHandler { } }", pack);
+
+        violations.Should().HaveCount(2).And.OnlyContain(v => v.Kind == ViolationKind.RequirementNotMet && string.Equals(v.RuleId, "R", StringComparison.Ordinal) && string.Equals(v.SourceType, "N.OrderHandler", StringComparison.Ordinal));
+        violations.Select(v => v.Message).Should().BeEquivalentTo(
+        [
+            "Type 'OrderHandler' is selected by rule 'R' and should have a name matching '*Service' but is named 'OrderHandler'",
+            "Type 'OrderHandler' is selected by rule 'R' and should be sealed but is not",
+        ]);
+    }
+
+    [Fact]
+    public void IsNot_reports_one_violation_per_matched_key()
+    {
+        var pack = ConditionPack(InN, new RuleRequirement { IsNot = new TargetSelector { Names = ["*Impl"], Abstract = true } });
+
+        var messages = Check("namespace N { public abstract class OrderImpl { } }", pack).Select(v => v.Message).ToList();
+
+        messages.Should().HaveCount(2);
+        messages.Should().ContainMatch("*should not have a name matching '*Impl' but is named 'OrderImpl'");
+        messages.Should().ContainMatch("*should not be abstract but is");
+    }
+
+    [Fact]
+    public void Old_keys_still_skip_enums_new_keys_do_not()
+    {
+        const string Source = "namespace N { public enum E { A } }";
+
+        Check(Source, ConditionPack(InN, new RuleRequirement { Kind = CSharpTypeKind.Class })).Should().BeEmpty();
+
+        var v = Check(Source, ConditionPack(InN, new RuleRequirement { Is = new TargetSelector { Kinds = [CSharpTypeKind.Class] } }))
+            .Should().ContainSingle().Subject;
+        v.Kind.Should().Be(ViolationKind.RequirementNotMet);
+        v.Message.Should().Be("Type 'E' is selected by rule 'R' and should be a 'Class' but is a 'Enum'");
+    }
+
+    [Fact]
+    public void NotExist_idiom_flags_every_selected_type()
+    {
+        var pack = ConditionPack(new TargetSelector { Namespaces = ["N.Legacy.**"] }, new RuleRequirement { IsNot = new TargetSelector { Types = ["**"] } }, allowEmpty: true);
+
+        Check("namespace N.Legacy { public class A { } public class B { } }", pack)
+            .Select(v => v.SourceType).Should().BeEquivalentTo(["N.Legacy.A", "N.Legacy.B"]);
+
+        const string Empty = "namespace N.Other { public class C { } }";
+        Check(Empty, pack).Should().BeEmpty();
+        var compilation = TestCompilation.Create(Empty);
+        var graph = TypeGraphBuilder.Build(compilation, new HashSet<SyntaxTree>(), CancellationToken.None);
+        VacuityRules.Check(pack, new LayerMap(pack), [graph], [], [new AnalyzedProject("Shop", null, compilation)]).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Selector_keys_work_as_conditions()
+    {
+        var inDomain = ConditionPack(InN, new RuleRequirement { Is = new TargetSelector { Namespaces = ["N.Domain.**"] } });
+        Check("namespace N.Domain { public class A { } } namespace N.Api { public class B { } }", inDomain)
+            .Should().ContainSingle().Which.Message.Should().Be("Type 'B' is selected by rule 'R' and should be in a namespace matching 'N.Domain.**' but is in namespace 'N.Api'");
+
+        var obsolete = ConditionPack(InN, new RuleRequirement { Is = new TargetSelector { Attributes = ["**.ObsoleteAttribute"] } });
+        Check("namespace N { [System.Obsolete] public class A { } public class B { } }", obsolete)
+            .Should().ContainSingle().Which.Message.Should().Be("Type 'B' is selected by rule 'R' and should have an attribute matching '**.ObsoleteAttribute' but does not");
+
+        var disposable = ConditionPack(InN, new RuleRequirement { IsNot = new TargetSelector { Interfaces = ["**.IDisposable"] } });
+        Check("namespace N { public class A : System.IDisposable { public void Dispose() { } } public class B { } }", disposable)
+            .Should().ContainSingle().Which.Message.Should().Be("Type 'A' is selected by rule 'R' and should not implement an interface matching '**.IDisposable' but does");
+    }
+
+    [Fact]
+    public void Several_patterns_and_kinds_are_listed_with_or()
+    {
+        var pack = ConditionPack(InN, new RuleRequirement
+        {
+            Is = new TargetSelector { Names = ["*Service", "*Handler"], Kinds = [CSharpTypeKind.Record, CSharpTypeKind.Struct], Accessibility = ["internal"] },
+        });
+
+        Check("namespace N { public class Order { } }", pack).Select(v => v.Message).Should().BeEquivalentTo(
+        [
+            "Type 'Order' is selected by rule 'R' and should have a name matching '*Service' or '*Handler' but is named 'Order'",
+            "Type 'Order' is selected by rule 'R' and should be a 'Record' or 'Struct' but is a 'Class'",
+            "Type 'Order' is selected by rule 'R' and should be 'internal' but is 'public'",
+        ]);
+    }
+
+    [Fact]
+    public void Boolean_false_reads_as_the_opposite_condition()
+    {
+        var pack = ConditionPack(InN, new RuleRequirement { Is = new TargetSelector { Sealed = false, Static = false } });
+
+        Check("namespace N { public static class Helpers { } }", pack).Select(v => v.Message).Should().BeEquivalentTo(
+        [
+            "Type 'Helpers' is selected by rule 'R' and should not be sealed but is",
+            "Type 'Helpers' is selected by rule 'R' and should not be static but is",
+        ]);
+    }
+
+    [Fact]
+    public void RequirementNotMet_is_13() => ((int)ViolationKind.RequirementNotMet).Should().Be(13);
+
     private static IReadOnlyList<ArchitectureViolation> Check(string source, RulePack pack)
     {
         var graph = TypeGraphBuilder.Build(TestCompilation.Create(source), new HashSet<SyntaxTree>(), CancellationToken.None);

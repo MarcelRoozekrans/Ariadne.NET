@@ -44,4 +44,10 @@ public enum ViolationKind
 
     /// <summary>A layer covers no type in the projects loaded, so no rule that names it can fire. It has no location and no target; the source is the layer name.</summary>
     VacuousLayer = 12,
+
+    /// <summary>
+    /// A type a require rule selects fails one key of the rule's <c>is</c> condition, or matches one key of its <c>isNot</c>
+    /// condition. There is one violation per key, located at the type.
+    /// </summary>
+    RequirementNotMet = 13,
 }

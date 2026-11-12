@@ -40,8 +40,7 @@ internal static class UniqueNameRules
         var exceptions = new TypeSelector[rule.Exceptions.Count];
         for (var i = 0; i < exceptions.Length; i++)
         {
-            var exception = rule.Exceptions[i];
-            exceptions[i] = TypeSelector.From(exception.Namespaces, exception.Assemblies, exception.Types);
+            exceptions[i] = TypeSelector.From(rule.Exceptions[i]);
         }
 
         var (againstByName, forTypes) = Collect(from, against, exceptions, layers, graphs);
