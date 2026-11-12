@@ -16,3 +16,10 @@ rules:
       for:
         namespaces: ["Parity.CResideInAssembly.Broken", "Parity.CResideInAssembly.Clean"]
       layer: Home
+  - id: PARITY-CRESIDEINASSEMBLY-NOT
+    because: Mirrors ArchUnitNET's NotResideInAssembly; NotBroken and NotClean must not reside in the Other assembly.
+    require:
+      for:
+        namespaces: ["Parity.CResideInAssembly.NotBroken", "Parity.CResideInAssembly.NotClean"]
+      isNot:
+        assemblies: ["Parity.CResideInAssembly.Other"]

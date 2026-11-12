@@ -11,3 +11,10 @@ rules:
         namespaces: ["Parity.CImplementInterface.Broken", "Parity.CImplementInterface.Clean"]
       implements:
         types: ["Parity.CImplementInterface.Target.IAuditable"]
+  - id: PARITY-CIMPLEMENTINTERFACE-NOT
+    because: Mirrors ArchUnitNET's NotImplementInterface; NotBroken and NotClean must not implement IAuditable.
+    require:
+      for:
+        namespaces: ["Parity.CImplementInterface.NotBroken", "Parity.CImplementInterface.NotClean"]
+      isNot:
+        interfaces: ["Parity.CImplementInterface.Target.IAuditable"]

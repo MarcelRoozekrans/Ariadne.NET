@@ -3,4 +3,18 @@ name: parity-c-have-full-name-containing
 version: "1.0.0"
 author: fixture
 
-# No rule yet: require has no is or isNot. Phase 4.2 adds PARITY-CHAVEFULLNAMECONTAINING and PARITY-CHAVEFULLNAMECONTAINING-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-CHAVEFULLNAMECONTAINING
+    because: Mirrors ArchUnitNET's HaveFullNameContaining with Order; Broken and Clean must contain it.
+    require:
+      for:
+        namespaces: ["Parity.CHaveFullNameContaining.Broken", "Parity.CHaveFullNameContaining.Clean"]
+      is:
+        types: ["**.*Order*.**"]
+  - id: PARITY-CHAVEFULLNAMECONTAINING-NOT
+    because: Mirrors ArchUnitNET's NotHaveFullNameContaining with NotBroken; NotBroken and NotClean must not contain it.
+    require:
+      for:
+        namespaces: ["Parity.CHaveFullNameContaining.NotBroken", "Parity.CHaveFullNameContaining.NotClean"]
+      isNot:
+        types: ["**.*NotBroken*.**"]

@@ -3,4 +3,18 @@ name: parity-c-be-structs
 version: "1.0.0"
 author: fixture
 
-# No rule yet: require has no is or isNot, and a selector has no kinds. Phase 4.2 adds PARITY-CBESTRUCTS and PARITY-CBESTRUCTS-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-CBESTRUCTS
+    because: Mirrors ArchUnitNET's BeStructs; Broken and Clean must satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CBeStructs.Broken", "Parity.CBeStructs.Clean"]
+      is:
+        kinds: [struct, recordStruct]
+  - id: PARITY-CBESTRUCTS-NOT
+    because: Mirrors ArchUnitNET's NotBeStructs; NotBroken and NotClean must not satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CBeStructs.NotBroken", "Parity.CBeStructs.NotClean"]
+      isNot:
+        kinds: [struct, recordStruct]

@@ -3,4 +3,18 @@ name: parity-c-have-full-name
 version: "1.0.0"
 author: fixture
 
-# No rule yet: require has no is or isNot. Phase 4.2 adds PARITY-CHAVEFULLNAME and PARITY-CHAVEFULLNAME-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-CHAVEFULLNAME
+    because: Mirrors ArchUnitNET's HaveFullName with Clean.OrderService; Broken and Clean must have that full name.
+    require:
+      for:
+        namespaces: ["Parity.CHaveFullName.Broken", "Parity.CHaveFullName.Clean"]
+      is:
+        types: ["Parity.CHaveFullName.Clean.OrderService"]
+  - id: PARITY-CHAVEFULLNAME-NOT
+    because: Mirrors ArchUnitNET's NotHaveFullName with NotBroken.PaymentService; NotBroken and NotClean must not have it.
+    require:
+      for:
+        namespaces: ["Parity.CHaveFullName.NotBroken", "Parity.CHaveFullName.NotClean"]
+      isNot:
+        types: ["Parity.CHaveFullName.NotBroken.PaymentService"]

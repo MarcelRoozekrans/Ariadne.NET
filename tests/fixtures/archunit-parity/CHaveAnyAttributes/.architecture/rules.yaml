@@ -3,4 +3,18 @@ name: parity-c-have-any-attributes
 version: "1.0.0"
 author: fixture
 
-# No rule yet: require has no is or isNot. Phase 4.2 adds PARITY-CHAVEANYATTRIBUTES and PARITY-CHAVEANYATTRIBUTES-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-CHAVEANYATTRIBUTES
+    because: Mirrors ArchUnitNET's HaveAnyAttributes with AuditedAttribute; Broken and Clean must satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CHaveAnyAttributes.Broken", "Parity.CHaveAnyAttributes.Clean"]
+      is:
+        attributes: ["Parity.CHaveAnyAttributes.Target.AuditedAttribute"]
+  - id: PARITY-CHAVEANYATTRIBUTES-NOT
+    because: Mirrors ArchUnitNET's NotHaveAnyAttributes with AuditedAttribute; NotBroken and NotClean must not satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CHaveAnyAttributes.NotBroken", "Parity.CHaveAnyAttributes.NotClean"]
+      isNot:
+        attributes: ["Parity.CHaveAnyAttributes.Target.AuditedAttribute"]

@@ -55,17 +55,17 @@ Methods of `Types().Should()`.
 
 | Id | ArchUnitNET | Ariadne | Status | Notes |
 |---|---|---|---|---|
-| `c-reside-in-namespace` | `ResideInNamespace`, `NotResideInNamespace` | `require` with `layer`, a layer selecting by `namespaces`; `:not` as `isNot: { namespaces }` | `gap` | 4.2, `:not` only |
-| `c-reside-in-assembly` | `ResideInAssembly`, `NotResideInAssembly` | `require` with `layer`, a layer selecting by `assemblies`; `:not` as `isNot: { assemblies }` | `gap` | 4.2, `:not` only |
+| `c-reside-in-namespace` | `ResideInNamespace`, `NotResideInNamespace` | `require` with `layer`, a layer selecting by `namespaces`; `:not` as `isNot: { namespaces }` | `covered` | |
+| `c-reside-in-assembly` | `ResideInAssembly`, `NotResideInAssembly` | `require` with `layer`, a layer selecting by `assemblies`; `:not` as `isNot: { assemblies }` | `covered` | |
 | `c-reside-in-namespace-matching` | `ResideInNamespaceMatching`, `NotResideInNamespaceMatching` | — | `out-of-scope` | Ariadne patterns are globs; translate a regex with a glob form by hand. |
 | `c-reside-in-assembly-matching` | `ResideInAssemblyMatching`, `NotResideInAssemblyMatching` | — | `out-of-scope` | Ariadne patterns are globs; translate a regex with a glob form by hand. |
-| `c-implement-interface` | `ImplementInterface`, `ImplementAny`, `ImplementAnyInterfacesThat`, `NotImplementInterface`, `NotImplementAny`, `NotImplementAnyInterfacesThat` | `require` with `implements`; `:not` as `isNot: { interfaces }` | `gap` | 4.2, `:not` only |
-| `c-be-assignable-to` | `BeAssignableTo`, `BeAssignableToTypesThat`, `NotBeAssignableTo`, `NotBeAssignableToTypesThat` | `require` with `is: { assignableTo }`, `isNot: { assignableTo }` | `gap` | 4.2 |
-| `c-be-enums` | `BeEnums`, `NotBeEnums` | `require` with `is: { kinds: [enum] }`, `isNot` | `gap` | 4.2 |
-| `c-be-structs` | `BeStructs`, `NotBeStructs` | `require` with `is: { kinds: [struct, recordStruct] }`, `isNot` | `gap` | 4.2 |
-| `c-be-value-types` | `BeValueTypes`, `NotBeValueTypes` | `require` with `is: { kinds: [struct, recordStruct, enum] }`, `isNot` | `gap` | 4.2 |
-| `c-be-nested` | `BeNested`, `NotBeNested` | `require` with `is: { nested: true }`, `isNot` | `gap` | 4.2 |
-| `c-be-nested-in` | `BeNestedIn` | `require` with `is: { nested: true, types }` | `gap` | 4.2 |
+| `c-implement-interface` | `ImplementInterface`, `ImplementAny`, `ImplementAnyInterfacesThat`, `NotImplementInterface`, `NotImplementAny`, `NotImplementAnyInterfacesThat` | `require` with `implements`; `:not` as `isNot: { interfaces }` | `covered` | |
+| `c-be-assignable-to` | `BeAssignableTo`, `BeAssignableToTypesThat`, `NotBeAssignableTo`, `NotBeAssignableToTypesThat` | `require` with `is: { assignableTo }`, `isNot: { assignableTo }` | `covered` | |
+| `c-be-enums` | `BeEnums`, `NotBeEnums` | `require` with `is: { kinds: [enum] }`, `isNot` | `covered` | |
+| `c-be-structs` | `BeStructs`, `NotBeStructs` | `require` with `is: { kinds: [struct, recordStruct] }`, `isNot` | `covered` | |
+| `c-be-value-types` | `BeValueTypes`, `NotBeValueTypes` | `require` with `is: { kinds: [struct, recordStruct, enum] }`, `isNot` | `covered` | |
+| `c-be-nested` | `BeNested`, `NotBeNested` | `require` with `is: { nested: true }`, `isNot` | `covered` | |
+| `c-be-nested-in` | `BeNestedIn` | `require` with `is: { nested: true, types }` | `covered` | |
 | `c-have-member-with-name` | `HaveMemberWithName`, `HaveMethodMemberWithName`, `HavePropertyMemberWithName`, `HaveFieldMemberWithName`, `NotHaveMemberWithName`, `NotHaveMethodMemberWithName`, `NotHavePropertyMemberWithName`, `NotHaveFieldMemberWithName` | — | `deferred` | member level, see #94 |
 | `c-adhere-to-plant-uml-diagram` | `AdhereToPlantUmlDiagram` | — | `out-of-scope` | Ariadne rules are YAML, not diagrams. A pack's layers and `allowedDependencies` say what a component diagram says. |
 | `c-be-static` | — | `require` with `is: { static: true }` | `ariadne-only` | ArchUnitNET 0.13.2 has no type-level static; added in 4.2 |
@@ -77,11 +77,11 @@ Methods of `Classes().That()` and `Classes().Should()`.
 | Id | ArchUnitNET | Ariadne | Status | Notes |
 |---|---|---|---|---|
 | `p-are-abstract` | `AreAbstract`, `AreNotAbstract` | `kinds: [class, record]` with `abstract: true`, `abstract: false` | `divergence` | ArchUnitNET reads a static class as abstract; Ariadne does not. See [p-are-abstract](#p-are-abstract). |
-| `c-be-abstract` | `BeAbstract`, `NotBeAbstract` | `require` with `is: { abstract: true }`, `isNot` | `gap` | 4.2 |
+| `c-be-abstract` | `BeAbstract`, `NotBeAbstract` | `require` for `kinds: [class, record]` with `is: { abstract: true }`, `isNot` | `divergence` | ArchUnitNET reads a static class as abstract; Ariadne does not. See [c-be-abstract](#c-be-abstract). |
 | `p-are-sealed` | `AreSealed`, `AreNotSealed` | `kinds: [class, record]` with `sealed: true`, `sealed: false` | `covered` | Both tools count a static class as sealed. |
-| `c-be-sealed` | `BeSealed`, `NotBeSealed` | `require` with `is: { sealed: true }`, `isNot` | `gap` | 4.2 |
+| `c-be-sealed` | `BeSealed`, `NotBeSealed` | `require` for `kinds: [class, record]` with `is: { sealed: true }`, `isNot` | `covered` | Both tools count a static class as sealed. |
 | `p-are-record` | `AreRecord`, `AreNotRecord` | `kinds: [record]`; `:not` as `kinds: [class]` | `covered` | `Classes()` holds no `record struct`, so neither polarity checks one, as the probes in `Clean` and `NotClean` show. |
-| `c-be-record` | `BeRecord`, `NotBeRecord` | `require` with `is: { kinds: [record] }`, `isNot` | `gap` | 4.2. `Classes()` holds no `record struct`, so neither polarity checks one, as the probes in `Clean` and `NotClean` show. |
+| `c-be-record` | `BeRecord`, `NotBeRecord` | `require` for `kinds: [class, record]` with `is: { kinds: [record] }`, `isNot` | `covered` | `Classes()` holds no `record struct`, so neither polarity checks one, as the probes in `Clean` and `NotClean` show. |
 | `p-are-immutable` | `AreImmutable`, `AreNotImmutable` | — | `deferred` | member level, see #94 |
 | `c-be-immutable` | `BeImmutable`, `NotBeImmutable` | — | `deferred` | member level, see #94 |
 
@@ -92,9 +92,9 @@ Methods of `Attributes().That()` and `Attributes().Should()`, which select attri
 | Id | ArchUnitNET | Ariadne | Status | Notes |
 |---|---|---|---|---|
 | `p-attribute-are-abstract` | `AreAbstract`, `AreNotAbstract` | `assignableTo: [System.Attribute]` with `abstract` | `covered` | |
-| `c-attribute-be-abstract` | `BeAbstract`, `NotBeAbstract` | `require` for `assignableTo: [System.Attribute]` with `is: { abstract: true }`, `isNot` | `gap` | 4.2 |
+| `c-attribute-be-abstract` | `BeAbstract`, `NotBeAbstract` | `require` for `assignableTo: [System.Attribute]` with `is: { abstract: true }`, `isNot` | `covered` | |
 | `p-attribute-are-sealed` | `AreSealed`, `AreNotSealed` | `assignableTo: [System.Attribute]` with `sealed` | `covered` | |
-| `c-attribute-be-sealed` | `BeSealed`, `NotBeSealed` | `require` for `assignableTo: [System.Attribute]` with `is: { sealed: true }`, `isNot` | `gap` | 4.2 |
+| `c-attribute-be-sealed` | `BeSealed`, `NotBeSealed` | `require` for `assignableTo: [System.Attribute]` with `is: { sealed: true }`, `isNot` | `covered` | |
 
 ## Object-level
 
@@ -105,10 +105,10 @@ Methods that every kind of object has, here applied to `Types()`.
 | Id | ArchUnitNET | Ariadne | Status | Notes |
 |---|---|---|---|---|
 | `p-are` | `Are`, `AreNot` | `types`; `:not` as an exception with `types` | `covered` | |
-| `c-be` | `Be`, `BeTypesThat`, `NotBe` | `require` with `is: { types }`, `isNot: { types }` | `gap` | 4.2 |
-| `c-be-kind` | `Be(Classes())`, `Be(Interfaces())`, `NotBe(Interfaces())` | `require` with `kind`; `:not` as `isNot: { kinds }` | `gap` | 4.2, `:not` only. `kind: class` leaves out records, which `Classes()` holds; see [c-be-kind](#c-be-kind). |
+| `c-be` | `Be`, `BeTypesThat`, `NotBe` | `require` with `is: { types }`, `isNot: { types }` | `covered` | |
+| `c-be-kind` | `Be(Classes())`, `Be(Interfaces())`, `NotBe(Interfaces())` | `require` with `kind`; `:not` as `isNot: { kinds }` | `divergence` | `kind: class` leaves out records, which `Classes()` holds; see [c-be-kind](#c-be-kind). The `:not` case agrees. |
 | `c-exist` | `Exist` | `VacuousRule` | `out-of-scope` | Every Ariadne rule already fails when its subject selects nothing. That failure names no type, so there is nothing to compare. |
-| `c-not-exist` | `NotExist` | `require` with `isNot: { types: ["**"] }` and `allowEmpty: true` | `gap` | 4.2 |
+| `c-not-exist` | `NotExist` | `require` with `isNot: { types: ["**"] }` and `allowEmpty: true` | `covered` | `allowEmpty: true` keeps the rule from failing as vacuous once the namespace is empty. |
 
 ### Accessibility
 
@@ -120,12 +120,12 @@ Methods that every kind of object has, here applied to `Types()`.
 | `p-are-private` | `ArePrivate`, `AreNotPrivate` | `accessibility: [private]`; `:not` as `accessibility` with the other five values | `covered` | |
 | `p-are-protected-internal` | `AreProtectedInternal`, `AreNotProtectedInternal` | `accessibility: [protected internal]`; `:not` as `accessibility` with the other five values | `covered` | |
 | `p-are-private-protected` | `ArePrivateProtected`, `AreNotPrivateProtected` | `accessibility: [private protected]`; `:not` as `accessibility` with the other five values | `covered` | |
-| `c-be-public` | `BePublic`, `NotBePublic` | `require` with `is: { accessibility: [public] }`, `isNot` | `gap` | 4.2. Today's `require` accepts `accessibility: public` but checks only `internal`, so it flags nothing. |
-| `c-be-internal` | `BeInternal`, `NotBeInternal` | `require` with `accessibility: internal`; `:not` as `isNot: { accessibility: [internal] }` | `gap` | 4.2, `:not` only |
-| `c-be-protected` | `BeProtected`, `NotBeProtected` | `require` with `is: { accessibility: [protected] }`, `isNot` | `gap` | 4.2 |
-| `c-be-private` | `BePrivate`, `NotBePrivate` | `require` with `is: { accessibility: [private] }`, `isNot` | `gap` | 4.2 |
-| `c-be-protected-internal` | `BeProtectedInternal`, `NotBeProtectedInternal` | `require` with `is: { accessibility: [protected internal] }`, `isNot` | `gap` | 4.2 |
-| `c-be-private-protected` | `BePrivateProtected`, `NotBePrivateProtected` | `require` with `is: { accessibility: [private protected] }`, `isNot` | `gap` | 4.2 |
+| `c-be-public` | `BePublic`, `NotBePublic` | `require` with `is: { accessibility: [public] }`, `isNot` | `covered` | The older `accessibility: public` on `require` checks nothing, because it checks only `internal`; `is` checks `public`. |
+| `c-be-internal` | `BeInternal`, `NotBeInternal` | `require` with `accessibility: internal`; `:not` as `isNot: { accessibility: [internal] }` | `covered` | |
+| `c-be-protected` | `BeProtected`, `NotBeProtected` | `require` with `is: { accessibility: [protected] }`, `isNot` | `covered` | |
+| `c-be-private` | `BePrivate`, `NotBePrivate` | `require` with `is: { accessibility: [private] }`, `isNot` | `covered` | |
+| `c-be-protected-internal` | `BeProtectedInternal`, `NotBeProtectedInternal` | `require` with `is: { accessibility: [protected internal] }`, `isNot` | `covered` | |
+| `c-be-private-protected` | `BePrivateProtected`, `NotBePrivateProtected` | `require` with `is: { accessibility: [private protected] }`, `isNot` | `covered` | |
 
 ### Names
 
@@ -144,15 +144,15 @@ Methods that every kind of object has, here applied to `Types()`.
 | `p-have-full-name-containing` | `HaveFullNameContaining`, `DoNotHaveFullNameContaining` | `types: ["**.*Part*.**"]`; `:not` as an exception with `types` | `divergence` | ArchUnitNET ignores case. See [p-have-full-name-containing](#p-have-full-name-containing). |
 | `p-have-full-name-matching` | `HaveFullNameMatching`, `DoNotHaveFullNameMatching` | — | `out-of-scope` | Ariadne patterns are globs; translate a regex with a glob form by hand. |
 | `p-have-assembly-qualified-name` | `HaveAssemblyQualifiedName`, `HaveAssemblyQualifiedNameStartingWith`, `HaveAssemblyQualifiedNameEndingWith`, `HaveAssemblyQualifiedNameContaining`, `HaveAssemblyQualifiedNameMatching` and their `DoNot` forms | — | `out-of-scope` | `assemblies` plus `types` express it. |
-| `c-have-name` | `HaveName`, `NotHaveName` | `require` with `is: { names }`, `isNot: { names }` | `gap` | 4.2 |
-| `c-have-name-starting-with` | `HaveNameStartingWith`, `NotHaveNameStartingWith` | `require` with `is: { names: ["Prefix*"] }`, `isNot` | `gap` | 4.2 |
-| `c-have-name-ending-with` | `HaveNameEndingWith`, `NotHaveNameEndingWith` | `require` with `is: { names: ["*Suffix"] }`, `isNot` | `gap` | 4.2 |
-| `c-have-name-containing` | `HaveNameContaining`, `NotHaveNameContaining` | `require` with `is: { names: ["*Part*"] }`, `isNot` | `gap` | 4.2 |
+| `c-have-name` | `HaveName`, `NotHaveName` | `require` with `is: { names }`, `isNot: { names }` | `covered` | |
+| `c-have-name-starting-with` | `HaveNameStartingWith`, `NotHaveNameStartingWith` | `require` with `is: { names: ["Prefix*"] }`, `isNot` | `covered` | |
+| `c-have-name-ending-with` | `HaveNameEndingWith`, `NotHaveNameEndingWith` | `require` with `is: { names: ["*Suffix"] }`, `isNot` | `covered` | |
+| `c-have-name-containing` | `HaveNameContaining`, `NotHaveNameContaining` | `require` with `is: { names: ["*Part*"] }`, `isNot` | `covered` | |
 | `c-have-name-matching` | `HaveNameMatching`, `NotHaveNameMatching` | — | `out-of-scope` | Ariadne patterns are globs; translate a regex with a glob form by hand. |
-| `c-have-full-name` | `HaveFullName`, `NotHaveFullName` | `require` with `is: { types }`, `isNot: { types }` | `gap` | 4.2 |
-| `c-have-full-name-starting-with` | `HaveFullNameStartingWith`, `NotHaveFullNameStartingWith` | `require` with `is: { types: ["Ns.Prefix*", "Ns.Prefix*.**"] }`, `isNot` | `gap` | 4.2 |
-| `c-have-full-name-ending-with` | `HaveFullNameEndingWith`, `NotHaveFullNameEndingWith` | `require` with `is: { types: ["**.*Suffix"] }`, `isNot` | `gap` | 4.2 |
-| `c-have-full-name-containing` | `HaveFullNameContaining`, `NotHaveFullNameContaining` | `require` with `is: { types: ["**.*Part*.**"] }`, `isNot` | `gap` | 4.2 |
+| `c-have-full-name` | `HaveFullName`, `NotHaveFullName` | `require` with `is: { types }`, `isNot: { types }` | `covered` | |
+| `c-have-full-name-starting-with` | `HaveFullNameStartingWith`, `NotHaveFullNameStartingWith` | `require` with `is: { types: ["Ns.Prefix*", "Ns.Prefix*.**"] }`, `isNot` | `covered` | |
+| `c-have-full-name-ending-with` | `HaveFullNameEndingWith`, `NotHaveFullNameEndingWith` | `require` with `is: { types: ["**.*Suffix"] }`, `isNot` | `covered` | |
+| `c-have-full-name-containing` | `HaveFullNameContaining`, `NotHaveFullNameContaining` | `require` with `is: { types: ["**.*Part*.**"] }`, `isNot` | `covered` | |
 | `c-have-full-name-matching` | `HaveFullNameMatching`, `NotHaveFullNameMatching` | — | `out-of-scope` | Ariadne patterns are globs; translate a regex with a glob form by hand. |
 | `c-have-assembly-qualified-name` | `HaveAssemblyQualifiedName`, `HaveAssemblyQualifiedNameStartingWith`, `HaveAssemblyQualifiedNameEndingWith`, `HaveAssemblyQualifiedNameContaining`, `HaveAssemblyQualifiedNameMatching` and their `Not` forms | — | `out-of-scope` | `assemblies` plus `types` express it. |
 
@@ -173,7 +173,7 @@ Methods that every kind of object has, here applied to `Types()`.
 | Id | ArchUnitNET | Ariadne | Status | Notes |
 |---|---|---|---|---|
 | `p-have-any-attributes` | `HaveAnyAttributes`, `DoNotHaveAnyAttributes` | `attributes`; `:not` as an exception with `attributes` | `gap` | unplanned, #97: `:not` only. Rule exceptions take no `attributes`, so an exception cannot leave out the types that carry one. |
-| `c-have-any-attributes` | `HaveAnyAttributes`, `HaveAnyAttributesThat`, `NotHaveAnyAttributes`, `NotHaveAnyAttributesThat` | `require` with `is: { attributes }`, `isNot: { attributes }` | `gap` | 4.2 |
+| `c-have-any-attributes` | `HaveAnyAttributes`, `HaveAnyAttributesThat`, `NotHaveAnyAttributes`, `NotHaveAnyAttributesThat` | `require` with `is: { attributes }`, `isNot: { attributes }` | `covered` | |
 | `p-have-attribute-with-arguments` | `HaveAttributeWithArguments`, `HaveAnyAttributesWithArguments`, `DoNotHaveAttributeWithArguments`, `DoNotHaveAnyAttributesWithArguments` | — | `deferred` | attribute arguments, see #95 |
 | `c-have-attribute-with-arguments` | `HaveAttributeWithArguments`, `HaveAnyAttributesWithArguments`, `NotHaveAttributeWithArguments`, `NotHaveAnyAttributesWithArguments` | — | `deferred` | attribute arguments, see #95 |
 | `p-have-attribute-with-named-arguments` | `HaveAttributeWithNamedArguments`, `HaveAnyAttributesWithNamedArguments`, `DoNotHaveAttributeWithNamedArguments`, `DoNotHaveAnyAttributesWithNamedArguments` | — | `deferred` | attribute arguments, see #95 |
@@ -247,6 +247,7 @@ Here ArchUnitNET and Ariadne answer differently on purpose, mostly because one r
 
 - [c-be-kind](#c-be-kind)
 - [p-are-abstract](#p-are-abstract), [p-are-abstract:not](#p-are-abstract)
+- [c-be-abstract](#c-be-abstract)
 - [c-only-depend-on](#c-only-depend-on)
 - [p-have-name](#p-have-name), [p-have-name:not](#p-have-name)
 - [p-have-name-ending-with](#p-have-name-ending-with), [p-have-name-ending-with:not](#p-have-name-ending-with)
@@ -260,7 +261,7 @@ Here ArchUnitNET and Ariadne answer differently on purpose, mostly because one r
 Fixture `tests/fixtures/archunit-parity/CBeKind`, rule `Should().Be(Classes())` against `require` with `kind: class`. Both tools flag the interface `Broken.IOrderService` and the struct `Broken.Money`. Only Ariadne flags the record `Broken.Ledger`.
 
 - **Reason:** a record class compiles to a class, so ArchUnitNET's `Classes()` holds it. Ariadne reads source, where `record` is a kind of its own, so `kind: class` rejects a record.
-- **Expected:** ArchUnitNET's answer, since a record class is a class in C#. Phase 4.2's `is: { kinds: [class, record] }` expresses `Be(Classes())` exactly; today's `kind` takes one kind.
+- **Expected:** ArchUnitNET's answer, since a record class is a class in C#. `is: { kinds: [class, record] }` expresses `Be(Classes())` exactly; the older `kind` key takes one kind. The `:not` case, `NotBe(Interfaces())` against `isNot: { kinds: [interface] }`, agrees.
 
 ### p-are-abstract
 
@@ -268,6 +269,13 @@ Fixture `tests/fixtures/archunit-parity/PAreAbstract`, rule `Classes().That().Ar
 
 - **Reason:** the compiler marks a static class `abstract sealed` in IL, so ArchUnitNET's `AreAbstract` holds it. Ariadne follows C#, where a static class is not abstract.
 - **Expected:** Ariadne's answer. C# does not let a static class be declared abstract, and a developer who writes `AreAbstract` does not mean static classes. Select those with `static: true`. `sealed` agrees: both tools count a static class as sealed, so `p-are-sealed` is `covered`.
+
+### c-be-abstract
+
+Fixture `tests/fixtures/archunit-parity/CBeAbstract`, rule `Classes().That().ResideInNamespace(…).Should().BeAbstract()` against `require` for `{ kinds: [class, record] }` with `is: { abstract: true }`. Both tools flag `Broken.OrderService` and the sealed `Broken.Shipment`. Only Ariadne flags the static class `Broken.Clock`. The `:not` case, `NotBeAbstract` against `isNot: { abstract: true }`, has no static class and agrees: both flag `NotBroken.OrderBase`.
+
+- **Reason:** as for [p-are-abstract](#p-are-abstract): IL marks a static class `abstract sealed`, so ArchUnitNET's `BeAbstract` passes it. Ariadne follows C#, where a static class is not abstract.
+- **Expected:** Ariadne's answer, for the same reason. `c-be-sealed` agrees: its fixture holds the static class `Clean.Clock`, which both tools count as sealed.
 
 ### c-only-depend-on
 

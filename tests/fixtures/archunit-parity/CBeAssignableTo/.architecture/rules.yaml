@@ -3,4 +3,18 @@ name: parity-c-be-assignable-to
 version: "1.0.0"
 author: fixture
 
-# No rule yet: require has no is or isNot, and a selector has no assignableTo. Phase 4.2 adds PARITY-CBEASSIGNABLETO and PARITY-CBEASSIGNABLETO-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-CBEASSIGNABLETO
+    because: Mirrors ArchUnitNET's BeAssignableTo; Broken and Clean must satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CBeAssignableTo.Broken", "Parity.CBeAssignableTo.Clean"]
+      is:
+        assignableTo: ["Parity.CBeAssignableTo.Target.AuditedBase"]
+  - id: PARITY-CBEASSIGNABLETO-NOT
+    because: Mirrors ArchUnitNET's NotBeAssignableTo; NotBroken and NotClean must not satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CBeAssignableTo.NotBroken", "Parity.CBeAssignableTo.NotClean"]
+      isNot:
+        assignableTo: ["Parity.CBeAssignableTo.Target.AuditedBase"]

@@ -3,4 +3,18 @@ name: parity-c-be-protected-internal
 version: "1.0.0"
 author: fixture
 
-# No rule yet: require has no is or isNot, and its accessibility key checks only internal. Phase 4.2 adds PARITY-CBEPROTECTEDINTERNAL and PARITY-CBEPROTECTEDINTERNAL-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-CBEPROTECTEDINTERNAL
+    because: Mirrors ArchUnitNET's BeProtectedInternal; Broken and Clean must satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CBeProtectedInternal.Broken", "Parity.CBeProtectedInternal.Clean"]
+      is:
+        accessibility: ["protected internal"]
+  - id: PARITY-CBEPROTECTEDINTERNAL-NOT
+    because: Mirrors ArchUnitNET's NotBeProtectedInternal; NotBroken and NotClean must not satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CBeProtectedInternal.NotBroken", "Parity.CBeProtectedInternal.NotClean"]
+      isNot:
+        accessibility: ["protected internal"]

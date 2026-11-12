@@ -3,4 +3,20 @@ name: parity-c-be-sealed
 version: "1.0.0"
 author: fixture
 
-# No rule yet: require has no is or isNot, and a selector has no sealed. Phase 4.2 adds PARITY-CBESEALED and PARITY-CBESEALED-NOT here and deletes their KnownGaps entries.
+rules:
+  - id: PARITY-CBESEALED
+    because: Mirrors ArchUnitNET's BeSealed on Classes(); Broken and Clean must satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CBeSealed.Broken", "Parity.CBeSealed.Clean"]
+        kinds: [class, record]
+      is:
+        sealed: true
+  - id: PARITY-CBESEALED-NOT
+    because: Mirrors ArchUnitNET's NotBeSealed on Classes(); NotBroken and NotClean must not satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CBeSealed.NotBroken", "Parity.CBeSealed.NotClean"]
+        kinds: [class, record]
+      isNot:
+        sealed: true
