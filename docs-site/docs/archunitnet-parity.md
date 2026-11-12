@@ -46,7 +46,7 @@ Methods of `Types().That()`.
 | `p-are-structs` | `AreStructs`, `AreNotStructs` | `kinds: [struct, recordStruct]`; `:not` as `kinds: [class, interface, record, enum, delegate]` | `covered` | |
 | `p-are-value-types` | `AreValueTypes`, `AreNotValueTypes` | `kinds: [struct, recordStruct, enum]`; `:not` as `kinds: [class, interface, record, delegate]` | `covered` | |
 | `p-are-nested` | `AreNested`, `AreNotNested` | `nested: true`, `nested: false` | `covered` | |
-| `p-are-nested-in` | `AreNestedIn` | `nested: true` with `types: ["Ns.Outer.*"]` | `covered` | The fixture selects the type nested in `Order` and leaves out a type nested in another class. `nested: true` also leaves out a top-level type in a namespace named like the outer type, which C# allows only across assemblies, so the fixture cannot hold one. |
+| `p-are-nested-in` | `AreNestedIn` | `nested: true` with `types: ["Ns.Outer.*"]` | `covered` | The fixture selects the type nested in `Order` and leaves out a type nested in another class. |
 | `p-have-member-with-name` | `HaveMemberWithName`, `HaveMethodMemberWithName`, `HavePropertyMemberWithName`, `HaveFieldMemberWithName`, `DoNotHaveMemberWithName`, `DoNotHaveMethodMemberWithName`, `DoNotHavePropertyMemberWithName`, `DoNotHaveFieldMemberWithName` | — | `deferred` | member level, see #94 |
 
 ## Type conditions
