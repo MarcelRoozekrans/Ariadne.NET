@@ -118,8 +118,11 @@ public sealed partial class SolutionLoader : ISolutionLoader
     // The steps shared by a real load and the AdhocWorkspace seam:
     // 1. pick the named projects the workspace loaded;
     // 2. skip named project files it did not load because they are not C#, such as .dcproj or .shproj, with their failures;
-    // 3. fail on any other workspace failure, then on a named .csproj that did not load;
+    // 3. fail on a workspace failure about no project, then on a named .csproj that did not load;
     // 4. skip the loaded non-C# projects, then compile each C# project and fail on what makes it uncheckable.
+    // MSBuildWorkspace reports an MSBuild warning as a Failure too, so a failure about a project only fails the load when that
+    // project did not load or does not compile, and then the load fails with that project's failures as before. A project that
+    // compiles is checked whatever its failures said (#117).
     // Restore is detected from each compilation, after the failures, so a malformed project file is not reported as unrestored.
     private static async Task<Result<LoadedSolution, AriadneError>> BuildAsync(
         Solution solution,
@@ -132,15 +135,20 @@ public sealed partial class SolutionLoader : ISolutionLoader
         var selected = SelectNamed(solution, named);
         var (unloadedCSharp, unloadedOther) = Unloaded(selected, named);
 
-        var remaining = WithoutFailuresOf(failures, unloadedOther);
-        if (remaining.Count > 0)
+        var (byProject, general) = BySubject(WithoutFailuresOf(failures, unloadedOther));
+        if (general.Count > 0)
         {
-            return Failure(LoadFailure(remaining));
+            return Failure(LoadFailure(general));
         }
 
         if (unloadedCSharp.Count > 0)
         {
             var path = unloadedCSharp[0];
+            if (byProject.TryGetValue(NamedProjects.Normalize(path), out var failed))
+            {
+                return Failure(LoadFailure(failed));
+            }
+
             return Failure(
                 AriadneErrorCode.Invalid,
                 $"Project '{Path.GetFileNameWithoutExtension(path)}' did not load.",
@@ -167,7 +175,10 @@ public sealed partial class SolutionLoader : ISolutionLoader
             var compiled = await ProjectCompiler.CompileAsync(csharp[i], rootDirectory, cancellationToken).ConfigureAwait(false);
             if (compiled.IsFailure)
             {
-                return Failure(compiled.Error);
+                return csharp[i].FilePath is { Length: > 0 } filePath
+                    && byProject.TryGetValue(NamedProjects.Normalize(filePath), out var failed)
+                    ? Failure(LoadFailure(failed))
+                    : Failure(compiled.Error);
             }
 
             analyzed.Add(compiled.Value);
@@ -243,6 +254,35 @@ public sealed partial class SolutionLoader : ISolutionLoader
         }
 
         return remaining;
+    }
+
+    /// <summary>
+    /// Splits workspace failures into those about a project file, keyed by its normalized path, and the rest. The project is the
+    /// subject path of the message when it ends in <c>proj</c>.
+    /// </summary>
+    internal static (Dictionary<string, List<string>> ByProject, List<string> General) BySubject(IReadOnlyList<string> failures)
+    {
+        var byProject = new Dictionary<string, List<string>>(NamedProjects.PathComparer);
+        var general = new List<string>();
+        foreach (var failure in failures)
+        {
+            if (SubjectPath(failure) is { } subject && Path.GetExtension(subject).EndsWith("proj", StringComparison.OrdinalIgnoreCase))
+            {
+                var key = NamedProjects.Normalize(subject);
+                if (!byProject.TryGetValue(key, out var list))
+                {
+                    byProject.Add(key, list = []);
+                }
+
+                list.Add(failure);
+            }
+            else
+            {
+                general.Add(failure);
+            }
+        }
+
+        return (byProject, general);
     }
 
     // The first quoted, rooted path in a workspace diagnostic, which may contain spaces.
