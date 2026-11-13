@@ -63,8 +63,9 @@ public sealed class ArchitectureValidator : IArchitectureValidator
         // once over all graphs and not merged per project.
         var nameCollisions = UniqueNameRules.Check(layers, resolvedPack, GraphsOf(entries));
 
-        // Slices span projects too, and their edges are checked per target framework scope, so they need each graph's framework.
-        var sliceViolations = SliceRules.Check(layers, resolvedPack, FrameworkGraphsOf(entries));
+        // Slices span projects too, and their edges are checked per target framework scope, so they need each graph's framework,
+        // project and referenced graphs.
+        var sliceViolations = SliceRules.Check(layers, resolvedPack, ScopedGraphsOf(entries));
 
         var vacuity = VacuityRules.Check(resolvedPack, layers, GraphsOf(entries), MatchesOf(entries), projects);
 
@@ -116,15 +117,15 @@ public sealed class ArchitectureValidator : IArchitectureValidator
         return graphs;
     }
 
-    private static List<(TypeGraph Graph, string? TargetFramework)> FrameworkGraphsOf(List<Entry> entries)
+    private static List<ScopedGraph> ScopedGraphsOf(List<Entry> entries)
     {
-        var graphs = new List<(TypeGraph Graph, string? TargetFramework)>(entries.Count);
+        var projects = new List<AnalyzedProject>(entries.Count);
         foreach (ref readonly var entry in CollectionsMarshal.AsSpan(entries))
         {
-            graphs.Add((entry.Graph, entry.Project.TargetFramework));
+            projects.Add(entry.Project);
         }
 
-        return graphs;
+        return ScopedGraph.Of(projects, GraphsOf(entries));
     }
 
     private static List<RoleMatches> MatchesOf(List<Entry> entries)

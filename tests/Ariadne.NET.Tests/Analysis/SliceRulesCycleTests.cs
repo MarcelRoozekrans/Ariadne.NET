@@ -198,14 +198,86 @@ public class SliceRulesCycleTests
         report.Violations.Where(v => v.Kind == ViolationKind.SliceCycle).Should().HaveCount(2);
     }
 
+    private const string OrderSource = "namespace Shop.Orders { public class Order { } }";
+
+    private const string InvoiceSource = "namespace Shop.Billing { public class Invoice { public Shop.Orders.Order? O; } }";
+
+    private const string RepoSource = "namespace Shop.Orders.Infrastructure { public class Repo { public Shop.Billing.Invoice? I; } }";
+
+    [Fact]
+    public void Cycle_through_a_compatible_framework_variant_is_found()
+    {
+        var orders = Named("Orders.Core", OrderSource);
+        var billingStd = Named("Billing", InvoiceSource, orders);
+        var billing8 = Named("Billing", InvoiceSource, orders);
+        var infra9 = Named("Orders.Infrastructure", RepoSource, billing8, orders);
+        var infra10 = Named("Orders.Infrastructure", RepoSource, billing8, orders);
+
+        var violations = Check(PackWith(Acyclic()), (orders, null), (billingStd, "netstandard2.0"), (billing8, "net8.0"), (infra9, "net9.0"), (infra10, "net10.0"));
+
+        violations.Should().HaveCount(2).And.OnlyContain(v => v.Kind == ViolationKind.SliceCycle);
+        violations.Select(v => (v.SourceType, v.Target)).Should().BeEquivalentTo(new[]
+        {
+            ("Shop.Billing.Invoice", "Shop.Orders.Order"),
+            ("Shop.Orders.Infrastructure.Repo", "Shop.Billing.Invoice"),
+        });
+        violations.Should().OnlyContain(v => v.TargetFrameworks.SequenceEqual(new[] { "net10.0", "net9.0" }) && v.ReferenceCount == 1);
+    }
+
+    [Fact]
+    public void Referenced_variant_does_not_replace_the_projects_own_variant()
+    {
+        var orders = Named("Orders.Core", OrderSource);
+        var billing8 = Named("Billing", InvoiceSource, orders);
+        var billing10 = Named("Billing", InvoiceSource, orders);
+        var infra8 = Named("Orders.Infrastructure", RepoSource, billing8, orders);
+        var infra10 = Named("Orders.Infrastructure", RepoSource, billing8, orders);
+
+        var violations = Check(PackWith(Acyclic()), (orders, null), (billing8, "net8.0"), (billing10, "net10.0"), (infra8, "net8.0"), (infra10, "net10.0"));
+
+        violations.Should().HaveCount(2).And.OnlyContain(v => v.Kind == ViolationKind.SliceCycle);
+        violations.Should().OnlyContain(v => v.TargetFrameworks.Count == 0 && v.ReferenceCount == 1);
+    }
+
+    [Fact]
+    public void Reference_to_a_compilation_outside_the_run_is_ignored()
+    {
+        var orders = Named("Orders.Core", OrderSource);
+        var billing8 = Named("Billing", InvoiceSource, orders);
+        var infra10 = Named("Orders.Infrastructure", RepoSource, billing8, orders);
+
+        Check(PackWith(Acyclic()), (orders, null), (infra10, "net10.0")).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Variant_referenced_through_a_referenced_variant_joins_the_scope()
+    {
+        var ordersStd = Named("Orders.Core", OrderSource);
+        var ordersNet6 = Named("Orders.Core", OrderSource);
+        var shared8 = Named("Shared", InvoiceSource, ordersStd);
+        var glue10 = Named("Glue", RepoSource, shared8);
+
+        var violations = Check(PackWith(Acyclic()), (ordersStd, "netstandard2.0"), (ordersNet6, "net6.0"), (shared8, "net8.0"), (glue10, "net10.0"));
+
+        violations.Should().HaveCount(2).And.OnlyContain(v => v.Kind == ViolationKind.SliceCycle);
+        violations.Should().OnlyContain(v => v.TargetFrameworks.SequenceEqual(new[] { "net10.0" }));
+    }
+
     private static IReadOnlyList<ArchitectureViolation> Check(RulePack pack, string source) =>
         Check(pack, (TestCompilation.Create(source), null));
 
     private static IReadOnlyList<ArchitectureViolation> Check(RulePack pack, params (CSharpCompilation Compilation, string? Framework)[] inputs)
     {
-        var graphs = inputs
-            .Select(i => (TypeGraphBuilder.Build(i.Compilation, new HashSet<SyntaxTree>(), CancellationToken.None), i.Framework))
+        var projects = inputs
+            .Select(i => new AnalyzedProject(i.Compilation.AssemblyName ?? string.Empty, i.Framework, i.Compilation))
             .ToList();
-        return SliceRules.Check(new LayerMap(pack), pack, graphs);
+        var graphs = projects
+            .Select(p => TypeGraphBuilder.Build(p.Compilation, new HashSet<SyntaxTree>(), CancellationToken.None))
+            .ToList();
+        return SliceRules.Check(new LayerMap(pack), pack, ScopedGraph.Of(projects, graphs));
     }
+
+    private static CSharpCompilation Named(string assembly, string source, params CSharpCompilation[] references) =>
+        TestCompilation.Create([.. references.Select(r => (MetadataReference)r.ToMetadataReference())], (assembly + ".cs", source))
+            .WithAssemblyName(assembly);
 }

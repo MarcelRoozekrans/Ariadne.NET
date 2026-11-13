@@ -16,18 +16,19 @@ internal static class SliceRules
     /// different slices, with the number of references and the location of the first. Only source types of the run have a
     /// slice, targets included; a nested type sits in its outermost type's slice. A type is identified by its assembly name and
     /// display string, so a type seen in several target frameworks of one project counts once. An exception exempts a source
-    /// type only, evaluated for each target framework variant, and a target that <c>allow</c> selects is not a dependency. Edges are checked per target framework scope, and
+    /// type only, evaluated for each target framework variant, and a target that <c>allow</c> selects is not a dependency. Edges are checked per target framework scope,
+    /// which also holds, for a project without that framework, the variant the framework's build compiles against, and
     /// a violation found in several scopes is reported once, naming the frameworks that found it, or none when every scope did.
     /// For a <c>freeOfCycles</c> rule it returns one <see cref="ViolationKind.SliceCycle"/> per slice edge and component: one for each
     /// edge whose two slices share a strongly connected component of the scope's slice graph, through the earliest reference from the one to the other.
     /// </summary>
     /// <param name="layers">The layer map of the pack.</param>
     /// <param name="pack">The resolved pack.</param>
-    /// <param name="graphs">The type graphs of the run, each with its project's target framework.</param>
+    /// <param name="graphs">The type graphs of the run, each with its project, target framework and referenced graphs.</param>
     /// <returns>The violations, in pack rule order.</returns>
     /// <exception cref="ArgumentException">A slices rule has no slices or a malformed pattern, which only a pack built in code can hold.</exception>
     public static IReadOnlyList<ArchitectureViolation> Check(
-        LayerMap layers, RulePack pack, IReadOnlyList<(TypeGraph Graph, string? TargetFramework)> graphs)
+        LayerMap layers, RulePack pack, IReadOnlyList<ScopedGraph> graphs)
     {
         ArgumentNullException.ThrowIfNull(layers);
         ArgumentNullException.ThrowIfNull(pack);
@@ -48,9 +49,9 @@ internal static class SliceRules
             sliced.Collect(graphs);
             var allow = slices.Allow is { } selector ? TargetMatcher.From(selector, layers) : null;
             var perGraph = new List<SliceEdges>(graphs.Count);
-            foreach (var (graph, _) in graphs)
+            foreach (var scoped in graphs)
             {
-                perGraph.Add(SliceEdges.Of(graph, sliced, allow));
+                perGraph.Add(SliceEdges.Of(scoped.Graph, sliced, allow));
             }
 
             if (slices.Independent)
@@ -263,11 +264,11 @@ internal static class SliceRules
         private readonly Dictionary<INamedTypeSymbol, SlicedType?> _bySymbol = new(SymbolEqualityComparer.Default);
         private readonly Dictionary<INamedTypeSymbol, bool> _exceptedBySymbol = new(SymbolEqualityComparer.Default);
 
-        public void Collect(IReadOnlyList<(TypeGraph Graph, string? TargetFramework)> graphs)
+        public void Collect(IReadOnlyList<ScopedGraph> graphs)
         {
-            foreach (var (graph, _) in graphs)
+            foreach (var scoped in graphs)
             {
-                foreach (var type in graph.SourceTypes)
+                foreach (var type in scoped.Graph.SourceTypes)
                 {
                     if (_bySymbol.ContainsKey(type))
                     {
@@ -668,9 +669,9 @@ internal static class SliceRules
     }
 
     /// <summary>
-    /// The graphs one check sees together, built as the validator builds the scopes of missing-interface checks: one per named
-    /// target framework, holding that framework's graphs and every graph of a project without one, or one scope over all graphs
-    /// when no project names a framework.
+    /// The graphs one check sees together: one scope per named target framework, holding that framework's graphs, every graph of
+    /// a project without one, and, for any other project, the variant those graphs reference, directly or through another
+    /// referenced variant; or one scope over all graphs when no project names a framework.
     /// </summary>
     private sealed class Scope(string? framework)
     {
@@ -678,7 +679,7 @@ internal static class SliceRules
 
         public string? Framework { get; } = framework;
 
-        public static List<Scope> Build(IReadOnlyList<(TypeGraph Graph, string? TargetFramework)> graphs)
+        public static List<Scope> Build(IReadOnlyList<ScopedGraph> graphs)
         {
             var byFramework = new Dictionary<string, Scope>(StringComparer.Ordinal);
             var scopes = new List<Scope>();
@@ -710,9 +711,35 @@ internal static class SliceRules
             foreach (ref readonly var scope in CollectionsMarshal.AsSpan(scopes))
             {
                 scope._graphs.AddRange(unnamed);
+                scope.AddReferencedVariants(graphs);
             }
 
             return scopes;
+        }
+
+        // Walks the references of the scope's graphs breadth-first and adds each referenced graph whose project has no variant in
+        // the scope yet: the variant this framework's build compiles against. A project's own variant for the framework was added
+        // first, so it always wins, and the scope keeps one variant per project, which keeps Edges from counting a reference twice.
+        private void AddReferencedVariants(IReadOnlyList<ScopedGraph> graphs)
+        {
+            var members = new HashSet<int>(_graphs);
+            var projects = new HashSet<string>(StringComparer.Ordinal);
+            foreach (ref readonly var member in CollectionsMarshal.AsSpan(_graphs))
+            {
+                projects.Add(graphs[member].Project);
+            }
+
+            for (var next = 0; next < _graphs.Count; next++)
+            {
+                foreach (var referenced in graphs[_graphs[next]].References)
+                {
+                    if (!members.Contains(referenced) && projects.Add(graphs[referenced].Project))
+                    {
+                        members.Add(referenced);
+                        _graphs.Add(referenced);
+                    }
+                }
+            }
         }
 
         /// <summary>The counted edges of the scope's graphs, summed per source and target type, in the order first seen.</summary>
