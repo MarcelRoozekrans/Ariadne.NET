@@ -170,35 +170,35 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 - [ ] A migration guide from ArchUnitNET exists on the docs site
 - [ ] Daedalus `main` references no ArchUnitNET package and checks an Ariadne pack in CI
 
-### Phase 4.1: Parity catalogue and harness [status: pending]
+### Phase 4.1: Parity catalogue and harness [status: complete 2026-11-13, merged as #99, released in 0.8.0]
 **Goal:** Catalogue ArchUnitNET's rule kinds and build the side-by-side harness on a fixture solution, green for today's kinds with the rest in `KnownGaps`.
 **Surface:** Backend
 **HelpWanted:** no
 **Design:** `docs/superpowers/specs/2026-11-11-phase-4.1-parity-catalogue-and-harness-design.md` (approved 2026-11-11)
 **Plan:** `docs/superpowers/plans/2026-11-11-phase-4.1-parity-catalogue-and-harness.md`
 
-### Phase 4.2: Type-level conditions [status: pending]
+### Phase 4.2: Type-level conditions [status: complete 2026-11-13, merged as #102, released in 0.8.0]
 **Goal:** Add naming pattern, base type, attribute, sealed, abstract, static and nested as conditions and, where needed, selectors.
 **Surface:** Backend
 **HelpWanted:** no
 **Design:** `docs/superpowers/specs/2026-11-11-phase-4.2-type-level-conditions-design.md` (approved 2026-11-11)
 **Plan:** `docs/superpowers/plans/2026-11-11-phase-4.2-type-level-conditions.md`
 
-### Phase 4.3: Slices [status: pending]
+### Phase 4.3: Slices [status: complete 2026-11-13, merged as #104; fix #114 for issue #113, released in 0.8.0]
 **Goal:** Add namespace capture segments and slice rules for no cycles and no dependency between slices, use them in `modular-monolith`, and close #32.
 **Surface:** Backend
 **HelpWanted:** no
 **Design:** `docs/superpowers/specs/2026-11-11-phase-4.3-slices-design.md` (approved 2026-11-11)
 **Plan:** `docs/superpowers/plans/2026-11-11-phase-4.3-slices.md`
 
-### Phase 4.4: Target vacuity [status: pending]
+### Phase 4.4: Target vacuity [status: complete 2026-11-13, merged as #106, released in 0.8.0]
 **Goal:** A `forbid`, `allowOnly` or `uniqueNames` rule can set `requireTarget: true` and then fails as `VacuousRule` when its target matches nothing the solution uses: for `forbid` and `allowOnly`, no type it declares or references, or no member edge for a `members` target; for `uniqueNames`, no type it declares. A target that names only layers already reported as `VacuousLayer` is left to that report.
 **Surface:** Backend
 **HelpWanted:** no
 **Design:** `docs/superpowers/specs/2026-11-11-phase-4.4-target-vacuity-design.md` (approved 2026-11-11)
 **Plan:** `docs/superpowers/plans/2026-11-11-phase-4.4-target-vacuity.md`
 
-### Phase 4.5: Migration guide [status: pending]
+### Phase 4.5: Migration guide [status: complete 2026-11-13, merged as #107, released in 0.8.0]
 **Goal:** Document moving from ArchUnitNET to Ariadne, construct by construct, with Daedalus's rules as the worked example.
 **Surface:** Docs
 **HelpWanted:** no
