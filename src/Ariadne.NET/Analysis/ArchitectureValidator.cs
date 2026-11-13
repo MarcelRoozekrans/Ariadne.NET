@@ -61,13 +61,14 @@ public sealed class ArchitectureValidator : IArchitectureValidator
 
         // Name collisions span projects, and a type seen in several target frameworks counts once, so they are found
         // once over all graphs and not merged per project.
-        var nameCollisions = UniqueNameRules.Check(layers, resolvedPack, GraphsOf(entries));
+        var graphs = GraphsOf(entries);
+        var nameCollisions = UniqueNameRules.Check(layers, resolvedPack, graphs);
 
         // Slices span projects too, and their edges are checked per target framework scope, so they need each graph's framework,
         // project and referenced graphs.
-        var sliceViolations = SliceRules.Check(layers, resolvedPack, ScopedGraphsOf(entries));
+        var sliceViolations = SliceRules.Check(layers, resolvedPack, ScopedGraph.Of(projects, graphs));
 
-        var vacuity = VacuityRules.Check(resolvedPack, layers, GraphsOf(entries), MatchesOf(entries), projects);
+        var vacuity = VacuityRules.Check(resolvedPack, layers, graphs, MatchesOf(entries), projects);
 
         var ordered = GroupByProject(entries);
         var allViolations = new List<ArchitectureViolation>();
@@ -115,17 +116,6 @@ public sealed class ArchitectureValidator : IArchitectureValidator
         }
 
         return graphs;
-    }
-
-    private static List<ScopedGraph> ScopedGraphsOf(List<Entry> entries)
-    {
-        var projects = new List<AnalyzedProject>(entries.Count);
-        foreach (ref readonly var entry in CollectionsMarshal.AsSpan(entries))
-        {
-            projects.Add(entry.Project);
-        }
-
-        return ScopedGraph.Of(projects, GraphsOf(entries));
     }
 
     private static List<RoleMatches> MatchesOf(List<Entry> entries)

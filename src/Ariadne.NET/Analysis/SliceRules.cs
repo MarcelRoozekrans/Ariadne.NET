@@ -720,6 +720,7 @@ internal static class SliceRules
         // Walks the references of the scope's graphs breadth-first and adds each referenced graph whose project has no variant in
         // the scope yet: the variant this framework's build compiles against. A project's own variant for the framework was added
         // first, so it always wins, and the scope keeps one variant per project, which keeps Edges from counting a reference twice.
+        // When graphs of the scope reference different variants of one project, the first reached in graph order joins.
         private void AddReferencedVariants(IReadOnlyList<ScopedGraph> graphs)
         {
             var members = new HashSet<int>(_graphs);

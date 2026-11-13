@@ -8,7 +8,7 @@ namespace Ariadne.NET.Analysis;
 /// </summary>
 /// <param name="Graph">The type graph.</param>
 /// <param name="TargetFramework">The project's target framework, or null for a project that names none.</param>
-/// <param name="Project">The project's name, shared by its target framework variants.</param>
+/// <param name="Project">The project's identity: its assembly name, shared by its target framework variants and the identity slice types use, or its name when the compilation has none.</param>
 /// <param name="References">The indices of the graphs this graph's compilation references, in reference order.</param>
 internal readonly record struct ScopedGraph(TypeGraph Graph, string? TargetFramework, string Project, IReadOnlyList<int> References)
 {
@@ -47,7 +47,7 @@ internal readonly record struct ScopedGraph(TypeGraph Graph, string? TargetFrame
                 }
             }
 
-            result.Add(new ScopedGraph(graphs[i], project.TargetFramework, project.Name, references));
+            result.Add(new ScopedGraph(graphs[i], project.TargetFramework, project.Compilation.AssemblyName ?? project.Name, references));
         }
 
         return result;

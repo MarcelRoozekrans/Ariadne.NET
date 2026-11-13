@@ -263,14 +263,49 @@ public class SliceRulesCycleTests
         violations.Should().OnlyContain(v => v.TargetFrameworks.SequenceEqual(new[] { "net10.0" }));
     }
 
+    [Fact]
+    public void Projects_with_the_same_name_and_different_assemblies_keep_their_own_variants()
+    {
+        // Two project files named Api: A's net10.0 variant must not stand in for B, whose net8.0 variant Web compiles against.
+        var orders = Named("Orders.Core", OrderSource);
+        var apiA9 = Named("A.Api", "namespace Other { public class X { } }");
+        var apiA10 = Named("A.Api", "namespace Other { public class X { } }");
+        var apiB8 = Named("B.Api", InvoiceSource, orders);
+        var web10 = Named("Web", RepoSource, apiB8, orders);
+
+        var violations = Check(PackWith(Acyclic()), [
+            new AnalyzedProject("Orders.Core", null, orders),
+            new AnalyzedProject("Api", "net9.0", apiA9),
+            new AnalyzedProject("Api", "net10.0", apiA10),
+            new AnalyzedProject("Api", "net8.0", apiB8),
+            new AnalyzedProject("Web", "net10.0", web10),
+        ]);
+
+        violations.Should().HaveCount(2).And.OnlyContain(v => v.Kind == ViolationKind.SliceCycle);
+        violations.Should().OnlyContain(v => v.TargetFrameworks.SequenceEqual(new[] { "net10.0" }));
+    }
+
+    [Fact]
+    public void Project_without_a_framework_brings_its_referenced_variant_into_every_scope()
+    {
+        var ordersStd = Named("Orders.Core", OrderSource);
+        var ordersNet6 = Named("Orders.Core", OrderSource);
+        var shared8 = Named("Shared", InvoiceSource, ordersStd);
+        var glue = Named("Glue", RepoSource, shared8);
+
+        var violations = Check(PackWith(Acyclic()), (ordersStd, "netstandard2.0"), (ordersNet6, "net6.0"), (shared8, "net8.0"), (glue, null));
+
+        violations.Should().HaveCount(2).And.OnlyContain(v => v.Kind == ViolationKind.SliceCycle && v.TargetFrameworks.Count == 0);
+    }
+
     private static IReadOnlyList<ArchitectureViolation> Check(RulePack pack, string source) =>
         Check(pack, (TestCompilation.Create(source), null));
 
-    private static IReadOnlyList<ArchitectureViolation> Check(RulePack pack, params (CSharpCompilation Compilation, string? Framework)[] inputs)
+    private static IReadOnlyList<ArchitectureViolation> Check(RulePack pack, params (CSharpCompilation Compilation, string? Framework)[] inputs) =>
+        Check(pack, [.. inputs.Select(i => new AnalyzedProject(i.Compilation.AssemblyName ?? string.Empty, i.Framework, i.Compilation))]);
+
+    private static IReadOnlyList<ArchitectureViolation> Check(RulePack pack, IReadOnlyList<AnalyzedProject> projects)
     {
-        var projects = inputs
-            .Select(i => new AnalyzedProject(i.Compilation.AssemblyName ?? string.Empty, i.Framework, i.Compilation))
-            .ToList();
         var graphs = projects
             .Select(p => TypeGraphBuilder.Build(p.Compilation, new HashSet<SyntaxTree>(), CancellationToken.None))
             .ToList();
