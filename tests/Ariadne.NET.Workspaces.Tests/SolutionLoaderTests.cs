@@ -425,17 +425,66 @@ public sealed class SolutionLoaderTests : IDisposable
     }
 
     [Fact]
-    public async Task FailureAboutAProjectThatDoesNotCompile_IsTheError()
+    public async Task FailureAboutAProjectThatDoesNotCompile_FollowsTheCompileError()
     {
         using var workspace = new AdhocWorkspace();
         var file = Path.Combine(_dir, "Broken", "Broken.csproj");
         AddProject(workspace, "Broken", LanguageNames.CSharp, "namespace Broken; public class A : Missing { }", file);
+        string[] failures = [$"Msbuild failed when processing the file '{file}' with message: only a warning"];
+
+        var result = await SolutionLoader.FromSolutionAsync(workspace.CurrentSolution, _dir, failures, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().StartWith("Project 'Broken' has 1 compile error");
+        var lines = result.Error.Detail!.Split('\n');
+        lines[0].Should().Contain("CS0246");
+        lines[^1].Should().Be(failures[0]);
+    }
+
+    [Fact]
+    public async Task FailureAboutAProjectNotInTheWorkspace_FailsTheLoad()
+    {
+        using var workspace = new AdhocWorkspace();
+        AddProject(workspace, "Fine", LanguageNames.CSharp, "namespace Fine; public class A { }", Path.Combine(_dir, "Fine", "Fine.csproj"));
+        string[] failures = [$"Msbuild failed when processing the file '{Path.Combine(_dir, "Ref", "Ref.csproj")}' with message: no project"];
+
+        var result = await SolutionLoader.FromSolutionAsync(workspace.CurrentSolution, _dir, failures, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Be("Project 'Ref' did not load.");
+        result.Error.Detail.Should().Be(failures[0]);
+    }
+
+    [Fact]
+    public async Task FailureAboutACompilingProjectWithAnApostropheInItsPath_DoesNotFailTheLoad()
+    {
+        using var workspace = new AdhocWorkspace();
+        var file = Path.Combine(_dir, "O'Brien", "Fine.csproj");
+        AddProject(workspace, "Fine", LanguageNames.CSharp, "namespace Fine; public class A { }", file);
+        string[] failures = [$"Msbuild failed when processing the file '{file}' with message: only a warning"];
+
+        var result = await SolutionLoader.FromSolutionAsync(workspace.CurrentSolution, _dir, failures, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.ToString() : null);
+        result.Value.Projects.Select(p => p.Name).Should().Equal("Fine");
+    }
+
+    [Fact]
+    public async Task FailureAboutAProjectWithoutReferences_IsTheError()
+    {
+        // A design-time build that stops early leaves the project without compiler arguments, so without references.
+        using var workspace = new AdhocWorkspace();
+        var file = Path.Combine(_dir, "Stopped", "Stopped.csproj");
+        var info = ProjectInfo.Create(
+            ProjectId.CreateNewId(), VersionStamp.Default, "Stopped", "Stopped", LanguageNames.CSharp, filePath: file,
+            compilationOptions: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        workspace.AddDocument(workspace.AddProject(info).Id, "A.cs", SourceText.From("namespace Stopped; public class A { }"));
         string[] failures = [$"Msbuild failed when processing the file '{file}' with message: a real error"];
 
         var result = await SolutionLoader.FromSolutionAsync(workspace.CurrentSolution, _dir, failures, CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Be("Project 'Broken' did not load.");
+        result.Error.Message.Should().Be("Project 'Stopped' did not load.");
         result.Error.Detail.Should().Be(failures[0]);
     }
 
