@@ -283,7 +283,7 @@ With `Shop.(**).Core.**`, the namespace `Shop.Orders.Core.Models` is in slice `O
 
 **Exceptions** exempt the source type, as in `forbid`: an excepted type keeps its slice and still counts as a target of other slices.
 
-**Across projects.** Slices are not bound to a project. The edges of all projects of the run are combined, so a cycle `Orders` to `Billing` to `Orders` is found even when three projects each hold one edge. A project built for several target frameworks is checked once per framework, together with the projects that name none, and a violation found in several frameworks is reported once with its `TargetFrameworks`.
+**Across projects.** Slices are not bound to a project. The edges of all projects of the run are combined, so a cycle `Orders` to `Billing` to `Orders` is found even when three projects each hold one edge. A project built for several target frameworks is checked once per framework, together with the projects that name none and, for a project that lacks that framework, the variant its build compiles against. So a cycle is found when its edges sit in compatible frameworks, such as a `net9.0` project and the `net8.0` variant of a dependency it uses. A violation found in several frameworks is reported once with its `TargetFrameworks`: the frameworks whose scope found it, which can be those of the consuming project rather than the source project.
 
 | Kind | Reported for | Message |
 |------|--------------|---------|

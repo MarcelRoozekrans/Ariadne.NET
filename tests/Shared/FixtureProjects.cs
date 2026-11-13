@@ -29,6 +29,7 @@ internal static class FixtureProjects
         "packages/clean/Packages.slnx",
         "packages/broken/Packages.slnx",
         "modular/Modular.slnx",
+        "crossframework/CrossFramework.slnx",
     ];
 
     /// <summary>

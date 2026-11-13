@@ -246,8 +246,8 @@ public class SliceRulesTests
         var memberEdgesOnly = new TypeGraph([], graph.MemberEdges, graph.SourceTypes, graph.SourceTypeLocations);
         var pack = PackWith(Independent([ShopModules]));
 
-        SliceRules.Check(new LayerMap(pack), pack, [(graph, null)]).Should().ContainSingle();
-        SliceRules.Check(new LayerMap(pack), pack, [(memberEdgesOnly, null)]).Should().BeEmpty();
+        SliceRules.Check(new LayerMap(pack), pack, [new ScopedGraph(graph, null, "Shop", [])]).Should().ContainSingle();
+        SliceRules.Check(new LayerMap(pack), pack, [new ScopedGraph(memberEdgesOnly, null, "Shop", [])]).Should().BeEmpty();
     }
 
     [Fact]
@@ -287,14 +287,39 @@ public class SliceRulesTests
         ((int)ViolationKind.SliceDependency).Should().Be(15);
     }
 
+    [Fact]
+    public void Independent_edge_in_a_referenced_variant_counts_in_the_consumer_scope()
+    {
+        var orders = Named("Orders.Core", "namespace Shop.Orders { public class Order { } }");
+        var billing8 = Named("Billing", "namespace Shop.Billing { public class Invoice { public Shop.Orders.Order? O; } }", orders);
+        var infra10 = Named(
+            "Orders.Infrastructure",
+            "namespace Shop.Orders.Infrastructure { public class Repo { public Shop.Billing.Invoice? I; } }",
+            billing8,
+            orders);
+
+        var violations = Check(PackWith(Independent([ShopModules])), (orders, null), (billing8, "net8.0"), (infra10, "net10.0"));
+
+        violations.Should().HaveCount(2);
+        violations.Single(v => string.Equals(v.SourceType, "Shop.Billing.Invoice", StringComparison.Ordinal)).TargetFrameworks.Should().BeEmpty();
+        violations.Single(v => string.Equals(v.SourceType, "Shop.Orders.Infrastructure.Repo", StringComparison.Ordinal)).TargetFrameworks.Should().Equal("net10.0");
+    }
+
     private static IReadOnlyList<ArchitectureViolation> Check(RulePack pack, string source) =>
         Check(pack, (TestCompilation.Create(source), null));
 
     private static IReadOnlyList<ArchitectureViolation> Check(RulePack pack, params (CSharpCompilation Compilation, string? Framework)[] inputs)
     {
-        var graphs = inputs
-            .Select(i => (TypeGraphBuilder.Build(i.Compilation, new HashSet<SyntaxTree>(), CancellationToken.None), i.Framework))
+        var projects = inputs
+            .Select(i => new AnalyzedProject(i.Compilation.AssemblyName ?? string.Empty, i.Framework, i.Compilation))
             .ToList();
-        return SliceRules.Check(new LayerMap(pack), pack, graphs);
+        var graphs = projects
+            .Select(p => TypeGraphBuilder.Build(p.Compilation, new HashSet<SyntaxTree>(), CancellationToken.None))
+            .ToList();
+        return SliceRules.Check(new LayerMap(pack), pack, ScopedGraph.Of(projects, graphs));
     }
+
+    private static CSharpCompilation Named(string assembly, string source, params CSharpCompilation[] references) =>
+        TestCompilation.Create([.. references.Select(r => (MetadataReference)r.ToMetadataReference())], (assembly + ".cs", source))
+            .WithAssemblyName(assembly);
 }

@@ -61,12 +61,14 @@ public sealed class ArchitectureValidator : IArchitectureValidator
 
         // Name collisions span projects, and a type seen in several target frameworks counts once, so they are found
         // once over all graphs and not merged per project.
-        var nameCollisions = UniqueNameRules.Check(layers, resolvedPack, GraphsOf(entries));
+        var graphs = GraphsOf(entries);
+        var nameCollisions = UniqueNameRules.Check(layers, resolvedPack, graphs);
 
-        // Slices span projects too, and their edges are checked per target framework scope, so they need each graph's framework.
-        var sliceViolations = SliceRules.Check(layers, resolvedPack, FrameworkGraphsOf(entries));
+        // Slices span projects too, and their edges are checked per target framework scope, so they need each graph's framework,
+        // project and referenced graphs.
+        var sliceViolations = SliceRules.Check(layers, resolvedPack, ScopedGraph.Of(projects, graphs));
 
-        var vacuity = VacuityRules.Check(resolvedPack, layers, GraphsOf(entries), MatchesOf(entries), projects);
+        var vacuity = VacuityRules.Check(resolvedPack, layers, graphs, MatchesOf(entries), projects);
 
         var ordered = GroupByProject(entries);
         var allViolations = new List<ArchitectureViolation>();
@@ -111,17 +113,6 @@ public sealed class ArchitectureValidator : IArchitectureValidator
         foreach (ref readonly var entry in CollectionsMarshal.AsSpan(entries))
         {
             graphs.Add(entry.Graph);
-        }
-
-        return graphs;
-    }
-
-    private static List<(TypeGraph Graph, string? TargetFramework)> FrameworkGraphsOf(List<Entry> entries)
-    {
-        var graphs = new List<(TypeGraph Graph, string? TargetFramework)>(entries.Count);
-        foreach (ref readonly var entry in CollectionsMarshal.AsSpan(entries))
-        {
-            graphs.Add((entry.Graph, entry.Project.TargetFramework));
         }
 
         return graphs;

@@ -133,7 +133,7 @@ ArchitectureReport
   └── TypesChecked: int
 ```
 
-A missing interface has no location, because no single reference caused it. A `LayerOverlap` on a metadata type has none either. `TargetFrameworks` is empty when the violation occurs in every target framework of the project, and otherwise lists the ones it occurs in.
+A missing interface has no location, because no single reference caused it. A `LayerOverlap` on a metadata type has none either. `TargetFrameworks` is empty when the violation occurs in every target framework of the project, and otherwise lists the ones it occurs in. A slices violation spans projects, so its `TargetFrameworks` name the builds whose framework scope found it, and are empty when every scope did. These can be the frameworks of a project that compiles against the source type's project, rather than the source project's own.
 
 The CLI prints a report like this:
 

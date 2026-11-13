@@ -30,6 +30,9 @@ public sealed record ArchitectureViolation
     /// <summary>How many references were merged into this violation.</summary>
     public int ReferenceCount { get; init; } = 1;
 
-    /// <summary>The target frameworks the violation was found in.</summary>
+    /// <summary>
+    /// The target frameworks the violation was found in, empty when it was found in all of them. For a slices violation they are
+    /// the framework scopes, the builds, that found it, which can be a consuming project's frameworks rather than the source type's.
+    /// </summary>
     public IReadOnlyList<string> TargetFrameworks { get; init; } = [];
 }
