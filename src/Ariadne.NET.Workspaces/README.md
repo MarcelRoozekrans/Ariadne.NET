@@ -39,6 +39,6 @@ Projects that are not C#, such as `.fsproj`, `.vbproj`, `.dcproj` and `.shproj`,
 
 ## When a load fails
 
-A load is complete or it is an error. It fails on a workspace failure, on a compile error (the error lists the first 5), on a `System.Object` that does not resolve, and on a source file that a project lists and that is missing on disk. Warnings do not fail it.
+A load is complete or it is an error. It fails on a compile error (the error lists the first 5), on a `System.Object` that does not resolve, on a source file that a project lists and that is missing on disk, and on a project that is not in the workspace. MSBuildWorkspace reports MSBuild warnings as failures too, so a workspace failure fails the load only when it names no project, names a project the workspace does not hold, names a project left without references or documents, or names a project that does not compile. In the last case the error is the compile error, with the workspace failures after it; in the others it is the workspace failures. A project with workspace failures that compiles is checked. Warnings do not fail it.
 
 See the [documentation site](https://marcelroozekrans.github.io/Ariadne.NET/) for what counts as a dependency and for the rules the validator applies.

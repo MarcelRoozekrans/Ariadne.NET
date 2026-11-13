@@ -46,12 +46,21 @@ public sealed partial class SolutionLoader : ISolutionLoader
     internal static Task<Result<LoadedSolution, AriadneError>> FromSolutionAsync(
         Solution solution,
         string rootDirectory,
+        CancellationToken cancellationToken) =>
+        FromSolutionAsync(solution, rootDirectory, failures: [], cancellationToken);
+
+    /// <summary>As <see cref="FromSolutionAsync(Solution, string, CancellationToken)"/>, with the workspace failures a load reported.</summary>
+    internal static Task<Result<LoadedSolution, AriadneError>> FromSolutionAsync(
+        Solution solution,
+        string rootDirectory,
+        IReadOnlyList<string> failures,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(solution);
         ArgumentNullException.ThrowIfNull(rootDirectory);
+        ArgumentNullException.ThrowIfNull(failures);
 
-        return BuildAsync(solution, rootDirectory, named: null, failures: [], owner: null, cancellationToken);
+        return BuildAsync(solution, rootDirectory, named: null, failures, owner: null, cancellationToken);
     }
 
     // The first method that touches MSBuildWorkspace; kept out of line so the JIT loads no MSBuild type before the locator registers.
@@ -118,8 +127,11 @@ public sealed partial class SolutionLoader : ISolutionLoader
     // The steps shared by a real load and the AdhocWorkspace seam:
     // 1. pick the named projects the workspace loaded;
     // 2. skip named project files it did not load because they are not C#, such as .dcproj or .shproj, with their failures;
-    // 3. fail on any other workspace failure, then on a named .csproj that did not load;
+    // 3. fail on a workspace failure about no project, then on a named .csproj that did not load;
     // 4. skip the loaded non-C# projects, then compile each C# project and fail on what makes it uncheckable.
+    // MSBuildWorkspace reports an MSBuild warning as a Failure too, so a failure about a project only fails the load when that
+    // project is not in the workspace, named or referenced, was left without references or documents, or does not compile. The first two fail with the project's workspace failures; a project that does not compile fails with its compile
+    // error, followed by its workspace failures. A project that compiles is checked whatever its failures said (#117).
     // Restore is detected from each compilation, after the failures, so a malformed project file is not reported as unrestored.
     private static async Task<Result<LoadedSolution, AriadneError>> BuildAsync(
         Solution solution,
@@ -132,19 +144,29 @@ public sealed partial class SolutionLoader : ISolutionLoader
         var selected = SelectNamed(solution, named);
         var (unloadedCSharp, unloadedOther) = Unloaded(selected, named);
 
-        var remaining = WithoutFailuresOf(failures, unloadedOther);
-        if (remaining.Count > 0)
+        var (byProject, general) = BySubject(WithoutFailuresOf(failures, unloadedOther));
+        if (general.Count > 0)
         {
-            return Failure(LoadFailure(remaining));
+            return Failure(LoadFailure(general));
         }
 
         if (unloadedCSharp.Count > 0)
         {
             var path = unloadedCSharp[0];
+            if (byProject.TryGetValue(NamedProjects.Normalize(path), out var failed))
+            {
+                return Failure(LoadFailure(failed));
+            }
+
             return Failure(
                 AriadneErrorCode.Invalid,
                 $"Project '{Path.GetFileNameWithoutExtension(path)}' did not load.",
                 $"{ProjectCompiler.Relative(rootDirectory, path)}: the workspace has no project for this file");
+        }
+
+        if (FailuresOfMissingProjects(solution, byProject) is { Count: > 0 } missing)
+        {
+            return Failure(LoadFailure(missing));
         }
 
         var (csharp, skipped) = Partition(selected, unloadedOther);
@@ -161,19 +183,47 @@ public sealed partial class SolutionLoader : ISolutionLoader
             return Failure(duplicate);
         }
 
+        var analyzed = await CompileAsync(csharp, rootDirectory, byProject, cancellationToken).ConfigureAwait(false);
+        if (analyzed.IsFailure)
+        {
+            return Failure(analyzed.Error);
+        }
+
+        return Result<LoadedSolution, AriadneError>.Success(new LoadedSolution(rootDirectory, analyzed.Value, skipped, owner));
+    }
+
+    // Compiles each C# project. A project with workspace failures and no references or no documents did not load: its evaluation
+    // failed, which leaves an empty project, or its design-time build stopped before the compiler arguments. Its failures are the
+    // error. Otherwise a compile error is the error, with the project's failures after it.
+    private static async Task<Result<List<AnalyzedProject>, AriadneError>> CompileAsync(
+        List<Project> csharp,
+        string rootDirectory,
+        Dictionary<string, List<string>> byProject,
+        CancellationToken cancellationToken)
+    {
         var analyzed = new List<AnalyzedProject>(csharp.Count);
         for (var i = 0; i < csharp.Count; i++)
         {
+            var failed = csharp[i].FilePath is { Length: > 0 } filePath
+                && byProject.TryGetValue(NamedProjects.Normalize(filePath), out var list)
+                ? list
+                : null;
+            if (failed is not null && (csharp[i].MetadataReferences.Count == 0 || csharp[i].DocumentIds.Count == 0))
+            {
+                return Result<List<AnalyzedProject>, AriadneError>.Failure(LoadFailure(failed));
+            }
+
             var compiled = await ProjectCompiler.CompileAsync(csharp[i], rootDirectory, cancellationToken).ConfigureAwait(false);
             if (compiled.IsFailure)
             {
-                return Failure(compiled.Error);
+                return Result<List<AnalyzedProject>, AriadneError>.Failure(
+                    failed is null ? compiled.Error : WithWorkspaceFailures(compiled.Error, failed));
             }
 
             analyzed.Add(compiled.Value);
         }
 
-        return Result<LoadedSolution, AriadneError>.Success(new LoadedSolution(rootDirectory, analyzed, skipped, owner));
+        return Result<List<AnalyzedProject>, AriadneError>.Success(analyzed);
     }
 
     // The workspace also holds the projects a named project references; they compile as references only. Null names every project.
@@ -245,10 +295,76 @@ public sealed partial class SolutionLoader : ISolutionLoader
         return remaining;
     }
 
-    // The first quoted, rooted path in a workspace diagnostic, which may contain spaces.
+    /// <summary>
+    /// Splits workspace failures into those about a project file, keyed by its normalized path, and the rest. The project is the
+    /// subject path of the message when it ends in <c>proj</c>.
+    /// </summary>
+    internal static (Dictionary<string, List<string>> ByProject, List<string> General) BySubject(IReadOnlyList<string> failures)
+    {
+        var byProject = new Dictionary<string, List<string>>(NamedProjects.PathComparer);
+        var general = new List<string>();
+        foreach (var failure in failures)
+        {
+            if (SubjectPath(failure) is { } subject && Path.GetExtension(subject).EndsWith("proj", StringComparison.OrdinalIgnoreCase))
+            {
+                var key = NamedProjects.Normalize(subject);
+                if (!byProject.TryGetValue(key, out var list))
+                {
+                    byProject.Add(key, list = []);
+                }
+
+                list.Add(failure);
+            }
+            else
+            {
+                general.Add(failure);
+            }
+        }
+
+        return (byProject, general);
+    }
+
+    // A compile error keeps its message; the project's workspace failures follow its detail, since they may say why it is incomplete.
+    private static AriadneError WithWorkspaceFailures(AriadneError error, List<string> failures)
+    {
+        var listed = string.Join('\n', failures);
+        return error with { Detail = error.Detail is { Length: > 0 } detail ? $"{detail}\n{listed}" : listed };
+    }
+
+    // The failures about project files the workspace holds no project for, such as a referenced project that did not load.
+    private static List<string> FailuresOfMissingProjects(Solution solution, Dictionary<string, List<string>> byProject)
+    {
+        var loaded = new HashSet<string>(NamedProjects.PathComparer);
+        foreach (var project in solution.Projects)
+        {
+            if (project.FilePath is { Length: > 0 } filePath)
+            {
+                loaded.Add(NamedProjects.Normalize(filePath));
+            }
+        }
+
+        var missing = new List<string>();
+        foreach (var (path, failed) in byProject)
+        {
+            if (!loaded.Contains(path))
+            {
+                missing.AddRange(failed);
+            }
+        }
+
+        return missing;
+    }
+
+    // The first quoted, rooted path in a workspace diagnostic, which may contain spaces and apostrophes. A quoted path that ends in a
+    // project extension is taken whole, so an apostrophe inside it does not cut it short; otherwise the first quoted text is used.
     private static string? SubjectPath(string message)
     {
-        var match = QuotedText().Match(message);
+        var match = QuotedProjectPath().Match(message);
+        if (!match.Success)
+        {
+            match = QuotedText().Match(message);
+        }
+
         return match.Success && Path.IsPathRooted(match.Groups["path"].Value) ? match.Groups["path"].Value : null;
     }
 
@@ -347,6 +463,9 @@ public sealed partial class SolutionLoader : ISolutionLoader
 
     [GeneratedRegex("'(?<path>[^']+)'", RegexOptions.ExplicitCapture, matchTimeoutMilliseconds: 1000)]
     private static partial Regex QuotedText();
+
+    [GeneratedRegex(@"'(?<path>[^\r\n]+?\.[A-Za-z]*proj)'", RegexOptions.ExplicitCapture, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex QuotedProjectPath();
 
     private static Result<LoadedSolution, AriadneError> Failure(AriadneError error) =>
         Result<LoadedSolution, AriadneError>.Failure(error);
