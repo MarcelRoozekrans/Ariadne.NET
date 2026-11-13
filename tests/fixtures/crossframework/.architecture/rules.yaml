@@ -1,0 +1,9 @@
+schema: 2
+name: crossframework
+
+rules:
+  - id: CF-ACYCLIC
+    because: Slices form a hierarchy.
+    slices:
+      matching: ["Cross.(*).**"]
+      freeOfCycles: true
