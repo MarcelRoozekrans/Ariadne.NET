@@ -46,12 +46,21 @@ public sealed partial class SolutionLoader : ISolutionLoader
     internal static Task<Result<LoadedSolution, AriadneError>> FromSolutionAsync(
         Solution solution,
         string rootDirectory,
+        CancellationToken cancellationToken) =>
+        FromSolutionAsync(solution, rootDirectory, failures: [], cancellationToken);
+
+    /// <summary>As <see cref="FromSolutionAsync(Solution, string, CancellationToken)"/>, with the workspace failures a load reported.</summary>
+    internal static Task<Result<LoadedSolution, AriadneError>> FromSolutionAsync(
+        Solution solution,
+        string rootDirectory,
+        IReadOnlyList<string> failures,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(solution);
         ArgumentNullException.ThrowIfNull(rootDirectory);
+        ArgumentNullException.ThrowIfNull(failures);
 
-        return BuildAsync(solution, rootDirectory, named: null, failures: [], owner: null, cancellationToken);
+        return BuildAsync(solution, rootDirectory, named: null, failures, owner: null, cancellationToken);
     }
 
     // The first method that touches MSBuildWorkspace; kept out of line so the JIT loads no MSBuild type before the locator registers.

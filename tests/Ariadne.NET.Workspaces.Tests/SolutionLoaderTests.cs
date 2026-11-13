@@ -411,6 +411,49 @@ public sealed class SolutionLoaderTests : IDisposable
     }
 
     [Fact]
+    public async Task FailureAboutACompilingProject_DoesNotFailTheLoad()
+    {
+        using var workspace = new AdhocWorkspace();
+        var file = Path.Combine(_dir, "Fine", "Fine.csproj");
+        AddProject(workspace, "Fine", LanguageNames.CSharp, "namespace Fine; public class A { }", file);
+        string[] failures = [$"Msbuild failed when processing the file '{file}' with message: only a warning"];
+
+        var result = await SolutionLoader.FromSolutionAsync(workspace.CurrentSolution, _dir, failures, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.ToString() : null);
+        result.Value.Projects.Select(p => p.Name).Should().Equal("Fine");
+    }
+
+    [Fact]
+    public async Task FailureAboutAProjectThatDoesNotCompile_IsTheError()
+    {
+        using var workspace = new AdhocWorkspace();
+        var file = Path.Combine(_dir, "Broken", "Broken.csproj");
+        AddProject(workspace, "Broken", LanguageNames.CSharp, "namespace Broken; public class A : Missing { }", file);
+        string[] failures = [$"Msbuild failed when processing the file '{file}' with message: a real error"];
+
+        var result = await SolutionLoader.FromSolutionAsync(workspace.CurrentSolution, _dir, failures, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Be("Project 'Broken' did not load.");
+        result.Error.Detail.Should().Be(failures[0]);
+    }
+
+    [Fact]
+    public async Task FailureThatNamesNoProject_FailsTheLoad()
+    {
+        using var workspace = new AdhocWorkspace();
+        AddProject(workspace, "Fine", LanguageNames.CSharp, "namespace Fine; public class A { }", Path.Combine(_dir, "Fine", "Fine.csproj"));
+        string[] failures = ["The solution file could not be read completely."];
+
+        var result = await SolutionLoader.FromSolutionAsync(workspace.CurrentSolution, _dir, failures, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Be("The solution did not load completely.");
+        result.Error.Detail.Should().Be(failures[0]);
+    }
+
+    [Fact]
     public async Task ExplicitCompileItemForMissingFile_IsInvalid()
     {
         var project = await CreatePlainProjectAsync("Gone", """<ItemGroup><Compile Include="Gone.cs" /></ItemGroup>""");
