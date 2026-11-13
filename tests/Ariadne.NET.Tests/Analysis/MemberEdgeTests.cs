@@ -659,8 +659,6 @@ public class MemberEdgeTests
     public void Filter_ComparesTheMemberSegment(string pattern, string memberName, bool expected) =>
         MemberNameFilter.From(PackWith(pattern)).CouldMatch(memberName).Should().Be(expected);
 
-    // Interim: measures with GC.GetAllocatedBytesForCurrentThread, see ZeroAlloc-Net/ZeroAlloc.TestHelpers#106;
-    // AllocationGate is not referenced in this repo yet.
     [Fact]
     public void Filter_CouldMatch_AllocatesNothing()
     {
@@ -673,16 +671,13 @@ public class MemberEdgeTests
         empty.CouldMatch(MemberNames.ConstructorName).Should().BeFalse();
         empty.CouldMatchIndexer.Should().BeFalse();
 
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < 1_000; i++)
+        Allocations.PerRound(() =>
         {
             empty.CouldMatch("ExecuteReader");
             _ = empty.CouldMatchIndexer;
             filter.CouldMatch("ExecuteReader");
             filter.CouldMatch("Text");
-        }
-
-        (GC.GetAllocatedBytesForCurrentThread() - before).Should().Be(0);
+        }).Should().Be(0);
     }
 
     private const string UsesEverything = """

@@ -78,8 +78,6 @@ public class LayerMapTests
         ((Action)(() => map.LayersOf(null!))).Should().Throw<ArgumentNullException>();
     }
 
-    // Interim: measures with GC.GetAllocatedBytesForCurrentThread, see ZeroAlloc-Net/ZeroAlloc.TestHelpers#106;
-    // AllocationGate is not referenced in this repo yet.
     [Fact]
     public void LayerOf_CachedSymbol_AllocatesNothing()
     {
@@ -89,13 +87,10 @@ public class LayerMapTests
         map.LayerOf(type).Should().Be("Domain");
         map.LayersOf(type);
 
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < 1_000; i++)
+        Allocations.PerRound(() =>
         {
             map.LayerOf(type);
             map.LayersOf(type);
-        }
-
-        (GC.GetAllocatedBytesForCurrentThread() - before).Should().Be(0);
+        }).Should().Be(0);
     }
 }

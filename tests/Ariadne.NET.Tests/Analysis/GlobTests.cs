@@ -78,21 +78,16 @@ public class GlobTests
         glob.IsMatch(name + ".X").Should().BeTrue();
     }
 
-    // Interim: measures with GC.GetAllocatedBytesForCurrentThread, see ZeroAlloc-Net/ZeroAlloc.TestHelpers#106;
-    // AllocationGate is not referenced in this repo yet.
     [Fact]
     public void IsMatch_AllocatesNothing()
     {
         var glob = Glob.Dotted("**.Domain.**").Value;
         glob.IsMatch("Shop.Domain.Orders").Should().BeTrue();
 
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < 1_000; i++)
+        Allocations.PerRound(() =>
         {
             glob.IsMatch("Shop.Domain.Orders");
-        }
-
-        (GC.GetAllocatedBytesForCurrentThread() - before).Should().Be(0);
+        }).Should().Be(0);
     }
 
     [Fact]
@@ -101,13 +96,10 @@ public class GlobTests
         var glob = Glob.Flat("Rag.NET*").Value;
         glob.IsMatch("Rag.NET.Abstractions").Should().BeTrue();
 
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < 1_000; i++)
+        Allocations.PerRound(() =>
         {
             glob.IsMatch("Rag.NET.Abstractions");
-        }
-
-        (GC.GetAllocatedBytesForCurrentThread() - before).Should().Be(0);
+        }).Should().Be(0);
     }
 
     [Theory]
