@@ -1,0 +1,14 @@
+schema: 2
+name: x
+layers:
+  - name: Domain
+    id: X-L-DOMAIN
+    because: core
+    namespaces: ["**.Domain.**"]
+rules:
+  - id: X-R1
+    because: b
+    requireTarget: true
+    require:
+      for: { layers: [Domain] }
+      kind: Class

@@ -624,6 +624,10 @@
           "type": "boolean",
           "description": "Accept a rule whose subject selects no type."
         },
+        "requireTarget": {
+          "type": "boolean",
+          "description": "Fail the run when the rule's target matches no type declared or referenced in the solution. true is allowed on forbid, allowOnly and uniqueNames rules only."
+        },
         "forbid": {
           "$ref": "#/$defs/kindBody"
         },
@@ -676,6 +680,37 @@
         }
       ],
       "allOf": [
+        {
+          "if": {
+            "properties": {
+              "requireTarget": {
+                "const": true
+              }
+            },
+            "required": [
+              "requireTarget"
+            ]
+          },
+          "then": {
+            "anyOf": [
+              {
+                "required": [
+                  "forbid"
+                ]
+              },
+              {
+                "required": [
+                  "allowOnly"
+                ]
+              },
+              {
+                "required": [
+                  "uniqueNames"
+                ]
+              }
+            ]
+          }
+        },
         {
           "if": {
             "required": [

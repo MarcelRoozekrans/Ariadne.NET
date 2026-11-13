@@ -34,7 +34,7 @@ internal static class PackYamlReader
     private static readonly string[] RetargetKeys = ["name", "namespaces", "assemblies"];
 
     private static readonly string[] RuleKeys =
-        ["id", "because", "description", "forbid", "allowOnly", "require", "bannedPackages", "uniqueNames", "slices", "exceptions", "locked", "allowEmpty"];
+        ["id", "because", "description", "forbid", "allowOnly", "require", "bannedPackages", "uniqueNames", "slices", "exceptions", "locked", "allowEmpty", "requireTarget"];
 
     private static readonly string[] AmendmentKeys = ["id", "exceptions"];
 
@@ -432,10 +432,10 @@ internal static class PackYamlReader
 
             var because = RequiredString(fields, "because", where, map);
             var description = OptionalString(fields, "description", where);
-            var locked = OptionalBool(fields, "locked", where);
-            var allowEmpty = OptionalBool(fields, "allowEmpty", where);
+            var (locked, allowEmpty, requireTarget) = ReadRuleFlags(fields, where);
 
             var body = ReadRuleBody(fields, map, where);
+
             _inSlicesRule = false;
             if (_problems.Count == before && id is not null && because is not null && body is { } read)
             {
@@ -452,10 +452,27 @@ internal static class PackYamlReader
                     Against = read.Against,
                     Slices = read.Slices,
                     Exceptions = exceptions,
-                    Locked = locked ?? false,
-                    AllowEmpty = allowEmpty ?? false,
+                    Locked = locked,
+                    AllowEmpty = allowEmpty,
+                    RequireTarget = requireTarget,
                 });
             }
+        }
+
+        // The kind check for requireTarget looks at the body keys, not the read body, so a body with its own problems
+        // still gets this one.
+        private (bool Locked, bool AllowEmpty, bool RequireTarget) ReadRuleFlags(Dictionary<string, Field> fields, string where)
+        {
+            var locked = OptionalBool(fields, "locked", where);
+            var allowEmpty = OptionalBool(fields, "allowEmpty", where);
+            var requireTarget = OptionalBool(fields, "requireTarget", where);
+            if (requireTarget == true
+                && (fields.ContainsKey("require") || fields.ContainsKey("bannedPackages") || fields.ContainsKey("slices")))
+            {
+                Add(fields["requireTarget"].Key, "'requireTarget' applies only to forbid, allowOnly and uniqueNames rules");
+            }
+
+            return (locked ?? false, allowEmpty ?? false, requireTarget ?? false);
         }
 
         // The kind whose exception keys apply; forbid, allowOnly and require share them.

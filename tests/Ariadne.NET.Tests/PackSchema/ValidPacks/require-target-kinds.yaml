@@ -1,0 +1,32 @@
+schema: 2
+name: x
+layers:
+  - name: Domain
+    id: X-L-DOMAIN
+    because: core
+    namespaces: ["**.Domain.**"]
+rules:
+  - id: X-R1
+    because: One seam to the runner.
+    requireTarget: true
+    allowOnly:
+      from: { layers: [Domain] }
+      to: { types: ["Lib.ISubagentRunner"] }
+  - id: X-R2
+    because: Domain stays off the data stack.
+    requireTarget: true
+    forbid:
+      from: { layers: [Domain] }
+      to: { namespaces: ["System.Data.**"] }
+  - id: X-R3
+    because: Domain names stay distinct from Lib names.
+    requireTarget: true
+    uniqueNames:
+      for: { layers: [Domain] }
+      against: { namespaces: ["Lib.**"] }
+  - id: X-R4
+    because: requireTarget false is accepted on any kind.
+    requireTarget: false
+    require:
+      for: { layers: [Domain] }
+      kind: Class

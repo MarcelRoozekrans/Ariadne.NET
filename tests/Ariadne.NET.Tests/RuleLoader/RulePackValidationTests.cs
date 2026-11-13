@@ -354,4 +354,111 @@ public class RulePackValidationTests
         result.Error.Detail.Should().Be(
             "rule pack YAML:6:5: typeKind '99' in role 'Command' must be one of Class, Interface, Record, Struct, RecordStruct");
     }
+
+    [Theory]
+    [InlineData(RuleKind.Require, false)]
+    [InlineData(RuleKind.BannedPackages, false)]
+    [InlineData(RuleKind.Slices, false)]
+    [InlineData(RuleKind.Forbid, true)]
+    [InlineData(RuleKind.AllowOnly, true)]
+    [InlineData(RuleKind.UniqueNames, true)]
+    public void Validator_allows_requireTarget_only_on_target_kinds(RuleKind kind, bool valid)
+    {
+        var validator = new RuleDefinitionValidator(
+            new TargetSelectorValidator(),
+            new TargetSelectorValidator(),
+            new RuleRequirementValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new TargetSelectorValidator()),
+            new TargetSelectorValidator(),
+            new RuleExceptionValidator(),
+            new SliceDefinitionValidator(new TargetSelectorValidator()));
+        var rule = new RuleDefinition
+        {
+            Id = "R",
+            Because = "b",
+            Kind = kind,
+            From = new TargetSelector(),
+            Slices = kind == RuleKind.Slices ? new SliceDefinition { Matching = ["Shop.(*)"], FreeOfCycles = true } : null,
+            RequireTarget = true,
+        };
+
+        var result = validator.Validate(rule);
+
+        if (valid)
+        {
+            result.IsValid.Should().BeTrue();
+            return;
+        }
+
+        result.IsValid.Should().BeFalse();
+        var failures = result.Failures.ToArray();
+        failures.Should().ContainSingle().Which.PropertyName.Should().Be(nameof(RuleDefinition.RequireTarget));
+        failures[0].ErrorMessage.Should().Contain("applies only to forbid, allowOnly and uniqueNames rules.");
+    }
+
+    [Fact]
+    public void Validator_accepts_a_rule_without_requireTarget_of_any_kind()
+    {
+        var validator = new RuleDefinitionValidator(
+            new TargetSelectorValidator(),
+            new TargetSelectorValidator(),
+            new RuleRequirementValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new TargetSelectorValidator()),
+            new TargetSelectorValidator(),
+            new RuleExceptionValidator(),
+            new SliceDefinitionValidator(new TargetSelectorValidator()));
+
+        validator.Validate(new RuleDefinition { Id = "R", Because = "b", Kind = RuleKind.Require, From = new TargetSelector() })
+            .IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Merged_rule_keeps_requireTarget()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-require-target-{Guid.NewGuid():N}");
+        var cacheDir = Path.Combine(tempDir, ".architecture", ".cache", "git", "parent");
+        Directory.CreateDirectory(cacheDir);
+        try
+        {
+            File.WriteAllText(Path.Combine(cacheDir, "parent.yaml"), """
+                schema: 2
+                name: parent
+                rules:
+                  - id: P-SEAM
+                    because: Agents reach Thalos through one seam.
+                    allowOnly:
+                      from: { namespaces: ["Shop.Agents.**"] }
+                      to: { types: ["Thalos.ISubagentRunner"] }
+                    requireTarget: true
+                  - id: P-PLAIN
+                    because: The domain stays free of Thalos.
+                    forbid:
+                      from: { namespaces: ["Shop.Domain.**"] }
+                      to: { namespaces: ["Thalos.**"] }
+                    requireTarget: true
+                """);
+            var child = _loader.LoadFromString("""
+                schema: 2
+                name: child
+                extends:
+                  - import://parent
+                rules:
+                  - id: P-SEAM
+                    exceptions:
+                      - types: ["Shop.Agents.Legacy"]
+                        because: Legacy runs its own agents until it is retired.
+                """);
+            child.IsSuccess.Should().BeTrue(child.IsSuccess ? "" : child.Error.Detail);
+
+            var resolved = NewResolver().Resolve(child.Value, tempDir);
+
+            resolved.IsSuccess.Should().BeTrue();
+            resolved.Value.Rules.Should().HaveCount(2);
+            resolved.Value.Rules.Should().OnlyContain(r => r.RequireTarget);
+            resolved.Value.Rules[0].Id.Should().Be("P-SEAM");
+            resolved.Value.Rules[0].Exceptions.Should().ContainSingle();
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
 }

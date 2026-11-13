@@ -1859,6 +1859,74 @@ public class PackYamlReaderTests
             "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'assemblies', 'types', " + TraitNames));
     }
 
+    private const string RequireTargetMessage = "'requireTarget' applies only to forbid, allowOnly and uniqueNames rules";
+
+    [Fact]
+    public void Reads_requireTarget_on_forbid_allowOnly_and_uniqueNames()
+    {
+        var yaml = """
+            schema: 2
+            name: shop
+            rules:
+              - id: R-FORBID
+                because: x
+                forbid:
+                  from: { namespaces: ["Shop.Domain.**"] }
+                  to: { namespaces: ["Thalos.**"] }
+                requireTarget: true
+              - id: R-ALLOWONLY
+                because: x
+                allowOnly:
+                  from: { namespaces: ["Shop.Agents.**"] }
+                  to: { types: ["Thalos.ISubagentRunner"] }
+                requireTarget: true
+              - id: R-UNIQUE
+                because: x
+                uniqueNames:
+                  for: { namespaces: ["Shop.Web.**"] }
+                  against: { namespaces: ["Shop.Application.DTOs.**"] }
+                requireTarget: true
+              - id: R-PLAIN
+                because: x
+                forbid:
+                  from: { namespaces: ["Shop.Domain.**"] }
+                  to: { namespaces: ["Newtonsoft.**"] }
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        result.Value.Rules.Select(r => r.RequireTarget).Should().Equal(true, true, true, false);
+    }
+
+    [Theory]
+    [InlineData("    requireTarget: true\n    require:\n      for: { namespaces: [\"Shop.**\"] }\n      isNot: { types: [\"**\"] }\n")]
+    [InlineData("    requireTarget: true\n    bannedPackages:\n      packages: [FluentValidation]\n")]
+    [InlineData("    requireTarget: true\n    slices:\n      matching: [\"Shop.(*)\"]\n      freeOfCycles: true\n")]
+    public void Rejects_requireTarget_elsewhere(string body)
+    {
+        Problems(RequireHead + body).Should().Equal(new PackProblem(6, 5, RequireTargetMessage));
+    }
+
+    [Fact]
+    public void Rejects_requireTarget_elsewhere_with_the_location_in_the_loader_detail()
+    {
+        var yaml = RequireHead + "    requireTarget: true\n    bannedPackages:\n      packages: [FluentValidation]\n";
+
+        var result = new YamlRulePackLoader().LoadFromString(yaml);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Detail.Should().Be("rule pack YAML:6:5: " + RequireTargetMessage);
+    }
+
+    [Fact]
+    public void Rejects_non_boolean_requireTarget()
+    {
+        var yaml = RequireHead + "    requireTarget: yes\n    forbid:\n      from: { namespaces: [\"Shop.**\"] }\n      to: { namespaces: [\"Lib.**\"] }\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(6, 5, "'requireTarget' in rule 'SH-001' must be true or false"));
+    }
+
     private static IReadOnlyList<PackProblem> Problems(string yaml)
     {
         var result = PackYamlReader.Read(yaml);

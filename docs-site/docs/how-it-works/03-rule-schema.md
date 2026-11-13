@@ -148,7 +148,7 @@ The C# model is `LayerDefinition`:
 
 ## Rules
 
-The `rules:` list holds `forbid`, `allowOnly`, `require`, `bannedPackages`, `uniqueNames` and `slices` rules. Every rule has an `id` and a `because`; the rule types, their fields, examples and limits are on the [Rule Types](rule-types.md) page. Rules that select nothing fail the run; see [Rules that select nothing](rule-types.md#rules-that-select-nothing).
+The `rules:` list holds `forbid`, `allowOnly`, `require`, `bannedPackages`, `uniqueNames` and `slices` rules. Every rule has an `id` and a `because`; the rule types, their fields, examples and limits are on the [Rule Types](rule-types.md) page. Rules that select nothing fail the run; see [Rules that select nothing](rule-types.md#rules-that-select-nothing). A `forbid`, `allowOnly` or `uniqueNames` rule can also set `requireTarget: true`, which fails the run when its target matches no type; see [A target that matches nothing](rule-types.md#a-target-that-matches-nothing).
 
 ## Selectors
 

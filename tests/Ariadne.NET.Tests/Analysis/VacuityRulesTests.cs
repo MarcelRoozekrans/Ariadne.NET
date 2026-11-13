@@ -279,6 +279,182 @@ public class VacuityRulesTests
         ((int)ViolationKind.VacuousLayer).Should().Be(12);
     }
 
+    private const string ToMessage =
+        "Rule 'R' requires its target, but its 'to' selector matches no type declared or referenced in the 2 project(s) loaded.";
+
+    private static readonly CSharpCompilation Library = TestCompilation.Create("""
+        namespace Lib
+        {
+            public interface ISubagentRunner { }
+            public class Api { public void Call() { } public void Other() { } }
+        }
+        """).WithAssemblyName("Lib");
+
+    private static RuleDefinition Target(
+        RuleKind kind, TargetSelector from, TargetSelector target, bool requireTarget = true, bool allowEmpty = false, string id = "R") => new()
+    {
+        Id = id,
+        Because = "Because R.",
+        Kind = kind,
+        From = from,
+        To = kind == RuleKind.UniqueNames ? new TargetSelector() : target,
+        Against = kind == RuleKind.UniqueNames ? target : new TargetSelector(),
+        RequireTarget = requireTarget,
+        AllowEmpty = allowEmpty,
+    };
+
+    private static TargetSelector Types(params string[] types) => new() { Types = types };
+
+    // Domain declares N.Domain.Order; Agents declares N.Agents.Runner and references Lib through the given source.
+    private static IReadOnlyList<ArchitectureViolation> CheckTwoProjects(RulePack pack, string agentsSource)
+    {
+        var domain = TestCompilation.Create("namespace N.Domain { public class Order { } }").WithAssemblyName("Domain");
+        var agents = TestCompilation.Create([Library.ToMetadataReference()], ("Agents.cs", agentsSource)).WithAssemblyName("Agents");
+        CSharpCompilation[] compilations = [domain, agents];
+        // As the validator does, the graphs keep the member uses the pack's members patterns could match.
+        var filter = MemberNameFilter.From(pack);
+        var graphs = compilations.Select(c => TypeGraphBuilder.Build(c, new HashSet<SyntaxTree>(), filter, CancellationToken.None)).ToList();
+        return Run(pack, graphs, [], compilations.Select(c => new AnalyzedProject(c.AssemblyName!, null, c)).ToList());
+    }
+
+    private const string AgentsUsingTheRunner = "namespace N.Agents { public class Runner { public Lib.ISubagentRunner? R; } }";
+
+    [Fact]
+    public void Target_referenced_by_another_project_is_found()
+    {
+        var pack = Pack([], [Target(RuleKind.Forbid, Ns("N.Domain.**"), Types("Lib.ISubagentRunner"))]);
+
+        CheckTwoProjects(pack, AgentsUsingTheRunner).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Renamed_target_is_reported()
+    {
+        var pack = Pack([], [Target(RuleKind.Forbid, Ns("N.Domain.**"), Types("Lib.IRenamedRunner"))]);
+
+        var v = CheckTwoProjects(pack, AgentsUsingTheRunner).Should().ContainSingle().Subject;
+        v.Kind.Should().Be(ViolationKind.VacuousRule);
+        v.RuleId.Should().Be("R");
+        v.SourceType.Should().Be("R");
+        v.Because.Should().Be("Because R.");
+        v.Location.Should().BeNull();
+        v.Target.Should().BeNull();
+        v.Message.Should().Be(ToMessage);
+    }
+
+    [Fact]
+    public void AllowOnly_target_is_checked_the_same_way()
+    {
+        var found = Pack([], [Target(RuleKind.AllowOnly, Ns("N.Agents.**"), Types("Lib.ISubagentRunner"))]);
+        var renamed = Pack([], [Target(RuleKind.AllowOnly, Ns("N.Agents.**"), Types("Lib.IRenamedRunner"))]);
+
+        CheckTwoProjects(found, AgentsUsingTheRunner).Should().BeEmpty();
+        CheckTwoProjects(renamed, AgentsUsingTheRunner).Select(v => v.Message).Should().Equal(ToMessage);
+    }
+
+    [Fact]
+    public void Target_declared_but_unreferenced_is_found()
+    {
+        var pack = Pack([], [Target(RuleKind.Forbid, Ns("N.Domain.**"), Ns("N.Agents.**"))]);
+
+        CheckTwoProjects(pack, "namespace N.Agents { public class Runner { } }").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Member_target_is_found_through_a_member_edge()
+    {
+        var pack = Pack([], [Target(RuleKind.Forbid, Ns("N.Domain.**"), new TargetSelector { Types = ["Lib.Api"], Members = ["Lib.Api.Call"] })]);
+
+        CheckTwoProjects(pack, "namespace N.Agents { public class Runner { public void Go(Lib.Api a) => a.Call(); } }")
+            .Should().BeEmpty();
+        CheckTwoProjects(pack, "namespace N.Agents { public class Runner { public void Go(Lib.Api a) => a.Other(); } }")
+            .Select(v => v.Message).Should().Equal(
+                "Rule 'R' requires its target, but no code in the 2 project(s) loaded uses a member its 'to' selector names.");
+    }
+
+    [Fact]
+    public void UniqueNames_against_is_checked()
+    {
+        const string Message =
+            "Rule 'R' requires its target, but its 'against' selector matches no type declared in the 2 project(s) loaded.";
+        var nothing = Pack([], [Target(RuleKind.UniqueNames, Ns("N.Domain.**"), Ns("Nowhere.**"))]);
+        var onlyReferenced = Pack([], [Target(RuleKind.UniqueNames, Ns("N.Domain.**"), Types("Lib.ISubagentRunner"))]);
+        var declared = Pack([], [Target(RuleKind.UniqueNames, Ns("N.Domain.**"), Ns("N.Agents.**"))]);
+
+        CheckTwoProjects(nothing, AgentsUsingTheRunner).Select(v => v.Message).Should().Equal(Message);
+        CheckTwoProjects(onlyReferenced, AgentsUsingTheRunner).Select(v => v.Message).Should().Equal(Message);
+        CheckTwoProjects(declared, AgentsUsingTheRunner).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AllowEmpty_does_not_excuse_the_target()
+    {
+        var pack = Pack([], [Target(RuleKind.Forbid, Ns("Nowhere.**"), Ns("Gone.**"), allowEmpty: true)]);
+
+        CheckTwoProjects(pack, AgentsUsingTheRunner).Select(v => v.Message).Should().Equal(
+            "Rule 'R' requires its target, but its 'to' selector matches no type declared or referenced in the 2 project(s) loaded.");
+    }
+
+    [Fact]
+    public void Subject_and_target_both_empty()
+    {
+        var pack = Pack([], [Target(RuleKind.Forbid, Ns("Nowhere.**"), Ns("Gone.**"))]);
+
+        var violations = CheckTwoProjects(pack, AgentsUsingTheRunner);
+
+        violations.Select(v => v.Kind).Should().Equal(ViolationKind.VacuousRule, ViolationKind.VacuousRule);
+        violations.Select(v => v.Message).Should().Equal(
+            "Rule 'R' selects no type: its 'from' selector matches nothing in the 2 project(s) loaded.",
+            "Rule 'R' requires its target, but its 'to' selector matches no type declared or referenced in the 2 project(s) loaded.");
+    }
+
+    [Fact]
+    public void Empty_target_without_requireTarget_is_silent()
+    {
+        var pack = Pack([], [Target(RuleKind.Forbid, Ns("N.Domain.**"), Ns("Newtonsoft.**"), requireTarget: false)]);
+
+        CheckTwoProjects(pack, AgentsUsingTheRunner).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Target_naming_only_vacuous_layers_is_skipped()
+    {
+        var pack = Pack([Layer("Empty", "**.Empty.**")], [Target(RuleKind.Forbid, Ns("N.Domain.**"), InLayer("Empty"))]);
+
+        CheckTwoProjects(pack, AgentsUsingTheRunner).Select(v => v.Kind).Should().Equal(ViolationKind.VacuousLayer);
+    }
+
+    [Fact]
+    public void Target_naming_a_non_vacuous_layer_is_found()
+    {
+        var pack = Pack([Layer("Agents", "N.Agents.**")], [Target(RuleKind.Forbid, Ns("N.Domain.**"), InLayer("Agents"))]);
+
+        CheckTwoProjects(pack, AgentsUsingTheRunner).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void UniqueNames_against_members_does_not_use_member_edges()
+    {
+        var members = new TargetSelector { Types = ["Lib.Api"], Members = ["Lib.Api.Call"] };
+        var pack = Pack([], [
+            Target(RuleKind.UniqueNames, Ns("N.Domain.**"), members),
+            Target(RuleKind.Forbid, Ns("N.Domain.**"), members, requireTarget: false, id: "F"),
+        ]);
+
+        CheckTwoProjects(pack, "namespace N.Agents { public class Runner { public void Go(Lib.Api a) => a.Call(); } }")
+            .Select(v => v.Message).Should().Equal(
+                "Rule 'R' requires its target, but its 'against' selector matches no type declared in the 2 project(s) loaded.");
+    }
+
+    [Fact]
+    public void Traits_only_target_is_found_by_a_matching_source_type()
+    {
+        var pack = Pack([], [Target(RuleKind.Forbid, Ns("N.Domain.**"), new TargetSelector { Sealed = true })]);
+
+        CheckTwoProjects(pack, "namespace N.Agents { public sealed class Runner { } }").Should().BeEmpty();
+        CheckTwoProjects(pack, "namespace N.Agents { public class Runner { } }").Select(v => v.Message).Should().Equal(ToMessage);
+    }
+
     private static AnalyzedProject Project(CSharpCompilation compilation) => new("Shop", null, compilation);
 
     private static IReadOnlyList<ArchitectureViolation> Check(RulePack pack, string source) =>

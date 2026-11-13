@@ -24,6 +24,7 @@ A rule is an entry in `rules:`. It has exactly one of `forbid`, `allowOnly`, `re
 | `exceptions` | no | List of selectors, each with a required `because`. A source type that an exception matches is exempt from the rule. On a `bannedPackages` rule an exception takes `assemblies` only, and on a `uniqueNames` rule `namespaces`, `types` and the type traits. |
 | `locked` | no, default `false` | A child pack cannot add exceptions to this rule. |
 | `allowEmpty` | no, default `false` | Accepts that the rule selects no type. See [Rules that select nothing](#rules-that-select-nothing). |
+| `requireTarget` | no, default `false` | On a `forbid`, `allowOnly` or `uniqueNames` rule: fails the run when the rule's target matches no type. See [A target that matches nothing](#a-target-that-matches-nothing). Any other rule kind rejects `true`. |
 
 A **target** is either `layers: [...]` or a [selector](03-rule-schema.md#selectors) made of `namespaces`, `assemblies`, `types`, `baseTypes`, `interfaces`, `attributes` and the [type traits](03-rule-schema.md#type-traits). `layers` may sit next to traits, which keeps the types of those layers that match every trait. Mixing `layers` with the other selector kinds in one target is a load error, and a target must select something.
 
@@ -159,11 +160,11 @@ A rule, a component role or a layer that selects no type cannot fail, so a clean
 | `VacuousRule` | a component role that matches no type in its layer | `Role '<Name>' matches no type in layer '<Layer>' in the <n> project(s) loaded.` |
 | `VacuousLayer` | a layer that covers no type | `Layer '<Name>' covers no type in the <n> project(s) loaded.` |
 
-Only the subject side is checked: the `from` of `forbid`, `allowOnly`, `require` and `uniqueNames` (for the last two, the `for` selector), and the `matching` patterns of `slices`. The `to`, `against` and `members` sides and the `exceptions` are never checked, since a rule about something that does not exist yet is still sound. A `bannedPackages` rule is vacuous only when it has a non-empty `from.assemblies` that matches no loaded project; without `from` it applies to every project. A rule or role whose subject resolves only through layers that are already reported as vacuous gets no second violation, because fixing the layer fixes it.
+Only the subject side is checked: the `from` of `forbid`, `allowOnly`, `require` and `uniqueNames` (for the last two, the `for` selector), and the `matching` patterns of `slices`. The `to`, `against` and `members` sides are not checked unless the rule sets `requireTarget: true` (`forbid`, `allowOnly` and `uniqueNames`; it checks only that target selector, see [a target that matches nothing](#a-target-that-matches-nothing)), and the `exceptions` are never checked, since a rule about something that does not exist yet is still sound. A `bannedPackages` rule is vacuous only when it has a non-empty `from.assemblies` that matches no loaded project; without `from` it applies to every project. A rule or role whose subject resolves only through layers that are already reported as vacuous gets no second violation, because fixing the layer fixes it.
 
 Vacuity is relative to the projects loaded. A run on a single `.csproj` reports as vacuous every layer whose types the loaded projects neither declare nor reference, and the message says how many projects were loaded. A layer in another project still counts as covered when a loaded project references its types. A layer that holds only generated types is vacuous, since generated code is not analyzed. Validate the solution, or mark the rules and roles that belong to other projects.
 
-To accept a rule or role that selects nothing, set `allowEmpty: true` on it. A layer has no opt-out: retarget it in the pack that extends the base pack, so that it covers the types of the solution. The built-in packs set `allowEmpty: true` on every role, because a solution rarely has all of them. The `rules` command and the `get_rules` tool show `allowEmpty` only when it is `true`.
+To accept a rule or role that selects nothing, set `allowEmpty: true` on it. A layer has no opt-out: retarget it in the pack that extends the base pack, so that it covers the types of the solution. The built-in packs set `allowEmpty: true` on every role, because a solution rarely has all of them. The `rules` command and the `get_rules` tool show `allowEmpty` and `requireTarget` only when they are `true`.
 
 ```yaml
 rules:
@@ -174,6 +175,39 @@ rules:
       from: { namespaces: ["Shop.Web.**"] }
       to: { namespaces: ["System.Data.SqlClient"] }
 ```
+
+### A target that matches nothing
+
+A `forbid` of a library that nobody uses is sound, so the target side is not checked by default. When a rule only means something if its target is in use, set `requireTarget: true` on it. A `forbid`, `allowOnly` or `uniqueNames` rule accepts the key; a `require`, `bannedPackages` or `slices` rule rejects `true` with the load error `'requireTarget' applies only to forbid, allowOnly and uniqueNames rules`.
+
+```yaml
+rules:
+  - id: AGENTS-ONE-SEAM
+    because: Subagents run through one seam.
+    requireTarget: true
+    allowOnly:
+      from: { namespaces: ["Agents.Runtime.**"] }
+      to: { types: ["Thalos.ISubagentRunner"] }
+```
+
+The run then looks for the target in every project loaded:
+
+- `to` of a `forbid` or `allowOnly` rule is found when a type it selects is declared or referenced anywhere in the solution. When `to` names `members`, it is found only when some code uses one of those members.
+- `against` of a `uniqueNames` rule is found only by a declared type, because that rule compares declared types.
+
+This proves that the solution uses the target somewhere, not which project does. A project that does not touch the target still passes when another project references it. A target is absent only when the solution neither declares nor references it. A guard on the solution's own types therefore works before anything uses them, since a declared type is found. A library that the solution reaches only transitively is never found, because the analysis sees the types that code writes. In Daedalus, Rag.NET is reached only through an adapter package, so the rule that forbids it does not set the key.
+
+Set `requireTarget` for a seam that the solution uses, such as a single-seam `allowOnly` to `Thalos.ISubagentRunner`, where a rename of the type would silently end the protection. Leave it off for a preventive `forbid` of a library that nobody uses yet.
+
+A missing target is one `VacuousRule` violation without a file or line, with the rule's `id` and `because`:
+
+| Rule | Message |
+|------|---------|
+| `forbid` or `allowOnly` | `Rule '<id>' requires its target, but its 'to' selector matches no type declared or referenced in the <n> project(s) loaded.` |
+| `forbid` or `allowOnly` with `members` in `to` | `Rule '<id>' requires its target, but no code in the <n> project(s) loaded uses a member its 'to' selector names.` |
+| `uniqueNames` | `Rule '<id>' requires its target, but its 'against' selector matches no type declared in the <n> project(s) loaded.` |
+
+`allowEmpty` does not excuse the target, since it is about the subject: a rule with both keys and an empty `from` and `to` reports one violation, for the target. When `to` names only layers that are already reported as `VacuousLayer`, the target is not reported again.
 
 ### Banned packages
 
