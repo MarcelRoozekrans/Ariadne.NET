@@ -108,8 +108,6 @@ public class TargetMatcherTests
         act.Should().Throw<ArgumentException>();
     }
 
-    // Interim: measures with GC.GetAllocatedBytesForCurrentThread, see ZeroAlloc-Net/ZeroAlloc.TestHelpers#106;
-    // AllocationGate is not referenced in this repo yet.
     [Fact]
     public void Matches_CachedSymbol_AllocatesNothing()
     {
@@ -121,14 +119,11 @@ public class TargetMatcherTests
         byNamespace.Matches(line).Should().BeTrue();
         byType.Matches(line).Should().BeTrue();
 
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < 1_000; i++)
+        Allocations.PerRound(() =>
         {
             byNamespace.Matches(line);
             byType.Matches(line);
-        }
-
-        (GC.GetAllocatedBytesForCurrentThread() - before).Should().Be(0);
+        }).Should().Be(0);
     }
 
     [Fact]

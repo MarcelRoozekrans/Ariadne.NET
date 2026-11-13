@@ -411,7 +411,6 @@ public class TypeSelectorTests
         RoleRules.ActualKind(Find(compilation, "N.D")).Should().Be(CSharpTypeKind.Class);
     }
 
-    // Interim: measures with GC.GetAllocatedBytesForCurrentThread, as TargetMatcherTests does.
     [Fact]
     public void Trait_matching_allocates_nothing_once_names_are_built()
     {
@@ -430,12 +429,9 @@ public class TypeSelectorTests
         });
         selector.Matches(impl, names).Should().BeTrue();
 
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < 1_000; i++)
+        Allocations.PerRound(() =>
         {
             selector.Matches(impl, names);
-        }
-
-        (GC.GetAllocatedBytesForCurrentThread() - before).Should().Be(0);
+        }).Should().Be(0);
     }
 }

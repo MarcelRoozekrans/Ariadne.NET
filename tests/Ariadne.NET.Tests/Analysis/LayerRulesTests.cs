@@ -203,8 +203,6 @@ public class LayerRulesTests
         violations.Select(v => v.Target).Should().Equal("Shop.Infrastructure.A", "Shop.Infrastructure.B");
     }
 
-    // Interim: measures with GC.GetAllocatedBytesForCurrentThread because the ZeroAlloc.TestHelpers source fails this repo's
-    // analyzers, tracked as ZeroAlloc-Net/ZeroAlloc.TestHelpers#106. Switch to AllocationGate once that issue ships.
     [Fact]
     public void LayerOf_CachedSymbol_AllocatesNothing()
     {
@@ -219,16 +217,12 @@ public class LayerRulesTests
         first.Should().Be("Domain");
         missBytes.Should().BeGreaterThan(0, "the first call inserts into the cache");
 
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < 1_000; i++)
+        Allocations.PerRound(() =>
         {
             map.LayerOf(type);
-        }
-
-        (GC.GetAllocatedBytesForCurrentThread() - before).Should().Be(0);
+        }).Should().Be(0);
     }
 
-    // Interim: see the note on LayerOf_CachedSymbol_AllocatesNothing, ZeroAlloc-Net/ZeroAlloc.TestHelpers#106.
     [Fact]
     public void LayerOf_TypeWithoutLayer_IsNullAndCached()
     {
@@ -243,13 +237,10 @@ public class LayerRulesTests
         first.Should().BeNull();
         missBytes.Should().BeGreaterThan(0, "the null result is inserted into the cache");
 
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < 1_000; i++)
+        Allocations.PerRound(() =>
         {
             map.LayerOf(type);
-        }
-
-        (GC.GetAllocatedBytesForCurrentThread() - before).Should().Be(0);
+        }).Should().Be(0);
         map.LayerOf(type).Should().BeNull();
     }
 

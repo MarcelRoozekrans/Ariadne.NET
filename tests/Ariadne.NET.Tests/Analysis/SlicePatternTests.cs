@@ -60,19 +60,15 @@ public sealed class SlicePatternTests
     [InlineData("**.(**).Core.**")]
     public void Valid_pattern_has_no_message(string pattern) => SlicePattern.Validate(pattern).Should().BeNull();
 
-    // Measures with GC.GetAllocatedBytesForCurrentThread, as GlobTests does.
     [Fact]
     public void TryCapture_does_not_allocate_on_a_miss()
     {
         var pattern = SlicePattern.Compile("**.(**).Core.**").Value;
         pattern.TryCapture("Shop.Orders.Public.Deep", out _).Should().BeFalse();
 
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < 1_000; i++)
+        Allocations.PerRound(() =>
         {
             pattern.TryCapture("Shop.Orders.Public.Deep", out _);
-        }
-
-        (GC.GetAllocatedBytesForCurrentThread() - before).Should().Be(0);
+        }).Should().Be(0);
     }
 }

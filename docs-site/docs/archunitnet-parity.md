@@ -7,6 +7,8 @@ title: ArchUnitNET parity
 
 This page lists every type-level and slice rule kind of [ArchUnitNET](https://github.com/TNG/ArchUnitNET) and says how a pack expresses it, or why it does not. The version is pinned at `TngTech.ArchUnitNET` 0.13.2; the rows come from that package's public API. Member-level kinds are listed too, as `deferred`.
 
+If you are moving an ArchUnitNET test suite to packs, start with the [migration guide](migrating-from-archunitnet.md).
+
 The test project `tests/Ariadne.NET.Parity.Tests` checks the page. For each row in scope it runs the ArchUnitNET rule and the Ariadne pack on one small fixture project and compares the types each tool flags. A row is `covered` only when its harness case passes in CI.
 
 How the comparison works:
@@ -154,7 +156,7 @@ Methods that every kind of object has, here applied to `Types()`.
 | `c-have-full-name-ending-with` | `HaveFullNameEndingWith`, `NotHaveFullNameEndingWith` | `require` with `is: { types: ["**.*Suffix"] }`, `isNot` | `divergence` | Ariadne ignores generic arity and matches with case. See [c-have-full-name-ending-with](#c-have-full-name-ending-with). |
 | `c-have-full-name-containing` | `HaveFullNameContaining`, `NotHaveFullNameContaining` | `require` with `is: { types: ["**.*Part*.**"] }`, `isNot` | `divergence` | Ariadne matches with case; ArchUnitNET ignores it. A part that spans a dot splits at it, as in `**.*NotBroken.Pay*.**`. See [c-have-full-name-containing](#c-have-full-name-containing). |
 | `c-have-full-name-matching` | `HaveFullNameMatching`, `NotHaveFullNameMatching` | — | `out-of-scope` | Ariadne patterns are globs; translate a regex with a glob form by hand. |
-| `c-have-assembly-qualified-name` | `HaveAssemblyQualifiedName`, `HaveAssemblyQualifiedNameStartingWith`, `HaveAssemblyQualifiedNameEndingWith`, `HaveAssemblyQualifiedNameContaining`, `HaveAssemblyQualifiedNameMatching` and their `Not` forms | — | `out-of-scope` | `assemblies` plus `types` express it. |
+| `c-have-assembly-qualified-name` | `HaveAssemblyQualifiedName`, `HaveAssemblyQualifiedNameStartingWith`, `HaveAssemblyQualifiedNameEndingWith`, `HaveAssemblyQualifiedNameContaining`, `HaveAssemblyQualifiedNameMatching` and their `Not` forms | — | `out-of-scope` | `assemblies` plus `types` express the positive forms. For a `Not` form, narrow `for` with one key and put the other in `isNot`: `isNot` with both keys rejects a type that matches either, not only one that matches both. |
 
 ### Dependencies
 

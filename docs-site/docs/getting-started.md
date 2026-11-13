@@ -7,6 +7,8 @@ title: Getting started
 
 Load a built-in rule pack and check a solution or project against it in a .NET console app.
 
+Coming from ArchUnitNET? See the [migration guide](migrating-from-archunitnet.md).
+
 ```bash
 dotnet new console -o MyApp --framework net10.0
 cd MyApp
