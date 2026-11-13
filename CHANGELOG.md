@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.8.0](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.7.1...v0.8.0) (2026-11-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* the generated RuleDefinitionValidator constructor takes a SliceDefinitionValidator argument as well.
+* the generated RuleRequirementValidator constructor takes three TargetSelectorValidator arguments instead of one.
+
+### Features
+
+* add requireTarget to report a rule target that matches nothing ([#106](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/106)) ([2b3a38c](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/2b3a38ca46535e2075291e24d37e911bc4aab2bf))
+* add slices rules for module isolation ([#104](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/104)) ([beee6ec](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/beee6ec307ad6b6a99f8d247da91981acd16545c))
+* add type-level traits and is and isNot conditions ([#102](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/102)) ([89ff570](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/89ff570c7f3f5a1b460bcf1a9e63c1df09ae40e1))
+
+
+### Bug Fixes
+
+* find slice cycles across compatible target frameworks ([#114](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/114)) ([50900fc](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/50900fcb4844cf7290c2a06c7700c85447cee748)), closes [#113](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/113) [#113](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/113) [#113](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/113)
+
+
+### Documentation
+
+* add the migration guide from ArchUnitNET ([#107](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/107)) ([7b004bb](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/7b004bbd288b1b3deaf632025755c376573cc456))
+* groom milestone 4 — ArchUnitNET parity ([#84](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/84)) ([3d7e351](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/3d7e351466044788559669cf113c40af7f7b556a))
+
+
+### Tests
+
+* add the ArchUnitNET parity catalogue and harness ([#99](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/99)) ([29dd91d](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/29dd91dec6f22ab21babdc450cacf080c1cb440b))
+
 ## [0.7.1](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.7.0...v0.7.1) (2026-11-11)
 
 
