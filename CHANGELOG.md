@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.8.0...v0.8.1) (2026-11-13)
+
+
+### Bug Fixes
+
+* load a project whose design-time build has an MSBuild warning ([#119](https://github.com/MarcelRoozekrans/Ariadne.NET/issues/119)) ([4d372a0](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/4d372a0fd9b2b1f30aec16da0a4c90928c6229e3))
+
 ## [0.8.0](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.7.1...v0.8.0) (2026-11-13)
 
 
