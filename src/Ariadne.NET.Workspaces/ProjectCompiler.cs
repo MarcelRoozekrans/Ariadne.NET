@@ -24,7 +24,7 @@ internal static class ProjectCompiler
 
     /// <summary>
     /// Fails on a source file that does not exist, a missing compilation, a compilation that cannot resolve <c>System.Object</c>,
-    /// and any compile error, listing the first five. The restore state is not itself checked: a project that compiles completely
+    /// and any compile error, listing the first five after any analyzer the compiler cannot load. The restore state is not itself checked: a project that compiles completely
     /// passes even if it was never restored. A failing project whose assets file cannot be found gets the restore hint.
     /// </summary>
     public static async Task<Result<AnalyzedProject, AriadneError>> CompileAsync(
@@ -201,7 +201,20 @@ internal static class ProjectCompiler
         }
 
         var errors = errorCount == 1 ? "1 compile error" : string.Create(CultureInfo.InvariantCulture, $"{errorCount} compile errors");
-        return WithHint(project, $"Project '{project.Name}' has {errors}", lines, mentionsAssets);
+        var subject = $"Project '{project.Name}' has {errors}";
+        var failures = AnalyzerLoadCheck.Failures(project, rootDirectory);
+        if (failures.Count > 0)
+        {
+            // A generator that never ran explains the errors that follow from its missing output, so it leads the detail.
+            subject += failures.Count == 1
+                ? $", and analyzer '{failures[0].Name}' could not be loaded, so its source generators did not run"
+                : string.Create(
+                    CultureInfo.InvariantCulture,
+                    $", and {failures.Count} analyzers could not be loaded, so their source generators did not run");
+            lines.InsertRange(0, failures.Select(f => f.Line));
+        }
+
+        return WithHint(project, subject, lines, mentionsAssets);
     }
 
     // Adds the restore hint when an error names the assets file, or when the project is on disk and no assets file can be found.

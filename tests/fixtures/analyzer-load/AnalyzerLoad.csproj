@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- A generator the compiler cannot load: the type it would have generated is missing, so App.cs does not compile. -->
+    <Analyzer Include="NotAnAssembly.dll" />
+  </ItemGroup>
+
+</Project>

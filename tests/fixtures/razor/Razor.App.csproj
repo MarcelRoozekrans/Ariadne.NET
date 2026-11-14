@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!--
+    Razor components compile only when the Razor source generator of the SDK that loads the project runs. That generator is
+    built against the Roslyn of its SDK, so this fixture fails to load when Ariadne's Microsoft.CodeAnalysis falls behind the
+    newest SDK CI installs (issue #118).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>

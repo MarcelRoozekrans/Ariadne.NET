@@ -23,6 +23,8 @@ internal static class FixtureProjects
         "multitarget/Multi.csproj",
         "fourlayer/Shop.csproj",
         "compile-error/Broken.csproj",
+        "analyzer-load/AnalyzerLoad.csproj",
+        "razor/Razor.App.csproj",
         "generator/Gen.App/Gen.App.csproj",
         "daedalus/clean/Daedalus.slnx",
         "daedalus/broken/Daedalus.slnx",

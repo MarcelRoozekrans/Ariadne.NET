@@ -3,19 +3,21 @@
   <!--
     Ariadne.NET.Workspaces loads MSBuild from the .NET SDK through MSBuildLocator, so no Microsoft.Build assembly may be
     copied to the output, and MSBuildLocator's MSBL001 check fails the build when one would be. Microsoft.Build.Framework
-    arrives transitively with its runtime assets, and the ExcludeAssets="runtime" that Ariadne.NET.Workspaces sets does
-    not flow to its consumers.
+    and Microsoft.NET.StringTools arrive transitively with their runtime assets, and the ExcludeAssets="runtime" that
+    Ariadne.NET.Workspaces sets does not flow to its consumers.
 
     A PackageReference with ExcludeAssets="runtime" cannot be added from here: NuGet restore ignores items that come from
-    package imports, so the reference never reaches project.assets.json. This target instead drops the package's runtime
+    package imports, so the reference never reaches project.assets.json. This target instead drops the packages' runtime
     assets from the copy-local items after they are resolved and before MSBuildLocator checks them, which is what
-    ExcludeAssets="runtime" does: the assembly stays out of the output folder and out of the deps.json file.
+    ExcludeAssets="runtime" does: the assemblies stay out of the output folder and out of the deps.json file. A package
+    in buildTransitive reaches every project that depends on this one, directly or through Ariadne.NET.Testing.
   -->
   <Target Name="AriadneExcludeMSBuildRuntimeAssets"
           AfterTargets="ResolvePackageAssets"
           BeforeTargets="EnsureMSBuildAssembliesNotCopied">
     <ItemGroup>
       <RuntimeCopyLocalItems Remove="@(RuntimeCopyLocalItems->WithMetadataValue('NuGetPackageId', 'Microsoft.Build.Framework'))" />
+      <RuntimeCopyLocalItems Remove="@(RuntimeCopyLocalItems->WithMetadataValue('NuGetPackageId', 'Microsoft.NET.StringTools'))" />
     </ItemGroup>
   </Target>
 

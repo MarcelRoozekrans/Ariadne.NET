@@ -13,7 +13,7 @@ The package brings in `Ariadne.NET.Workspaces`, `Ariadne.NET` and `Ariadne.NET.A
 ## Requirements
 
 - **A .NET SDK on the machine.** The check loads MSBuild from it with MSBuildLocator.
-- **No extra reference.** The package ships a `buildTransitive` targets file that keeps `Microsoft.Build.Framework` out of your test project's output, so you add no `Microsoft.Build.Framework` line and the build does not fail with `MSBL001`. The `BuildHost-netcore` and `BuildHost-net472` folders the workspace needs land in your output.
+- **No extra reference.** `Ariadne.NET.Workspaces`, which this package depends on, ships a `buildTransitive` targets file that keeps `Microsoft.Build.Framework` and `Microsoft.NET.StringTools` out of your test project's output, so you add no `Microsoft.Build.Framework` line and the build does not fail with `MSBL001`. The `BuildHost-netcore` and `BuildHost-net472` folders the workspace needs land in your output.
 - **A restored solution.** Ariadne never restores; run `dotnet restore` first. A project that does not compile fails the load.
 - **A `.architecture` folder with at least one pack**, in the solution's folder or any folder above it. `ariadne init` creates one.
 

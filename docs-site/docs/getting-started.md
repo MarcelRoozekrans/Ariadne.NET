@@ -18,13 +18,7 @@ dotnet add package Microsoft.Extensions.DependencyInjection
 
 `Ariadne.NET.Workspaces` brings in `Ariadne.NET` and `Ariadne.NET.Abstractions`. Ariadne.NET references only the dependency injection abstractions, so the app needs the container package to build a service provider.
 
-Add one more reference to `MyApp.csproj`. `dotnet add package` cannot set `ExcludeAssets`, so edit the file:
-
-```xml
-<PackageReference Include="Microsoft.Build.Framework" Version="17.14.28" ExcludeAssets="runtime" />
-```
-
-Ariadne.NET.Workspaces loads projects with MSBuild from the installed .NET SDK, and it needs this reference to keep the MSBuild assemblies out of your output. Without it the build fails with `MSBL001`.
+Ariadne.NET.Workspaces loads projects with MSBuild from the installed .NET SDK, and keeps the MSBuild assemblies out of your output itself, so `MyApp.csproj` needs no other reference. If it still has the `Microsoft.Build.Framework` line that versions up to 0.8 needed, remove it, or restore fails with `NU1605`.
 
 Replace `Program.cs` with:
 

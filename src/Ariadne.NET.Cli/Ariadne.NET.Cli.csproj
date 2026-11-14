@@ -8,8 +8,9 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.15" />
-    <!-- Required by every project that references Ariadne.NET.Workspaces; see its README. -->
-    <PackageReference Include="Microsoft.Build.Framework" Version="17.14.28" ExcludeAssets="runtime" />
+    <!-- A project reference skips the buildTransitive targets of Ariadne.NET.Workspaces, so these two stay; see its README. -->
+    <PackageReference Include="Microsoft.Build.Framework" Version="18.7.1" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.NET.StringTools" Version="18.7.1" ExcludeAssets="runtime" />
     <PackageReference Include="System.CommandLine" Version="3.0.0" />
   </ItemGroup>
 
