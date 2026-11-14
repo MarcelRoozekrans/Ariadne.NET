@@ -166,7 +166,7 @@ Ariadne never restores. A compilation that is complete passes even without a res
 
 `Ariadne.NET.Workspaces` and `Ariadne.NET.Testing` need no extra reference. Both load projects with MSBuild from an installed .NET SDK, which they find with MSBuildLocator, and the `buildTransitive` targets file of `Ariadne.NET.Workspaces` keeps `Microsoft.Build.Framework` and `Microsoft.NET.StringTools` out of the output, so the build does not fail with `MSBL001`. Up to 0.8, a project that referenced `Ariadne.NET.Workspaces` needed its own `Microsoft.Build.Framework` line; remove it when you upgrade, or restore fails with `NU1605`. The `BuildHost-*` folders that the workspace needs come with the package.
 
-The workspace runs the source generators the design-time build lists, including those of the SDK, such as the Razor generator. A generator built against a newer Microsoft.CodeAnalysis than Ariadne runs cannot load, and the code it would generate is missing. When a project then has compile errors, the error names each analyzer that cannot be loaded and why, before the compile errors.
+The workspace runs the source generators the design-time build lists, including those of the SDK, such as the Razor generator. A generator built against a newer Microsoft.CodeAnalysis than Ariadne runs cannot load, and the code it would generate is missing. When a project then has compile errors, the error first names each analyzer whose file is missing or unreadable, is not a .NET assembly, or is built against a newer Microsoft.CodeAnalysis, and says which. The check reads only the analyzer file's metadata, so a generator that fails later, for example on a missing dependency of its own, is not named.
 
 ### Performance
 
