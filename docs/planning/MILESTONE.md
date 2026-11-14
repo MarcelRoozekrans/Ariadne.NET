@@ -27,7 +27,7 @@ Anyone who writes architecture rules in ArchUnitNET can write the same rules in 
 4. Phase 4.4 — Target vacuity [complete]
 5. Phase 4.5 — Migration guide [complete]
 6. Phase 4.6 — Daedalus switch-over [complete]
-7. Phase 4.7 — Attributes in rule exceptions [pending]
+7. Phase 4.7 — Attributes in rule exceptions [active]
 
 ## Audit History
 
