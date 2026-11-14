@@ -38,4 +38,13 @@ public class RuleShapeTests
         PackSchemaHarness.LoaderAccepts(yaml).Should().BeTrue();
         PackSchemaHarness.SchemaErrors(yaml).Should().BeEmpty();
     }
+
+    [Fact]
+    public void Rule_amendment_with_attributes_exception_is_accepted()
+    {
+        var yaml = "schema: 2\nname: x\nextends: [builtin://clean-architecture]\nrules:\n  - id: CA-X\n    exceptions:\n      - attributes: [\"**.AuditedAttribute\"]\n        because: Audited types may.\n";
+
+        PackSchemaHarness.LoaderAccepts(yaml).Should().BeTrue();
+        PackSchemaHarness.SchemaErrors(yaml).Should().BeEmpty();
+    }
 }

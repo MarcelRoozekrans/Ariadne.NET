@@ -1,0 +1,30 @@
+schema: 2
+name: x
+layers:
+  - name: Domain
+    id: X-L-DOMAIN
+    because: core
+    namespaces: ["**.Domain.**"]
+  - name: Web
+    id: X-L-WEB
+    because: edge
+    namespaces: ["**.Web.**"]
+    allowedDependencies: [Domain]
+rules:
+  - id: X-R1
+    because: b
+    forbid:
+      from: { layers: [Domain] }
+      to: { namespaces: ["**.Persistence.**"] }
+    exceptions:
+      - attributes: ["**.AuditedAttribute"]
+        because: audited types may use persistence
+  - id: X-R2
+    because: b
+    uniqueNames:
+      for: { layers: [Web] }
+      against: { layers: [Domain] }
+    exceptions:
+      - attributes: ["**.MirrorAttribute"]
+        nested: true
+        because: marked nested types may mirror a name
