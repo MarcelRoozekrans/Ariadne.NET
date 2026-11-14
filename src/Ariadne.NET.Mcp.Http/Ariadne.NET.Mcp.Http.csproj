@@ -9,7 +9,7 @@
     <!-- A project reference skips the buildTransitive targets of Ariadne.NET.Workspaces, so these two stay; see its README. -->
     <PackageReference Include="Microsoft.Build.Framework" Version="18.12.2" ExcludeAssets="runtime" />
     <PackageReference Include="Microsoft.NET.StringTools" Version="18.12.2" ExcludeAssets="runtime" />
-    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="1.4.2" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.4.0" />
   </ItemGroup>
 
   <PropertyGroup>
