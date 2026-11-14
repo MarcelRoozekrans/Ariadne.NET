@@ -189,7 +189,7 @@ A target may have `layers` together with traits: a type must be in one of the la
 
 An empty pattern, or one with an empty segment such as `Shop..Domain`, is a load error.
 
-`TargetSelector` has `Layers`, `Namespaces`, `Assemblies`, `Types`, `BaseTypes`, `Interfaces`, `Attributes` and `Members`, and the traits `Names`, `Kinds` (`IList<CSharpTypeKind>`, which includes `Enum` and `Delegate`), `Accessibility`, `AssignableTo`, `Sealed`, `Abstract`, `Static` and `Nested` (`bool?`). `RuleException` has `Namespaces`, `Assemblies`, `Types`, the same eight traits and a required `Because`.
+`TargetSelector` has `Layers`, `Namespaces`, `Assemblies`, `Types`, `BaseTypes`, `Interfaces`, `Attributes` and `Members`, and the traits `Names`, `Kinds` (`IList<CSharpTypeKind>`, which includes `Enum` and `Delegate`), `Accessibility`, `AssignableTo`, `Sealed`, `Abstract`, `Static` and `Nested` (`bool?`). `RuleException` has `Namespaces`, `Assemblies`, `Types`, `Attributes`, the same eight traits and a required `Because`.
 
 ## `extends`
 
