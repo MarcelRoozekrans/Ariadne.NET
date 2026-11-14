@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Runtime.InteropServices;
 using Microsoft.CodeAnalysis;
 
@@ -11,7 +12,7 @@ internal static class TypeGraphBuilder
         Compilation compilation,
         IReadOnlySet<SyntaxTree> generatedTrees,
         CancellationToken cancellationToken) =>
-        Build(compilation, generatedTrees, MemberNameFilter.Empty, cancellationToken);
+        Build(compilation, generatedTrees, FrozenSet<SyntaxTree>.Empty, MemberNameFilter.Empty, cancellationToken);
 
     /// <summary>
     /// Walks every non-generated tree of the compilation and collects its type edges, source types and the member uses whose
@@ -21,19 +22,33 @@ internal static class TypeGraphBuilder
         Compilation compilation,
         IReadOnlySet<SyntaxTree> generatedTrees,
         MemberNameFilter filter,
+        CancellationToken cancellationToken) =>
+        Build(compilation, generatedTrees, FrozenSet<SyntaxTree>.Empty, filter, cancellationToken);
+
+    /// <summary>
+    /// Walks every non-generated tree of the compilation, and every tree of the Razor generator, which is checked as hand-written
+    /// code with its locations mapped to the Razor file, and collects type edges, source types and the member uses whose name
+    /// passes the filter.
+    /// </summary>
+    public static TypeGraph Build(
+        Compilation compilation,
+        IReadOnlySet<SyntaxTree> generatedTrees,
+        IReadOnlySet<SyntaxTree> razorTrees,
+        MemberNameFilter filter,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(compilation);
         ArgumentNullException.ThrowIfNull(generatedTrees);
+        ArgumentNullException.ThrowIfNull(razorTrees);
         ArgumentNullException.ThrowIfNull(filter);
 
         var walker = new TypeReferenceWalker(filter, cancellationToken);
         foreach (var tree in compilation.SyntaxTrees)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!GeneratedCode.IsGeneratedTree(tree, compilation, generatedTrees, cancellationToken))
+            if (!GeneratedCode.IsGeneratedTree(tree, compilation, generatedTrees, razorTrees, cancellationToken))
             {
-                walker.Walk(compilation.GetSemanticModel(tree));
+                walker.Walk(compilation.GetSemanticModel(tree), razorTrees.Contains(tree));
             }
         }
 

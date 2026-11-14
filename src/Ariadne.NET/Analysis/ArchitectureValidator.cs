@@ -96,7 +96,7 @@ public sealed class ArchitectureValidator : IArchitectureValidator
 
     private static Entry AnalyzeProject(AnalyzedProject project, LayerMap layers, RulePack pack, in Matchers matchers, CancellationToken cancellationToken)
     {
-        var graph = TypeGraphBuilder.Build(project.Compilation, project.GeneratedTrees, matchers.MemberFilter, cancellationToken);
+        var graph = TypeGraphBuilder.Build(project.Compilation, project.GeneratedTrees, project.RazorTrees, matchers.MemberFilter, cancellationToken);
         var violations = new List<ArchitectureViolation>(LayerRules.Check(graph, layers, pack));
         violations.AddRange(matchers.Forbid.Check(graph));
         violations.AddRange(matchers.AllowOnly.Check(graph));

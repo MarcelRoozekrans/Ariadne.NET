@@ -38,6 +38,9 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     /// <summary>The current edge source, or null outside a type or inside a type that is not checked.</summary>
     private INamedTypeSymbol? _source;
 
+    // The Razor file of the tree being walked, or null when the tree is not from the Razor generator.
+    private string? _razorFallbackPath;
+
     public TypeReferenceWalker(MemberNameFilter filter, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(filter);
@@ -58,10 +61,19 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     public Dictionary<INamedTypeSymbol, SourceLocation> SourceTypes { get; } = new(SymbolEqualityComparer.Default);
 
     /// <summary>Walks one tree, binding through the given semantic model.</summary>
-    public void Walk(SemanticModel model)
+    public void Walk(SemanticModel model) => Walk(model, isRazor: false);
+
+    /// <summary>
+    /// Walks one tree, binding through the given semantic model; locations in a tree of the Razor generator are mapped to its
+    /// Razor file.
+    /// </summary>
+    public void Walk(SemanticModel model, bool isRazor)
     {
         ArgumentNullException.ThrowIfNull(model);
 
+        _razorFallbackPath = isRazor
+            ? RazorSource.FilePathOf(model.SyntaxTree, _cancellationToken) ?? model.SyntaxTree.FilePath
+            : null;
         _model = model;
         _programType = null;
         _source = null;
@@ -69,6 +81,7 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
         _importScopeOwner = null;
         Visit(model.SyntaxTree.GetRoot(_cancellationToken));
         _model = null;
+        _razorFallbackPath = null;
     }
 
     public override void VisitClassDeclaration(ClassDeclarationSyntax node)
@@ -618,6 +631,11 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     private SourceLocation ToLocation(TextSpan span)
     {
         var tree = Model.SyntaxTree;
+        if (_razorFallbackPath is { } razorPath)
+        {
+            return RazorSource.Locate(tree, span, razorPath, _cancellationToken);
+        }
+
         var start = tree.GetLineSpan(span, _cancellationToken).StartLinePosition;
         return new SourceLocation(tree.FilePath, start.Line + 1, start.Character + 1);
     }
