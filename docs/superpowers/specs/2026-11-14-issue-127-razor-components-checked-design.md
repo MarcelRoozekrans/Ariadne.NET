@@ -48,9 +48,10 @@ compiled assembly, failed. #456 waits for this fix.
 - The whole Razor tree is walked, not only its mapped spans: the component is a source type (`uniqueNames`, `require`,
   layers), and component tags in markup, `@inherits` and the default `ComponentBase` count as dependencies, as they do for
   ArchUnitNET, which reads the assembly.
-- Locations in a Razor tree: the mapped `.razor` position when the span maps; otherwise line 1, column 1 of the `.razor`
-  file, whose path comes from the tree's first mapped `#line` directive, else its `#pragma checksum`; the generated path only
-  when the tree names no file at all. Trees outside the Razor set keep their unmapped location.
+- Locations in a Razor tree: the mapped `.razor` position when the span maps; otherwise line 1, column 1 of the Razor file
+  named by the tree's `#pragma checksum`, or for a `.decl.g.cs` tree, which has none, by its `.g.cs` sibling's; the generated
+  path only when neither exists. Not the first `#line`: in a component tree it maps the usings of `_Imports.razor` (found in
+  the final review). Trees outside the Razor set keep their unmapped location.
 - Consequences, accepted: `_Imports` classes and `.cshtml` views (namespace `AspNetCoreGeneratedDocument`) become source types too.
 - The parity catalogue lists ArchUnitNET API rows only, so it gets no row for this.
 
