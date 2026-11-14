@@ -205,12 +205,20 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Design:** `docs/superpowers/specs/2026-11-11-phase-4.5-migration-guide-design.md` (approved 2026-11-11)
 **Plan:** `docs/superpowers/plans/2026-11-11-phase-4.5-migration-guide.md`
 
-### Phase 4.6: Daedalus switch-over [status: pending]
+### Phase 4.6: Daedalus switch-over [status: complete 2026-11-14, Daedalus #456 merged as 423bba73, guide update #131]
 **Goal:** In the Daedalus repo, replace the ArchUnitNET tests with an Ariadne pack checked through `Ariadne.NET.Testing`, and remove the ArchUnitNET package.
 **Surface:** Mixed
 **HelpWanted:** no
 **Design:** `docs/superpowers/specs/2026-11-11-phase-4.6-daedalus-switch-over-design.md` (approved 2026-11-11)
 **Plan:** `docs/superpowers/plans/2026-11-11-phase-4.6-daedalus-switch-over.md`
+**Completed:** 2026-11-14
+
+### Phase 4.7: Attributes in rule exceptions [status: pending]
+**Goal:** Rule exceptions and amendment exceptions accept `attributes`, with the selector key's meaning, so `p-have-any-attributes:not` leaves `KnownGaps`, its catalogue row becomes `covered` and #97 closes. Gap phase from the 2026-11-14 milestone audit.
+**Surface:** Backend
+**HelpWanted:** no
+**Design:** _to be written_
+**Plan:** _to be written_
 
 ## Milestone 5: Agent surfaces [status: pending]
 **Goal:** Agents in the family runtime and in editors use Ariadne while writing code.

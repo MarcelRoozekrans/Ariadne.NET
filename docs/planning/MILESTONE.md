@@ -16,19 +16,21 @@ Anyone who writes architecture rules in ArchUnitNET can write the same rules in 
 - [ ] Packs express type-level conditions (naming pattern, base type, attribute, sealed, abstract, static, nested) and slice rules (no cycles, no dependency between slices); the pack JSON Schema and its conformance tests cover them
 - [ ] The built-in `modular-monolith` pack forbids one module's types from depending on another module's internals, a fixture proves it, and #32 is closed
 - [ ] A migration guide on the docs site maps each ArchUnitNET construct to pack YAML and translates Daedalus's rules as a worked example
-- [ ] Daedalus `main` references no ArchUnitNET package; its CI checks an Ariadne pack through `Ariadne.NET.Testing`; the only architecture tests left in C# are `NuGetPackageRootPathTests` and the DI integration test
+- [ ] Daedalus `main` references no ArchUnitNET package; its CI checks an Ariadne pack through `Ariadne.NET.Testing`; the only architecture tests left in C# are `NuGetPackageRootPathTests`, the DI integration test and `RetainedArchitectureTests`, which keeps the Rag.NET adapter fact as two reflection checks because its `Rag.**` target never appears in the solution and cannot use `requireTarget` (amended 2026-11-14 by the owner after the audit)
 - [ ] Member-level rule kinds are filed as one issue
 
 ## Phases
 
-1. Phase 4.1 — Parity catalogue and harness [pending]
-2. Phase 4.2 — Type-level conditions [pending]
-3. Phase 4.3 — Slices [pending]
-4. Phase 4.4 — Target vacuity [pending]
-5. Phase 4.5 — Migration guide [pending]
-6. Phase 4.6 — Daedalus switch-over [pending]
+1. Phase 4.1 — Parity catalogue and harness [complete]
+2. Phase 4.2 — Type-level conditions [complete]
+3. Phase 4.3 — Slices [complete]
+4. Phase 4.4 — Target vacuity [complete]
+5. Phase 4.5 — Migration guide [complete]
+6. Phase 4.6 — Daedalus switch-over [complete]
+7. Phase 4.7 — Attributes in rule exceptions [pending]
 
 ## Audit History
 
 | Date | Verdict | Gaps |
 |---|---|---|
+| 2026-11-14 | FAIL | `KnownGaps` holds `p-have-any-attributes:not` (#97); Daedalus keeps `RetainedArchitectureTests`, a third C# architecture test. Report `docs/superpowers/reviews/2026-11-14-milestone-4-audit.md` |
