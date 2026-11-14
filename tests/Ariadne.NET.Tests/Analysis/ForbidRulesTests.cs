@@ -196,6 +196,46 @@ public class ForbidRulesTests
     }
 
     [Fact]
+    public void Exception_attributes_exempt_types_that_carry_the_attribute()
+    {
+        const string Source = """
+            namespace T { public class X { } }
+            namespace N
+            {
+                public sealed class AuditedAttribute : System.Attribute { }
+                [Audited] public class Kept { public T.X? A; }
+                public class Base { public T.X? B; }
+                [Audited] public class AuditedBase { }
+                public class Derived : AuditedBase { public T.X? C; }
+            }
+            """;
+        var exception = new RuleException { Attributes = ["N.AuditedAttribute"], Because = "Audited types may use T." };
+
+        var forbid = PackWith(Rule(new TargetSelector { Namespaces = ["N.**"] }, new TargetSelector { Namespaces = ["T.**"] }, exception));
+        Check(Source, forbid).Select(v => v.SourceType).Should().BeEquivalentTo("N.Base", "N.Derived");
+
+        var require = new RulePack
+        {
+            Name = "test",
+            Rules =
+            [
+                new RuleDefinition
+                {
+                    Id = "R",
+                    Because = "Because R.",
+                    Kind = RuleKind.Require,
+                    From = new TargetSelector { Namespaces = ["N.**"] },
+                    Require = new RuleRequirement { Is = new TargetSelector { Sealed = true } },
+                    Exceptions = [exception],
+                },
+            ],
+        };
+        var graph = TypeGraphBuilder.Build(TestCompilation.Create(Source), new HashSet<SyntaxTree>(), CancellationToken.None);
+        var reported = RequireRules.Check(graph, new LayerMap(require), require).Select(v => v.SourceType).ToList();
+        reported.Should().NotContain("N.Kept").And.Contain("N.Derived");
+    }
+
+    [Fact]
     public void TargetMixingLayersAndNamespaces_Throws()
     {
         var pack = PackWith(Rule(new TargetSelector { Layers = ["Domain"], Namespaces = ["Web.**"] }, new TargetSelector { Namespaces = ["Web.**"] }));
