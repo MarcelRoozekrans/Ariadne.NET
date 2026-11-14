@@ -224,16 +224,16 @@ internal static class RulePackReferenceCheck
             var where = $"exceptions[{i}] of rule '{id}'";
             if (exception is
                 {
-                    Namespaces.Count: 0, Assemblies.Count: 0, Types.Count: 0, Names.Count: 0, Kinds.Count: 0, Accessibility.Count: 0,
+                    Namespaces.Count: 0, Assemblies.Count: 0, Types.Count: 0, Attributes.Count: 0, Names.Count: 0, Kinds.Count: 0, Accessibility.Count: 0,
                     AssignableTo.Count: 0, Sealed: null, Abstract: null, Static: null, Nested: null,
                 })
             {
-                failures.Add($"{where} selects nothing; it needs at least one of namespaces, assemblies, types or a trait");
+                failures.Add($"{where} selects nothing; it needs at least one of namespaces, assemblies, types, attributes or a trait");
             }
 
             CheckTraitValues(where, exception.Kinds, exception.Accessibility, failures);
             if (rule.Kind == RuleKind.Slices
-                && HasCapture(exception.Namespaces, exception.Assemblies, exception.Types, exception.Names, exception.AssignableTo))
+                && HasCapture(exception.Namespaces, exception.Assemblies, exception.Types, exception.Attributes, exception.Names, exception.AssignableTo))
             {
                 failures.Add($"{where} has a pattern with a capture; {CaptureOutsideMatching}");
             }
