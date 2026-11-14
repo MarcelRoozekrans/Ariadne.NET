@@ -8,7 +8,7 @@
   <!-- ZeroAlloc.Validation brings ZeroAlloc.Pipeline with it; Meziantou.Analyzer is an analyzer package no consumer receives. -->
   <ItemGroup>
     <PackageReference Include="ZeroAlloc.Validation" Version="2.5.0" />
-    <PackageReference Include="Meziantou.Analyzer" Version="3.0.339" PrivateAssets="all" />
+    <PackageReference Include="Meziantou.Analyzer" Version="3.0.340" PrivateAssets="all" />
   </ItemGroup>
 
 </Project>
