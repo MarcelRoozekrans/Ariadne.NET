@@ -56,22 +56,26 @@ internal static class ProjectCompiler
             return Failure(errors);
         }
 
+        // Razor output is the code of .razor and .cshtml files, so it is checked; every other generator's output is skipped.
         var generatedPaths = new HashSet<string>(StringComparer.Ordinal);
+        var razorPaths = new HashSet<string>(StringComparer.Ordinal);
         foreach (var document in await project.GetSourceGeneratedDocumentsAsync(cancellationToken).ConfigureAwait(false))
         {
             if (document.FilePath is { Length: > 0 } filePath)
             {
-                generatedPaths.Add(filePath);
+                (RazorGenerator.IsRazorDocument(filePath, document.HintName) ? razorPaths : generatedPaths).Add(filePath);
             }
         }
 
         var generatedTrees = compilation.SyntaxTrees.Where(t => generatedPaths.Contains(t.FilePath)).ToFrozenSet();
+        var razorTrees = compilation.SyntaxTrees.Where(t => razorPaths.Contains(t.FilePath)).ToFrozenSet();
         var (name, targetFramework) = ProjectName.Split(project);
         var packages = TryReadPackages(project, targetFramework, out var resolved) ? resolved : null;
         return Result<AnalyzedProject, AriadneError>.Success(
             new AnalyzedProject(name, targetFramework, compilation)
             {
                 GeneratedTrees = generatedTrees,
+                RazorTrees = razorTrees,
                 Packages = packages,
             });
     }

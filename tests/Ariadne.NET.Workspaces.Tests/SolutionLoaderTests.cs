@@ -171,7 +171,9 @@ public sealed class SolutionLoaderTests : IDisposable
 
         var app = loaded.Projects.Should().ContainSingle().Which;
         app.Compilation.GetTypeByMetadataName("Razor.App.Components.Counter").Should().NotBeNull();
-        app.GeneratedTrees.Should().Contain(t => t.FilePath.Contains("Counter_razor", StringComparison.Ordinal));
+        app.RazorTrees.Should().Contain(t => t.FilePath.Contains("Counter_razor", StringComparison.Ordinal));
+        app.GeneratedTrees.Should().NotContain(t => t.FilePath.Contains("Counter_razor", StringComparison.Ordinal));
+        app.RazorTrees.Should().OnlyContain(t => app.Compilation.SyntaxTrees.Contains(t));
 
         using var workspace = MSBuildWorkspace.Create();
         var project = await workspace.OpenProjectAsync(projectPath);
@@ -191,6 +193,7 @@ public sealed class SolutionLoaderTests : IDisposable
         app.Name.Should().Be("Gen.App");
         app.GeneratedTrees.Select(t => Path.GetFileName(t.FilePath)).Should().Equal("Registrations.cs");
         app.GeneratedTrees.Should().OnlyContain(t => app.Compilation.SyntaxTrees.Contains(t));
+        app.RazorTrees.Should().BeEmpty();
     }
 
     [Fact]
