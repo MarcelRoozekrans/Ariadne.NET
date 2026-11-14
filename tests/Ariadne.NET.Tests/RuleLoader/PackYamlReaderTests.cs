@@ -1298,7 +1298,7 @@ public class PackYamlReaderTests
             """;
 
         Problems(yaml).Should().Equal(
-            new PackProblem(10, 9, "'assemblies' is not accepted in exceptions[0] of rule 'SH-001'; an exception of a uniqueNames rule excuses a type's name, so it takes 'types' or 'namespaces'"));
+            new PackProblem(10, 9, "'assemblies' is not accepted in exceptions[0] of rule 'SH-001'; an exception of a uniqueNames rule excuses a type's name, so it takes 'namespaces', 'types', 'attributes' or a type trait"));
     }
 
     [Fact]
