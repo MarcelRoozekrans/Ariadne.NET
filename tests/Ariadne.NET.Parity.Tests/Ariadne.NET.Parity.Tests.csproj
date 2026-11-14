@@ -18,8 +18,8 @@
       A project reference skips the buildTransitive targets of Ariadne.NET.Workspaces, so this project keeps the two
       references they replace for a package consumer; see the Workspaces README.
     -->
-    <PackageReference Include="Microsoft.Build.Framework" Version="18.7.1" ExcludeAssets="runtime" />
-    <PackageReference Include="Microsoft.NET.StringTools" Version="18.7.1" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.Build.Framework" Version="18.12.2" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.NET.StringTools" Version="18.12.2" ExcludeAssets="runtime" />
   </ItemGroup>
 
   <ItemGroup>
