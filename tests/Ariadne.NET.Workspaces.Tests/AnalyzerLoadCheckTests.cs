@@ -1,6 +1,10 @@
+using System.Buffers.Binary;
+using Ariadne.NET.Abstractions;
 using FluentAssertions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Text;
 
 namespace Ariadne.NET.Workspaces.Tests;
 
@@ -51,6 +55,97 @@ public sealed class AnalyzerLoadCheckTests : IDisposable
         File.WriteAllText(path, "not an assembly");
 
         AnalyzerLoadCheck.Problem(path).Should().Be("not a .NET assembly");
+    }
+
+    [Fact]
+    public void PeWithoutMetadata_IsNotAnAssembly()
+    {
+        var path = Emit("Native", "public class Native { }", []);
+        var bytes = File.ReadAllBytes(path);
+        ClearClrHeader(bytes);
+        File.WriteAllBytes(path, bytes);
+
+        AnalyzerLoadCheck.Problem(path).Should().Be("not a .NET assembly");
+    }
+
+    [Fact]
+    public void LockedFile_CannotBeRead()
+    {
+        var path = Emit("Locked", "public class Locked { }", []);
+        using var held = File.Open(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+
+        AnalyzerLoadCheck.Problem(path).Should().StartWith("cannot be read: ");
+    }
+
+    [Fact]
+    public void Failures_ShowPathsUnderTheRootRelativeAndOthersInFull()
+    {
+        var root = Directory.CreateDirectory(Path.Combine(_dir, "repo")).FullName;
+        var inside = Path.Combine(root, "Inside.dll");
+        var outside = Path.Combine(_dir, "Outside.dll");
+        File.WriteAllText(inside, "not an assembly");
+        var fine = EmitAnalyzer("Fine", AnalyzerLoadCheck.RunningCompilerVersion);
+
+        // An analyzer reference held in memory has no path and is skipped.
+        var project = ProjectWithAnalyzers("Two", "public class Two { }", inside, outside, fine)
+            .AddAnalyzerReference(new AnalyzerImageReference([]));
+
+        AnalyzerLoadCheck.Failures(project, root).Should().Equal(
+            ("Inside", "Inside.dll: not a .NET assembly"),
+            ("Outside", $"{outside}: file not found"));
+    }
+
+    [Fact]
+    public async Task CompileErrorsAfterTwoAnalyzerFailures_SayHowMany()
+    {
+        var project = ProjectWithAnalyzers(
+            "Two",
+            "public class Two { public Generated.Missing? Value; }",
+            Path.Combine(_dir, "First.dll"),
+            Path.Combine(_dir, "Second.dll"));
+
+        var result = await ProjectCompiler.CompileAsync(project, _dir, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().Be(
+            "Project 'Two' has 1 compile error, and 2 analyzers could not be loaded, so their source generators did not run.");
+        result.Error.Detail!.Split('\n')[..2].Should().Equal("First.dll: file not found", "Second.dll: file not found");
+    }
+
+    // Zeroes the CLI header entry of the PE data directories, which leaves a valid PE that holds no metadata.
+    private static void ClearClrHeader(byte[] image)
+    {
+        var pe = BinaryPrimitives.ReadInt32LittleEndian(image.AsSpan(0x3C));
+        var optional = pe + 4 + 20;
+        var directories = optional + (BinaryPrimitives.ReadUInt16LittleEndian(image.AsSpan(optional)) == 0x20B ? 112 : 96);
+        image.AsSpan(directories + (14 * 8), 8).Clear();
+    }
+
+    private static Project ProjectWithAnalyzers(string name, string source, params string[] analyzerPaths)
+    {
+        var workspace = new AdhocWorkspace();
+        var project = workspace.AddProject(ProjectInfo.Create(
+            ProjectId.CreateNewId(),
+            VersionStamp.Default,
+            name,
+            name,
+            LanguageNames.CSharp,
+            compilationOptions: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable),
+            metadataReferences: [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)],
+            analyzerReferences: [.. analyzerPaths.Select(p => new AnalyzerFileReference(p, new NoLoader()))]));
+        return project.AddDocument("Source.cs", SourceText.From(source)).Project;
+    }
+
+    // The check reads metadata only, so nothing is ever loaded through this.
+    private sealed class NoLoader : IAnalyzerAssemblyLoader
+    {
+        public void AddDependencyLocation(string fullPath)
+        {
+        }
+
+        public System.Reflection.Assembly LoadFromPath(string fullPath) =>
+            throw new InvalidOperationException($"Loading {fullPath} is not expected.");
     }
 
     // An analyzer assembly that references a stand-in Microsoft.CodeAnalysis with the given version, which is all the check reads.
