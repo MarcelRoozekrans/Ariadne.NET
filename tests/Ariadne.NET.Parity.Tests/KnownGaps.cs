@@ -7,12 +7,5 @@ namespace Ariadne.NET.Parity.Tests;
 public static class KnownGaps
 {
     /// <summary>All gap entries.</summary>
-    public static IReadOnlyList<KnownGap> Entries { get; } =
-    [
-        new(
-            "p-have-any-attributes:not",
-            "unplanned",
-            "No 'attributes' in rule exceptions, so an exception cannot leave out the types that carry an attribute; phase "
-            + "4.2 adds only the eight traits there. Tracked in #97."),
-    ];
+    public static IReadOnlyList<KnownGap> Entries { get; } = [];
 }

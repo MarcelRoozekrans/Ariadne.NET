@@ -283,7 +283,8 @@ public static class ParityCases
             _ => Types().That().HaveName("OrderService").Or().HaveName("PaymentService")
                 .Should().NotDependOnAny(Types().That().ResideInNamespace("Parity.XOrWithinPredicate.Target"))),
 
-        // Phase 4.2 cases: gaps until phase 4.2 added the traits and is and isNot. p-have-any-attributes:not stays a gap.
+        // Phase 4.2 cases: gaps until phase 4.2 added the traits and is and isNot. p-have-any-attributes:not was a gap until
+        // phase 4.7 added attributes to rule exceptions.
         new(
             "p-implement-interface:not",
             "PImplementInterface",
