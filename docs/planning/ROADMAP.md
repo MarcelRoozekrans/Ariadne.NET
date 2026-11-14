@@ -218,7 +218,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Surface:** Backend
 **HelpWanted:** no
 **Design:** `docs/superpowers/specs/2026-11-14-phase-4.7-attributes-in-rule-exceptions-design.md`
-**Plan:** _to be written_
+**Plan:** `docs/superpowers/plans/2026-11-14-phase-4.7-attributes-in-rule-exceptions.md`
 
 ## Milestone 5: Agent surfaces [status: pending]
 **Goal:** Agents in the family runtime and in editors use Ariadne while writing code.
