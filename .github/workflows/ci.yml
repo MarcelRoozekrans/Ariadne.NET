@@ -46,10 +46,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The newest SDK runs the design-time builds of the fixtures, so tests/fixtures/razor fails here when its Razor
+      # generator needs a newer Microsoft.CodeAnalysis than Ariadne ships (issue #118). Raise it with each SDK major.
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: |
+            10.0.x
+            11.0.x
           cache: true
           cache-dependency-path: '**/*.csproj'
 
@@ -189,10 +193,10 @@ jobs:
       # Ariadne.NET.Abstractions in as dependencies: this proves those three of the five packages restore from the feed.
       # The next step restores Ariadne.NET.Testing the same way.
       # Microsoft.Extensions.DependencyInjection comes from nuget.org: Ariadne.NET depends only on the DI abstractions,
-      # and the sample needs a container to resolve the services from. Microsoft.Build.Framework comes from nuget.org
-      # too: Workspaces keeps its own copy out of the output because MSBuildLocator loads the SDK's, and that exclusion
-      # does not flow to consumers, so the consumer carries its own reference with the runtime assets excluded or the
-      # build fails with MSBL001. The sample also checks a directory against the pack, and the step runs it twice. First
+      # and the sample needs a container to resolve the services from. The consumer has no Microsoft.Build reference:
+      # MSBuildLocator loads MSBuild from the SDK, and the buildTransitive targets of Ariadne.NET.Workspaces keep the
+      # Microsoft.Build.Framework and Microsoft.NET.StringTools copies out of the output, or the build fails with
+      # MSBL001. The sample also checks a directory against the pack, and the step runs it twice. First
       # against the consumer's own project, whose sources are a Program.cs without a namespace and one empty type in each
       # layer: no violations, so it must exit 0. Then against a fixture class library written under RUNNER_TEMP, a Domain
       # type that references a WebApi type, which the clean-architecture pack forbids, with an empty type in the other two
@@ -211,11 +215,6 @@ jobs:
           done
           dotnet add "$app" package Ariadne.NET.Workspaces --version "$PACKAGE_VERSION" --no-restore
           dotnet add "$app" package Microsoft.Extensions.DependencyInjection --version 10.0.14 --no-restore
-          # dotnet add package cannot set ExcludeAssets, so add the reference and then rewrite it in place. The grep
-          # fails the step if the rewrite did not match, rather than letting the build fail later with MSBL001.
-          dotnet add "$app" package Microsoft.Build.Framework --version 17.14.28 --no-restore
-          sed -i 's|<PackageReference Include="Microsoft.Build.Framework" Version="17.14.28" />|<PackageReference Include="Microsoft.Build.Framework" Version="17.14.28" ExcludeAssets="runtime" />|' "$app/consumer.csproj"
-          grep -q 'Include="Microsoft.Build.Framework".*ExcludeAssets="runtime"' "$app/consumer.csproj"
           cat > "$app/nuget.config" <<EOF
           <?xml version="1.0" encoding="utf-8"?>
           <configuration>
@@ -230,6 +229,12 @@ jobs:
             </packageSourceMapping>
           </configuration>
           EOF
+          # The consumer has no Microsoft.Build reference: Ariadne.NET.Workspaces drops the MSBuild runtime assets
+          # through buildTransitive, or the build fails with MSBL001.
+          if grep -q "Microsoft.Build" "$app/consumer.csproj"; then
+            echo "::error::The consumer must not reference a Microsoft.Build package."
+            exit 1
+          fi
           dotnet build "$app" -c Release
           dotnet run --project "$app" --no-build -c Release -- "$app"
           fixture="$RUNNER_TEMP/violation-fixture"
@@ -262,8 +267,8 @@ jobs:
           fi
 
       # Builds and runs tools/release/testing-consumer/Program.cs, a console app that references only
-      # Ariadne.NET.Testing from the local feed and has no Microsoft.Build.Framework reference: the package must supply
-      # the MSBuild fix itself through buildTransitive, or the build fails with MSBL001. The program checks a fixture
+      # Ariadne.NET.Testing from the local feed and has no Microsoft.Build.Framework reference: the buildTransitive
+      # targets of Ariadne.NET.Workspaces must reach it through Ariadne.NET.Testing, or the build fails with MSBL001. The program checks a fixture
       # project written under RUNNER_TEMP against the pack in the fixture's own .architecture folder and must see the
       # one violation the pack forbids, which also proves the BuildHost folders reached the output. The step then fails
       # when any Microsoft.Build assembly other than Microsoft.Build.Locator.dll is in the output folder.

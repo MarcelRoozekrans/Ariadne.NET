@@ -5,6 +5,7 @@ using FluentAssertions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.MSBuild;
 using Microsoft.CodeAnalysis.Text;
 
 namespace Ariadne.NET.Workspaces.Tests;
@@ -130,6 +131,21 @@ public sealed class SolutionLoaderTests : IDisposable
     }
 
     [Fact]
+    public async Task CompileErrorAfterAnalyzerLoadFailure_NamesTheAnalyzerFirst()
+    {
+        var result = await _loader.LoadAsync(FixtureProjects.Path("analyzer-load", "AnalyzerLoad.csproj"));
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(AriadneErrorCode.Invalid);
+        result.Error.Message.Should().Be(
+            "Project 'AnalyzerLoad' has 1 compile error, and analyzer 'NotAnAssembly' could not be loaded, "
+            + "so its source generators did not run.");
+        var lines = result.Error.Detail!.Split('\n');
+        lines[0].Should().Be("NotAnAssembly.dll: not a .NET assembly");
+        lines[1].Should().StartWith("App.cs:5:").And.Contain("CS0246");
+    }
+
+    [Fact]
     public async Task Unrestored_IsInvalidAndSaysRestore()
     {
         var project = FixtureProjects.Path("unrestored", "Unrestored.csproj");
@@ -142,6 +158,28 @@ public sealed class SolutionLoaderTests : IDisposable
         result.Error.Detail.Should().Contain("CS0246");
         result.Error.Detail!.Split('\n').Should().Contain(RestoreHint);
         File.Exists(FixtureProjects.Path("unrestored", "obj", "project.assets.json")).Should().BeFalse("the loader never restores");
+    }
+
+    // Issue #118: the Razor generator is built against the Roslyn of its SDK, so a component compiles only while Ariadne's
+    // Microsoft.CodeAnalysis is at least as new. The design-time build runs out of process on the newest SDK installed, which
+    // CI makes an SDK 11 or later; the SDK check keeps the test from passing on an older SDK whose generator any Roslyn loads.
+    [Fact]
+    public async Task RazorComponents_CompileOnTheNewestSdk()
+    {
+        var projectPath = FixtureProjects.Path("razor", "Razor.App.csproj");
+        using var loaded = await LoadAsync("razor", "Razor.App.csproj");
+
+        var app = loaded.Projects.Should().ContainSingle().Which;
+        app.Compilation.GetTypeByMetadataName("Razor.App.Components.Counter").Should().NotBeNull();
+        app.GeneratedTrees.Should().Contain(t => t.FilePath.Contains("Counter_razor", StringComparison.Ordinal));
+
+        using var workspace = MSBuildWorkspace.Create();
+        var project = await workspace.OpenProjectAsync(projectPath);
+        var razor = project.AnalyzerReferences
+            .Select(r => r.FullPath)
+            .Should().ContainSingle(p => Path.GetFileName(p) == "Microsoft.CodeAnalysis.Razor.Compiler.dll").Which!;
+        var sdk = new DirectoryInfo(razor).Parent!.Parent!.Parent!.Parent!.Name;
+        Version.Parse(sdk.Split('-')[0]).Major.Should().BeGreaterThanOrEqualTo(11, $"the Razor generator is {razor}");
     }
 
     [Fact]

@@ -21,11 +21,7 @@ dotnet add package Ariadne.NET.Workspaces
 
 `Ariadne.NET.Workspaces` loads solutions and projects with MSBuild and checks them against a rule pack. It brings in `Ariadne.NET`, the rule engine, and `Ariadne.NET.Abstractions`, which holds the rule-pack schema and contracts. Reference `Ariadne.NET` alone to check compilations you build yourself, or `Ariadne.NET.Abstractions` alone when your tool only needs to describe rule packs.
 
-Load a built-in rule pack and check a solution or project against it in a console app. This needs `dotnet add package Microsoft.Extensions.DependencyInjection` as well, because Ariadne.NET references only the dependency injection abstractions. It also needs a .NET SDK on the machine, and one extra reference in the app's project file, which keeps the MSBuild assemblies out of the output. Without it the build fails with `MSBL001`:
-
-```xml
-<PackageReference Include="Microsoft.Build.Framework" Version="17.14.28" ExcludeAssets="runtime" />
-```
+Load a built-in rule pack and check a solution or project against it in a console app. This needs `dotnet add package Microsoft.Extensions.DependencyInjection` as well, because Ariadne.NET references only the dependency injection abstractions. It also needs a .NET SDK on the machine. The package keeps the MSBuild assemblies out of the app's output itself, so the project file needs no `Microsoft.Build.Framework` line; an app that still has the `17.14.28` line from 0.8 or earlier fails to restore with `NU1605` until the line is removed.
 
 ```csharp
 using Ariadne.NET.Abstractions;

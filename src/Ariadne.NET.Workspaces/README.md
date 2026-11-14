@@ -5,13 +5,7 @@ Loads .NET solutions and projects with `MSBuildWorkspace`, so Ariadne.NET can ch
 ## Requirements
 
 - **A .NET SDK on the machine.** The package finds it with MSBuildLocator and loads MSBuild from it. With no SDK, the load fails with an `Unavailable` error.
-- **A `Microsoft.Build.Framework` reference in every project that references this package.** It keeps the MSBuild assemblies out of your output, and the exclusion does not flow from the package to you:
-
-  ```xml
-  <PackageReference Include="Microsoft.Build.Framework" Version="17.14.28" ExcludeAssets="runtime" />
-  ```
-
-  Without it the build fails with `MSBL001`. The `BuildHost-netcore` and `BuildHost-net472` folders that the workspace needs come with the package and land in your output.
+- **No extra reference.** The package ships a `buildTransitive` targets file that keeps `Microsoft.Build.Framework` and `Microsoft.NET.StringTools` out of your output, so the build does not fail with `MSBL001`. Up to 0.8, every project that referenced this package needed its own `Microsoft.Build.Framework` line; remove it when you upgrade, or restore fails with `NU1605`, because the package now needs `Microsoft.Build.Framework` 18.7.1 or later. The `BuildHost-netcore` and `BuildHost-net472` folders that the workspace needs come with the package and land in your output.
 - **A restored solution.** Ariadne never restores. A project whose compilation is complete passes even if it was never restored, for example a project with no packages that targets the SDK's own framework. Any other project that does not compile fails the load, and when no `project.assets.json` is found the error adds `run 'dotnet restore' first`.
 
 ## Use

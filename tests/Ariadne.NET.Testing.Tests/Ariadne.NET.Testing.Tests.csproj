@@ -15,10 +15,11 @@
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1" />
     <!--
-      A project reference does not apply the package's buildTransitive targets, so this project keeps the reference every
-      project that references Ariadne.NET.Workspaces needs; see the Workspaces README.
+      A project reference skips the buildTransitive targets of Ariadne.NET.Workspaces, so this project keeps the two
+      references they replace for a package consumer; see the Workspaces README.
     -->
-    <PackageReference Include="Microsoft.Build.Framework" Version="17.14.28" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.Build.Framework" Version="18.7.1" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.NET.StringTools" Version="18.7.1" ExcludeAssets="runtime" />
   </ItemGroup>
 
   <ItemGroup>
