@@ -126,7 +126,7 @@ The engine automatically resolves which layer a component belongs to based on it
 
 ## Semantic Validation
 
-Checks a solution or project against the architecture rules with the compiler's semantic model. `Ariadne.NET.Workspaces` loads the projects with MSBuild, and the engine builds a type graph from each compilation. A dependency is a type reference somebody wrote: base types, interfaces, attributes, member signatures, generic arguments and types used in bodies. An unused `using` and `var` give nothing, and generated code is never a source.
+Checks a solution or project against the architecture rules with the compiler's semantic model. `Ariadne.NET.Workspaces` loads the projects with MSBuild, and the engine builds a type graph from each compilation. A dependency is a type reference somebody wrote: base types, interfaces, attributes, member signatures, generic arguments and types used in bodies. An unused `using` and `var` give nothing. Generated code is never a source, except the code of Razor components and views (`.razor`, `.cshtml`), which is checked like hand-written code and reported at the Razor file.
 
 Detected violations:
 - **DependencyNotAllowed** — a type references a type in a layer that is not in its layer's `allowedDependencies`. One violation per source type and target type, located at the first reference, with a reference count. Carries the layer's id and `because`.
