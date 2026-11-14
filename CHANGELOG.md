@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.2](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.9.1...v0.9.2) (2026-11-14)
+
+
+### Documentation
+
+* show the pack Daedalus ships in the migration guide ([edcd716](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/edcd716ab6bd89399afccc79d92e9b5a47e0148c))
+
 ## [0.9.1](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.9.0...v0.9.1) (2026-11-14)
 
 
