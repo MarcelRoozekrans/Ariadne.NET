@@ -217,7 +217,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Goal:** Rule exceptions and amendment exceptions accept `attributes`, with the selector key's meaning, so `p-have-any-attributes:not` leaves `KnownGaps`, its catalogue row becomes `covered` and #97 closes. Gap phase from the 2026-11-14 milestone audit.
 **Surface:** Backend
 **HelpWanted:** no
-**Design:** _to be written_
+**Design:** `docs/superpowers/specs/2026-11-14-phase-4.7-attributes-in-rule-exceptions-design.md`
 **Plan:** _to be written_
 
 ## Milestone 5: Agent surfaces [status: pending]
