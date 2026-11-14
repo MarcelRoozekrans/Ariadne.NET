@@ -144,6 +144,22 @@ public class UniqueNameRulesTests
     }
 
     [Fact]
+    public void Exception_attributes_suppress_types_that_carry_the_attribute()
+    {
+        var pack = PackWith(new RuleException { Attributes = ["Shop.Web.MirrorAttribute"], Because = "Marked web types may mirror domain names." });
+
+        Check(pack, """
+            namespace Shop.Domain { public class Order { } public class Line { } }
+            namespace Shop.Web
+            {
+                public sealed class MirrorAttribute : System.Attribute { }
+                [Mirror] public class Order { }
+                public class Line { }
+            }
+            """).Should().ContainSingle().Which.SourceType.Should().Be("Shop.Web.Line");
+    }
+
+    [Fact]
     public void Exception_traits_suppress_matching_types_only()
     {
         var pack = PackWith(new RuleException { Kinds = [CSharpTypeKind.Record], Because = "Web DTO records may mirror domain names." });

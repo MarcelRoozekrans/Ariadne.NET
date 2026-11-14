@@ -344,6 +344,11 @@
         },
         {
           "required": [
+            "attributes"
+          ]
+        },
+        {
+          "required": [
             "names"
           ]
         },
@@ -383,7 +388,7 @@
           ]
         }
       ],
-      "description": "A place where the rule does not apply. On a bannedPackages rule only assemblies, on a uniqueNames rule namespaces, types and the type traits. Type traits are accepted on every rule kind except bannedPackages.",
+      "description": "A place where the rule does not apply. On a bannedPackages rule only assemblies, on a uniqueNames rule namespaces, types, attributes and the type traits. Attributes and type traits are accepted on every rule kind except bannedPackages.",
       "properties": {
         "namespaces": {
           "$ref": "#/$defs/patternList"
@@ -393,6 +398,10 @@
         },
         "types": {
           "$ref": "#/$defs/patternList"
+        },
+        "attributes": {
+          "$ref": "#/$defs/patternList",
+          "description": "Attribute classes applied directly to the type, as in a selector. Not accepted on a bannedPackages rule."
         },
         "because": {
           "$ref": "#/$defs/text",
@@ -724,6 +733,7 @@
                   "properties": {
                     "namespaces": false,
                     "types": false,
+                    "attributes": false,
                     "names": false,
                     "kinds": false,
                     "accessibility": false,

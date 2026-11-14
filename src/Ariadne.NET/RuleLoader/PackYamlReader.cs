@@ -73,7 +73,7 @@ internal static class PackYamlReader
 
     private static readonly string[] OtherSelectorKeys = ["namespaces", "assemblies", "types", "baseTypes", "interfaces", "attributes", "members"];
 
-    private static readonly string[] ExceptionKeys = ["namespaces", "assemblies", "types", .. TraitKeys, "because"];
+    private static readonly string[] ExceptionKeys = ["namespaces", "assemblies", "types", "attributes", .. TraitKeys, "because"];
 
     private const string RuleBodyKeys = "'forbid', 'allowOnly', 'require', 'bannedPackages', 'uniqueNames' or 'slices'";
 
@@ -958,10 +958,11 @@ internal static class PackYamlReader
                 var namespaces = PatternList(fields, "namespaces", where, Glob.Dotted);
                 var assemblies = PatternList(fields, "assemblies", where, Glob.Flat);
                 var types = PatternList(fields, "types", where, Glob.Dotted);
+                var attributes = PatternList(fields, "attributes", where, Glob.Dotted);
                 var traits = ReadTraits(fields, where);
                 var because = RequiredString(fields, "because", where, map);
                 var misplaced = RejectMisplaced(fields, where, kind);
-                if (!misplaced && NoneSelected(fields, [("namespaces", namespaces), ("assemblies", assemblies), ("types", types)])
+                if (!misplaced && NoneSelected(fields, [("namespaces", namespaces), ("assemblies", assemblies), ("types", types), ("attributes", attributes)])
                     && !traits.AnySelected(fields))
                 {
                     var allowed = ExceptionKeyRules.Allowed(kind);
@@ -975,6 +976,7 @@ internal static class PackYamlReader
                         Namespaces = namespaces ?? [],
                         Assemblies = assemblies ?? [],
                         Types = types ?? [],
+                        Attributes = attributes ?? [],
                         Names = traits.Names ?? [],
                         Kinds = traits.Kinds ?? [],
                         Accessibility = traits.Accessibility ?? [],

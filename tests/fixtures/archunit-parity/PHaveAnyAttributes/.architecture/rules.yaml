@@ -10,3 +10,13 @@ rules:
       from: { attributes: ["Parity.PHaveAnyAttributes.Contracts.AuditedAttribute"] }
       to:
         namespaces: ["Parity.PHaveAnyAttributes.Target.**"]
+  - id: PARITY-PHAVEANYATTRIBUTES-NOT
+    because: Mirrors ArchUnitNET's DoNotHaveAnyAttributes; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PHaveAnyAttributes.**"]
+      to:
+        namespaces: ["Parity.PHaveAnyAttributes.Target.**"]
+    exceptions:
+      - attributes: ["Parity.PHaveAnyAttributes.Contracts.AuditedAttribute"]
+        because: DoNotHaveAnyAttributes leaves out the types that carry Audited.
