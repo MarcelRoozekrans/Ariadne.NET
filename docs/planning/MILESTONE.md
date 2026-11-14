@@ -21,12 +21,12 @@ Anyone who writes architecture rules in ArchUnitNET can write the same rules in 
 
 ## Phases
 
-1. Phase 4.1 — Parity catalogue and harness [pending]
-2. Phase 4.2 — Type-level conditions [pending]
-3. Phase 4.3 — Slices [pending]
-4. Phase 4.4 — Target vacuity [pending]
-5. Phase 4.5 — Migration guide [pending]
-6. Phase 4.6 — Daedalus switch-over [pending]
+1. Phase 4.1 — Parity catalogue and harness [complete]
+2. Phase 4.2 — Type-level conditions [complete]
+3. Phase 4.3 — Slices [complete]
+4. Phase 4.4 — Target vacuity [complete]
+5. Phase 4.5 — Migration guide [complete]
+6. Phase 4.6 — Daedalus switch-over [complete]
 
 ## Audit History
 
