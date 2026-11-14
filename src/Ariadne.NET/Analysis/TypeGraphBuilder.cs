@@ -7,7 +7,10 @@ namespace Ariadne.NET.Analysis;
 /// <summary>Builds the type dependency graph of a compilation's hand-written code.</summary>
 internal static class TypeGraphBuilder
 {
-    /// <summary>Walks every non-generated tree of the compilation and collects its type edges and source types, and no member edges.</summary>
+    /// <summary>
+    /// Walks every non-generated tree of the compilation and collects its type edges and source types, and no member edges.
+    /// Razor generator trees are skipped here, as they are in every tree set; pass them to the overload that takes them.
+    /// </summary>
     public static TypeGraph Build(
         Compilation compilation,
         IReadOnlySet<SyntaxTree> generatedTrees,
@@ -43,12 +46,13 @@ internal static class TypeGraphBuilder
         ArgumentNullException.ThrowIfNull(filter);
 
         var walker = new TypeReferenceWalker(filter, cancellationToken);
+        var razorFiles = razorTrees.Count == 0 ? null : RazorSource.FilePaths(razorTrees, cancellationToken);
         foreach (var tree in compilation.SyntaxTrees)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!GeneratedCode.IsGeneratedTree(tree, compilation, generatedTrees, razorTrees, cancellationToken))
             {
-                walker.Walk(compilation.GetSemanticModel(tree), razorTrees.Contains(tree));
+                walker.Walk(compilation.GetSemanticModel(tree), razorFiles?.GetValueOrDefault(tree));
             }
         }
 

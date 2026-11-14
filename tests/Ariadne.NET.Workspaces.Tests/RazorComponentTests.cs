@@ -39,8 +39,26 @@ public sealed class RazorComponentTests
         violation.Location.Value.Line.Should().Be(8);
     }
 
+    // Hidden code, such as the base type, is reported at line 1 of the component's own file, not at _Imports.razor, whose usings
+    // come first in every component tree, and not in the generated file, which the lowercase folder of Banner would sort first.
+    [Theory]
+    [InlineData("Razor.App.Components.Counter", "Counter.razor")]
+    [InlineData("Razor.App.Components.shared.Banner", "Banner.razor")]
+    public async Task HiddenComponentCode_IsReportedAtLine1OfItsOwnRazorFile(string component, string file)
+    {
+        var report = await ValidateAsync();
+
+        var violation = report.Violations.Should().ContainSingle(v =>
+            string.Equals(v.RuleId, "RAZOR-PROBE-HIDDEN-CODE", StringComparison.Ordinal)
+            && string.Equals(v.SourceType, component, StringComparison.Ordinal)).Which;
+        violation.Target.Should().Be("Microsoft.AspNetCore.Components.ComponentBase");
+        Path.GetFileName(violation.Location!.Value.FilePath).Should().Be(file);
+        violation.Location.Value.Line.Should().Be(1);
+        violation.Location.Value.Column.Should().Be(1);
+    }
+
     [Fact]
-    public async Task OnlyTheTwoRazorViolations()
+    public async Task OnlyTheExpectedRazorViolations()
     {
         var report = await ValidateAsync();
 
@@ -49,6 +67,8 @@ public sealed class RazorComponentTests
         [
             ("RAZOR-NO-INFRASTRUCTURE", "Razor.App.Components.Counter"),
             ("RAZOR-NO-DTO-COPIES", "Razor.App.Components.Counter.ProjectDto"),
+            ("RAZOR-PROBE-HIDDEN-CODE", "Razor.App.Components.Counter"),
+            ("RAZOR-PROBE-HIDDEN-CODE", "Razor.App.Components.shared.Banner"),
         ]);
     }
 

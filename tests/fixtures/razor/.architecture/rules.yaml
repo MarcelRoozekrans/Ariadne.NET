@@ -26,3 +26,12 @@ rules:
         layers: [Components]
       against:
         namespaces: ["Razor.App.Contracts"]
+  # A probe, not a real rule: it makes each component's base-type edge to ComponentBase visible. That edge sits in Razor's
+  # hidden code, so its location shows where hidden code is reported: line 1 of the component's own Razor file.
+  - id: RAZOR-PROBE-HIDDEN-CODE
+    because: Probe that shows where code under #line hidden is reported.
+    forbid:
+      from:
+        layers: [Components]
+      to:
+        namespaces: ["Microsoft.AspNetCore.Components"]

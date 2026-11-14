@@ -39,7 +39,7 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     private INamedTypeSymbol? _source;
 
     // The Razor file of the tree being walked, or null when the tree is not from the Razor generator.
-    private string? _razorFallbackPath;
+    private string? _razorFilePath;
 
     public TypeReferenceWalker(MemberNameFilter filter, CancellationToken cancellationToken)
     {
@@ -61,19 +61,17 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     public Dictionary<INamedTypeSymbol, SourceLocation> SourceTypes { get; } = new(SymbolEqualityComparer.Default);
 
     /// <summary>Walks one tree, binding through the given semantic model.</summary>
-    public void Walk(SemanticModel model) => Walk(model, isRazor: false);
+    public void Walk(SemanticModel model) => Walk(model, razorFilePath: null);
 
     /// <summary>
-    /// Walks one tree, binding through the given semantic model; locations in a tree of the Razor generator are mapped to its
-    /// Razor file.
+    /// Walks one tree, binding through the given semantic model. For a tree of the Razor generator, <paramref name="razorFilePath"/>
+    /// names its Razor file: locations follow the tree's <c>#line</c> mapping, and unmapped code is reported at line 1 of that file.
     /// </summary>
-    public void Walk(SemanticModel model, bool isRazor)
+    public void Walk(SemanticModel model, string? razorFilePath)
     {
         ArgumentNullException.ThrowIfNull(model);
 
-        _razorFallbackPath = isRazor
-            ? RazorSource.FilePathOf(model.SyntaxTree, _cancellationToken) ?? model.SyntaxTree.FilePath
-            : null;
+        _razorFilePath = razorFilePath;
         _model = model;
         _programType = null;
         _source = null;
@@ -81,7 +79,7 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
         _importScopeOwner = null;
         Visit(model.SyntaxTree.GetRoot(_cancellationToken));
         _model = null;
-        _razorFallbackPath = null;
+        _razorFilePath = null;
     }
 
     public override void VisitClassDeclaration(ClassDeclarationSyntax node)
@@ -631,7 +629,7 @@ internal sealed class TypeReferenceWalker : CSharpSyntaxWalker
     private SourceLocation ToLocation(TextSpan span)
     {
         var tree = Model.SyntaxTree;
-        if (_razorFallbackPath is { } razorPath)
+        if (_razorFilePath is { } razorPath)
         {
             return RazorSource.Locate(tree, span, razorPath, _cancellationToken);
         }
