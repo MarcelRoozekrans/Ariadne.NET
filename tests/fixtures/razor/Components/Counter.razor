@@ -2,4 +2,8 @@
 
 @code {
     private int _count;
+
+    public static System.Type ClockType => typeof(Razor.App.Infrastructure.Clock);
+
+    public sealed record ProjectDto(System.Guid Id);
 }
