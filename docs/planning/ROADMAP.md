@@ -213,6 +213,13 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Plan:** `docs/superpowers/plans/2026-11-11-phase-4.6-daedalus-switch-over.md`
 **Completed:** 2026-11-14
 
+### Phase 4.7: Attributes in rule exceptions [status: pending]
+**Goal:** Rule exceptions and amendment exceptions accept `attributes`, with the selector key's meaning, so `p-have-any-attributes:not` leaves `KnownGaps`, its catalogue row becomes `covered` and #97 closes. Gap phase from the 2026-11-14 milestone audit.
+**Surface:** Backend
+**HelpWanted:** no
+**Design:** _to be written_
+**Plan:** _to be written_
+
 ## Milestone 5: Agent surfaces [status: pending]
 **Goal:** Agents in the family runtime and in editors use Ariadne while writing code.
 **Definition of Done:**
