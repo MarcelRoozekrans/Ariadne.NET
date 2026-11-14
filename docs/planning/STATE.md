@@ -1,19 +1,17 @@
 # Session State
 
-**Last session:** 2026-11-14 (Phase 4.7 designed, planned, built and reviewed; next: merge, release, re-audit Milestone 4)
+**Last session:** 2026-11-14 (Phase 4.7 merged and released in 0.9.2; next: re-audit and complete Milestone 4)
 **Repository:** `MarcelRoozekrans/Ariadne.NET`, public since 2026-11-03. The old private repository `MarcelRoozekrans/architecture-governance-engine` is frozen. In the current clones, the main checkout and its worktrees, `origin` is `MarcelRoozekrans/Ariadne.NET`; push with `git push origin HEAD:<branch>`. Check `git remote -v` in an older clone, where the new repository may still be the remote `ariadne`.
 
 ## Current Position
 
-## Next: merge Phase 4.7, release, then close Milestone 4
+## Next: re-audit Milestone 4, then complete it
 
-- **Phase 4.7 built 2026-11-14** on `feat/phase-4.7-exception-attributes`, stacked on `chore/complete-phase-4.6` (PR #134). ROADMAP.md and MILESTONE.md already say complete; the plan is ticked. Design `docs/superpowers/specs/2026-11-14-phase-4.7-attributes-in-rule-exceptions-design.md`, plan `docs/superpowers/plans/2026-11-14-phase-4.7-attributes-in-rule-exceptions.md`, both approved.
-- **What it does:** rule exceptions and amendment exceptions take `attributes`, with the selector meaning: attribute classes applied directly to the type. A bannedPackages exception rejects it in the loader, the reference check, the merger and the schema. `PARITY-PHAVEANYATTRIBUTES-NOT` added, `KnownGaps.Entries` is empty, catalogue row `covered`. Commits are `feat`, so release-please makes a minor release.
-- **Owner decisions 2026-11-14:** `attributes` only, not `baseTypes` or `interfaces`, because `assignableTo` covers their negations; execute natively with one final review.
-- **Found during execution:** the plan missed `RulePackReferenceCheck`, which called an attributes-only exception empty; fixed with tests. Final review: no Critical or Important; three Minors fixed in the loop: the uniqueNames exception message now names every key it takes, the selector docs say `attributes` are direct and work in exceptions, and the migration guide says that `assignableTo` used for a `DoNotInherit` exception also exempts the named base class.
-- **Verification:** full suite green except the three known local `SolutionLoaderTests`; build 0 errors, 13 known #132 warnings.
-- **Next steps:** merge #134, then the 4.7 PR; check that the release-please PR lists the 4.7 `feat` commits; merge the release when the owner says so; then rerun `audit-milestone` for Milestone 4, which now expects `KnownGaps` empty, then `complete-milestone`. Close #97 if the 4.7 PR's merge did not.
-- **Open follow-up:** #132, the 13 build warnings from `Microsoft.Build.Framework` and `Microsoft.NET.StringTools` 18.12.2.
+- **Branch:** `chore/milestone-4-close`, from `main` after the 0.9.2 release. Do the audit and completion here and open one PR.
+- **Phase 4.7 merged and released 2026-11-14:** PR #134 squash-merged as ffb0b23; PR #136 `feat: accept attributes in rule exceptions` squash-merged as df8f70d after it was rebased onto `main` and CodeRabbit approved; #97 closed. Release PR #133 merged by the session on the owner's instruction, with `--admin` for the review rule only, as 603da3c; tag `v0.9.2`, `publish-nuget` green, docs deploy green. Changelog 0.9.2 lists the feature. It is a patch bump because of `bump-patch-for-minor-pre-major`.
+- **Phase 4.7 facts:** rule exceptions and amendment exceptions take `attributes`, meaning the attribute classes applied directly to the type, and a bannedPackages exception rejects it. `KnownGaps.Entries` is empty and the catalogue row `p-have-any-attributes` reads `covered`. The migration guide now says that `assignableTo` used for `DoNotImplementInterface` or `DoNotInherit` exempts the named type itself; this came from a review finding and a CodeRabbit finding.
+- **Next steps:** run `audit-milestone` for Milestone 4. The 2026-11-14 audit `docs/superpowers/reviews/2026-11-14-milestone-4-audit.md` failed only on the `KnownGaps` gap, and DoD criterion 8 was amended for `RetainedArchitectureTests`. Write a new audit report. On PASS, run `complete-milestone`; `Released by` is release-please, so it creates no tag. Then open the PR, and on merge start Milestone 5 with `new-milestone`.
+- **Open follow-up:** #132, the 13 build warnings from `Microsoft.Build.Framework` and `Microsoft.NET.StringTools` 18.12.2. Also red Renovate PR for YamlDotNet major.
 
 ## Phase 4.6 on Ariadne.NET 0.9.1 — finished
 
