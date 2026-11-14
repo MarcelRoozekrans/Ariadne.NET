@@ -1,0 +1,142 @@
+# AGENTS.md: Ariadne.NET
+
+This file provides guidance to coding agents when working with code in this repository.
+
+A pattern-agnostic architecture governance engine for .NET. Architecture patterns (clean, hexagonal, CQRS, …) are declarative YAML **rule packs**; the engine resolves and merges them, then uses them to generate correctly placed C# components (Roslyn) and to validate existing solutions (semantic type graph). Core principle: *AI generates behavior, the engine governs structure.* Five NuGet packages ship from it: `Ariadne.NET`, `Ariadne.NET.Abstractions`, `Ariadne.NET.Workspaces`, `Ariadne.NET.Testing` and the `ariadne` dotnet tool `Ariadne.NET.Cli`.
+
+## Layout
+
+### Projects
+
+- `Ariadne.NET.Abstractions` — the rule-pack schema (`RulePack`, `LayerDefinition`, `ComponentRoleDefinition`, …) and the pack contracts `IRulePackLoader`, `IRulePackResolver`, `IBuiltinPackRegistry`, all in the one flat namespace `Ariadne.NET.Abstractions`. Packable. Its only dependencies are `ZeroAlloc.Results` 1.5.0 and `ZeroAlloc.Validation` 2.5.0 (which bundles its generator; there is no separate Generator reference), and it is `IsAotCompatible`; `tests/Ariadne.NET.AotSmoke` proves it publishes with Native AOT. It also holds `AriadneError`. Keep it that way: no ZeroAlloc.Inject, no YamlDotNet, no loading logic. The validation contracts stay in the engine until M2 settles their shape.
+- `Ariadne.NET` — the engine: YAML loading, `extends` resolution, merging, built-in packs, the semantic validator (`Analysis/`), the report writers (`Reports/`: text, JSON and SARIF, the last two serialized with ZeroAlloc.Serialisation 2.11.0), sync and code generation. Packable; depends on Abstractions. Must have no host dependencies, and no MSBuild: it validates `Compilation`s it is handed.
+- `Ariadne.NET.Workspaces` — loads a `.sln`, `.slnx`, `.slnf` or `.csproj` with `MSBuildWorkspace` (`ISolutionLoader`) and runs the engine's validator on it (`ISolutionValidator`). Packable; with `Ariadne.NET.Testing`, the only project that references `Microsoft.CodeAnalysis.Workspaces.MSBuild` (`Microsoft.Build.Locator` comes in through Workspaces). It also holds `IPackSetValidator`: it finds the `.architecture` folder from the solution's folder upward, checks every `.yaml` or `.yml` directly in it as its own pack, except `imports.yaml` and `imports.yml`, the `ariadne sync` manifest (an error that does not already name the file is prefixed with `In pack file '<name>': `, each violation carries `Pack`) and merges them into one report. Package consumers add no MSBuild line: `buildTransitive/Ariadne.NET.Workspaces.targets` drops the runtime copies of `Microsoft.Build.Framework` and `Microsoft.NET.StringTools` (both 18.12.2, which Roslyn 5.12 needs) before MSBuildLocator's `MSBL001` check, also for consumers of `Ariadne.NET.Testing`. A project reference skips `buildTransitive`, so every project in this repo that references Workspaces carries both with `ExcludeAssets="runtime"`: the CLI, MCP hosts, hooks, tests and `tools/perf`. No other `Microsoft.Build*` assembly may land in an output folder. When a project has compile errors, `AnalyzerLoadCheck` reads each analyzer's metadata and names those the compiler cannot load (missing, not an assembly, built against a newer Microsoft.CodeAnalysis) first; `tests/fixtures/razor` fails in CI when the newest SDK's Razor generator outruns the Roslyn Ariadne ships, so CI installs that SDK. Ariadne never restores.
+- `Ariadne.NET.Testing` — `ArchitectureCheck.Run`, `RunAsync`, `AssertValid` and `AssertValidAsync` run the pack-set check from a unit test in any framework; failures are `ArchitectureCheckException` (could not run) and its subtype `ArchitectureViolationException` (message is the text report, `Report` holds the data). Packable, depends on Workspaces, net10 only. Consumers add no `Microsoft.Build.Framework` line: the Workspaces `buildTransitive` targets reach them through the package dependency, and the package references `Microsoft.CodeAnalysis.Workspaces.MSBuild` itself with `PrivateAssets="none"` so the BuildHost folders reach the consumer. Projects in this repo reference it as a project, which skips `buildTransitive`, so `tests/Ariadne.NET.Testing.Tests` keeps its own `Microsoft.Build.Framework` and `Microsoft.NET.StringTools` references. `tools/release/inspect_packages.py` lets Workspaces and Testing depend on MSBuild packages and nothing else.
+- `Ariadne.NET.Hooks` — the Claude Code hooks behind `ariadne hook <event>`: `HookHost` runs the `IHook` for session-start, pre-tool-use or stop. Host layer, not packable. **Fail open:** a hook exits 0 for every outcome and a failure becomes one `ariadne hook: ...` line on stderr with empty stdout, because a non-zero exit blocks the agent's tool call (only a missing event argument is a usage error). `HookCommand` must let nothing escape.
+- `Ariadne.NET.Cli` — System.CommandLine 3.0.0 CLI. Packable as a dotnet tool: `PackageId` `Ariadne.NET.Cli`, command `ariadne`, framework-dependent on net10 (no AOT, MSBuild is located at run time). `PackAsTool` bundles the project references, so the package has no Ariadne dependencies. `--version` prints the informational version without the `+` build metadata; `validate` is async on `IPackSetValidator`, and a cancelled run prints `Cancelled.` and exits 2; one static `XxxCommand.Create(IServiceProvider)` per command in `Commands/`, wired in `CliRootCommand`. Commands return `ExitCodes` (0 success, 1 violations, 2 error); `CliRootCommand.InvokeAsync` turns uncaught exceptions into 2. `hook` is the exception to the exit codes: it always returns 0, apart from the missing-argument usage error, and speaks UTF-8 without a BOM on its standard streams. `tests/Ariadne.NET.Cli.Tests` changes the process working directory, so it runs without test parallelization.
+- `Ariadne.NET.Mcp` — MCP stdio server. Tools are static methods on `[McpServerToolType]` classes in `Tools/`; resources in `Resources/` (`ariadne://packs/{name}`). Services are injected as method parameters.
+- `Ariadne.NET.Mcp.Http` — **not a REST API anymore** (the REST controllers were removed). It is only the HTTP transport for the MCP tools, reusing the tool/resource assemblies from `Ariadne.NET.Mcp`.
+
+### Outside src/
+
+- `tools/release/` holds `inspect_packages.py` with its unit tests and the `consumer` and `testing-consumer` sample programs that CI's `pack-validate` job builds against the packed local feed. `tools/perf/Ariadne.NET.Perf` is the load and check benchmark, part of the solution but not packed.
+- `examples/github-actions/` holds the example consumer workflows that CI's `fail-the-build` job mirrors.
+
+## Architecture
+
+### Pipeline
+
+`RulePackResolver` → `RulePackMerger` → `LayerInferenceEngine` → `CodeGeneratorService`, wired by `GenerateOrchestrator` (components) and `WorkspaceOrchestrator` (solution scaffolding). Validation is a separate path: `ISolutionValidator` (Workspaces) loads the projects, then `IArchitectureValidator` (`Analysis/`) builds a `TypeGraph` per compilation, one edge per type reference somebody wrote, and checks it with `LayerRules`, `ForbidRules`, `AllowOnlyRules`, `RequireRules`, `SliceRules` and `RoleRules` over a selector-based `LayerMap`. `SliceRules` runs once over the graphs of all projects, so a cycle that no single project holds is still found: `(*)` and `(**)` captures cut the source types of the run into slices, `SliceDependency` is one violation per source and target type and `SliceCycle` one per slice edge inside a strongly connected component. `RequireRules` checks `layer`, `kind`, `accessibility`, `implements`, and `is` and `isNot`, which give one `RequirementNotMet` violation per failed key for every selected type; the older keys keep skipping enums and delegates. `var` and unused usings give no edge, generated code is never a source except Razor generator output (`.razor`, `.cshtml`), which is checked with locations mapped to the Razor file through `#line` (`AnalyzedProject.RazorTrees`, found by `RazorGenerator` from the folder directly above the hint name in the generated document's path, which names the generator type; unmapped code goes to line 1 of the file the tree's `#pragma checksum` names, or its `.g.cs` sibling's for a `.decl.g.cs`), and a project is checked once per target framework. A layer violation is one per source and target type, with the layer id (or the joined ids for an overlap), a rule id, `ROLE-<Name>`, `CODE-001` or `CODE-002` as rule id, and the layer's or rule's `because`. `VacuityRules` reports a rule, role or layer that selects nothing, and also a rule's target that matches nothing when the rule sets `requireTarget` (`forbid`, `allowOnly` and `uniqueNames` only; `allowEmpty` does not excuse it). `docs/perf/phase-2.1-baseline.md` holds the load and check baseline from `tools/perf`, with the phase 2.2 re-measurement in its own section. The result then leaves as a report: `TextReportWriter`, `JsonReportWriter` (schema 1) and `SarifReportWriter` (SARIF 2.1.0) in `Reports/`; JSON and SARIF paths are relative to the repository root (`ReportRoot`, the nearest ancestor with a `.git` entry) with `/` separators, and `ArchitectureCheck` in the Testing package can write them from a test.
+
+- **Resolution:** a user pack (usually `.architecture/rules.yaml`) lists `extends:` references. `builtin://<name>` loads an embedded pack from `src/Ariadne.NET/BuiltinPacks/*.yaml` (registered via `EmbeddedResource`; adding a YAML file there adds a template). `import://<name>` loads from `.architecture/.cache/git/<name>/` and requires a working directory — populated by `ariadne sync` from `.architecture/imports.yaml` (`Sync/`: git CLI provider, semver tag ranges). Anything else is an `Invalid` Result. The user pack is merged last.
+- **Loading and validation:** `PackYamlReader` reads a schema 2 pack strictly. It walks YamlDotNet's representation model by hand against a closed key set per mapping and collects every problem as `<location>:<line>:<column>: <message>`; a missing `schema: 2` is the one v1 hint, linking the docs page's `#migrating-from-v1` anchor. Then the member rules run through the `*Validator` types that ZeroAlloc.Validation generates in Abstractions, as a backstop for packs built in code. After every resolve, `RulePackReferenceCheck` checks cross-references on the merged pack: duplicate layer or role names, duplicate layer and rule ids, an empty layer or rule id (a pack built in code), unknown layers in `allowedDependencies` and in rule targets, a role's unknown layer, an unknown `interfaceRole`. Both report `Rule pack '{name}' is invalid.` with one `path: reason` line per failure as Detail, built by `RulePackError`. Selectors take the trait keys `names`, `kinds`, `accessibility`, `assignableTo`, `sealed`, `abstract`, `static` and `nested` on `TargetSelector` and `RuleException`: in `require` `for`, `forbid` and `allowOnly` targets, `is` and `isNot` and exceptions, not in `uniqueNames` `for` or `against`, and `layers` may sit next to traits but not next to glob keys; `kind` and role `typeKind` reject `enum` and `delegate`, which only `kinds` accepts. A role-only pack (`cqrs`, `ddd-tactical`) has no layers and resolves on its own, but should be combined with a base pack that declares the layers its roles name; when the merged pack declares at least one layer, a role naming an undeclared layer is an `Invalid` error.
+- **Merge semantics** (`RulePackMerger`, errors only, every problem collected): packs merge parent first, then the child. A layer or rule id defined by two packs is a conflict; a child retargets an inherited layer's `namespaces` and `assemblies` (an entry with only `name` and selectors) and appends `exceptions` to an inherited rule (an entry with only `id` and `exceptions`), and an amendment of a `locked` rule fails. Component roles merge by name, later wins; naming conventions: last pack wins. Composite template expressions like `clean-architecture+cqrs` are parsed by `TemplateReference` into one `builtin://` reference per name; both `ariadne init` and the MCP `template` parameter use it. Two layer-defining packs, such as `clean-architecture+microservice`, do not compose.
+- **Rule auto-detection in MCP:** `RuleResolutionHelper` uses an explicit `template` argument, else `.architecture/rules.yaml` in the current directory, else falls back to `clean-architecture`. The CLI instead requires `.architecture/rules.yaml` (created by `ariadne init`).
+
+### Dependency injection
+
+Registration is compile-time via **ZeroAlloc.Inject** 1.12.0: classes are annotated `[Singleton]` and the generator emits the internal `AddAriadneNETGeneratedServices()` (Core). The hand-written public `AddAriadneNETServices()` (`AriadneNETServiceCollectionExtensions.cs`) composes it with the ZeroAlloc.Resilience-generated `AddGitClientResilience<GitCliClient>()`, because Inject cannot see another generator's output. The Workspaces project registers `ISolutionLoader`, `ISolutionValidator` and `IPackSetValidator` with plain `AddSingleton` in `AddAriadneNETWorkspaces()`, which callers use next to `AddAriadneNETServices()`. The Mcp project's generated `AddAriadneNETMcpServices()` registers `RuleResolutionHelper` behind `IRuleResolutionHelper`. A new service only needs the attribute; `ServiceRegistrationTests` asserts the Core services resolve.
+
+### Errors
+
+Expected failures are values, not exceptions. The loader, resolver, registry, `TemplateReference`, imports loader, `SemVerRange` and sync all return `Result<T, AriadneError>` (ZeroAlloc.Results). `AriadneError` is a record struct with `Code` (`NotFound`=1, `Invalid`=2, `Unavailable`=3), `Message` and `Detail`. The CLI prints `Error: {Message}`, then the `Detail` unindented on the next line when there is one, and exits 2; only `ariadne sync` indents, listing each failed import with its Detail indented under it. Every `Message` is a full sentence ending in a period. MCP tools surface errors by throwing `McpException`, which the SDK turns into an `IsError` tool result; resources throw `McpProtocolException` with `ResourceNotFound`. Remaining `throw` sites are `ArgumentNullException` guards, embedded-resource packaging bugs, the `GitCliClient` proxy feed, that MCP idiom, the `ArgumentException` guards in `SliceRules` and `TargetMatcher.From` against a malformed rule built in code, which `RulePackReferenceCheck` already reports on resolve, and two in `CodeGeneratorService`: the `ArgumentException` for a role the pack lacks, or one whose `TypeKind` is `Enum` or `Delegate`, is a guard against direct API misuse, since `GenerateOrchestrator` passes only the role inference found and the validators reject those two kinds, and the `ArgumentOutOfRangeException` arm for an undefined `TypeKind` is unreachable, since the loader rejects one. Code generation stays non-Result until M5. Anything else is a bug.
+
+### Telemetry and resilience
+
+`Ariadne.NET.Telemetry.AriadneTelemetry.SourceName` is `"Ariadne.NET"`. `Telemetry/` holds only `AriadneTelemetry` and the instrumented interfaces `IPackOperations` and `ISyncOperations`; their one implementations sit next to the facades that call them, `PackOperations` in `RuleLoader/` and `SyncOperations` in `Sync/`. Spans are `ariadne.load`, `ariadne.resolve`, `ariadne.get_pack` and `ariadne.sync_import`; the histogram is `ariadne.operation.duration`. The ZeroAlloc.Telemetry proxies are built explicitly behind the public facades, not registered in DI. Git access goes through an internal `IGitClient` wrapped by ZeroAlloc.Resilience (Timeout 60 s per git command, one budget shared by all its attempts; Retry 3 attempts, exponential backoff from 500 ms). Git arguments are an argv list with `--`, import names and paths are contained, symlinks are refused, and URL credentials are redacted in messages and `.git-info.json`.
+
+### Repo's own rules
+
+`.architecture/rules.yaml` is a standalone schema 2 pack that governs this repo itself, selecting by assembly: Core, Workspaces, Host (CLI, hooks, MCP servers and the testing package) and Tests layers, plus `forbid` rules that keep Core free of the hosts, the workspace loader and host frameworks. CI runs `ariadne validate` on the repo's own solution with it; `validate` checks every pack file in `.architecture/`, so a second pack file added there is checked too, and a pack meant to be imported must be a `builtin://` or `import://` reference, not a file in that folder.
+
+## Build and test
+
+The solution file is `src/Ariadne.NET.slnx` (the .NET 10 XML format, not `.sln`). CI installs the .NET 10 and 11 SDKs; all projects target `net10.0`.
+
+```bash
+dotnet build src/Ariadne.NET.slnx
+dotnet test src/Ariadne.NET.slnx
+
+# Single test project / single test
+dotnet test tests/Ariadne.NET.Tests
+dotnet test src/Ariadne.NET.slnx --filter "FullyQualifiedName~RulePackMergerTests"
+dotnet test src/Ariadne.NET.slnx --filter "FullyQualifiedName=Ariadne.NET.Tests.RuleEngine.RulePackMergerTests.<Method>"
+
+# Run hosts
+dotnet run --project src/Ariadne.NET.Cli -- <init|rules|roles|generate|validate|sync|hook> [...]   # init --agent claude also installs the Claude Code hooks into .claude/settings.json (keeps an existing rules.yaml); validate takes a .sln, .slnx, .slnf or .csproj, default ., and `--format text|json|sarif` and `--output <file>` (json and sarif without --output: the report alone on stdout, the text report on stderr; a write failure exits 2; an unknown --format is a usage error that exits 1), and checks every .yaml or .yml directly in the .architecture folder (not imports.yaml or imports.yml, the sync manifest) found from the solution's folder upward, not the working directory's rules.yaml; hook <session-start|pre-tool-use|stop> reads Claude Code hook JSON on stdin
+dotnet run --project src/Ariadne.NET.Mcp        # MCP over stdio
+dotnet run --project src/Ariadne.NET.Mcp.Http   # MCP over HTTP at /mcp
+
+# Native AOT check for Ariadne.NET.Abstractions: fails on any trim or AOT warning
+dotnet publish tests/Ariadne.NET.AotSmoke -c Release -r linux-x64 -p:PublishAot=true -warnaserror
+
+# Docs site (Docusaurus, deployed to GitHub Pages)
+cd docs-site && npm ci && npm run start
+```
+
+The build and test steps as CI runs them (`.github/workflows/ci.yml`, job `build`), including the architecture self-check:
+
+```bash
+dotnet restore src/Ariadne.NET.slnx
+dotnet build src/Ariadne.NET.slnx --no-restore -c Release
+dotnet test src/Ariadne.NET.slnx --no-build -c Release --collect:"XPlat Code Coverage" --results-directory ./test-results
+dotnet run --project src/Ariadne.NET.Cli -c Release --no-build -- validate src/Ariadne.NET.slnx
+python3 -m unittest discover -s tools/release -p "test_inspect_packages.py"
+```
+
+The docs site build (`.github/workflows/docs.yml`, Node 22) is `npm ci && npm run build` in `docs-site/`.
+
+CI (`.github/workflows/ci.yml`) builds and tests on ubuntu and windows with the .NET 10 and 11 SDKs, with a coverage gate and a codecov upload on ubuntu. It also runs `aot-smoke` and `pack-validate` (packs the five packages, restores the `tools/release/consumer` sample from a local feed with no MSBuild reference, then installs the `ariadne` tool from that feed with `--tool-path` and runs it), `fail-the-build` (needs `pack-validate`, downloads its `packages` artifact, installs the tool from it with a local-only nuget.config, restores and validates `tests/fixtures/broken/Shop.slnx` with `--format sarif` and expects exit 1 plus a SARIF result, then expects exit 0 on the clean fixture; same flags as the examples in `examples/github-actions/`), `commitlint` on pull requests, and `publish-nuget` on a tag dispatch. `.github/workflows/baseline-checks.yml` runs the ci-baseline v1 checks: gitleaks, CodeQL and NuGetAudit. There is no separate lint step: analyzers (Meziantou, Roslynator, ErrorProne.NET, NetFabric.Hyperlinq, ZeroAlloc) run during build via `Directory.Build.props`. `TreatWarningsAsErrors` is on in `Directory.Build.props`, so the build must stay at zero warnings. ZeroAlloc.Analyzers is at 1.13.0.
+
+The version is read from `.release-please-manifest.json` by `Directory.Build.props`; a normal build is `<version>-local`. A release pack passes `-p:AriadneRelease=true` to the build that compiles the DLLs too, as CI does with `dotnet pack src/Ariadne.NET.slnx -c Release -p:AriadneRelease=true -o artifacts/packages`; a `--no-build` pack after a build without it ships release-numbered packages whose DLLs still say `-local`.
+
+## Conventions and gotchas
+
+### Conventions enforced by analyzers
+
+- Public APIs expose `IList<T>`/`IDictionary<,>`/`IReadOnlyList<T>`, not `List<T>`/`Dictionary<,>` (MA0016). Rule-schema models use `IList<T>`.
+- String-keyed dictionaries and string comparisons need an explicit `StringComparer`/`StringComparison` (MA0002 etc.); the engine uses `OrdinalIgnoreCase` for names.
+- One type per file (MA0048) — this is why records/enums each have their own file.
+- `ConfigureAwait(false)` on awaits.
+- Tests: xUnit + FluentAssertions (+ NSubstitute in `Ariadne.NET.Tests`). Test folders mirror the source namespaces (Abstractions types are tested under `tests/Ariadne.NET.Tests/Abstractions/`, the validator under `Analysis/`); `tests/Ariadne.NET.Workspaces.Tests` loads the fixture solutions in `tests/fixtures`; `tests/Ariadne.NET.Testing.Tests` covers `ArchitectureCheck` (xUnit, project reference, so its own `Microsoft.Build.Framework` and `Microsoft.NET.StringTools` lines); MCP tool tests construct the real services directly rather than via DI.
+- `tests/Ariadne.NET.Parity.Tests` runs ArchUnitNET 0.13.5 and Ariadne side by side on `tests/fixtures/archunit-parity` (built, not only restored, by `FixtureProjects.EnsureParityBuilt`); the catalogue `docs-site/docs/archunitnet-parity.md` is checked against `ParityCases`, `KnownGaps` and `Divergences`; a phase closes a gap by adding the pack rule and deleting its entry.
+
+### Docs
+
+The Docusaurus site builds from `docs-site/docs/`, the source of the user-facing docs (`docs/features.md` is an older copy that is no longer updated); `docs/` otherwise holds design and plan documents, perf notes and planning state. A change to the pack format also changes `docs-site/static/schema/pack.schema.json`; the tests in `tests/Ariadne.NET.Tests/PackSchema` fail when the schema and the loader disagree on a listed case; add a case there for every new key or rule. The migration guide `docs-site/docs/migrating-from-archunitnet.md` is checked too: `MigrationGuideSnippetTests` loads its YAML blocks and checks the Daedalus test map against the worked-example pack, and `MigrationGuideTests` checks its catalogue ids against the catalogue.
+
+### Releases
+
+Conventional commits on `main` drive release-please, which opens a release PR using the release bot App token. Merging it tags `vX.Y.Z` and dispatches `ci.yml`, whose `publish-nuget` job pushes five packages, `Ariadne.NET`, `Ariadne.NET.Abstractions`, `Ariadne.NET.Workspaces`, `Ariadne.NET.Testing` and `Ariadne.NET.Cli`, to nuget.org. The version comes from `.release-please-manifest.json`; see `RELEASING.md`.
+
+<!-- org-core:start sha256=3022fd292033117a25777334465cf8843056c471038e693d18c2272e0bc8044a (generated from docker-nuc scripts/agents-md/org-core-personal.md; do not edit here) -->
+## Org rules
+
+These rules hold in every public MarcelRoozekrans repo.
+
+### Commits and releases
+
+- Conventional Commits. release-please reads them on the default branch: `feat:` and `fix:` cut a
+  release, `docs:`, `chore:`, `ci:`, `test:` and `refactor:` do not. A breaking change needs `!` or
+  a `BREAKING CHANGE:` footer.
+- A commit body never contains nested parentheses. release-please cannot parse them and silently
+  drops the whole commit from the changelog, while the workflow still reports success.
+- After merging a `feat:` or `fix:`, check that the commit appears in the release-please PR.
+
+### Branches and pull requests
+
+- Every change goes through a branch and a pull request. Never push to the default branch directly.
+- A PR body says what the diff does, and nothing the diff does not do.
+- Fix review findings in the PR under review, including small ones. File an issue only for a finding
+  that belongs to other code, needs a design decision, is its own piece of work, or waits on
+  something external.
+
+### CI
+
+- The .NET repos call the shared workflows of `MarcelRoozekrans/ci-baseline`, pinned to `@v1`, never
+  `@main`.
+- Its coverage gate fails the build when line coverage drops below the floor of 80%, and Codecov
+  fails a PR that lowers project coverage by more than 1 percentage point. New code comes with
+  tests.
+- A repo with a lower floor documents the reason and links the issue that raises it.
+<!-- org-core:end -->
