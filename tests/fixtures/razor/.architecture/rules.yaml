@@ -1,0 +1,28 @@
+schema: 2
+name: razor-fixture
+
+# Issue #127: a component's @code block reaches the compilation only as Razor generator output. Both rules fire only when that
+# output is checked.
+layers:
+  - name: Components
+    id: RAZOR-LAYER-COMPONENTS
+    because: Components hold the user interface and depend on no other layer.
+    description: "Razor components"
+    allowedDependencies: []
+    namespaces: ["Razor.App.Components", "Razor.App.Components.**"]
+
+rules:
+  - id: RAZOR-NO-INFRASTRUCTURE
+    because: Components reach infrastructure only through services the host registers.
+    forbid:
+      from:
+        layers: [Components]
+      to:
+        namespaces: ["Razor.App.Infrastructure", "Razor.App.Infrastructure.**"]
+  - id: RAZOR-NO-DTO-COPIES
+    because: Components use the contract types instead of declaring copies of them.
+    uniqueNames:
+      for:
+        layers: [Components]
+      against:
+        namespaces: ["Razor.App.Contracts"]
