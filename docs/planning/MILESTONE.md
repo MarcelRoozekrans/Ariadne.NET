@@ -32,3 +32,4 @@ Anyone who writes architecture rules in ArchUnitNET can write the same rules in 
 
 | Date | Verdict | Gaps |
 |---|---|---|
+| 2026-11-14 | FAIL | `KnownGaps` holds `p-have-any-attributes:not` (#97); Daedalus keeps `RetainedArchitectureTests`, a third C# architecture test. Report `docs/superpowers/reviews/2026-11-14-milestone-4-audit.md` |
