@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.9.0](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.8.1...v0.9.0) (2026-11-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* Ariadne.NET.Workspaces needs Microsoft.Build.Framework 18.7.1, so remove the 17.14.28 line that 0.8 required; the package now keeps MSBuild out of the output itself
+
+### Features
+
+* name each analyzer the compiler cannot load when a project fails to compile ([4eb91b7](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/4eb91b745bee4c6012d3e34f9486211e8bc67a9b))
+
+
+### Bug Fixes
+
+* Ariadne.NET.Workspaces needs Microsoft.Build.Framework 18.7.1, so remove the 17.14.28 line that 0.8 required; the package now keeps MSBuild out of the output itself ([4eb91b7](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/4eb91b745bee4c6012d3e34f9486211e8bc67a9b))
+* load Razor components built by the .NET 11 SDK by moving to Microsoft.CodeAnalysis 5.12.0 ([4eb91b7](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/4eb91b745bee4c6012d3e34f9486211e8bc67a9b))
+
 ## [0.8.1](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.8.0...v0.8.1) (2026-11-13)
 
 
