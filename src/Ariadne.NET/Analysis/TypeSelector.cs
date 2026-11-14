@@ -58,7 +58,7 @@ internal sealed class TypeSelector
     }
 
     /// <summary>
-    /// Compiles a rule exception once: its <c>namespaces</c>, <c>assemblies</c> and <c>types</c> globs and its traits, all
+    /// Compiles a rule exception once: its <c>namespaces</c>, <c>assemblies</c>, <c>types</c> and <c>attributes</c> globs and its traits, all
     /// AND-ed. The loader validates patterns and values, so an invalid one is a programming error.
     /// </summary>
     /// <param name="exception">The exception to compile.</param>
@@ -68,7 +68,7 @@ internal sealed class TypeSelector
     {
         ArgumentNullException.ThrowIfNull(exception);
 
-        return Compile(exception.Namespaces, exception.Assemblies, exception.Types, [], [], [], [], TypeTraits.From(exception));
+        return Compile(exception.Namespaces, exception.Assemblies, exception.Types, [], [], exception.Attributes, [], TypeTraits.From(exception));
     }
 
     /// <summary>Compiles the patterns once. The loader validates patterns, so an invalid one is a programming error.</summary>

@@ -1,18 +1,18 @@
 # Session State
 
-**Last session:** 2026-11-14 (Phase 4.6 completed; Milestone 4 audit FAIL with one gap; gap Phase 4.7 added; next: brainstorm Phase 4.7)
+**Last session:** 2026-11-14 (Phase 4.7 designed, planned, built and reviewed; next: merge, release, re-audit Milestone 4)
 **Repository:** `MarcelRoozekrans/Ariadne.NET`, public since 2026-11-03. The old private repository `MarcelRoozekrans/architecture-governance-engine` is frozen. In the current clones, the main checkout and its worktrees, `origin` is `MarcelRoozekrans/Ariadne.NET`; push with `git push origin HEAD:<branch>`. Check `git remote -v` in an older clone, where the new repository may still be the remote `ariadne`.
 
 ## Current Position
 
-## Next: Phase 4.7, Attributes in rule exceptions (#97)
+## Next: merge Phase 4.7, release, then close Milestone 4
 
-- **Branch:** `chore/complete-phase-4.6` holds the 4.6 completion, the audit and the new phase; its PR is open against `main`. Start 4.7 on a new branch from `main` once it has merged, else from that branch.
-- **Done 2026-11-14:** `complete-phase` 4.6: plan ticked, ROADMAP.md and MILESTONE.md say complete. MILESTONE.md's phase list also caught up with 4.1 to 4.5.
-- **Milestone 4 audit, 2026-11-14, FAIL:** `docs/superpowers/reviews/2026-11-14-milestone-4-audit.md`. Gap: `KnownGaps` still holds the type-level case `p-have-any-attributes:not`, because rule exceptions take no `attributes` (#97). Deviation: Daedalus keeps `RetainedArchitectureTests` next to the two C# tests the DoD allowed.
-- **Owner decisions 2026-11-14:** close #97 in a new Backend phase 4.7 that accepts `attributes` in rule exceptions and amendment exceptions, with the selector key's meaning; this settles #97's "needs a decision" in favour of `attributes`. Amend DoD criterion 8 to allow `RetainedArchitectureTests`; done in MILESTONE.md.
-- **Phase 4.7 inputs:** #97 names the work: loader, `RuleException`, `pack.schema.json`, a `PackSchema` case, the `PARITY-PHAVEANYATTRIBUTES-NOT` rule in `tests/fixtures/archunit-parity/PHaveAnyAttributes`, delete the `KnownGaps` entry, mark the catalogue row `covered`, close #97. Exceptions already compile to `TypeSelector`. Check the migration guide and the rule-schema docs page for the exception key list.
-- **Next steps:** `start-next-phase` routes 4.7 to brainstorming (no design yet), then writing-plans and execution. After it merges and is released, rerun `audit-milestone`, then `complete-milestone`.
+- **Phase 4.7 built 2026-11-14** on `feat/phase-4.7-exception-attributes`, stacked on `chore/complete-phase-4.6` (PR #134). ROADMAP.md and MILESTONE.md already say complete; the plan is ticked. Design `docs/superpowers/specs/2026-11-14-phase-4.7-attributes-in-rule-exceptions-design.md`, plan `docs/superpowers/plans/2026-11-14-phase-4.7-attributes-in-rule-exceptions.md`, both approved.
+- **What it does:** rule exceptions and amendment exceptions take `attributes`, with the selector meaning: attribute classes applied directly to the type. A bannedPackages exception rejects it in the loader, the reference check, the merger and the schema. `PARITY-PHAVEANYATTRIBUTES-NOT` added, `KnownGaps.Entries` is empty, catalogue row `covered`. Commits are `feat`, so release-please makes a minor release.
+- **Owner decisions 2026-11-14:** `attributes` only, not `baseTypes` or `interfaces`, because `assignableTo` covers their negations; execute natively with one final review.
+- **Found during execution:** the plan missed `RulePackReferenceCheck`, which called an attributes-only exception empty; fixed with tests. Final review: no Critical or Important; three Minors fixed in the loop: the uniqueNames exception message now names every key it takes, the selector docs say `attributes` are direct and work in exceptions, and the migration guide says that `assignableTo` used for a `DoNotInherit` exception also exempts the named base class.
+- **Verification:** full suite green except the three known local `SolutionLoaderTests`; build 0 errors, 13 known #132 warnings.
+- **Next steps:** merge #134, then the 4.7 PR; check that the release-please PR lists the 4.7 `feat` commits; merge the release when the owner says so; then rerun `audit-milestone` for Milestone 4, which now expects `KnownGaps` empty, then `complete-milestone`. Close #97 if the 4.7 PR's merge did not.
 - **Open follow-up:** #132, the 13 build warnings from `Microsoft.Build.Framework` and `Microsoft.NET.StringTools` 18.12.2.
 
 ## Phase 4.6 on Ariadne.NET 0.9.1 — finished

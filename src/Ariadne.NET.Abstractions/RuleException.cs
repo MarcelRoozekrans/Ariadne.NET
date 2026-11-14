@@ -9,6 +9,8 @@ public sealed class RuleException
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> Namespaces { get; init; } = [];
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> Assemblies { get; init; } = [];
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> Types { get; init; } = [];
+    /// <summary>Dotted globs over the full name of the attribute classes applied directly to the type, as in a selector. Any one may match.</summary>
+    [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> Attributes { get; init; } = [];
     /// <summary>Flat globs (<c>Glob.Flat</c>) over the innermost simple name of the type, without arity. Any one may match.</summary>
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> Names { get; init; } = [];
     /// <summary>Type kinds the type may have: class, interface, record, struct, record struct, enum or delegate. Any one may match.</summary>

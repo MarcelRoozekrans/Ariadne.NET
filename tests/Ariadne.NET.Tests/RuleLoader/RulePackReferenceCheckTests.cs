@@ -497,7 +497,15 @@ public class RulePackReferenceCheckTests
         var rule = ForbidRule(new TargetSelector { Types = ["**.X"] }, null, new RuleException { Because = "Empty." });
 
         Resolve(PackWithRule(rule)).Error.Detail.Should().Be(
-            "exceptions[0] of rule 'R-1' selects nothing; it needs at least one of namespaces, assemblies, types or a trait");
+            "exceptions[0] of rule 'R-1' selects nothing; it needs at least one of namespaces, assemblies, types, attributes or a trait");
+    }
+
+    [Fact]
+    public void Exception_with_only_attributes_resolves()
+    {
+        var rule = ForbidRule(new TargetSelector { Types = ["**.X"] }, null, new RuleException { Attributes = ["**.AuditedAttribute"], Because = "Audited." });
+
+        Resolve(PackWithRule(rule)).IsSuccess.Should().BeTrue();
     }
 
     [Theory]
@@ -645,6 +653,23 @@ public class RulePackReferenceCheckTests
     }
 
     [Fact]
+    public void Capture_in_exception_attributes_of_a_slices_rule_is_invalid()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "R-1",
+            Because = "because",
+            Kind = RuleKind.Slices,
+            From = new TargetSelector(),
+            Slices = Slices(),
+            Exceptions = [new RuleException { Attributes = ["Shop.(*).LegacyAttribute"], Because = "x" }],
+        };
+
+        Resolve(PackWithRule(rule)).Error.Detail.Should().Be(
+            "exceptions[0] of rule 'R-1' has a pattern with a capture; a capture, (*) or (**), is only accepted in the matching of a slices rule");
+    }
+
+    [Fact]
     public void Capture_in_an_amendment_exception_of_a_slices_rule_is_invalid()
     {
         var pack = new RulePack
@@ -742,6 +767,6 @@ public class RulePackReferenceCheckTests
         };
 
         Resolve(PackWithRule(rule)).Error.Detail.Should().Be(
-            "exceptions[0] of rule 'R-1' has 'assemblies'; an exception of a uniqueNames rule excuses a type's name, so it takes 'types' or 'namespaces'");
+            "exceptions[0] of rule 'R-1' has 'assemblies'; an exception of a uniqueNames rule excuses a type's name, so it takes 'namespaces', 'types', 'attributes' or a type trait");
     }
 }

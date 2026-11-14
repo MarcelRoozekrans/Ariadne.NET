@@ -162,9 +162,9 @@ Matching is ordinal and case-sensitive, like C# names.
 
 - **`baseTypes`** match any type in the base class chain of a type, with the `types` grammar. `**.RepositoryBase` selects every class that derives from a `RepositoryBase`, directly or not. A generic base is matched without its type arguments.
 - **`interfaces`** match any interface a type implements or inherits, directly or through a base class, with the `types` grammar. `**.I*Repository` selects every implementation of a repository interface.
-- **`attributes`** match the full name of an attribute on the type, with the `types` grammar. Write the name as the compiler knows it, so `**.ObsoleteAttribute` and not `**.Obsolete`.
+- **`attributes`** match the full name of an attribute applied directly to the type, with the `types` grammar. An attribute the type only inherits from a base class does not count. Write the name as the compiler knows it, so `**.ObsoleteAttribute` and not `**.Obsolete`.
 
-The three keys work in the `for` of a `require` rule and in the targets of `forbid` and `allowOnly`. Like `namespaces`, `assemblies` and `types`, they cannot be mixed with `layers` in one target.
+The three keys work in the `for` of a `require` rule and in the targets of `forbid` and `allowOnly`. `attributes` also works in `exceptions`, including the exceptions of an amendment, except on a `bannedPackages` rule. Like `namespaces`, `assemblies` and `types`, they cannot be mixed with `layers` in one target.
 
 ### Type traits
 
@@ -189,7 +189,7 @@ A target may have `layers` together with traits: a type must be in one of the la
 
 An empty pattern, or one with an empty segment such as `Shop..Domain`, is a load error.
 
-`TargetSelector` has `Layers`, `Namespaces`, `Assemblies`, `Types`, `BaseTypes`, `Interfaces`, `Attributes` and `Members`, and the traits `Names`, `Kinds` (`IList<CSharpTypeKind>`, which includes `Enum` and `Delegate`), `Accessibility`, `AssignableTo`, `Sealed`, `Abstract`, `Static` and `Nested` (`bool?`). `RuleException` has `Namespaces`, `Assemblies`, `Types`, the same eight traits and a required `Because`.
+`TargetSelector` has `Layers`, `Namespaces`, `Assemblies`, `Types`, `BaseTypes`, `Interfaces`, `Attributes` and `Members`, and the traits `Names`, `Kinds` (`IList<CSharpTypeKind>`, which includes `Enum` and `Delegate`), `Accessibility`, `AssignableTo`, `Sealed`, `Abstract`, `Static` and `Nested` (`bool?`). `RuleException` has `Namespaces`, `Assemblies`, `Types`, `Attributes`, the same eight traits and a required `Because`.
 
 ## `extends`
 
