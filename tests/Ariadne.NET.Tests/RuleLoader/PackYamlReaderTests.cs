@@ -346,7 +346,7 @@ public class PackYamlReaderTests
 
         Problems(yaml).Should().Equal(
             new PackProblem(4, 5, "layer 'Domain' needs at least one of 'namespaces', 'assemblies'"),
-            new PackProblem(15, 9, "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'assemblies', 'types', 'names', 'kinds', 'accessibility', 'assignableTo', 'sealed', 'abstract', 'static', 'nested'"));
+            new PackProblem(15, 9, "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'assemblies', 'types', 'attributes', 'names', 'kinds', 'accessibility', 'assignableTo', 'sealed', 'abstract', 'static', 'nested'"));
     }
 
     [Fact]
@@ -1484,7 +1484,7 @@ public class PackYamlReaderTests
     {
         var yaml = RequireHead + "    uniqueNames:\n      for: { layers: [Web] }\n      against: { layers: [Application] }\n    exceptions:\n      - because: Old.\n";
 
-        Problems(yaml).Should().Equal(new PackProblem(10, 9, "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'types', 'names', 'kinds', 'accessibility', 'assignableTo', 'sealed', 'abstract', 'static', 'nested'"));
+        Problems(yaml).Should().Equal(new PackProblem(10, 9, "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'types', 'attributes', 'names', 'kinds', 'accessibility', 'assignableTo', 'sealed', 'abstract', 'static', 'nested'"));
     }
 
     [Fact]
@@ -1493,6 +1493,56 @@ public class PackYamlReaderTests
         var yaml = RequireHead + "    require:\n      for: { layers: [Domain], types: [\"**.X\"] }\n      layer: Domain\n";
 
         Problems(yaml).Should().ContainSingle().Which.Message.Should().Contain("cannot mix 'layers' with 'namespaces'");
+    }
+
+    [Fact]
+    public void Exception_with_attributes_reads()
+    {
+        var yaml = RequireHead + """
+                forbid:
+                  from: { namespaces: ["Shop.**"] }
+                  to: { namespaces: ["Shop.Persistence.**"] }
+                exceptions:
+                  - attributes: ["Shop.**.AuditedAttribute"]
+                    because: Audited types may use persistence.
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        result.Value.Rules.Should().ContainSingle().Which.Exceptions.Should().ContainSingle()
+            .Which.Attributes.Should().Equal("Shop.**.AuditedAttribute");
+    }
+
+    [Fact]
+    public void BannedPackages_ExceptionWithAttributes_Fails()
+    {
+        var yaml = RequireHead + """
+                bannedPackages:
+                  packages: [FluentValidation]
+                exceptions:
+                  - attributes: ["**.LegacyAttribute"]
+                    because: Old.
+            """;
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(9, 9, "'attributes' is not accepted in exceptions[0] of rule 'SH-001'; a package belongs to a project, so the exception of a bannedPackages rule names it by 'assemblies'"));
+    }
+
+    [Fact]
+    public void Exception_attributes_with_bad_glob_fails()
+    {
+        var yaml = RequireHead + """
+                forbid:
+                  from: { namespaces: ["Shop.**"] }
+                  to: { namespaces: ["Shop.Persistence.**"] }
+                exceptions:
+                  - attributes: ["A..B"]
+                    because: x
+            """;
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(10, 22, "'A..B' in exceptions[0] of rule 'SH-001' is not a valid pattern: pattern 'A..B' has an empty segment"));
     }
 
     private const string TraitNames =
@@ -1856,7 +1906,7 @@ public class PackYamlReaderTests
             """;
 
         Problems(yaml).Should().Equal(new PackProblem(10, 9,
-            "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'assemblies', 'types', " + TraitNames));
+            "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'assemblies', 'types', 'attributes', " + TraitNames));
     }
 
     private const string RequireTargetMessage = "'requireTarget' applies only to forbid, allowOnly and uniqueNames rules";
