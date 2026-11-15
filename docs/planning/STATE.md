@@ -1,6 +1,6 @@
 # Session State
 
-**Last session:** 2026-11-15 (Milestone 4 re-audit FAILED on criterion 3; gap phases 4.8 and 4.9 added; next: merge `chore/milestone-4-close`, then groom 4.8)
+**Last session:** 2026-11-15 (phases 4.8 and 4.9 groomed and approved on `chore/groom-phases-4.8-4.9`, PR opened; next: merge it, then build 4.8 and 4.9)
 **Repository:** `MarcelRoozekrans/Ariadne.NET`, public since 2026-11-03. The old private repository `MarcelRoozekrans/architecture-governance-engine` is frozen. In the current clones, the main checkout and its worktrees, `origin` is `MarcelRoozekrans/Ariadne.NET`; push with `git push origin HEAD:<branch>`. Check `git remote -v` in an older clone, where the new repository may still be the remote `ariadne`.
 
 ## Current Position
@@ -9,9 +9,17 @@
 
 - **2026-11-15 re-audit, FAIL:** `docs/superpowers/reviews/2026-11-15-milestone-4-audit.md`, audited at `main` 659d938 and Daedalus.NET 423bba73. Criteria 1, 2 and 4 to 9 pass: `KnownGaps.Entries` is empty, #97 is closed, and criterion 8 holds as amended, with Daedalus's `CleanArchitectureTests` as the DI integration test. Criterion 3 fails: nine type-level catalogue rows are `deferred` to #95 and #96, but the criterion allows deferral for member-level kinds only. I first wrote PASS and completed the milestone on PR #138; CodeRabbit flagged criterion 3, and the completion was reverted on the same PR.
 - **Owner decision 2026-11-15:** gap phases, not a criterion amendment. Phase 4.8 covers #95, attribute arguments and `OnlyHaveAttributes`; phase 4.9 covers #96, `DependOnAny` and dependency-based selectors. Both give their rows a pack form and a harness case: criterion 3 allows `out-of-scope` for custom predicates only, so if 4.9's design concludes a row does not belong in a pack, that needs the owner to amend the criterion first. Both are `pending` with no design yet.
-- **Branch:** `chore/milestone-4-close`, PR #138: the FAIL audit, the two phases and this file.
-- **Next steps:** merge #138; then `start-next-phase` brainstorms phase 4.8, or `groom-milestone` designs and plans 4.8 and 4.9 together. After both are complete, run `audit-milestone` again and write a new report.
-- **Open follow-up:** #132, the 13 build warnings from `Microsoft.Build.Framework` and `Microsoft.NET.StringTools` 18.12.2. Release PR #137 for 0.9.3 is open; merging it is the owner's call.
+- **Merged:** PR #138 squash-merged as ad40978 on 2026-11-15. Release PR #137 merged too, as 8f27a1b: 0.9.3. Work on branch `chore/groom-phases-4.8-4.9`, from `main` after ad40978.
+- **Next steps:** run project-orchestration `groom-milestone` for Milestone 4: brainstorm and plan 4.8, then 4.9, one commit per phase, then one PR. Read #95 and #96 and the Attributes and Dependencies sections of `docs-site/docs/archunitnet-parity.md` first. After both are complete, run `audit-milestone` again and write a new report.
+- **Phase 4.8 groomed 2026-11-15:** design `docs/superpowers/specs/2026-11-15-phase-4.8-attribute-arguments-and-allow-lists-design.md`, approved by the owner; plan `docs/superpowers/plans/2026-11-15-phase-4.8-attribute-arguments-and-allow-lists.md`, nine tasks. The owner picked two new additive selector keys, `attributeArguments` and `onlyAttributes`, valid wherever `attributes` is, over a mixed `attributes` list, which would break the API, and over C#-like strings. ArchUnitNET 0.13.5 facts, read from its source: `…WithArguments` needs every value somewhere among one instance's argument values, named values included and position ignored; `OnlyHaveAttributes` passes a type with no attributes; ArchUnitNET counts the compiler's nullable attributes, so the `only` rows may become `divergence`. The owner approved the plan on 2026-11-15, unchanged.
+- **Phase 4.9 groomed 2026-11-15:** design `docs/superpowers/specs/2026-11-15-phase-4.9-dependency-predicates-design.md` and plan `docs/superpowers/plans/2026-11-15-phase-4.9-dependency-predicates.md` (nine tasks), both approved by the owner. `**Builds on:** Phase 4.8`, with a `- guard 4.9:` check added to the 4.8 plan.
+  - Keys: `dependsOn` and `onlyDependsOn` take a nested rule-target selector, which the owner picked over a list of type globs and over layer names. It has no `members` and no nesting.
+  - Placement: the keys are valid wherever `attributes` is, and also next to `layers`.
+  - Semantics: a dependency is a `TypeGraph` edge, generic arguments included. `onlyDependsOn` ignores types declared outside the run, as ArchUnitNET's `OnlyDependOn` does.
+  - Implementation: the validator builds every graph first, then a run-wide `DependencyIndex`, and only then compiles and checks the rules.
+  - Parity: four parity cases. Each fixture has probes for a lambda closure, a framework-only type and an empty type, to measure IL-only dependencies.
+- **Next after the groom PR merges:** build 4.8, then 4.9: attended through `start-next-phase`, or queued with `ready-check`. Then run `audit-milestone` again.
+- **Open follow-up:** #132, the 13 build warnings from `Microsoft.Build.Framework` and `Microsoft.NET.StringTools` 18.12.2.
 
 ### Phase 4.7 closing notes
 
@@ -115,10 +123,9 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 
 ## Recommended Next Step
 
-1. Merge PR #138 once CI is green and CodeRabbit approves.
-2. Design and plan phases 4.8 and 4.9: `groom-milestone` for both, or `start-next-phase` for 4.8 first. Then build them, re-audit Milestone 4, and on PASS run `complete-milestone`; release-please handles the release, so no tag.
-3. Then start Milestone 5 with `new-milestone`, reusing the parked 5.7 design.
-4. CodeRabbit auto-pauses reviews when a branch gets many commits quickly; on a paused PR, comment `@coderabbitai review` once.
-5. `fix/hooks-follow-ups` is still pushed with no PR.
+1. Ask the owner to review the 4.8 plan. Then groom phase 4.9 (#96) with `groom-milestone` on `chore/groom-phases-4.8-4.9`, commit it, and open one PR for both grooms. Then build 4.8 and 4.9, re-audit Milestone 4, and on PASS run `complete-milestone`; release-please handles the release, so no tag.
+2. Then start Milestone 5 with `new-milestone`, reusing the parked 5.7 design.
+3. CodeRabbit auto-pauses reviews when a branch gets many commits quickly; on a paused PR, comment `@coderabbitai review` once.
+4. `fix/hooks-follow-ups` is still pushed with no PR.
 
 Commit rules: conventional commits; no `Co-Authored-By` trailer or session link; no nested parentheses in commit bodies; keep every footer line under 100 characters, because commitlint rejects longer ones; breaking commits carry `!` and a `BREAKING CHANGE` footer. Shared VM: one build or test at a time, no local AOT publish.
