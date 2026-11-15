@@ -1,6 +1,6 @@
 # Session State
 
-**Last session:** 2026-11-15 (Milestone 4 re-audit FAILED on criterion 3; gap phases 4.8 and 4.9 added; PR #138 merged as ad40978; next: groom 4.8 and 4.9)
+**Last session:** 2026-11-15 (phase 4.8 groomed and approved on `chore/groom-phases-4.8-4.9`; next: groom 4.9, then one PR)
 **Repository:** `MarcelRoozekrans/Ariadne.NET`, public since 2026-11-03. The old private repository `MarcelRoozekrans/architecture-governance-engine` is frozen. In the current clones, the main checkout and its worktrees, `origin` is `MarcelRoozekrans/Ariadne.NET`; push with `git push origin HEAD:<branch>`. Check `git remote -v` in an older clone, where the new repository may still be the remote `ariadne`.
 
 ## Current Position
@@ -11,6 +11,7 @@
 - **Owner decision 2026-11-15:** gap phases, not a criterion amendment. Phase 4.8 covers #95, attribute arguments and `OnlyHaveAttributes`; phase 4.9 covers #96, `DependOnAny` and dependency-based selectors. Both give their rows a pack form and a harness case: criterion 3 allows `out-of-scope` for custom predicates only, so if 4.9's design concludes a row does not belong in a pack, that needs the owner to amend the criterion first. Both are `pending` with no design yet.
 - **Merged:** PR #138 squash-merged as ad40978 on 2026-11-15. Release PR #137 merged too, as 8f27a1b: 0.9.3. Work on branch `chore/groom-phases-4.8-4.9`, from `main` after ad40978.
 - **Next steps:** run project-orchestration `groom-milestone` for Milestone 4: brainstorm and plan 4.8, then 4.9, one commit per phase, then one PR. Read #95 and #96 and the Attributes and Dependencies sections of `docs-site/docs/archunitnet-parity.md` first. After both are complete, run `audit-milestone` again and write a new report.
+- **Phase 4.8 groomed 2026-11-15:** design `docs/superpowers/specs/2026-11-15-phase-4.8-attribute-arguments-and-allow-lists-design.md`, approved by the owner; plan `docs/superpowers/plans/2026-11-15-phase-4.8-attribute-arguments-and-allow-lists.md`, nine tasks. The owner picked two new additive selector keys, `attributeArguments` and `onlyAttributes`, valid wherever `attributes` is, over a mixed `attributes` list, which would break the API, and over C#-like strings. ArchUnitNET 0.13.5 facts, read from its source: `…WithArguments` needs every value somewhere among one instance's argument values, named values included and position ignored; `OnlyHaveAttributes` passes a type with no attributes; ArchUnitNET counts the compiler's nullable attributes, so the `only` rows may become `divergence`. Plan review by the owner is still open: ask for it at the start of the next session.
 - **Open follow-up:** #132, the 13 build warnings from `Microsoft.Build.Framework` and `Microsoft.NET.StringTools` 18.12.2.
 
 ### Phase 4.7 closing notes
@@ -95,6 +96,10 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 - Issue #50: done, merged as #62 and released in 0.7.0.
 - The three 5.6 follow-ups (`stop_hook_active` keeps the edit list, `init` preserves a custom hook `timeout`, SIGTERM during `stop` exits 0): one hooks fix PR. Not yet implemented.
 
+## Grooming
+
+Grooming: milestone 4, next phase 4.9
+
 ## Open Decisions
 
 - #36: may a child pack amend an inherited layer's `allowedDependencies`; should retargeting respect `locked`; should an empty retarget be rejected? Matters for the M4 Daedalus pack.
@@ -115,7 +120,7 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 
 ## Recommended Next Step
 
-1. Design and plan phases 4.8 and 4.9 with `groom-milestone` on `chore/groom-phases-4.8-4.9`. Then build them, re-audit Milestone 4, and on PASS run `complete-milestone`; release-please handles the release, so no tag.
+1. Ask the owner to review the 4.8 plan. Then groom phase 4.9 (#96) with `groom-milestone` on `chore/groom-phases-4.8-4.9`, commit it, and open one PR for both grooms. Then build 4.8 and 4.9, re-audit Milestone 4, and on PASS run `complete-milestone`; release-please handles the release, so no tag.
 2. Then start Milestone 5 with `new-milestone`, reusing the parked 5.7 design.
 3. CodeRabbit auto-pauses reviews when a branch gets many commits quickly; on a paused PR, comment `@coderabbitai review` once.
 4. `fix/hooks-follow-ups` is still pushed with no PR.
