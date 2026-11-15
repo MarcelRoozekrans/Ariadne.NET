@@ -1,15 +1,16 @@
 # Session State
 
-**Last session:** 2026-11-15 (Milestone 4 re-audited, PASS, and completed; next: merge `chore/milestone-4-close`, then start Milestone 5)
+**Last session:** 2026-11-15 (Milestone 4 re-audit FAILED on criterion 3; gap phases 4.8 and 4.9 added; next: merge `chore/milestone-4-close`, then groom 4.8)
 **Repository:** `MarcelRoozekrans/Ariadne.NET`, public since 2026-11-03. The old private repository `MarcelRoozekrans/architecture-governance-engine` is frozen. In the current clones, the main checkout and its worktrees, `origin` is `MarcelRoozekrans/Ariadne.NET`; push with `git push origin HEAD:<branch>`. Check `git remote -v` in an older clone, where the new repository may still be the remote `ariadne`.
 
 ## Current Position
 
-## Milestone 4 complete — next: merge, then start Milestone 5
+## Next: build gap phases 4.8 and 4.9, then re-audit Milestone 4
 
-- **2026-11-15:** the re-audit `docs/superpowers/reviews/2026-11-15-milestone-4-audit.md` passed every criterion, audited at `main` 659d938 and Daedalus.NET 423bba73. `KnownGaps.Entries` is empty and #97 is closed; criterion 8 holds as amended, with `CleanArchitectureTests` in Daedalus's integration project as the DI integration test. Milestone 4 is `complete` in ROADMAP.md and MILESTONE.md. `Released by` is release-please, so no tag was made; 0.9.2 already carries the milestone's last feature.
-- **Branch:** `chore/milestone-4-close`, one PR with the audit, the completion and this file.
-- **Next steps:** merge that PR, then run `new-milestone` for Milestone 5, Agent surfaces, which brainstorms the milestone before MILESTONE.md is rewritten. Phase 5.6 is already complete and 5.7 is designed and parked.
+- **2026-11-15 re-audit, FAIL:** `docs/superpowers/reviews/2026-11-15-milestone-4-audit.md`, audited at `main` 659d938 and Daedalus.NET 423bba73. Criteria 1, 2 and 4 to 9 pass: `KnownGaps.Entries` is empty, #97 is closed, and criterion 8 holds as amended, with Daedalus's `CleanArchitectureTests` as the DI integration test. Criterion 3 fails: nine type-level catalogue rows are `deferred` to #95 and #96, but the criterion allows deferral for member-level kinds only. I first wrote PASS and completed the milestone on PR #138; CodeRabbit flagged criterion 3, and the completion was reverted on the same PR.
+- **Owner decision 2026-11-15:** gap phases, not a criterion amendment. Phase 4.8 covers #95, attribute arguments and `OnlyHaveAttributes`; phase 4.9 covers #96, `DependOnAny` and dependency-based selectors, and may mark rows `out-of-scope` with a reason the owner approves, since #96 asks whether they belong in a pack at all. Both are `pending` with no design yet.
+- **Branch:** `chore/milestone-4-close`, PR #138: the FAIL audit, the two phases and this file.
+- **Next steps:** merge #138; then `start-next-phase` brainstorms phase 4.8, or `groom-milestone` designs and plans 4.8 and 4.9 together. After both are complete, run `audit-milestone` again and write a new report.
 - **Open follow-up:** #132, the 13 build warnings from `Microsoft.Build.Framework` and `Microsoft.NET.StringTools` 18.12.2. Release PR #137 for 0.9.3 is open; merging it is the owner's call.
 
 ### Phase 4.7 closing notes
@@ -114,9 +115,10 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 
 ## Recommended Next Step
 
-1. Merge the `chore/milestone-4-close` PR once CI is green.
-2. Start Milestone 5 with project-orchestration `new-milestone`: brainstorm at milestone scope, write `docs/superpowers/specs/YYYY-MM-DD-milestone-5-design.md`, then rewrite MILESTONE.md and set Milestone 5 `active` in ROADMAP.md. Reuse the parked 5.7 design.
-3. CodeRabbit auto-pauses reviews when a branch gets many commits quickly; on a paused PR, comment `@coderabbitai review` once.
-4. `fix/hooks-follow-ups` is still pushed with no PR.
+1. Merge PR #138 once CI is green and CodeRabbit approves.
+2. Design and plan phases 4.8 and 4.9: `groom-milestone` for both, or `start-next-phase` for 4.8 first. Then build them, re-audit Milestone 4, and on PASS run `complete-milestone`; release-please handles the release, so no tag.
+3. Then start Milestone 5 with `new-milestone`, reusing the parked 5.7 design.
+4. CodeRabbit auto-pauses reviews when a branch gets many commits quickly; on a paused PR, comment `@coderabbitai review` once.
+5. `fix/hooks-follow-ups` is still pushed with no PR.
 
 Commit rules: conventional commits; no `Co-Authored-By` trailer or session link; no nested parentheses in commit bodies; keep every footer line under 100 characters, because commitlint rejects longer ones; breaking commits carry `!` and a `BREAKING CHANGE` footer. Shared VM: one build or test at a time, no local AOT publish.

@@ -1,8 +1,7 @@
 # Milestone 4: ArchUnitNET parity
 
-**Status:** complete
+**Status:** active
 **Started:** 2026-11-11
-**Completed:** 2026-11-15
 
 ## Goal
 
@@ -10,15 +9,15 @@ Anyone who writes architecture rules in ArchUnitNET can write the same rules in 
 
 ## Definition of Done
 
-- [x] All planned phases complete
-- [x] All tests passing
-- [x] The docs site has a parity catalogue listing every type-level and slice rule kind of the pinned ArchUnitNET version, each with its Ariadne equivalent or marked deferred (member level) or out of scope (custom predicates), with the reason
-- [x] Every in-scope catalogue entry has a clean and a broken fixture variant; CI runs ArchUnitNET and Ariadne on both and they agree on verdict and offending types, except where a `Divergences` entry with a fixture and a reason covers it; `KnownGaps` holds no type-level or slice entry; every `Divergences` entry appears in the catalogue
-- [x] Packs express type-level conditions (naming pattern, base type, attribute, sealed, abstract, static, nested) and slice rules (no cycles, no dependency between slices); the pack JSON Schema and its conformance tests cover them
-- [x] The built-in `modular-monolith` pack forbids one module's types from depending on another module's internals, a fixture proves it, and #32 is closed
-- [x] A migration guide on the docs site maps each ArchUnitNET construct to pack YAML and translates Daedalus's rules as a worked example
-- [x] Daedalus `main` references no ArchUnitNET package; its CI checks an Ariadne pack through `Ariadne.NET.Testing`; the only architecture tests left in C# are `NuGetPackageRootPathTests`, the DI integration test and `RetainedArchitectureTests`, which keeps the Rag.NET adapter fact as two reflection checks because its `Rag.**` target never appears in the solution and cannot use `requireTarget` (amended 2026-11-14 by the owner after the audit)
-- [x] Member-level rule kinds are filed as one issue
+- [ ] All planned phases complete
+- [ ] All tests passing
+- [ ] The docs site has a parity catalogue listing every type-level and slice rule kind of the pinned ArchUnitNET version, each with its Ariadne equivalent or marked deferred (member level) or out of scope (custom predicates), with the reason
+- [ ] Every in-scope catalogue entry has a clean and a broken fixture variant; CI runs ArchUnitNET and Ariadne on both and they agree on verdict and offending types, except where a `Divergences` entry with a fixture and a reason covers it; `KnownGaps` holds no type-level or slice entry; every `Divergences` entry appears in the catalogue
+- [ ] Packs express type-level conditions (naming pattern, base type, attribute, sealed, abstract, static, nested) and slice rules (no cycles, no dependency between slices); the pack JSON Schema and its conformance tests cover them
+- [ ] The built-in `modular-monolith` pack forbids one module's types from depending on another module's internals, a fixture proves it, and #32 is closed
+- [ ] A migration guide on the docs site maps each ArchUnitNET construct to pack YAML and translates Daedalus's rules as a worked example
+- [ ] Daedalus `main` references no ArchUnitNET package; its CI checks an Ariadne pack through `Ariadne.NET.Testing`; the only architecture tests left in C# are `NuGetPackageRootPathTests`, the DI integration test and `RetainedArchitectureTests`, which keeps the Rag.NET adapter fact as two reflection checks because its `Rag.**` target never appears in the solution and cannot use `requireTarget` (amended 2026-11-14 by the owner after the audit)
+- [ ] Member-level rule kinds are filed as one issue
 
 ## Phases
 
@@ -29,10 +28,12 @@ Anyone who writes architecture rules in ArchUnitNET can write the same rules in 
 5. Phase 4.5 — Migration guide [complete]
 6. Phase 4.6 — Daedalus switch-over [complete]
 7. Phase 4.7 — Attributes in rule exceptions [complete]
+8. Phase 4.8 — Attribute arguments and attribute allow-lists [pending]
+9. Phase 4.9 — Dependency predicates and DependOnAny [pending]
 
 ## Audit History
 
 | Date | Verdict | Gaps |
 |---|---|---|
 | 2026-11-14 | FAIL | `KnownGaps` holds `p-have-any-attributes:not` (#97); Daedalus keeps `RetainedArchitectureTests`, a third C# architecture test. Report `docs/superpowers/reviews/2026-11-14-milestone-4-audit.md` |
-| 2026-11-15 | PASS | None. Phase 4.7 closed the `KnownGaps` gap (#97); criterion 8 holds as amended. Report `docs/superpowers/reviews/2026-11-15-milestone-4-audit.md` |
+| 2026-11-15 | FAIL | Criterion 3: nine type-level catalogue rows are `deferred` (#95, #96), but the criterion allows deferral for member-level kinds only. Owner chose gap phases 4.8 and 4.9 over amending the criterion. Report `docs/superpowers/reviews/2026-11-15-milestone-4-audit.md` |
