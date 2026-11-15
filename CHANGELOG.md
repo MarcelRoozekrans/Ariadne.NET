@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.3](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.9.2...v0.9.3) (2026-11-15)
+
+
+### Documentation
+
+* add AGENTS.md for coding agents and reviewers ([659d938](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/659d9381c46ef58345a3edce1d28ccc219df2c0a))
+
 ## [0.9.2](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.9.1...v0.9.2) (2026-11-14)
 
 
