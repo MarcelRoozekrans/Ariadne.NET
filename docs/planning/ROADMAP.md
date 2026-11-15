@@ -229,6 +229,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 
 ### Phase 4.9: Dependency predicates and DependOnAny [status: pending]
 **Goal:** The three #96 catalogue rows (`c-depend-on-any`, `p-depend-on-any`, `p-only-depend-on`) leave `deferred`: each is expressed in packs with a harness case, and #96 closes. Criterion 3 allows `out-of-scope` for custom predicates only, so any other disposition needs an amendment of the criterion first. Gap phase from the 2026-11-15 milestone audit.
+**Plan:** `docs/superpowers/plans/2026-11-15-phase-4.9-dependency-predicates.md`
 **Surface:** Backend
 **HelpWanted:** no
 
