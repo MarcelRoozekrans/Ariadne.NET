@@ -28,9 +28,12 @@ Anyone who writes architecture rules in ArchUnitNET can write the same rules in 
 5. Phase 4.5 — Migration guide [complete]
 6. Phase 4.6 — Daedalus switch-over [complete]
 7. Phase 4.7 — Attributes in rule exceptions [complete]
+8. Phase 4.8 — Attribute arguments and attribute allow-lists [pending]
+9. Phase 4.9 — Dependency predicates and DependOnAny [pending]
 
 ## Audit History
 
 | Date | Verdict | Gaps |
 |---|---|---|
 | 2026-11-14 | FAIL | `KnownGaps` holds `p-have-any-attributes:not` (#97); Daedalus keeps `RetainedArchitectureTests`, a third C# architecture test. Report `docs/superpowers/reviews/2026-11-14-milestone-4-audit.md` |
+| 2026-11-15 | FAIL | Criterion 3: nine type-level catalogue rows are `deferred` (#95, #96), but the criterion allows deferral for member-level kinds only. Owner chose gap phases 4.8 and 4.9 over amending the criterion. Report `docs/superpowers/reviews/2026-11-15-milestone-4-audit.md` |

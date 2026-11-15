@@ -1,19 +1,22 @@
 # Session State
 
-**Last session:** 2026-11-14 (Phase 4.7 designed, planned, built and reviewed; next: merge, release, re-audit Milestone 4)
+**Last session:** 2026-11-15 (Milestone 4 re-audit FAILED on criterion 3; gap phases 4.8 and 4.9 added; next: merge `chore/milestone-4-close`, then groom 4.8)
 **Repository:** `MarcelRoozekrans/Ariadne.NET`, public since 2026-11-03. The old private repository `MarcelRoozekrans/architecture-governance-engine` is frozen. In the current clones, the main checkout and its worktrees, `origin` is `MarcelRoozekrans/Ariadne.NET`; push with `git push origin HEAD:<branch>`. Check `git remote -v` in an older clone, where the new repository may still be the remote `ariadne`.
 
 ## Current Position
 
-## Next: merge Phase 4.7, release, then close Milestone 4
+## Next: build gap phases 4.8 and 4.9, then re-audit Milestone 4
 
-- **Phase 4.7 built 2026-11-14** on `feat/phase-4.7-exception-attributes`, stacked on `chore/complete-phase-4.6` (PR #134). ROADMAP.md and MILESTONE.md already say complete; the plan is ticked. Design `docs/superpowers/specs/2026-11-14-phase-4.7-attributes-in-rule-exceptions-design.md`, plan `docs/superpowers/plans/2026-11-14-phase-4.7-attributes-in-rule-exceptions.md`, both approved.
-- **What it does:** rule exceptions and amendment exceptions take `attributes`, with the selector meaning: attribute classes applied directly to the type. A bannedPackages exception rejects it in the loader, the reference check, the merger and the schema. `PARITY-PHAVEANYATTRIBUTES-NOT` added, `KnownGaps.Entries` is empty, catalogue row `covered`. Commits are `feat`, so release-please makes a minor release.
-- **Owner decisions 2026-11-14:** `attributes` only, not `baseTypes` or `interfaces`, because `assignableTo` covers their negations; execute natively with one final review.
-- **Found during execution:** the plan missed `RulePackReferenceCheck`, which called an attributes-only exception empty; fixed with tests. Final review: no Critical or Important; three Minors fixed in the loop: the uniqueNames exception message now names every key it takes, the selector docs say `attributes` are direct and work in exceptions, and the migration guide says that `assignableTo` used for a `DoNotInherit` exception also exempts the named base class.
-- **Verification:** full suite green except the three known local `SolutionLoaderTests`; build 0 errors, 13 known #132 warnings.
-- **Next steps:** merge #134, then the 4.7 PR; check that the release-please PR lists the 4.7 `feat` commits; merge the release when the owner says so; then rerun `audit-milestone` for Milestone 4, which now expects `KnownGaps` empty, then `complete-milestone`. Close #97 if the 4.7 PR's merge did not.
-- **Open follow-up:** #132, the 13 build warnings from `Microsoft.Build.Framework` and `Microsoft.NET.StringTools` 18.12.2.
+- **2026-11-15 re-audit, FAIL:** `docs/superpowers/reviews/2026-11-15-milestone-4-audit.md`, audited at `main` 659d938 and Daedalus.NET 423bba73. Criteria 1, 2 and 4 to 9 pass: `KnownGaps.Entries` is empty, #97 is closed, and criterion 8 holds as amended, with Daedalus's `CleanArchitectureTests` as the DI integration test. Criterion 3 fails: nine type-level catalogue rows are `deferred` to #95 and #96, but the criterion allows deferral for member-level kinds only. I first wrote PASS and completed the milestone on PR #138; CodeRabbit flagged criterion 3, and the completion was reverted on the same PR.
+- **Owner decision 2026-11-15:** gap phases, not a criterion amendment. Phase 4.8 covers #95, attribute arguments and `OnlyHaveAttributes`; phase 4.9 covers #96, `DependOnAny` and dependency-based selectors. Both give their rows a pack form and a harness case: criterion 3 allows `out-of-scope` for custom predicates only, so if 4.9's design concludes a row does not belong in a pack, that needs the owner to amend the criterion first. Both are `pending` with no design yet.
+- **Branch:** `chore/milestone-4-close`, PR #138: the FAIL audit, the two phases and this file.
+- **Next steps:** merge #138; then `start-next-phase` brainstorms phase 4.8, or `groom-milestone` designs and plans 4.8 and 4.9 together. After both are complete, run `audit-milestone` again and write a new report.
+- **Open follow-up:** #132, the 13 build warnings from `Microsoft.Build.Framework` and `Microsoft.NET.StringTools` 18.12.2. Release PR #137 for 0.9.3 is open; merging it is the owner's call.
+
+### Phase 4.7 closing notes
+
+- **Phase 4.7 merged and released 2026-11-14:** PR #134 squash-merged as ffb0b23; PR #136 `feat: accept attributes in rule exceptions` squash-merged as df8f70d after it was rebased onto `main` and CodeRabbit approved; #97 closed. Release PR #133 merged by the session on the owner's instruction, with `--admin` for the review rule only, as 603da3c; tag `v0.9.2`, `publish-nuget` green, docs deploy green. Changelog 0.9.2 lists the feature. It is a patch bump because of `bump-patch-for-minor-pre-major`.
+- **Phase 4.7 facts:** rule exceptions and amendment exceptions take `attributes`, meaning the attribute classes applied directly to the type, and a bannedPackages exception rejects it. `KnownGaps.Entries` is empty and the catalogue row `p-have-any-attributes` reads `covered`. The migration guide now says that `assignableTo` used for `DoNotImplementInterface` or `DoNotInherit` exempts the named type itself; this came from a review finding and a CodeRabbit finding.
 
 ## Phase 4.6 on Ariadne.NET 0.9.1 — finished
 
@@ -95,7 +98,6 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 ## Open Decisions
 
 - #36: may a child pack amend an inherited layer's `allowedDependencies`; should retargeting respect `locked`; should an empty retarget be rejected? Matters for the M4 Daedalus pack.
-- #32: module-isolation rule type for modular monoliths needs a design and a phase slot.
 - An own YAML library: a separate, unscheduled project outside Ariadne (agreed 2026-10-31).
 - From the roadmap design, none blocking: whether M3 ships a Roslyn analyzer; code generation's role after M4; Mnemosyne.NET integration.
 
@@ -113,10 +115,10 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 
 ## Recommended Next Step
 
-Milestone 4 is groomed and on `main` (PR #84, merged 2026-11-12, CodeRabbit approved, CI green): six phases with approved designs, plans with `## Checks`, and guard checks.
-
-1. **Ready-check done 2026-11-12, queue written.** All five checks pass for 4.1 to 4.5; the base build is green. One gap was answered by the owner: the new public API in 4.2, 4.3 and 4.4 is approved, recorded in each plan's Global Constraints in fcd7265. The queue is a linear stack: `phase-4-1` on nothing, then 4-2 on 4-1, 4-3 on 4-2, 4-4 on 4-3 and 4-5 on 4-4, each PR against the branch before it, so one parked phase parks every later one. 4.6 is not queued. The queue file `.claude/unattended-queue.json` is git-excluded and lives only in the worktree that wrote it; re-run `ready-check` in another checkout. Merge this branch to `main` first, so the run reads the amended plans. Then start the run from an up-to-date `main` with `SUPERPOWERS_UNATTENDED=1 claude -p "Run the unattended queue: build Milestone 4 phases 4.1 to 4.5 of Ariadne.NET as stacked PRs"`. The owner runs it in bypass permissions mode, so no allow-list is kept in the repo.
-2. CodeRabbit auto-pauses reviews when a branch gets many commits quickly (`reviews.auto_review.auto_pause_after_reviewed_commits`; no `.coderabbit.yaml` in the repo). On a paused PR, comment `@coderabbitai review` once. An unattended run's PRs may hit this.
-3. `fix/hooks-follow-ups` is still pushed with no PR.
+1. Merge PR #138 once CI is green and CodeRabbit approves.
+2. Design and plan phases 4.8 and 4.9: `groom-milestone` for both, or `start-next-phase` for 4.8 first. Then build them, re-audit Milestone 4, and on PASS run `complete-milestone`; release-please handles the release, so no tag.
+3. Then start Milestone 5 with `new-milestone`, reusing the parked 5.7 design.
+4. CodeRabbit auto-pauses reviews when a branch gets many commits quickly; on a paused PR, comment `@coderabbitai review` once.
+5. `fix/hooks-follow-ups` is still pushed with no PR.
 
 Commit rules: conventional commits; no `Co-Authored-By` trailer or session link; no nested parentheses in commit bodies; keep every footer line under 100 characters, because commitlint rejects longer ones; breaking commits carry `!` and a `BREAKING CHANGE` footer. Shared VM: one build or test at a time, no local AOT publish.

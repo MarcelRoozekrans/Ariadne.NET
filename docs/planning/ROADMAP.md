@@ -221,6 +221,16 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Plan:** `docs/superpowers/plans/2026-11-14-phase-4.7-attributes-in-rule-exceptions.md`
 **Completed:** 2026-11-14
 
+### Phase 4.8: Attribute arguments and attribute allow-lists [status: pending]
+**Goal:** Packs can select and require types by an attribute's positional and named arguments and can say a type carries no attributes outside a given set, so the six #95 catalogue rows (`p-`/`c-have-attribute-with-arguments`, `p-`/`c-have-attribute-with-named-arguments`, `p-`/`c-only-have-attributes`) leave `deferred` with harness cases and #95 closes. Gap phase from the 2026-11-15 milestone audit.
+**Surface:** Backend
+**HelpWanted:** no
+
+### Phase 4.9: Dependency predicates and DependOnAny [status: pending]
+**Goal:** The three #96 catalogue rows (`c-depend-on-any`, `p-depend-on-any`, `p-only-depend-on`) leave `deferred`: each is expressed in packs with a harness case, and #96 closes. Criterion 3 allows `out-of-scope` for custom predicates only, so any other disposition needs an amendment of the criterion first. Gap phase from the 2026-11-15 milestone audit.
+**Surface:** Backend
+**HelpWanted:** no
+
 ## Milestone 5: Agent surfaces [status: pending]
 **Goal:** Agents in the family runtime and in editors use Ariadne while writing code.
 **Definition of Done:**
