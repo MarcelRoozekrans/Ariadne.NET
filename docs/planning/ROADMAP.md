@@ -156,19 +156,21 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 **Plan:** `docs/superpowers/plans/2026-11-10-phase-3.4-ci-examples.md`
 **Completed:** 2026-11-11
 
-## Milestone 4: ArchUnitNET parity [status: active]
+## Milestone 4: ArchUnitNET parity [status: complete]
 **Goal:** Anyone who writes architecture rules in ArchUnitNET can write the same rules in Ariadne and get the same verdicts, proved side by side in this repo; Daedalus is the first consumer to switch over.
 **Started:** 2026-11-11
+**Completed:** 2026-11-15
+**Audit:** `docs/superpowers/reviews/2026-11-15-milestone-4-audit.md` (PASS; the 2026-11-14 audit failed and added phase 4.7)
 **Design:** `docs/superpowers/specs/2026-11-11-milestone-4-design.md`
 **Definition of Done:**
-- [ ] All planned phases complete
-- [ ] All tests passing
-- [ ] A parity catalogue on the docs site lists every type-level and slice rule kind of the pinned ArchUnitNET version with its Ariadne equivalent, or marks it deferred or out of scope
-- [ ] The side-by-side harness agrees on every in-scope kind, apart from documented `Divergences`; `KnownGaps` holds no type-level or slice entry
-- [ ] Packs express type-level conditions and slice rules, covered by the pack JSON Schema
-- [ ] The `modular-monolith` pack enforces module boundaries and #32 is closed
-- [ ] A migration guide from ArchUnitNET exists on the docs site
-- [ ] Daedalus `main` references no ArchUnitNET package and checks an Ariadne pack in CI
+- [x] All planned phases complete
+- [x] All tests passing
+- [x] A parity catalogue on the docs site lists every type-level and slice rule kind of the pinned ArchUnitNET version with its Ariadne equivalent, or marks it deferred or out of scope
+- [x] The side-by-side harness agrees on every in-scope kind, apart from documented `Divergences`; `KnownGaps` holds no type-level or slice entry
+- [x] Packs express type-level conditions and slice rules, covered by the pack JSON Schema
+- [x] The `modular-monolith` pack enforces module boundaries and #32 is closed
+- [x] A migration guide from ArchUnitNET exists on the docs site
+- [x] Daedalus `main` references no ArchUnitNET package and checks an Ariadne pack in CI
 
 ### Phase 4.1: Parity catalogue and harness [status: complete 2026-11-13, merged as #99, released in 0.8.0]
 **Goal:** Catalogue ArchUnitNET's rule kinds and build the side-by-side harness on a fixture solution, green for today's kinds with the rest in `KnownGaps`.

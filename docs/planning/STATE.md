@@ -1,17 +1,21 @@
 # Session State
 
-**Last session:** 2026-11-14 (Phase 4.7 merged and released in 0.9.2; next: re-audit and complete Milestone 4)
+**Last session:** 2026-11-15 (Milestone 4 re-audited, PASS, and completed; next: merge `chore/milestone-4-close`, then start Milestone 5)
 **Repository:** `MarcelRoozekrans/Ariadne.NET`, public since 2026-11-03. The old private repository `MarcelRoozekrans/architecture-governance-engine` is frozen. In the current clones, the main checkout and its worktrees, `origin` is `MarcelRoozekrans/Ariadne.NET`; push with `git push origin HEAD:<branch>`. Check `git remote -v` in an older clone, where the new repository may still be the remote `ariadne`.
 
 ## Current Position
 
-## Next: re-audit Milestone 4, then complete it
+## Milestone 4 complete — next: merge, then start Milestone 5
 
-- **Branch:** `chore/milestone-4-close`, from `main` after the 0.9.2 release. Do the audit and completion here and open one PR.
+- **2026-11-15:** the re-audit `docs/superpowers/reviews/2026-11-15-milestone-4-audit.md` passed every criterion, audited at `main` 659d938 and Daedalus.NET 423bba73. `KnownGaps.Entries` is empty and #97 is closed; criterion 8 holds as amended, with `CleanArchitectureTests` in Daedalus's integration project as the DI integration test. Milestone 4 is `complete` in ROADMAP.md and MILESTONE.md. `Released by` is release-please, so no tag was made; 0.9.2 already carries the milestone's last feature.
+- **Branch:** `chore/milestone-4-close`, one PR with the audit, the completion and this file.
+- **Next steps:** merge that PR, then run `new-milestone` for Milestone 5, Agent surfaces, which brainstorms the milestone before MILESTONE.md is rewritten. Phase 5.6 is already complete and 5.7 is designed and parked.
+- **Open follow-up:** #132, the 13 build warnings from `Microsoft.Build.Framework` and `Microsoft.NET.StringTools` 18.12.2. Release PR #137 for 0.9.3 is open; merging it is the owner's call.
+
+### Phase 4.7 closing notes
+
 - **Phase 4.7 merged and released 2026-11-14:** PR #134 squash-merged as ffb0b23; PR #136 `feat: accept attributes in rule exceptions` squash-merged as df8f70d after it was rebased onto `main` and CodeRabbit approved; #97 closed. Release PR #133 merged by the session on the owner's instruction, with `--admin` for the review rule only, as 603da3c; tag `v0.9.2`, `publish-nuget` green, docs deploy green. Changelog 0.9.2 lists the feature. It is a patch bump because of `bump-patch-for-minor-pre-major`.
 - **Phase 4.7 facts:** rule exceptions and amendment exceptions take `attributes`, meaning the attribute classes applied directly to the type, and a bannedPackages exception rejects it. `KnownGaps.Entries` is empty and the catalogue row `p-have-any-attributes` reads `covered`. The migration guide now says that `assignableTo` used for `DoNotImplementInterface` or `DoNotInherit` exempts the named type itself; this came from a review finding and a CodeRabbit finding.
-- **Next steps:** run `audit-milestone` for Milestone 4. The 2026-11-14 audit `docs/superpowers/reviews/2026-11-14-milestone-4-audit.md` failed only on the `KnownGaps` gap, and DoD criterion 8 was amended for `RetainedArchitectureTests`. Write a new audit report. On PASS, run `complete-milestone`; `Released by` is release-please, so it creates no tag. Then open the PR, and on merge start Milestone 5 with `new-milestone`.
-- **Open follow-up:** #132, the 13 build warnings from `Microsoft.Build.Framework` and `Microsoft.NET.StringTools` 18.12.2. Also red Renovate PR for YamlDotNet major.
 
 ## Phase 4.6 on Ariadne.NET 0.9.1 — finished
 
@@ -93,7 +97,6 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 ## Open Decisions
 
 - #36: may a child pack amend an inherited layer's `allowedDependencies`; should retargeting respect `locked`; should an empty retarget be rejected? Matters for the M4 Daedalus pack.
-- #32: module-isolation rule type for modular monoliths needs a design and a phase slot.
 - An own YAML library: a separate, unscheduled project outside Ariadne (agreed 2026-10-31).
 - From the roadmap design, none blocking: whether M3 ships a Roslyn analyzer; code generation's role after M4; Mnemosyne.NET integration.
 
@@ -111,10 +114,9 @@ Phase 2.2 decisions by the owner, 2026-11-05:
 
 ## Recommended Next Step
 
-Milestone 4 is groomed and on `main` (PR #84, merged 2026-11-12, CodeRabbit approved, CI green): six phases with approved designs, plans with `## Checks`, and guard checks.
-
-1. **Ready-check done 2026-11-12, queue written.** All five checks pass for 4.1 to 4.5; the base build is green. One gap was answered by the owner: the new public API in 4.2, 4.3 and 4.4 is approved, recorded in each plan's Global Constraints in fcd7265. The queue is a linear stack: `phase-4-1` on nothing, then 4-2 on 4-1, 4-3 on 4-2, 4-4 on 4-3 and 4-5 on 4-4, each PR against the branch before it, so one parked phase parks every later one. 4.6 is not queued. The queue file `.claude/unattended-queue.json` is git-excluded and lives only in the worktree that wrote it; re-run `ready-check` in another checkout. Merge this branch to `main` first, so the run reads the amended plans. Then start the run from an up-to-date `main` with `SUPERPOWERS_UNATTENDED=1 claude -p "Run the unattended queue: build Milestone 4 phases 4.1 to 4.5 of Ariadne.NET as stacked PRs"`. The owner runs it in bypass permissions mode, so no allow-list is kept in the repo.
-2. CodeRabbit auto-pauses reviews when a branch gets many commits quickly (`reviews.auto_review.auto_pause_after_reviewed_commits`; no `.coderabbit.yaml` in the repo). On a paused PR, comment `@coderabbitai review` once. An unattended run's PRs may hit this.
-3. `fix/hooks-follow-ups` is still pushed with no PR.
+1. Merge the `chore/milestone-4-close` PR once CI is green.
+2. Start Milestone 5 with project-orchestration `new-milestone`: brainstorm at milestone scope, write `docs/superpowers/specs/YYYY-MM-DD-milestone-5-design.md`, then rewrite MILESTONE.md and set Milestone 5 `active` in ROADMAP.md. Reuse the parked 5.7 design.
+3. CodeRabbit auto-pauses reviews when a branch gets many commits quickly; on a paused PR, comment `@coderabbitai review` once.
+4. `fix/hooks-follow-ups` is still pushed with no PR.
 
 Commit rules: conventional commits; no `Co-Authored-By` trailer or session link; no nested parentheses in commit bodies; keep every footer line under 100 characters, because commitlint rejects longer ones; breaking commits carry `!` and a `BREAKING CHANGE` footer. Shared VM: one build or test at a time, no local AOT publish.
