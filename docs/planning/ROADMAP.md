@@ -223,6 +223,7 @@ Design: `docs/superpowers/specs/2026-10-30-roadmap-design.md`
 
 ### Phase 4.8: Attribute arguments and attribute allow-lists [status: pending]
 **Goal:** Packs can select and require types by an attribute's positional and named arguments and can say a type carries no attributes outside a given set, so the six #95 catalogue rows (`p-`/`c-have-attribute-with-arguments`, `p-`/`c-have-attribute-with-named-arguments`, `p-`/`c-only-have-attributes`) leave `deferred` with harness cases and #95 closes. Gap phase from the 2026-11-15 milestone audit.
+**Plan:** `docs/superpowers/plans/2026-11-15-phase-4.8-attribute-arguments-and-allow-lists.md`
 **Surface:** Backend
 **HelpWanted:** no
 
