@@ -35,7 +35,7 @@ No `docs/pre-push-review-*.md` report exists. Warning, not a failure, as in the 
 
 ## Owner decision
 
-2026-11-15: close the gap with phases rather than amend the criterion. Phase 4.8 covers #95 and phase 4.9 covers #96, where 4.9 may still mark a row `out-of-scope` with a reason the owner approves. Milestone 4 stays active until both are complete and a new audit passes.
+2026-11-15: close the gap with phases rather than amend the criterion. Phase 4.8 covers #95 and phase 4.9 covers #96; each gives its rows a pack form and a harness case. Criterion 3 allows `out-of-scope` for custom predicates only, so marking one of these rows `out-of-scope` for another reason would need an amendment of the criterion, which the owner did not choose. Milestone 4 stays active until both are complete and a new audit passes.
 
 ## Open follow-ups, not blocking
 
