@@ -81,8 +81,9 @@ dotnet restore src/Ariadne.NET.slnx
 dotnet build src/Ariadne.NET.slnx --no-restore -c Release
 dotnet test src/Ariadne.NET.slnx --no-build -c Release --collect:"XPlat Code Coverage" --results-directory ./test-results
 dotnet run --project src/Ariadne.NET.Cli -c Release --no-build -- validate src/Ariadne.NET.slnx
-python3 -m unittest discover -s tools/release -p "test_inspect_packages.py"
 ```
+
+Job `pack-validate` also runs the release tooling tests: `python3 -m unittest discover -s tools/release -p "test_inspect_packages.py"`.
 
 The docs site build (`.github/workflows/docs.yml`, Node 22) is `npm ci && npm run build` in `docs-site/`.
 
@@ -107,21 +108,23 @@ The Docusaurus site builds from `docs-site/docs/`, the source of the user-facing
 
 ### Releases
 
-Conventional commits on `main` drive release-please, which opens a release PR using the release bot App token. Merging it tags `vX.Y.Z` and dispatches `ci.yml`, whose `publish-nuget` job pushes five packages, `Ariadne.NET`, `Ariadne.NET.Abstractions`, `Ariadne.NET.Workspaces`, `Ariadne.NET.Testing` and `Ariadne.NET.Cli`, to nuget.org. The version comes from `.release-please-manifest.json`; see `RELEASING.md`.
+release-please opens its release PR with the release bot App token. Merging it tags `vX.Y.Z` and dispatches `ci.yml`, whose `publish-nuget` job pushes five packages, `Ariadne.NET`, `Ariadne.NET.Abstractions`, `Ariadne.NET.Workspaces`, `Ariadne.NET.Testing` and `Ariadne.NET.Cli`, to nuget.org. The version comes from `.release-please-manifest.json`; see `RELEASING.md`.
 
-<!-- org-core:start sha256=3022fd292033117a25777334465cf8843056c471038e693d18c2272e0bc8044a (generated from docker-nuc scripts/agents-md/org-core-personal.md; do not edit here) -->
+<!-- org-core:start sha256=08a88996bc9165f888fc0260607cfd0670cae128c323e16707c6b452ee66222d (generated from docker-nuc scripts/agents-md/org-core-personal.md; do not edit here) -->
 ## Org rules
 
 These rules hold in every public MarcelRoozekrans repo.
 
 ### Commits and releases
 
-- Conventional Commits. release-please reads them on the default branch: `feat:` and `fix:` cut a
-  release, `docs:`, `chore:`, `ci:`, `test:` and `refactor:` do not. A breaking change needs `!` or
-  a `BREAKING CHANGE:` footer.
+- Conventional Commits. release-please reads them on the default branch, and the changelog sections
+  in `release-please-config.json` decide which types count. The standard: `feat`, `fix`, `perf`,
+  `deps` and `revert` open or update the release PR; `docs`, `test`, `refactor`, `build`, `ci`,
+  `chore` and `style` do not, unless the commit is breaking or has a `Release-As:` footer. The
+  release happens when that PR merges. A breaking change needs `!` or a `BREAKING CHANGE:` footer.
 - A commit body never contains nested parentheses. release-please cannot parse them and silently
   drops the whole commit from the changelog, while the workflow still reports success.
-- After merging a `feat:` or `fix:`, check that the commit appears in the release-please PR.
+- After merging a commit that should release, check that it appears in the release-please PR.
 
 ### Branches and pull requests
 
