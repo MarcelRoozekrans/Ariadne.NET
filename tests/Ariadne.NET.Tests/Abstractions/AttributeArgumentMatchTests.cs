@@ -43,6 +43,14 @@ public sealed class AttributeArgumentMatchTests
     }
 
     [Fact]
+    public void Entry_with_null_named_is_invalid()
+    {
+        var result = new AttributeArgumentMatchValidator().Validate(new AttributeArgumentMatch { Arguments = ["a"], Named = null! });
+
+        result.IsValid.Should().BeFalse();
+    }
+
+    [Fact]
     public void Entry_with_named_only_is_valid()
     {
         var named = new Dictionary<string, string>(StringComparer.Ordinal) { ["Key"] = "v" };

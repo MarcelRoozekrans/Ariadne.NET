@@ -893,6 +893,35 @@ public class PackYamlReaderTests
         watch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5));
     }
 
+    [Theory]
+    [InlineData("arguments", "[", "]")]
+    [InlineData("named", "{", "}")]
+    public void AliasExpansion_StopsAtTheBudgetInsideAnAttributeArgumentEntry(string key, string open, string close)
+    {
+        // One rule whose attributeArguments entry holds 1000 values or names, aliased 150 times.
+        const int k = 1000;
+        var yaml = new System.Text.StringBuilder()
+            .Append("schema: 2\nname: shop\nrules:\n")
+            .Append("  - &r\n    id: R1\n    because: x\n    forbid:\n      to: { layers: [B] }\n      from:\n        attributeArguments:\n")
+            .Append("          - ").Append(key).Append(": ").Append(open).Append('\n');
+        for (var i = 0; i < k; i++)
+        {
+            yaml.Append("              ").Append(string.Equals(key, "named", StringComparison.Ordinal) ? $"n{i}: v" : $"v{i}").Append(",\n");
+        }
+
+        yaml.Append("              ").Append(close).Append('\n');
+        for (var i = 1; i < 150; i++)
+        {
+            yaml.Append("  - *r\n");
+        }
+
+        var problems = Problems(yaml.ToString());
+
+        problems.Should().ContainSingle()
+            .Which.Message.Should().Be("the pack expands to more than 100000 entries");
+        problems[0].Line.Should().BeInRange(9, 9 + k, "the budget runs out inside the aliased entry");
+    }
+
     [Fact]
     public void ProblemInANodeReachedTwiceByAlias_ReportedOnce()
     {

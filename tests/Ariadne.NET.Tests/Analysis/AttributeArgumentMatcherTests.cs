@@ -128,6 +128,13 @@ public class AttributeArgumentMatcherTests
     [InlineData("long", "2", "1e500000000", false)]
     [InlineData("ulong", "18446744073709551615", "18446744073709551615", true)]
     [InlineData("long", "-1", "18446744073709551615", false)]
+    [InlineData("bool", "false", "false", true)]
+    [InlineData("bool", "false", "FALSE", true)]
+    [InlineData("bool", "false", "true", false)]
+    [InlineData("float", "1.5f", "abc", false)]
+    [InlineData("double", "1.5", "abc", false)]
+    [InlineData("object", "null", "1", false)]
+    [InlineData("object", "null", "null", false)]
     public void ValueEquals_ComparesByKind(string parameterType, string argument, string text, bool expected)
     {
         var constant = Constant(parameterType, argument);

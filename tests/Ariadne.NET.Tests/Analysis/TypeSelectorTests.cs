@@ -638,6 +638,14 @@ public class TypeSelectorTests
     }
 
     [Fact]
+    public void FirstOutsideOnlyAttributes_is_null_without_onlyAttributes()
+    {
+        var selector = TypeSelector.From(new TargetSelector { Attributes = ["N.*"] });
+
+        selector.FirstOutsideOnlyAttributes(Find(AttributeCompilation.Value, "N.Many"), new TypeNames()).Should().BeNull();
+    }
+
+    [Fact]
     public void FirstOutsideOnlyAttributes_names_first_in_declaration_order()
     {
         var names = new TypeNames();
