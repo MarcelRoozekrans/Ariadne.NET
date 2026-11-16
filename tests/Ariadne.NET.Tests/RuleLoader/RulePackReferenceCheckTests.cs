@@ -636,6 +636,41 @@ public class RulePackReferenceCheckTests
             "exceptions[0] of rule 'R-1' has 'onlyDependsOn'; a package belongs to a project, so the exception of a bannedPackages rule names it by 'assemblies'");
     }
 
+    [Theory]
+    [InlineData("namespaces")]
+    [InlineData("nested")]
+    [InlineData("dependsOn")]
+    [InlineData("onlyDependsOn")]
+    public void BannedPackages_from_with_a_key_other_than_assemblies_fails(string key)
+    {
+        var from = key switch
+        {
+            "namespaces" => new TargetSelector { Assemblies = ["App"], Namespaces = ["App.**"] },
+            "nested" => new TargetSelector { Assemblies = ["App"], Nested = true },
+            "dependsOn" => new TargetSelector { Assemblies = ["App"], DependsOn = new TargetSelector { Layers = ["Domain"] } },
+            _ => new TargetSelector { Assemblies = ["App"], OnlyDependsOn = new TargetSelector { Layers = ["Domain"] } },
+        };
+        var rule = new RuleDefinition { Id = "R-1", Because = "because", Kind = RuleKind.BannedPackages, From = from, Packages = ["FluentValidation"] };
+
+        Resolve(PackWithRule(rule)).Error.Detail.Should().Be(
+            $"the from of rule 'R-1' has '{key}', which a bannedPackages from does not take; a package belongs to a project, so it selects projects by 'assemblies' only");
+    }
+
+    [Fact]
+    public void BannedPackages_from_with_only_assemblies_resolves()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "R-1",
+            Because = "because",
+            Kind = RuleKind.BannedPackages,
+            From = new TargetSelector { Assemblies = ["App"] },
+            Packages = ["FluentValidation"],
+        };
+
+        Resolve(PackWithRule(rule)).IsSuccess.Should().BeTrue();
+    }
+
     [Fact]
     public void Exception_with_only_attributes_resolves()
     {
@@ -993,7 +1028,7 @@ public class RulePackReferenceCheckTests
             Because = "because",
             Kind = RuleKind.BannedPackages,
             Packages = ["Newtonsoft.Json"],
-            From = new TargetSelector { Layers = ["Domain"] },
+            From = new TargetSelector { Assemblies = ["Shop.*"] },
             Exceptions = [new RuleException { Assemblies = ["Shop.Domain"], Nested = true, Because = "x" }],
         };
 

@@ -191,6 +191,24 @@ internal static class RulePackReferenceCheck
         }
     }
 
+    // The target keys the loader keeps out of one rule kind's targets.
+    private static void CheckKindTargets(RuleDefinition rule, string id, List<string> failures)
+    {
+        if (rule.Kind == RuleKind.UniqueNames)
+        {
+            // The loader keeps traits out of a uniqueNames target; TargetMatcher would narrow the collisions by them.
+            RejectKeys($"the for of rule '{id}'", rule.From, PackYamlReader.TraitKeys, "which a uniqueNames target does not take", failures);
+            RejectKeys($"the against of rule '{id}'", rule.Against, PackYamlReader.TraitKeys, "which a uniqueNames target does not take", failures);
+        }
+        else if (rule.Kind == RuleKind.BannedPackages)
+        {
+            // BannedPackageRules reads only assemblies, so another key would be ignored and the rule would cover every project.
+            RejectKeys($"the from of rule '{id}'", rule.From,
+                [.. SetKeys(rule.From).Where(static key => !string.Equals(key, "assemblies", StringComparison.Ordinal))],
+                "which a bannedPackages from does not take; a package belongs to a project, so it selects projects by 'assemblies' only", failures);
+        }
+    }
+
     // What the loader calls a rule's From: require and uniqueNames read it from 'for', the others from 'from'.
     private static string FromKey(RuleKind kind) => kind is RuleKind.Require or RuleKind.UniqueNames ? "for" : "from";
 
@@ -203,13 +221,7 @@ internal static class RulePackReferenceCheck
         CheckTarget($"the {FromKey(rule.Kind)} of rule '{id}'", rule.From, failures);
         CheckTarget($"the to of rule '{id}'", rule.To, failures);
         CheckTarget($"the against of rule '{id}'", rule.Against, failures);
-        if (rule.Kind == RuleKind.UniqueNames)
-        {
-            // The loader keeps traits out of a uniqueNames target; TargetMatcher would narrow the collisions by them.
-            RejectKeys($"the for of rule '{id}'", rule.From, PackYamlReader.TraitKeys, "which a uniqueNames target does not take", failures);
-            RejectKeys($"the against of rule '{id}'", rule.Against, PackYamlReader.TraitKeys, "which a uniqueNames target does not take", failures);
-        }
-
+        CheckKindTargets(rule, id, failures);
         if (rule.Require is { } requirement)
         {
             if (requirement.Is is { } isCondition)
