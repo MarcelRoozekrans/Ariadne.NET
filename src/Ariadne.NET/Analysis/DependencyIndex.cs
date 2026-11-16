@@ -40,7 +40,7 @@ internal sealed class DependencyIndex
             typesByMetadataName.Add(IndexGraph(graph, dependencies));
         }
 
-        return new DependencyIndex(dependencies, MapAssemblies(projects, ScopedGraph.Of(projects, graphs)), typesByMetadataName);
+        return new DependencyIndex(dependencies, MapAssemblies(projects), typesByMetadataName);
     }
 
     /// <summary>The dependencies of the type, in source order; empty for a type declared outside the run's projects.</summary>
@@ -82,6 +82,8 @@ internal sealed class DependencyIndex
             return null;
         }
 
+        // Roslyn already resolves a type forward when the destination assembly is referenced, so the symbol's containing
+        // assembly is the destination and this branch does not fire; it is defensive.
         if (assembly.ResolveForwardedType(MetadataNameOf(definition)) is { } forwarded)
         {
             definition = forwarded.OriginalDefinition;
@@ -142,10 +144,10 @@ internal sealed class DependencyIndex
     /// <summary>
     /// Maps every assembly symbol that names a run project to that project's graph: each compilation's own assembly, and each
     /// assembly a compilation references. A <see cref="CompilationReference"/> to a run compilation names its graph exactly. Any
-    /// other reference is matched by assembly identity, preferring a graph the referencing project's compilation references,
-    /// then one of the same target framework, then the first.
+    /// other reference, such as a metadata reference to a run project's output, is matched by assembly identity, preferring a
+    /// graph of the referencing project's target framework, then the first.
     /// </summary>
-    private static Dictionary<IAssemblySymbol, int> MapAssemblies(IReadOnlyList<AnalyzedProject> projects, List<ScopedGraph> scoped)
+    private static Dictionary<IAssemblySymbol, int> MapAssemblies(IReadOnlyList<AnalyzedProject> projects)
     {
         var result = new Dictionary<IAssemblySymbol, int>(SymbolEqualityComparer.Default);
         var indexOf = new Dictionary<Compilation, int>(projects.Count, ReferenceEqualityComparer.Instance);
@@ -180,7 +182,7 @@ internal sealed class DependencyIndex
                 }
                 else if (byIdentity.TryGetValue(assembly.Identity, out var candidates))
                 {
-                    result.Add(assembly, Prefer(candidates, scoped[j].References, projects[j].TargetFramework, projects));
+                    result.Add(assembly, Prefer(candidates, projects[j].TargetFramework, projects));
                 }
             }
         }
@@ -188,17 +190,8 @@ internal sealed class DependencyIndex
         return result;
     }
 
-    private static int Prefer(
-        IReadOnlyList<int> candidates, IReadOnlyList<int> referenced, string? targetFramework, IReadOnlyList<AnalyzedProject> projects)
+    private static int Prefer(IReadOnlyList<int> candidates, string? targetFramework, IReadOnlyList<AnalyzedProject> projects)
     {
-        for (var i = 0; i < candidates.Count; i++)
-        {
-            if (referenced.Contains(candidates[i]))
-            {
-                return candidates[i];
-            }
-        }
-
         for (var i = 0; i < candidates.Count; i++)
         {
             if (string.Equals(projects[candidates[i]].TargetFramework, targetFramework, StringComparison.OrdinalIgnoreCase))

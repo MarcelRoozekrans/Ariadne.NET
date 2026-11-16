@@ -6,6 +6,10 @@ namespace Ariadne.NET.Abstractions;
 /// </summary>
 internal static class DependencySelectorCheck
 {
+    /// <summary>The validation message for a bad <c>dependsOn</c> or <c>onlyDependsOn</c>, on a selector and on an exception.</summary>
+    public const string Message =
+        "{PropertyName} must select something, must not hold members, dependsOn or onlyDependsOn, and must not mix layers with namespace, assembly or type globs.";
+
     public static bool IsValid(TargetSelector nested)
     {
         if (nested.Members.Count > 0 || nested.DependsOn is not null || nested.OnlyDependsOn is not null)

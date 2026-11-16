@@ -33,9 +33,9 @@ public sealed class RuleException
     public bool? Nested { get; init; }
 
     /// <summary>Holds when at least one dependency of the type is selected by this selector, as in a target selector.</summary>
-    [Must(nameof(IsValidDependency), Message = "{PropertyName} must select something, must not hold members, dependsOn or onlyDependsOn, and must not mix layers with namespace, assembly or type globs.")] public TargetSelector? DependsOn { get; init; }
+    [Must(nameof(IsValidDependency), Message = DependencySelectorCheck.Message)] public TargetSelector? DependsOn { get; init; }
     /// <summary>Holds when every dependency of the type is selected by this selector, and when the type has none.</summary>
-    [Must(nameof(IsValidDependency), Message = "{PropertyName} must select something, must not hold members, dependsOn or onlyDependsOn, and must not mix layers with namespace, assembly or type globs.")] public TargetSelector? OnlyDependsOn { get; init; }
+    [Must(nameof(IsValidDependency), Message = DependencySelectorCheck.Message)] public TargetSelector? OnlyDependsOn { get; init; }
 
     [NotEmpty] public required string Because { get; init; }
 

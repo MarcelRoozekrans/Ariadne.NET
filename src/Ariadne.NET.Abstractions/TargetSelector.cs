@@ -37,9 +37,9 @@ public sealed class TargetSelector
     public bool? Nested { get; init; }
 
     /// <summary>Holds when at least one dependency of the type is selected by this selector. A dependency is a type the type's own code refers to, as the original definition; a type declared outside the run's projects has none.</summary>
-    [Must(nameof(IsValidDependency), Message = "{PropertyName} must select something, must not hold members, dependsOn or onlyDependsOn, and must not mix layers with namespace, assembly or type globs.")] public TargetSelector? DependsOn { get; init; }
+    [Must(nameof(IsValidDependency), Message = DependencySelectorCheck.Message)] public TargetSelector? DependsOn { get; init; }
     /// <summary>Holds when every dependency of the type is selected by this selector, and when the type has none. Dependencies on types outside the run's projects are ignored.</summary>
-    [Must(nameof(IsValidDependency), Message = "{PropertyName} must select something, must not hold members, dependsOn or onlyDependsOn, and must not mix layers with namespace, assembly or type globs.")] public TargetSelector? OnlyDependsOn { get; init; }
+    [Must(nameof(IsValidDependency), Message = DependencySelectorCheck.Message)] public TargetSelector? OnlyDependsOn { get; init; }
 
     internal bool IsValidDependency(TargetSelector? nested) => nested is null || DependencySelectorCheck.IsValid(nested);
 
