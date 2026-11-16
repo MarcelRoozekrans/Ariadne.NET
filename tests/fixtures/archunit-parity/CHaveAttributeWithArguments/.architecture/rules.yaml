@@ -1,0 +1,24 @@
+schema: 2
+name: parity-c-have-attribute-with-arguments
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-CHAVEATTRIBUTEWITHARGUMENTS
+    because: Mirrors ArchUnitNET's HaveAttributeWithArguments with TagAttribute; Broken and Clean must satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CHaveAttributeWithArguments.Broken", "Parity.CHaveAttributeWithArguments.Clean"]
+      is:
+        attributeArguments:
+          - attribute: "Parity.CHaveAttributeWithArguments.Contracts.TagAttribute"
+            arguments: ["billing", 7]
+  - id: PARITY-CHAVEATTRIBUTEWITHARGUMENTS-NOT
+    because: Mirrors ArchUnitNET's NotHaveAnyAttributesWithArguments; NotBroken and NotClean must hold neither value on any attribute, so each value is its own entry.
+    require:
+      for:
+        namespaces: ["Parity.CHaveAttributeWithArguments.NotBroken", "Parity.CHaveAttributeWithArguments.NotClean"]
+      isNot:
+        attributeArguments:
+          - arguments: ["billing"]
+          - arguments: [7]

@@ -1,0 +1,27 @@
+schema: 2
+name: parity-p-have-attribute-with-named-arguments
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-PHAVEATTRIBUTEWITHNAMEDARGUMENTS
+    because: Mirrors ArchUnitNET's HaveAttributeWithNamedArguments; the types it selects must not depend on Target.
+    forbid:
+      from:
+        attributeArguments:
+          - attribute: "Parity.PHaveAttributeWithNamedArguments.Contracts.TagAttribute"
+            named: { Area: "billing", Audited: true }
+      to:
+        namespaces: ["Parity.PHaveAttributeWithNamedArguments.Target.**"]
+  - id: PARITY-PHAVEATTRIBUTEWITHNAMEDARGUMENTS-NOT
+    because: Mirrors ArchUnitNET's DoNotHaveAnyAttributesWithNamedArguments; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PHaveAttributeWithNamedArguments.**"]
+      to:
+        namespaces: ["Parity.PHaveAttributeWithNamedArguments.Target.**"]
+    exceptions:
+      - attributeArguments:
+          - named: { Area: "billing" }
+          - named: { Audited: true }
+        because: DoNotHaveAnyAttributesWithNamedArguments leaves out the types with any attribute that holds either pair, so each pair is its own entry.

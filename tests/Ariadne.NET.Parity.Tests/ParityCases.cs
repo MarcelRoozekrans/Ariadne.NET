@@ -1078,6 +1078,79 @@ public static class ParityCases
                 .Or().ResideInNamespace("Parity.CHaveAnyAttributes.NotClean")
                 .Should().NotHaveAnyAttributes(AttributeOf(a, "Parity.CHaveAnyAttributes.Target.AuditedAttribute"))),
 
+        // Phase 4.8 cases: attribute arguments. One type in each fixture holds the right values on two different instances
+        // of the attribute, so the rule that all values sit on one instance is checked against ArchUnitNET. ArchUnitNET's
+        // DoNot... and Not... methods are not the negation of the positive ones: they reject a type when any one value sits
+        // on any attribute, so the :not packs give each value its own entry.
+        new(
+            "p-have-attribute-with-arguments",
+            "PHaveAttributeWithArguments",
+            "Parity.PHaveAttributeWithArguments",
+            "PARITY-PHAVEATTRIBUTEWITHARGUMENTS",
+            Projection.Types,
+            a => Types().That().HaveAttributeWithArguments(AttributeOf(a, "Parity.PHaveAttributeWithArguments.Contracts.TagAttribute"), new object[] { "billing", 7 })
+                .Should().NotDependOnAny(Types().That().ResideInNamespace("Parity.PHaveAttributeWithArguments.Target"))),
+        new(
+            "p-have-attribute-with-arguments:not",
+            "PHaveAttributeWithArguments",
+            "Parity.PHaveAttributeWithArguments",
+            "PARITY-PHAVEATTRIBUTEWITHARGUMENTS-NOT",
+            Projection.Types,
+            _ => Types().That().DoNotHaveAnyAttributesWithArguments(new object[] { "billing", 7 })
+                .Should().NotDependOnAny(Types().That().ResideInNamespace("Parity.PHaveAttributeWithArguments.Target"))),
+        new(
+            "c-have-attribute-with-arguments",
+            "CHaveAttributeWithArguments",
+            "Parity.CHaveAttributeWithArguments",
+            "PARITY-CHAVEATTRIBUTEWITHARGUMENTS",
+            Projection.Types,
+            a => Types().That().ResideInNamespace("Parity.CHaveAttributeWithArguments.Broken")
+                .Or().ResideInNamespace("Parity.CHaveAttributeWithArguments.Clean")
+                .Should().HaveAttributeWithArguments(AttributeOf(a, "Parity.CHaveAttributeWithArguments.Contracts.TagAttribute"), new object[] { "billing", 7 })),
+        new(
+            "c-have-attribute-with-arguments:not",
+            "CHaveAttributeWithArguments",
+            "Parity.CHaveAttributeWithArguments",
+            "PARITY-CHAVEATTRIBUTEWITHARGUMENTS-NOT",
+            Projection.Types,
+            _ => Types().That().ResideInNamespace("Parity.CHaveAttributeWithArguments.NotBroken")
+                .Or().ResideInNamespace("Parity.CHaveAttributeWithArguments.NotClean")
+                .Should().NotHaveAnyAttributesWithArguments(new object[] { "billing", 7 })),
+        new(
+            "p-have-attribute-with-named-arguments",
+            "PHaveAttributeWithNamedArguments",
+            "Parity.PHaveAttributeWithNamedArguments",
+            "PARITY-PHAVEATTRIBUTEWITHNAMEDARGUMENTS",
+            Projection.Types,
+            a => Types().That().HaveAttributeWithNamedArguments(AttributeOf(a, "Parity.PHaveAttributeWithNamedArguments.Contracts.TagAttribute"), new (string, object)[] { ("Area", "billing"), ("Audited", true) })
+                .Should().NotDependOnAny(Types().That().ResideInNamespace("Parity.PHaveAttributeWithNamedArguments.Target"))),
+        new(
+            "p-have-attribute-with-named-arguments:not",
+            "PHaveAttributeWithNamedArguments",
+            "Parity.PHaveAttributeWithNamedArguments",
+            "PARITY-PHAVEATTRIBUTEWITHNAMEDARGUMENTS-NOT",
+            Projection.Types,
+            _ => Types().That().DoNotHaveAnyAttributesWithNamedArguments(new (string, object)[] { ("Area", "billing"), ("Audited", true) })
+                .Should().NotDependOnAny(Types().That().ResideInNamespace("Parity.PHaveAttributeWithNamedArguments.Target"))),
+        new(
+            "c-have-attribute-with-named-arguments",
+            "CHaveAttributeWithNamedArguments",
+            "Parity.CHaveAttributeWithNamedArguments",
+            "PARITY-CHAVEATTRIBUTEWITHNAMEDARGUMENTS",
+            Projection.Types,
+            a => Types().That().ResideInNamespace("Parity.CHaveAttributeWithNamedArguments.Broken")
+                .Or().ResideInNamespace("Parity.CHaveAttributeWithNamedArguments.Clean")
+                .Should().HaveAttributeWithNamedArguments(AttributeOf(a, "Parity.CHaveAttributeWithNamedArguments.Contracts.TagAttribute"), new (string, object)[] { ("Area", "billing"), ("Audited", true) })),
+        new(
+            "c-have-attribute-with-named-arguments:not",
+            "CHaveAttributeWithNamedArguments",
+            "Parity.CHaveAttributeWithNamedArguments",
+            "PARITY-CHAVEATTRIBUTEWITHNAMEDARGUMENTS-NOT",
+            Projection.Types,
+            _ => Types().That().ResideInNamespace("Parity.CHaveAttributeWithNamedArguments.NotBroken")
+                .Or().ResideInNamespace("Parity.CHaveAttributeWithNamedArguments.NotClean")
+                .Should().NotHaveAnyAttributesWithNamedArguments(new (string, object)[] { ("Area", "billing"), ("Audited", true) })),
+
         // Phase 4.3 gaps: each has a KnownGaps entry and no rule in its kind's pack. The pattern spans the kind, so every
         // namespace below Parity.<Kind> is its own slice and slice names start with the Broken or Clean namespace.
         new(

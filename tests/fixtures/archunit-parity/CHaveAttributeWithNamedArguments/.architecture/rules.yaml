@@ -1,0 +1,24 @@
+schema: 2
+name: parity-c-have-attribute-with-named-arguments
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-CHAVEATTRIBUTEWITHNAMEDARGUMENTS
+    because: Mirrors ArchUnitNET's HaveAttributeWithNamedArguments with TagAttribute; Broken and Clean must satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.CHaveAttributeWithNamedArguments.Broken", "Parity.CHaveAttributeWithNamedArguments.Clean"]
+      is:
+        attributeArguments:
+          - attribute: "Parity.CHaveAttributeWithNamedArguments.Contracts.TagAttribute"
+            named: { Area: "billing", Audited: true }
+  - id: PARITY-CHAVEATTRIBUTEWITHNAMEDARGUMENTS-NOT
+    because: Mirrors ArchUnitNET's NotHaveAnyAttributesWithNamedArguments; NotBroken and NotClean must hold neither pair on any attribute, so each pair is its own entry.
+    require:
+      for:
+        namespaces: ["Parity.CHaveAttributeWithNamedArguments.NotBroken", "Parity.CHaveAttributeWithNamedArguments.NotClean"]
+      isNot:
+        attributeArguments:
+          - named: { Area: "billing" }
+          - named: { Audited: true }
