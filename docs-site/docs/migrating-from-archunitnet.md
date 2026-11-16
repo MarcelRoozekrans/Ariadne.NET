@@ -239,7 +239,7 @@ rules:
       - attributeArguments:
           - arguments: ["billing"]
           - arguments: [7]
-        because: Billing and 7 are both marked types.
+        because: Types holding either value are excused.
   - id: SERVICES-HOLD-NO-TAG-VALUE
     because: NotHaveAttributeWithNamedArguments, so each pair is its own entry and the attribute names the class.
     require:
@@ -273,7 +273,7 @@ rules:
           - "Shop.Contracts.ReviewedAttribute"
 ```
 
-`onlyAttributes` ignores the attributes the compiler emits: `CompilerGeneratedAttribute`, `NullableAttribute`, `NullableContextAttribute`, `NullablePublicOnlyAttribute`, `IsReadOnlyAttribute`, `IsByRefLikeAttribute` and `EmbeddedAttribute`. ArchUnitNET 0.13.5 does not count the nullable attributes for `OnlyHaveAttributes` either, so the two tools agree on nullable-enabled projects.
+`onlyAttributes` ignores the attributes the compiler emits: `CompilerGeneratedAttribute`, `NullableAttribute`, `NullableContextAttribute`, `NullablePublicOnlyAttribute`, `IsReadOnlyAttribute`, `IsByRefLikeAttribute`, `DefaultMemberAttribute` and `EmbeddedAttribute`. ArchUnitNET 0.13.5 does not count the nullable attributes for `OnlyHaveAttributes` either, so the two tools agree on nullable-enabled projects.
 
 `OnlyHaveAttributes()` with no set means "has no attributes". An empty `onlyAttributes` list is a load error, so write that as `isNot: { attributes: ["**"] }` in a condition, or as an exception with `attributes: ["**"]` in a predicate:
 
