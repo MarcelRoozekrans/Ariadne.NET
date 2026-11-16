@@ -226,7 +226,7 @@ Package ids match case-insensitively, since NuGet ids do, with the `*` rules of 
 
 ### Unique names
 
-A `uniqueNames` rule keeps a type from reusing the name of another type. `for` and `against` are both required and take every selector key. A type in `for` that has the same simple name as a type in `against` is one violation, located at the `for` type, with the other type as `Target`.
+A `uniqueNames` rule keeps a type from reusing the name of another type. `for` and `against` are both required and take the plain selector keys and `dependsOn` and `onlyDependsOn`, not the type traits. A type in `for` that has the same simple name as a type in `against` is one violation, located at the `for` type, with the other type as `Target`.
 
 ```yaml
 rules:

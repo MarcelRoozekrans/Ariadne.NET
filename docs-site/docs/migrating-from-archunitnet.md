@@ -300,7 +300,7 @@ rules:
 
 `DependOnAny` and `OnlyDependOn` select types by what they reference. `dependsOn` and `onlyDependsOn` take a nested selector with the keys of a target (`namespaces`, `assemblies`, `types`, `layers`, the type traits, `baseTypes`, `interfaces`, `attributes`, `attributeArguments` and `onlyAttributes`) and sit next to the other keys, in every place a type trait is accepted. A dependency is a type reference the type writes, once per target type. Keyword types such as `string` and `int` give no reference, so `dependsOn: { namespaces: ["System.**"] }` selects a type that writes `System.String` or `StringBuilder` and not one that only writes `string`.
 
-`DependOnAny(x)` is `dependsOn`. Types that depend on the application layer's `Target` namespace must not depend on `Forbidden`:
+`DependOnAny(x)` is `dependsOn`. Types that depend on the `Target` namespace must not depend on `Forbidden`:
 
 ```yaml
 schema: 2
