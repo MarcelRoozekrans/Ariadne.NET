@@ -525,7 +525,113 @@ public class RulePackReferenceCheckTests
         var rule = ForbidRule(new TargetSelector { Types = ["**.X"] }, null, new RuleException { Because = "Empty." });
 
         Resolve(PackWithRule(rule)).Error.Detail.Should().Be(
-            "exceptions[0] of rule 'R-1' selects nothing; it needs at least one of namespaces, assemblies, types, attributes, attributeArguments, onlyAttributes or a trait");
+            "exceptions[0] of rule 'R-1' selects nothing; it needs at least one of namespaces, assemblies, types, attributes, attributeArguments, onlyAttributes, a trait, dependsOn or onlyDependsOn");
+    }
+
+    [Fact]
+    public void Unknown_layer_inside_dependsOn_is_reported_at_its_path()
+    {
+        var rule = ForbidRule(
+            new TargetSelector { Layers = ["Domain"], DependsOn = new TargetSelector { Layers = ["Ghost"] } },
+            new TargetSelector { Types = ["**.T"], OnlyDependsOn = new TargetSelector { Layers = ["Nope"] } },
+            new RuleException { Because = "x", DependsOn = new TargetSelector { Layers = ["Phantom"] } });
+
+        Resolve(PackWithRule(rule)).Error.Detail!.Split('\n').Should().Equal(
+            "the dependsOn of the from of rule 'R-1' refers to unknown layer 'Ghost'",
+            "the onlyDependsOn of the to of rule 'R-1' refers to unknown layer 'Nope'",
+            "the dependsOn of exceptions[0] of rule 'R-1' refers to unknown layer 'Phantom'");
+    }
+
+    [Fact]
+    public void Unknown_layer_inside_a_condition_dependency_selector_is_reported_at_its_path()
+    {
+        var requirement = new RuleRequirement { IsNot = new TargetSelector { OnlyDependsOn = new TargetSelector { Layers = ["Ghost"] } } };
+
+        Resolve(PackWithRequire(requirement)).Error.Detail.Should().Be("the onlyDependsOn of the isNot of rule 'R-1' refers to unknown layer 'Ghost'");
+    }
+
+    [Fact]
+    public void Selector_and_exception_with_only_dependsOn_resolve()
+    {
+        var rule = ForbidRule(
+            new TargetSelector { DependsOn = new TargetSelector { Layers = ["Domain"] } },
+            null,
+            new RuleException { Because = "x", OnlyDependsOn = new TargetSelector { Namespaces = ["Shop.**"] } });
+        var requirement = new RuleRequirement { Is = new TargetSelector { DependsOn = new TargetSelector { Layers = ["Domain"] } } };
+
+        Resolve(PackWithRule(rule)).IsSuccess.Should().BeTrue();
+        Resolve(PackWithRequire(requirement)).IsSuccess.Should().BeTrue();
+    }
+
+    public static TheoryData<TargetSelector, string> BadDependencySelectors => new()
+    {
+        { new TargetSelector(), "the dependsOn of the from of rule 'R-1' selects nothing; it needs at least one selector key other than members, dependsOn and onlyDependsOn" },
+        { new TargetSelector { Types = ["**.A"], Members = ["**.M"] },
+            "the dependsOn of the from of rule 'R-1' has 'members', which the selector under dependsOn or onlyDependsOn does not take" },
+        { new TargetSelector { Types = ["**.A"], DependsOn = new TargetSelector { Types = ["**.B"] } },
+            "the dependsOn of the from of rule 'R-1' has 'dependsOn', which the selector under dependsOn or onlyDependsOn does not take" },
+        { new TargetSelector { Layers = ["Domain"], Namespaces = ["Shop.**"] },
+            "the dependsOn of the from of rule 'R-1' mixes layers with namespaces, assemblies, types, base types, interfaces, attributes, attribute arguments, attribute allow-lists or members" },
+        { new TargetSelector { Accessibility = ["friend"] },
+            "the dependsOn of the from of rule 'R-1' has accessibility 'friend', which must be one of public, internal, protected, private, protected internal, private protected" },
+        { new TargetSelector { AttributeArguments = [new AttributeArgumentMatch()] },
+            $"attributeArguments[0] in the dependsOn of the from of rule 'R-1' {EmptyEntryReason}" },
+    };
+
+    [Theory]
+    [MemberData(nameof(BadDependencySelectors))]
+    public void Bad_dependency_selector_is_reported_at_its_path(TargetSelector nested, string failure)
+    {
+        var rule = ForbidRule(new TargetSelector { Types = ["**.X"], DependsOn = nested });
+
+        Resolve(PackWithRule(rule)).Error.Detail.Should().Be(failure);
+    }
+
+    [Fact]
+    public void Capture_inside_a_dependency_selector_of_a_slices_rule_fails()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "R-1",
+            Because = "because",
+            Kind = RuleKind.Slices,
+            From = new TargetSelector(),
+            Slices = new SliceDefinition
+            {
+                Matching = ["Shop.(*).**"],
+                Independent = true,
+                Allow = new TargetSelector { DependsOn = new TargetSelector { Namespaces = ["Shop.(*).Api.**"] } },
+            },
+        };
+
+        Resolve(PackWithRule(rule)).Error.Detail.Should().Be(
+            "the dependsOn of the allow of rule 'R-1' has a pattern with a capture; a capture, (*) or (**), is only accepted in the matching of a slices rule");
+    }
+
+    [Fact]
+    public void Implements_with_dependsOn_fails()
+    {
+        var requirement = new RuleRequirement { Implements = new TargetSelector { Types = ["**.I"], DependsOn = new TargetSelector { Layers = ["Domain"] } } };
+
+        Resolve(PackWithRequire(requirement)).Error.Detail.Should().Be(
+            "the implements of rule 'R-1' has 'dependsOn', which implements does not take; it takes namespaces, assemblies, types");
+    }
+
+    [Fact]
+    public void BannedPackages_exception_with_onlyDependsOn_fails()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "R-1",
+            Because = "because",
+            Kind = RuleKind.BannedPackages,
+            From = new TargetSelector(),
+            Packages = ["FluentValidation"],
+            Exceptions = [new RuleException { Because = "x", OnlyDependsOn = new TargetSelector { Layers = ["Domain"] } }],
+        };
+
+        Resolve(PackWithRule(rule)).Error.Detail.Should().Be(
+            "exceptions[0] of rule 'R-1' has 'onlyDependsOn'; a package belongs to a project, so the exception of a bannedPackages rule names it by 'assemblies'");
     }
 
     [Fact]
@@ -875,6 +981,6 @@ public class RulePackReferenceCheckTests
         };
 
         Resolve(PackWithRule(rule)).Error.Detail.Should().Be(
-            "exceptions[0] of rule 'R-1' has 'assemblies'; an exception of a uniqueNames rule excuses a type's name, so it takes 'namespaces', 'types', 'attributes', 'attributeArguments', 'onlyAttributes' or a type trait");
+            "exceptions[0] of rule 'R-1' has 'assemblies'; an exception of a uniqueNames rule excuses a type's name, so it takes 'namespaces', 'types', 'attributes', 'attributeArguments', 'onlyAttributes', a type trait, 'dependsOn' or 'onlyDependsOn'");
     }
 }
