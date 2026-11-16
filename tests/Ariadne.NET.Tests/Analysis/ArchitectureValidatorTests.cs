@@ -717,7 +717,7 @@ public class ArchitectureValidatorTests
     public static TheoryData<string, bool> DependencyKeyPlaces()
     {
         var data = new TheoryData<string, bool>();
-        foreach (var place in new[] { "forbid from", "forbid to", "allowOnly from", "allowOnly to", "require for", "require is", "require isNot", "rule exception", "amendment exception", "slices allow", "uniqueNames for", "uniqueNames against" })
+        foreach (var place in new[] { "forbid from", "forbid to", "allowOnly from", "allowOnly to", "require for", "require is", "require isNot", "require implements", "rule exception", "amendment exception", "slices allow", "uniqueNames for", "uniqueNames against" })
         {
             data.Add(place, false);
             data.Add(place, true);
@@ -737,8 +737,8 @@ public class ArchitectureValidatorTests
     public void UsesDependencyKeys_is_true_for_key_in(string place, bool only)
     {
         var key = only ? OnlyDependencyKey : DependencyKey;
-        RuleDefinition Rule(RuleKind kind, TargetSelector? from = null, TargetSelector? to = null) =>
-            new() { Id = "K", Because = "K.", Kind = kind, From = from ?? VNs("Shop.**"), To = to ?? new TargetSelector(), Against = to ?? new TargetSelector() };
+        RuleDefinition Rule(RuleKind kind, TargetSelector? from = null, TargetSelector? to = null, TargetSelector? against = null) =>
+            new() { Id = "K", Because = "K.", Kind = kind, From = from ?? VNs("Shop.**"), To = to ?? new TargetSelector(), Against = against ?? new TargetSelector() };
         var rule = place switch
         {
             "forbid from" => Rule(RuleKind.Forbid, from: key),
@@ -748,10 +748,11 @@ public class ArchitectureValidatorTests
             "require for" => new RuleDefinition { Id = "K", Because = "K.", Kind = RuleKind.Require, From = key, Require = new RuleRequirement { Is = new TargetSelector { Sealed = true } } },
             "require is" => new RuleDefinition { Id = "K", Because = "K.", Kind = RuleKind.Require, From = VNs("Shop.**"), Require = new RuleRequirement { Is = key } },
             "require isNot" => new RuleDefinition { Id = "K", Because = "K.", Kind = RuleKind.Require, From = VNs("Shop.**"), Require = new RuleRequirement { IsNot = key } },
+            "require implements" => new RuleDefinition { Id = "K", Because = "K.", Kind = RuleKind.Require, From = VNs("Shop.**"), Require = new RuleRequirement { Implements = key } },
             "rule exception" => new RuleDefinition { Id = "K", Because = "K.", Kind = RuleKind.Forbid, From = VNs("Shop.**"), To = VNs("Shop.Data.**"), Exceptions = [ExceptionWith(key)] },
             "slices allow" => new RuleDefinition { Id = "K", Because = "K.", Kind = RuleKind.Slices, From = new TargetSelector(), Slices = new SliceDefinition { Matching = ["Shop.(*)"], Independent = true, Allow = key } },
             "uniqueNames for" => Rule(RuleKind.UniqueNames, from: key),
-            "uniqueNames against" => Rule(RuleKind.UniqueNames, to: key),
+            "uniqueNames against" => Rule(RuleKind.UniqueNames, against: key),
             _ => null,
         };
         var basePack = PackWithoutDependencyKeys();
