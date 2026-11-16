@@ -62,6 +62,36 @@ public class GitCliSyncProviderTests
     }
 
     [Fact]
+    public void ParseTagsFromLsRemote_LinesWithoutATabOrOutsideTags_ShouldBeSkipped()
+    {
+        var output = string.Join("\n", new[]
+        {
+            "warning: redirecting to the new location",
+            "aaa1234567890123456789012345678901234567\tHEAD",
+            "bbb1234567890123456789012345678901234567\trefs/heads/v9.0.0",
+            "ccc1234567890123456789012345678901234567\trefs/tags/v1.0.0",
+        });
+
+        var tags = SyncOperations.ParseTagsFromLsRemote(output);
+
+        tags.Should().Equal("v1.0.0");
+    }
+
+    [Fact]
+    public void ParseCommitFromLsRemote_LineWithoutATab_ShouldBeSkipped()
+    {
+        var output = string.Join("\n", new[]
+        {
+            "warning: redirecting to the new location",
+            "ccc1234567890123456789012345678901234567\trefs/tags/v1.0.0",
+        });
+
+        var sha = SyncOperations.ParseCommitFromLsRemote(output, "v1.0.0");
+
+        sha.Should().Be("ccc1234567890123456789012345678901234567");
+    }
+
+    [Fact]
     public void IsCacheValid_NoCacheDir_ShouldReturnFalse()
     {
         var result = SyncOperations.IsCacheValid(

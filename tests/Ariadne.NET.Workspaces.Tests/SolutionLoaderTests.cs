@@ -316,6 +316,54 @@ public sealed class SolutionLoaderTests : IDisposable
         result.Error.Detail.Should().Contain(Path.Combine("One", "Lib.csproj")).And.Contain(Path.Combine("Two", "Lib.csproj"));
     }
 
+    [Fact]
+    public async Task DuplicateProjectNameOfOneFile_ListsTheFileOnceAndNoOtherProject()
+    {
+        using var workspace = new AdhocWorkspace();
+        var file = Path.Combine(_dir, "One", "Lib.csproj");
+        AddProject(workspace, "Lib", LanguageNames.CSharp, "namespace One; public class A { }", file);
+        AddProject(workspace, "Lib", LanguageNames.CSharp, "namespace One; public class B { }", file);
+        AddProject(workspace, "Other", LanguageNames.CSharp, "namespace Other; public class C { }", Path.Combine(_dir, "Other", "Other.csproj"));
+
+        var result = await SolutionLoader.FromSolutionAsync(workspace.CurrentSolution, _dir, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Be("More than one project is named 'Lib'.");
+        result.Error.Detail.Should().Be($"{Path.Combine("One", "Lib.csproj")}: project 'Lib'");
+    }
+
+    [Fact]
+    public async Task NonCSharpProjectWithTwoFrameworks_IsSkippedOnce()
+    {
+        using var workspace = new AdhocWorkspace();
+        var file = Path.Combine(_dir, "VbLib", "VbLib.vbproj");
+        AddProject(workspace, "VbLib(net8.0)", LanguageNames.VisualBasic, filePath: file);
+        AddProject(workspace, "VbLib(net9.0)", LanguageNames.VisualBasic, filePath: file);
+        AddProject(workspace, "CsLib", LanguageNames.CSharp, "namespace CsLib; public class A { }");
+
+        var result = await SolutionLoader.FromSolutionAsync(workspace.CurrentSolution, _dir, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.ToString() : null);
+        using var loaded = result.Value;
+        loaded.SkippedProjects.Should().Equal(new SkippedProject("VbLib", "not a C# project"));
+    }
+
+    [Theory]
+    [InlineData("Could not read 'Lib.csproj' from the solution.")]
+    [InlineData("Could not read 'ROOTShop.slnx' completely.")]
+    public async Task FailureWhoseQuotedPathIsRelativeOrNotAProject_FailsTheWholeLoad(string template)
+    {
+        using var workspace = new AdhocWorkspace();
+        AddProject(workspace, "Fine", LanguageNames.CSharp, "namespace Fine; public class A { }", Path.Combine(_dir, "Fine", "Fine.csproj"));
+        string[] failures = [template.Replace("ROOT", _dir + Path.DirectorySeparatorChar, StringComparison.Ordinal)];
+
+        var result = await SolutionLoader.FromSolutionAsync(workspace.CurrentSolution, _dir, failures, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Be("The solution did not load completely.");
+        result.Error.Detail.Should().Be(failures[0]);
+    }
+
     [Theory]
     [InlineData("", "docker-compose.dcproj")]
     [InlineData("", "Shared.shproj")]
