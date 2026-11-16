@@ -693,6 +693,22 @@ public class PackYamlReaderTests
     }
 
     [Fact]
+    public void TwoDuplicateKeys_InOneMapping_AreBothReported()
+    {
+        var yaml = """
+            schema: 2
+            name: shop
+            name: other
+            author: a
+            author: b
+            """;
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(3, 1, "duplicate key 'name' in the pack"),
+            new PackProblem(5, 1, "duplicate key 'author' in the pack"));
+    }
+
+    [Fact]
     public void AnchorAndAlias_Resolve()
     {
         var yaml = """

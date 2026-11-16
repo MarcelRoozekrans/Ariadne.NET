@@ -72,6 +72,33 @@ public class SliceRulesCycleTests
     }
 
     [Fact]
+    public void Edge_out_of_a_component_is_not_reported()
+    {
+        var violations = Check(PackWith(Acyclic()), """
+            namespace Shop.Billing { public class B { public Shop.Orders.A? Back; public Shop.Shipping.S? Out; } }
+            namespace Shop.Orders { public class A { public Shop.Billing.B? X; } }
+            namespace Shop.Shipping { public class S { } }
+            """);
+
+        violations.Should().HaveCount(2);
+        violations.Should().NotContain(v => string.Equals(v.Target, "Shop.Shipping.S", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Edge_between_two_components_is_not_reported()
+    {
+        var violations = Check(PackWith(Acyclic()), TwoSliceCycle + """
+
+            namespace Shop.Shipping { public class S { public Shop.Stock.T? X; public Shop.Orders.A? Y; } }
+            namespace Shop.Stock { public class T { public Shop.Shipping.S? X; } }
+            """);
+
+        violations.Should().HaveCount(4);
+        violations.Should().NotContain(v => string.Equals(v.Target, "Shop.Orders.A", StringComparison.Ordinal)
+            && string.Equals(v.SourceType, "Shop.Shipping.S", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Acyclic_slices_report_nothing()
     {
         Check(PackWith(Acyclic()), """

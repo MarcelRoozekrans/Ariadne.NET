@@ -44,6 +44,22 @@ public sealed class CodeGeneratorServiceTests
     }
 
     [Fact]
+    public void Generate_RoleThatRequiresAnInterfaceButNamesNone_HasNoBaseList()
+    {
+        var pack = new RulePack
+        {
+            Name = "test",
+            ComponentRoles = [new ComponentRoleDefinition { Name = "Service", Layer = "Application", TypeKind = CSharpTypeKind.Class, RequiresInterface = true }],
+            NamingConventions = new NamingConventions { Namespace = "{SolutionName}.{Layer}", FilePath = "{ComponentName}.cs" },
+        };
+        var request = new CodeGenerationRequest { SolutionName = "MyApp", Feature = "Orders", ComponentName = "OrderService", RoleName = "Service" };
+
+        var result = _sut.Generate(pack, request);
+
+        result.Code.Should().Contain("public class OrderService").And.NotContain("OrderService :");
+    }
+
+    [Fact]
     public void Generate_Entity_ProducesPublicClass()
     {
         var request = new CodeGenerationRequest
