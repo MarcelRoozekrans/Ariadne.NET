@@ -11,7 +11,7 @@ internal static class ExceptionKeyRules
     /// <summary>Why the exception key does not apply to the rule kind, or null when it does.</summary>
     public static string? Rejection(RuleKind kind, string key) => kind switch
     {
-        RuleKind.BannedPackages when key is "types" or "namespaces" or "attributes" || Array.IndexOf(PackYamlReader.TraitKeys, key) >= 0 =>
+        RuleKind.BannedPackages when key is "types" or "namespaces" or "attributes" or "attributeArguments" or "onlyAttributes" || Array.IndexOf(PackYamlReader.TraitKeys, key) >= 0 =>
             "a package belongs to a project, so the exception of a bannedPackages rule names it by 'assemblies'",
         RuleKind.UniqueNames when key is "assemblies" =>
             "an exception of a uniqueNames rule excuses a type's name, so it takes 'namespaces', 'types', 'attributes' or a type trait",
@@ -29,6 +29,8 @@ internal static class ExceptionKeyRules
             ("assemblies", exception.Assemblies.Count > 0),
             ("types", exception.Types.Count > 0),
             ("attributes", exception.Attributes.Count > 0),
+            ("attributeArguments", exception.AttributeArguments.Count > 0),
+            ("onlyAttributes", exception.OnlyAttributes.Count > 0),
             ("names", exception.Names.Count > 0),
             ("kinds", exception.Kinds.Count > 0),
             ("accessibility", exception.Accessibility.Count > 0),
@@ -45,7 +47,7 @@ internal static class ExceptionKeyRules
     public static string[] Allowed(RuleKind kind) => kind switch
     {
         RuleKind.BannedPackages => ["assemblies"],
-        RuleKind.UniqueNames => ["namespaces", "types", "attributes", .. PackYamlReader.TraitKeys],
-        _ => ["namespaces", "assemblies", "types", "attributes", .. PackYamlReader.TraitKeys],
+        RuleKind.UniqueNames => ["namespaces", "types", "attributes", "attributeArguments", "onlyAttributes", .. PackYamlReader.TraitKeys],
+        _ => ["namespaces", "assemblies", "types", "attributes", "attributeArguments", "onlyAttributes", .. PackYamlReader.TraitKeys],
     };
 }

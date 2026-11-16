@@ -169,7 +169,8 @@ internal static class RulePackReferenceCheck
         }
 
         CheckTarget($"the allow of rule '{id}'", allow, failures);
-        if (HasCapture(allow.Namespaces, allow.Assemblies, allow.Types, allow.BaseTypes, allow.Interfaces, allow.Attributes, allow.Names, allow.AssignableTo))
+        if (HasCapture(allow.Namespaces, allow.Assemblies, allow.Types, allow.BaseTypes, allow.Interfaces, allow.Attributes, AttributePatterns(allow.AttributeArguments),
+                allow.OnlyAttributes, allow.Names, allow.AssignableTo))
         {
             failures.Add($"the allow of rule '{id}' has a pattern with a capture; {CaptureOutsideMatching}");
         }
@@ -181,8 +182,8 @@ internal static class RulePackReferenceCheck
         else if (allow is
                  {
                      Layers.Count: 0, Namespaces.Count: 0, Assemblies.Count: 0, Types.Count: 0, BaseTypes.Count: 0, Interfaces.Count: 0,
-                     Attributes.Count: 0, Names.Count: 0, Kinds.Count: 0, Accessibility.Count: 0, AssignableTo.Count: 0,
-                     Sealed: null, Abstract: null, Static: null, Nested: null,
+                     Attributes.Count: 0, AttributeArguments.Count: 0, OnlyAttributes.Count: 0, Names.Count: 0, Kinds.Count: 0, Accessibility.Count: 0,
+                     AssignableTo.Count: 0, Sealed: null, Abstract: null, Static: null, Nested: null,
                  })
         {
             failures.Add($"the allow of rule '{id}' selects nothing; it needs at least one selector key");
@@ -224,16 +225,17 @@ internal static class RulePackReferenceCheck
             var where = $"exceptions[{i}] of rule '{id}'";
             if (exception is
                 {
-                    Namespaces.Count: 0, Assemblies.Count: 0, Types.Count: 0, Attributes.Count: 0, Names.Count: 0, Kinds.Count: 0, Accessibility.Count: 0,
-                    AssignableTo.Count: 0, Sealed: null, Abstract: null, Static: null, Nested: null,
+                    Namespaces.Count: 0, Assemblies.Count: 0, Types.Count: 0, Attributes.Count: 0, AttributeArguments.Count: 0, OnlyAttributes.Count: 0,
+                    Names.Count: 0, Kinds.Count: 0, Accessibility.Count: 0, AssignableTo.Count: 0, Sealed: null, Abstract: null, Static: null, Nested: null,
                 })
             {
-                failures.Add($"{where} selects nothing; it needs at least one of namespaces, assemblies, types, attributes or a trait");
+                failures.Add($"{where} selects nothing; it needs at least one of namespaces, assemblies, types, attributes, attributeArguments, onlyAttributes or a trait");
             }
 
             CheckTraitValues(where, exception.Kinds, exception.Accessibility, failures);
             if (rule.Kind == RuleKind.Slices
-                && HasCapture(exception.Namespaces, exception.Assemblies, exception.Types, exception.Attributes, exception.Names, exception.AssignableTo))
+                && HasCapture(exception.Namespaces, exception.Assemblies, exception.Types, exception.Attributes, AttributePatterns(exception.AttributeArguments),
+                    exception.OnlyAttributes, exception.Names, exception.AssignableTo))
             {
                 failures.Add($"{where} has a pattern with a capture; {CaptureOutsideMatching}");
             }
@@ -262,6 +264,8 @@ internal static class RulePackReferenceCheck
             ("baseTypes", selector.BaseTypes.Count > 0),
             ("interfaces", selector.Interfaces.Count > 0),
             ("attributes", selector.Attributes.Count > 0),
+            ("attributeArguments", selector.AttributeArguments.Count > 0),
+            ("onlyAttributes", selector.OnlyAttributes.Count > 0),
             ("members", selector.Members.Count > 0),
             ("names", selector.Names.Count > 0),
             ("kinds", selector.Kinds.Count > 0),
@@ -286,6 +290,10 @@ internal static class RulePackReferenceCheck
         }
     }
 
+    // The attribute class patterns of attribute argument entries, which a capture would turn into literal segments too.
+    private static List<string> AttributePatterns(IList<AttributeArgumentMatch> entries) =>
+        [.. entries.Select(static entry => entry?.Attribute).OfType<string>()];
+
     private const string CaptureOutsideMatching = "a capture, (*) or (**), is only accepted in the matching of a slices rule";
 
     // A capture only names a slice in matching, so anywhere else it would be a literal glob segment that never matches.
@@ -309,9 +317,10 @@ internal static class RulePackReferenceCheck
     private static void CheckTarget(string where, TargetSelector target, List<string> failures)
     {
         if (target.Layers.Count > 0 && (target.Namespaces.Count > 0 || target.Assemblies.Count > 0 || target.Types.Count > 0
-                || target.BaseTypes.Count > 0 || target.Interfaces.Count > 0 || target.Attributes.Count > 0 || target.Members.Count > 0))
+                || target.BaseTypes.Count > 0 || target.Interfaces.Count > 0 || target.Attributes.Count > 0 || target.AttributeArguments.Count > 0
+                || target.OnlyAttributes.Count > 0 || target.Members.Count > 0))
         {
-            failures.Add($"{where} mixes layers with namespaces, assemblies, types, base types, interfaces, attributes or members");
+            failures.Add($"{where} mixes layers with namespaces, assemblies, types, base types, interfaces, attributes, attribute arguments, attribute allow-lists or members");
         }
 
         CheckTraitValues(where, target.Kinds, target.Accessibility, failures);
@@ -402,7 +411,7 @@ internal static class RulePackReferenceCheck
         else if (condition is
                  {
                      Namespaces.Count: 0, Assemblies.Count: 0, Types.Count: 0, BaseTypes.Count: 0, Interfaces.Count: 0, Attributes.Count: 0,
-                     Names.Count: 0, Kinds.Count: 0, Accessibility.Count: 0, AssignableTo.Count: 0,
+                     AttributeArguments.Count: 0, OnlyAttributes.Count: 0, Names.Count: 0, Kinds.Count: 0, Accessibility.Count: 0, AssignableTo.Count: 0,
                      Sealed: null, Abstract: null, Static: null, Nested: null,
                  })
         {

@@ -49,7 +49,7 @@ internal static class PackYamlReader
 
     // The selector keys of a uniqueNames target, which does not take traits.
     private static readonly string[] PlainTargetKeys =
-        ["layers", "namespaces", "assemblies", "types", "baseTypes", "interfaces", "attributes"];
+        ["layers", "namespaces", "assemblies", "types", "baseTypes", "interfaces", "attributes", "attributeArguments", "onlyAttributes"];
 
     private static readonly string[] TargetKeys = [.. PlainTargetKeys, .. TraitKeys];
 
@@ -58,7 +58,7 @@ internal static class PackYamlReader
 
     // What 'is' and 'isNot' check against the type itself: every selector key except 'layers' and 'members'.
     private static readonly string[] ConditionKeys =
-        ["namespaces", "assemblies", "types", "baseTypes", "interfaces", "attributes", .. TraitKeys];
+        ["namespaces", "assemblies", "types", "baseTypes", "interfaces", "attributes", "attributeArguments", "onlyAttributes", .. TraitKeys];
 
     private static readonly string[] BannedPackagesKeys = ["packages", "from"];
 
@@ -71,9 +71,14 @@ internal static class PackYamlReader
     // What a type must implement is matched by name only: its namespace, assembly or full name.
     private static readonly string[] ImplementsKeys = ["namespaces", "assemblies", "types"];
 
-    private static readonly string[] OtherSelectorKeys = ["namespaces", "assemblies", "types", "baseTypes", "interfaces", "attributes", "members"];
+    private static readonly string[] OtherSelectorKeys =
+        ["namespaces", "assemblies", "types", "baseTypes", "interfaces", "attributes", "attributeArguments", "onlyAttributes", "members"];
 
-    private static readonly string[] ExceptionKeys = ["namespaces", "assemblies", "types", "attributes", .. TraitKeys, "because"];
+    private static readonly string[] ExceptionKeys =
+        ["namespaces", "assemblies", "types", "attributes", "attributeArguments", "onlyAttributes", .. TraitKeys, "because"];
+
+    // The keys of one attributeArguments entry; all three apply to the same attribute instance.
+    private static readonly string[] AttributeArgumentKeys = ["attribute", "arguments", "named"];
 
     private const string RuleBodyKeys = "'forbid', 'allowOnly', 'require', 'bannedPackages', 'uniqueNames' or 'slices'";
 
@@ -173,12 +178,12 @@ internal static class PackYamlReader
         return true;
     }
 
-    // True when no selector list holds a value; a list that was itself invalid has already been reported.
-    private static bool NoneSelected(Dictionary<string, Field> fields, ReadOnlySpan<(string Key, List<string>? Items)> selectors)
+    // True when no selector list holds a value; a list that was itself invalid has a null count and has already been reported.
+    private static bool NoneSelected(Dictionary<string, Field> fields, ReadOnlySpan<(string Key, int? Count)> selectors)
     {
-        foreach (var (key, items) in selectors)
+        foreach (var (key, count) in selectors)
         {
-            if (items is { Count: > 0 } || (items is null && fields.ContainsKey(key)))
+            if (count > 0 || (count is null && fields.ContainsKey(key)))
             {
                 return false;
             }
@@ -377,7 +382,7 @@ internal static class PackYamlReader
             var because = RequiredString(fields, "because", where, map);
             var description = OptionalString(fields, "description", where);
             var allowed = StringList(fields, "allowedDependencies", where);
-            if (NoneSelected(fields, [("namespaces", namespaces), ("assemblies", assemblies)]))
+            if (NoneSelected(fields, [("namespaces", namespaces?.Count), ("assemblies", assemblies?.Count)]))
             {
                 Add(map, $"{where} needs at least one of 'namespaces', 'assemblies'");
             }
@@ -827,9 +832,10 @@ internal static class PackYamlReader
         {
             var before = _problems.Count;
             var fields = Fields(map, keys, where);
-            var listKeys = Array.FindAll(keys, static k => !IsTrait(k));
+            // attributeArguments holds entries, not patterns, so it is read on its own after the pattern lists.
+            var listKeys = Array.FindAll(keys, static k => !IsTrait(k) && !string.Equals(k, "attributeArguments", StringComparison.Ordinal));
             var lists = new List<string>?[listKeys.Length];
-            var selectors = new (string Key, List<string>? Items)[listKeys.Length];
+            var selectors = new (string Key, int? Count)[listKeys.Length + 1];
             for (var i = 0; i < listKeys.Length; i++)
             {
                 lists[i] = listKeys[i] switch
@@ -837,11 +843,14 @@ internal static class PackYamlReader
                     "layers" => StringList(fields, "layers", where),
                     "assemblies" => PatternList(fields, "assemblies", where, Glob.Flat),
                     "members" => PatternList(fields, "members", where, MemberPattern),
+                    "onlyAttributes" => ReadOnlyAttributes(fields, where),
                     _ => PatternList(fields, listKeys[i], where, Glob.Dotted),
                 };
-                selectors[i] = (listKeys[i], lists[i]);
+                selectors[i] = (listKeys[i], lists[i]?.Count);
             }
 
+            var attributeArguments = ReadAttributeArguments(fields, where);
+            selectors[^1] = ("attributeArguments", attributeArguments?.Count);
             var traits = ReadTraits(fields, where);
             if (fields.TryGetValue("layers", out var layersField) && OtherSelectorKeys.Any(fields.ContainsKey))
             {
@@ -863,6 +872,8 @@ internal static class PackYamlReader
                     BaseTypes = ListFor(lists, listKeys, "baseTypes"),
                     Interfaces = ListFor(lists, listKeys, "interfaces"),
                     Attributes = ListFor(lists, listKeys, "attributes"),
+                    AttributeArguments = attributeArguments ?? [],
+                    OnlyAttributes = ListFor(lists, listKeys, "onlyAttributes"),
                     Members = ListFor(lists, listKeys, "members"),
                     Names = traits.Names ?? [],
                     Kinds = traits.Kinds ?? [],
@@ -934,6 +945,175 @@ internal static class PackYamlReader
             return valid ? values : null;
         }
 
+        // An empty list cannot be told from an absent key once read, so it is rejected; it is null then, as an invalid list is.
+        private List<string>? ReadOnlyAttributes(Dictionary<string, Field> fields, string where)
+        {
+            var patterns = PatternList(fields, "onlyAttributes", where, Glob.Dotted);
+            if (patterns is { Count: 0 })
+            {
+                Add(fields["onlyAttributes"].Key,
+                    $"'onlyAttributes' in {where} needs at least one pattern; to select types without attributes, use isNot: {{ attributes: [\"**\"] }}");
+                return null;
+            }
+
+            return patterns;
+        }
+
+        // The entries of an attributeArguments list. Null when the key is absent or any entry has a problem, which is reported.
+        private List<AttributeArgumentMatch>? ReadAttributeArguments(Dictionary<string, Field> fields, string where) =>
+            fields.TryGetValue("attributeArguments", out var field) ? ReadAttributeArguments(in field, where) : null;
+
+        private List<AttributeArgumentMatch>? ReadAttributeArguments(in Field field, string where)
+        {
+            if (field.Value is not YamlSequenceNode sequence)
+            {
+                Add(field.Key, $"'attributeArguments' in {where} must be a list");
+                return null;
+            }
+
+            var before = _problems.Count;
+            var entries = new List<AttributeArgumentMatch>(sequence.Children.Count);
+            for (var i = 0; i < sequence.Children.Count && Visit(sequence.Children[i]); i++)
+            {
+                if (sequence.Children[i] is not YamlMappingNode map)
+                {
+                    Add(sequence.Children[i], $"'attributeArguments[{i}]' in {where} must be a mapping");
+                    continue;
+                }
+
+                if (ReadAttributeArgument(map, $"attributeArguments[{i}] of {where}") is { } entry)
+                {
+                    entries.Add(entry);
+                }
+            }
+
+            return _problems.Count == before && !_exhausted ? entries : null;
+        }
+
+        private AttributeArgumentMatch? ReadAttributeArgument(YamlMappingNode map, string where)
+        {
+            var before = _problems.Count;
+            var fields = Fields(map, AttributeArgumentKeys, where);
+            var attribute = OptionalString(fields, "attribute", where);
+            if (attribute is not null)
+            {
+                CheckPattern(fields["attribute"].Value, attribute, where, Glob.Dotted);
+            }
+
+            var hasArguments = fields.TryGetValue("arguments", out var argumentsField);
+            var arguments = hasArguments ? ReadArgumentValues(in argumentsField, where) : null;
+            var hasNamed = fields.TryGetValue("named", out var namedField);
+            var named = hasNamed ? ReadNamedValues(in namedField, where) : null;
+            if (!hasArguments && !hasNamed)
+            {
+                Add(map, $"{where} needs 'arguments' or 'named'; to select by the attribute alone, use 'attributes'");
+            }
+
+            return _problems.Count == before
+                ? new AttributeArgumentMatch
+                {
+                    Attribute = attribute,
+                    Arguments = arguments ?? [],
+                    Named = named ?? new Dictionary<string, string>(StringComparer.Ordinal),
+                }
+                : null;
+        }
+
+        private List<string>? ReadArgumentValues(in Field field, string where)
+        {
+            if (field.Value is not YamlSequenceNode sequence)
+            {
+                Add(field.Key, $"'arguments' in {where} must be a list");
+                return null;
+            }
+
+            if (sequence.Children.Count == 0)
+            {
+                Add(field.Key, $"'arguments' in {where} needs at least one value");
+                return null;
+            }
+
+            var values = new List<string>(sequence.Children.Count);
+            foreach (var item in sequence.Children)
+            {
+                if (!Visit(item))
+                {
+                    return null;
+                }
+
+                if (ArgumentValue(item, $"a value in 'arguments' of {where}") is { } value)
+                {
+                    values.Add(value);
+                }
+            }
+
+            return values.Count == sequence.Children.Count ? values : null;
+        }
+
+        // Names compare ordinal and case-sensitive, as C# does; a name the parser saw twice is reported as a duplicate key.
+        private Dictionary<string, string>? ReadNamedValues(in Field field, string where)
+        {
+            if (field.Value is not YamlMappingNode map)
+            {
+                Add(field.Key, $"'named' in {where} must be a mapping");
+                return null;
+            }
+
+            ReportDuplicates(map, where);
+            if (map.Children.Count == 0)
+            {
+                Add(field.Key, $"'named' in {where} needs at least one name");
+                return null;
+            }
+
+            var named = new Dictionary<string, string>(StringComparer.Ordinal);
+            var valid = true;
+            foreach (var (keyNode, valueNode) in map.Children)
+            {
+                if (!Visit(keyNode))
+                {
+                    return null;
+                }
+
+                if (keyNode is not YamlScalarNode { Value: { } name } nameNode || IsNull(nameNode) || string.IsNullOrWhiteSpace(name))
+                {
+                    Add(keyNode, $"a name in 'named' of {where} must be a string");
+                    valid = false;
+                    continue;
+                }
+
+                if (ArgumentValue(valueNode, $"the value of '{PackText.Show(name)}' in {where}") is { } value)
+                {
+                    named.TryAdd(name, value);
+                }
+                else
+                {
+                    valid = false;
+                }
+            }
+
+            return valid ? named : null;
+        }
+
+        // A value is one scalar, kept as its text; quoting does not change it. A YAML null would read as the text "null"
+        // or as nothing, so it must be quoted to say which.
+        private string? ArgumentValue(YamlNode node, string what)
+        {
+            if (node is not YamlScalarNode scalar)
+            {
+                Add(node, $"{what} must be a single value, not a list or mapping");
+                return null;
+            }
+
+            if (IsNull(scalar) || scalar.Value is null)
+            {
+                Add(node, $"{what} is null; quote it to match the text 'null'");
+                return null;
+            }
+
+            return scalar.Value;
+        }
+
         private static List<string> ListFor(List<string>?[] lists, string[] keys, string key)
         {
             var at = Array.IndexOf(keys, key);
@@ -959,10 +1139,16 @@ internal static class PackYamlReader
                 var assemblies = PatternList(fields, "assemblies", where, Glob.Flat);
                 var types = PatternList(fields, "types", where, Glob.Dotted);
                 var attributes = PatternList(fields, "attributes", where, Glob.Dotted);
+                var attributeArguments = ReadAttributeArguments(fields, where);
+                var onlyAttributes = ReadOnlyAttributes(fields, where);
                 var traits = ReadTraits(fields, where);
                 var because = RequiredString(fields, "because", where, map);
                 var misplaced = RejectMisplaced(fields, where, kind);
-                if (!misplaced && NoneSelected(fields, [("namespaces", namespaces), ("assemblies", assemblies), ("types", types), ("attributes", attributes)])
+                if (!misplaced
+                    && NoneSelected(fields, [
+                        ("namespaces", namespaces?.Count), ("assemblies", assemblies?.Count), ("types", types?.Count), ("attributes", attributes?.Count),
+                        ("attributeArguments", attributeArguments?.Count), ("onlyAttributes", onlyAttributes?.Count),
+                    ])
                     && !traits.AnySelected(fields))
                 {
                     var allowed = ExceptionKeyRules.Allowed(kind);
@@ -977,6 +1163,8 @@ internal static class PackYamlReader
                         Assemblies = assemblies ?? [],
                         Types = types ?? [],
                         Attributes = attributes ?? [],
+                        AttributeArguments = attributeArguments ?? [],
+                        OnlyAttributes = onlyAttributes ?? [],
                         Names = traits.Names ?? [],
                         Kinds = traits.Kinds ?? [],
                         Accessibility = traits.Accessibility ?? [],
@@ -1137,7 +1325,14 @@ internal static class PackYamlReader
                 }
             }
 
-            // Removed once reported, so a mapping reached again through an alias does not report them twice.
+            ReportDuplicates(mapping, where);
+            return fields;
+        }
+
+        // The keys the parser saw twice in the mapping. Removed once reported, so a mapping reached again through an alias
+        // does not report them twice.
+        private void ReportDuplicates(YamlMappingNode mapping, string where)
+        {
             if (duplicates.Remove(DuplicateKeyFilter.Position(mapping.Start), out var seen))
             {
                 foreach (ref readonly var duplicate in CollectionsMarshal.AsSpan(seen))
@@ -1145,8 +1340,6 @@ internal static class PackYamlReader
                     _problems.Add(new PackProblem(duplicate.Line, duplicate.Column, $"duplicate key '{PackText.Show(duplicate.Key)}' in {where}"));
                 }
             }
-
-            return fields;
         }
 
         // Repeats inside a mapping the walk never reached, such as one under an unknown key: never silently dropped.
@@ -1272,20 +1465,26 @@ internal static class PackYamlReader
             var sequence = (YamlSequenceNode)fields[key].Value;
             for (var i = 0; i < values.Count; i++)
             {
-                if (_inSlicesRule && SlicePattern.HasCapture(values[i]))
-                {
-                    AddInvalidPattern(sequence.Children[i], values[i], where, CaptureOutsideMatching);
-                    continue;
-                }
-
-                var glob = compile(values[i]);
-                if (!glob.IsSuccess)
-                {
-                    AddInvalidPattern(sequence.Children[i], values[i], where, glob.Error);
-                }
+                CheckPattern(sequence.Children[i], values[i], where, compile);
             }
 
             return values;
+        }
+
+        // Reports a pattern that does not compile, or that holds a capture outside the 'matching' of a slices rule.
+        private void CheckPattern(YamlNode node, string pattern, string where, Func<string, Result<Glob, string>> compile)
+        {
+            if (_inSlicesRule && SlicePattern.HasCapture(pattern))
+            {
+                AddInvalidPattern(node, pattern, where, CaptureOutsideMatching);
+                return;
+            }
+
+            var glob = compile(pattern);
+            if (!glob.IsSuccess)
+            {
+                AddInvalidPattern(node, pattern, where, glob.Error);
+            }
         }
 
         // The reason may quote the pattern too; it is shown the same way as the pattern itself.

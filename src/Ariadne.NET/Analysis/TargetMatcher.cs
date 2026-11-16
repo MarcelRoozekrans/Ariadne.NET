@@ -31,16 +31,19 @@ internal sealed class TargetMatcher
     /// <param name="target">The target to compile.</param>
     /// <param name="layers">The layer map that resolves layer names.</param>
     /// <returns>The matcher.</returns>
-    /// <exception cref="ArgumentException">The target mixes layers with namespaces, assemblies, types, base types, interfaces, attributes or members. Layers with traits are allowed.</exception>
+    /// <exception cref="ArgumentException">The target mixes layers with namespaces, assemblies, types, base types, interfaces, attributes, attribute arguments, attribute allow-lists or members. Layers with traits are allowed.</exception>
     public static TargetMatcher From(TargetSelector target, LayerMap layers)
     {
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(layers);
 
         if (target.Layers.Count > 0 && (target.Namespaces.Count > 0 || target.Assemblies.Count > 0 || target.Types.Count > 0
-                || target.BaseTypes.Count > 0 || target.Interfaces.Count > 0 || target.Attributes.Count > 0 || target.Members.Count > 0))
+                || target.BaseTypes.Count > 0 || target.Interfaces.Count > 0 || target.Attributes.Count > 0 || target.AttributeArguments.Count > 0
+                || target.OnlyAttributes.Count > 0 || target.Members.Count > 0))
         {
-            throw new ArgumentException("A target selects either layers or namespaces, assemblies, types, base types, interfaces, attributes and members, not both. Traits may join either.", nameof(target));
+            throw new ArgumentException(
+                "A target selects either layers or namespaces, assemblies, types, base types, interfaces, attributes, attribute arguments, attribute allow-lists and members, not both. Traits may join either.",
+                nameof(target));
         }
 
         return new TargetMatcher(

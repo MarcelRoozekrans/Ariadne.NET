@@ -497,7 +497,7 @@ public class RulePackReferenceCheckTests
         var rule = ForbidRule(new TargetSelector { Types = ["**.X"] }, null, new RuleException { Because = "Empty." });
 
         Resolve(PackWithRule(rule)).Error.Detail.Should().Be(
-            "exceptions[0] of rule 'R-1' selects nothing; it needs at least one of namespaces, assemblies, types, attributes or a trait");
+            "exceptions[0] of rule 'R-1' selects nothing; it needs at least one of namespaces, assemblies, types, attributes, attributeArguments, onlyAttributes or a trait");
     }
 
     [Fact]
@@ -506,6 +506,82 @@ public class RulePackReferenceCheckTests
         var rule = ForbidRule(new TargetSelector { Types = ["**.X"] }, null, new RuleException { Attributes = ["**.AuditedAttribute"], Because = "Audited." });
 
         Resolve(PackWithRule(rule)).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Exception_with_only_onlyAttributes_resolves()
+    {
+        var rule = ForbidRule(new TargetSelector { Types = ["**.X"] }, null, new RuleException { OnlyAttributes = ["System.**"], Because = "Plain." });
+
+        Resolve(PackWithRule(rule)).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Exception_with_only_named_attribute_arguments_resolves()
+    {
+        var match = new AttributeArgumentMatch { Named = new Dictionary<string, string>(StringComparer.Ordinal) { ["Legacy"] = "true" } };
+        var rule = ForbidRule(new TargetSelector { Types = ["**.X"] }, null, new RuleException { AttributeArguments = [match], Because = "Legacy." });
+
+        Resolve(PackWithRule(rule)).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Condition_with_only_onlyAttributes_resolves()
+    {
+        Resolve(PackWithRequire(new RuleRequirement { Is = new TargetSelector { OnlyAttributes = ["System.**"] } })).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Condition_with_only_attribute_arguments_resolves()
+    {
+        var match = new AttributeArgumentMatch { Arguments = ["1"] };
+
+        Resolve(PackWithRequire(new RuleRequirement { IsNot = new TargetSelector { AttributeArguments = [match] } })).IsSuccess.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Slices_allow_with_only_an_attribute_key_resolves(bool only)
+    {
+        var allow = only
+            ? new TargetSelector { OnlyAttributes = ["System.**"] }
+            : new TargetSelector { AttributeArguments = [new AttributeArgumentMatch { Arguments = ["1"] }] };
+
+        Resolve(PackWithRule(SlicesRule(Slices(allow)))).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Implements_with_attribute_argument_keys_fails()
+    {
+        var implements = new TargetSelector { Types = ["**.I"], OnlyAttributes = ["System.**"] };
+
+        Resolve(PackWithRequire(new RuleRequirement { Implements = implements })).Error.Detail.Should()
+            .Contain("the implements of rule 'R-1' has 'onlyAttributes', which implements does not take");
+    }
+
+    [Fact]
+    public void Capture_in_the_onlyAttributes_of_a_slices_allow_is_invalid()
+    {
+        Resolve(PackWithRule(SlicesRule(Slices(new TargetSelector { OnlyAttributes = ["Shop.(*).TagAttribute"] })))).Error.Detail.Should().Be(
+            "the allow of rule 'R-1' has a pattern with a capture; a capture, (*) or (**), is only accepted in the matching of a slices rule");
+    }
+
+    [Fact]
+    public void Capture_in_an_attribute_argument_pattern_of_a_slices_exception_is_invalid()
+    {
+        var pack = PackWithRule(new RuleDefinition
+        {
+            Id = "R-1",
+            Because = "because",
+            Kind = RuleKind.Slices,
+            From = new TargetSelector(),
+            Slices = Slices(),
+            Exceptions = [new RuleException { AttributeArguments = [new AttributeArgumentMatch { Attribute = "Shop.(*).RouteAttribute", Arguments = ["1"] }], Because = "x" }],
+        });
+
+        Resolve(pack).Error.Detail.Should().Be(
+            "exceptions[0] of rule 'R-1' has a pattern with a capture; a capture, (*) or (**), is only accepted in the matching of a slices rule");
     }
 
     [Theory]
@@ -538,17 +614,21 @@ public class RulePackReferenceCheckTests
     [InlineData("namespaces")]
     [InlineData("members")]
     [InlineData("attributes")]
+    [InlineData("attributeArguments")]
+    [InlineData("onlyAttributes")]
     public void Target_MixingLayersWithGlobKeys_Fails(string key)
     {
         var to = key switch
         {
+            "attributeArguments" => new TargetSelector { Layers = ["Domain"], AttributeArguments = [new AttributeArgumentMatch { Arguments = ["1"] }] },
+            "onlyAttributes" => new TargetSelector { Layers = ["Domain"], OnlyAttributes = ["**.A"] },
             "namespaces" => new TargetSelector { Layers = ["Domain"], Namespaces = ["X"] },
             "members" => new TargetSelector { Layers = ["Domain"], Members = ["**.M"] },
             _ => new TargetSelector { Layers = ["Domain"], Attributes = ["**.A"] },
         };
 
         Resolve(PackWithRule(ForbidRule(new TargetSelector { Types = ["**.X"] }, to))).Error.Detail.Should().Be(
-            "the to of rule 'R-1' mixes layers with namespaces, assemblies, types, base types, interfaces, attributes or members");
+            "the to of rule 'R-1' mixes layers with namespaces, assemblies, types, base types, interfaces, attributes, attribute arguments, attribute allow-lists or members");
     }
 
     [Fact]
@@ -693,7 +773,7 @@ public class RulePackReferenceCheckTests
     [Theory]
     [InlineData("members", "the allow of rule 'R-1' has members, which it does not take")]
     [InlineData("empty", "the allow of rule 'R-1' selects nothing; it needs at least one selector key")]
-    [InlineData("mixed", "the allow of rule 'R-1' mixes layers with namespaces, assemblies, types, base types, interfaces, attributes or members")]
+    [InlineData("mixed", "the allow of rule 'R-1' mixes layers with namespaces, assemblies, types, base types, interfaces, attributes, attribute arguments, attribute allow-lists or members")]
     public void Slices_rule_with_an_unusable_allow_is_invalid(string shape, string expected)
     {
         var allow = shape switch

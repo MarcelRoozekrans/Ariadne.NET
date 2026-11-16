@@ -320,7 +320,7 @@ public class PackYamlReaderTests
             """;
 
         Problems(yaml).Should().Equal(
-            new PackProblem(8, 9, "a target in rule 'SH-001' cannot mix 'layers' with 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces' or 'attributes'"));
+            new PackProblem(8, 9, "a target in rule 'SH-001' cannot mix 'layers' with 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'attributeArguments' or 'onlyAttributes'"));
     }
 
     [Fact]
@@ -346,7 +346,7 @@ public class PackYamlReaderTests
 
         Problems(yaml).Should().Equal(
             new PackProblem(4, 5, "layer 'Domain' needs at least one of 'namespaces', 'assemblies'"),
-            new PackProblem(15, 9, "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'assemblies', 'types', 'attributes', 'names', 'kinds', 'accessibility', 'assignableTo', 'sealed', 'abstract', 'static', 'nested'"));
+            new PackProblem(15, 9, "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'assemblies', 'types', 'attributes', 'attributeArguments', 'onlyAttributes', 'names', 'kinds', 'accessibility', 'assignableTo', 'sealed', 'abstract', 'static', 'nested'"));
     }
 
     [Fact]
@@ -364,7 +364,7 @@ public class PackYamlReaderTests
             """;
 
         Problems(yaml).Should().Equal(
-            new PackProblem(8, 11, "the to of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'members', 'names', 'kinds', 'accessibility', 'assignableTo', 'sealed', 'abstract', 'static', 'nested'"));
+            new PackProblem(8, 11, "the to of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'attributeArguments', 'onlyAttributes', 'members', 'names', 'kinds', 'accessibility', 'assignableTo', 'sealed', 'abstract', 'static', 'nested'"));
     }
 
     [Fact]
@@ -1274,7 +1274,7 @@ public class PackYamlReaderTests
         var yaml = RequireHead + "    uniqueNames:\n      for: {}\n      against: { layers: [Application] }\n";
 
         Problems(yaml).Should().Equal(
-            new PackProblem(7, 12, "the for of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes'"));
+            new PackProblem(7, 12, "the for of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'attributeArguments', 'onlyAttributes'"));
     }
 
     [Fact]
@@ -1402,7 +1402,7 @@ public class PackYamlReaderTests
             """;
 
         Problems(yaml).Should().Equal(
-            new PackProblem(9, 9, "a target in rule 'SH-001' cannot mix 'layers' with 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes' or 'members'"));
+            new PackProblem(9, 9, "a target in rule 'SH-001' cannot mix 'layers' with 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'attributeArguments', 'onlyAttributes' or 'members'"));
     }
 
     [Fact]
@@ -1458,7 +1458,7 @@ public class PackYamlReaderTests
         var yaml = RequireHead + "    uniqueNames:\n      for: { layers: [Web] }\n      against: {}\n";
 
         Problems(yaml).Should().Equal(
-            new PackProblem(8, 16, "the against of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes'"));
+            new PackProblem(8, 16, "the against of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'attributeArguments', 'onlyAttributes'"));
     }
 
     [Fact]
@@ -1484,7 +1484,7 @@ public class PackYamlReaderTests
     {
         var yaml = RequireHead + "    uniqueNames:\n      for: { layers: [Web] }\n      against: { layers: [Application] }\n    exceptions:\n      - because: Old.\n";
 
-        Problems(yaml).Should().Equal(new PackProblem(10, 9, "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'types', 'attributes', 'names', 'kinds', 'accessibility', 'assignableTo', 'sealed', 'abstract', 'static', 'nested'"));
+        Problems(yaml).Should().Equal(new PackProblem(10, 9, "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'types', 'attributes', 'attributeArguments', 'onlyAttributes', 'names', 'kinds', 'accessibility', 'assignableTo', 'sealed', 'abstract', 'static', 'nested'"));
     }
 
     [Fact]
@@ -1789,7 +1789,7 @@ public class PackYamlReaderTests
         var yaml = RequireHead + "    require:\n      for: { namespaces: [\"Shop.**\"] }\n      is: {}\n";
 
         Problems(yaml).Should().Equal(new PackProblem(8, 11,
-            "the is of rule 'SH-001' needs at least one of 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', " + TraitNames));
+            "the is of rule 'SH-001' needs at least one of 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'attributeArguments', 'onlyAttributes', " + TraitNames));
     }
 
     [Fact]
@@ -1812,7 +1812,7 @@ public class PackYamlReaderTests
         var yaml = RequireHead + "    require:\n      for: { layers: [Domain], sealed: true, namespaces: [\"Shop.**\"] }\n      layer: Domain\n";
 
         Problems(yaml).Should().Equal(new PackProblem(7, 14,
-            "a target in rule 'SH-001' cannot mix 'layers' with 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces' or 'attributes'"));
+            "a target in rule 'SH-001' cannot mix 'layers' with 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'attributeArguments' or 'onlyAttributes'"));
     }
 
     [Theory]
@@ -1891,7 +1891,7 @@ public class PackYamlReaderTests
         var yaml = RequireHead + $"    require:\n      for: {{ {entry} }}\n      layer: Domain\n";
 
         Problems(yaml).Should().Equal(new PackProblem(7, 12,
-            "the for of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', " + TraitNames));
+            "the for of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'attributeArguments', 'onlyAttributes', " + TraitNames));
     }
 
     [Fact]
@@ -1906,7 +1906,195 @@ public class PackYamlReaderTests
             """;
 
         Problems(yaml).Should().Equal(new PackProblem(10, 9,
-            "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'assemblies', 'types', 'attributes', " + TraitNames));
+            "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'assemblies', 'types', 'attributes', 'attributeArguments', 'onlyAttributes', " + TraitNames));
+    }
+
+    [Fact]
+    public void AttributeArguments_in_forbid_from_reads()
+    {
+        var yaml = RequireHead + """
+                forbid:
+                  from:
+                    attributeArguments:
+                      - attribute: "Shop.RouteAttribute"
+                        arguments: ["api/orders", 2]
+                        named: { Version: 2 }
+                  to: { namespaces: ["Lib.**"] }
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var entry = result.Value.Rules.Should().ContainSingle().Subject.From.AttributeArguments.Should().ContainSingle().Subject;
+        entry.Attribute.Should().Be("Shop.RouteAttribute");
+        entry.Arguments.Should().Equal("api/orders", "2");
+        entry.Named.Should().ContainSingle().Which.Should().Be(new KeyValuePair<string, string>("Version", "2"));
+        entry.Named.ContainsKey("version").Should().BeFalse("named argument names compare ordinal");
+    }
+
+    [Fact]
+    public void AttributeArguments_in_is_reads()
+    {
+        var yaml = RequireHead + """
+                require:
+                  for: { namespaces: ["Shop.**"] }
+                  is:
+                    attributeArguments:
+                      - arguments: [Singleton]
+                      - attribute: "**.RouteAttribute"
+                        named: { Name: orders }
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var entries = result.Value.Rules.Should().ContainSingle().Subject.Require!.Is!.AttributeArguments;
+        entries.Should().HaveCount(2);
+        entries[0].Attribute.Should().BeNull();
+        entries[0].Arguments.Should().Equal("Singleton");
+        entries[0].Named.Should().BeEmpty();
+        entries[1].Attribute.Should().Be("**.RouteAttribute");
+        entries[1].Arguments.Should().BeEmpty();
+        entries[1].Named.Should().ContainSingle().Which.Should().Be(new KeyValuePair<string, string>("Name", "orders"));
+    }
+
+    [Fact]
+    public void OnlyAttributes_in_isNot_reads()
+    {
+        var yaml = RequireHead + """
+                require:
+                  for: { namespaces: ["Shop.**"] }
+                  isNot: { onlyAttributes: ["System.**", "Shop.**.AuditedAttribute"] }
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        result.Value.Rules.Should().ContainSingle().Subject.Require!.IsNot!.OnlyAttributes
+            .Should().Equal("System.**", "Shop.**.AuditedAttribute");
+    }
+
+    [Fact]
+    public void Exception_with_only_attribute_arguments_reads()
+    {
+        var yaml = RequireHead + """
+                forbid:
+                  from: { namespaces: ["Shop.**"] }
+                  to: { namespaces: ["Shop.Persistence.**"] }
+                exceptions:
+                  - attributeArguments:
+                      - named: { Legacy: true }
+                    because: Legacy types may use persistence.
+                  - onlyAttributes: ["System.**"]
+                    because: Plain types may too.
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var exceptions = result.Value.Rules.Should().ContainSingle().Subject.Exceptions;
+        exceptions.Should().HaveCount(2);
+        exceptions[0].AttributeArguments.Should().ContainSingle().Which.Named.Should()
+            .ContainSingle().Which.Should().Be(new KeyValuePair<string, string>("Legacy", "true"));
+        exceptions[1].OnlyAttributes.Should().Equal("System.**");
+    }
+
+    [Fact]
+    public void OnlyAttributes_in_uniqueNames_for_reads()
+    {
+        var yaml = RequireHead + """
+                uniqueNames:
+                  for: { onlyAttributes: ["Shop.**"] }
+                  against: { attributeArguments: [{ arguments: [dto] }] }
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var rule = result.Value.Rules.Should().ContainSingle().Subject;
+        rule.From.OnlyAttributes.Should().Equal("Shop.**");
+        rule.Against.AttributeArguments.Should().ContainSingle().Which.Arguments.Should().Equal("dto");
+    }
+
+    // A forbid whose from starts on line 9 at column 9; the entry of attributeArguments starts on line 10 at column 13.
+    private const string AttributeArgumentsHead =
+        RequireHead + "    forbid:\n      to: { namespaces: [\"Lib.**\"] }\n      from:\n";
+
+    private const string EntryWhere = "attributeArguments[0] of the from of rule 'SH-001'";
+
+    [Theory]
+    [InlineData("        attributeArguments:\n          - attribute: \"Shop.RouteAttribute\"\n", 10, 13,
+        EntryWhere + " needs 'arguments' or 'named'; to select by the attribute alone, use 'attributes'")]
+    [InlineData("        attributeArguments:\n          - arguments: []\n", 10, 13,
+        "'arguments' in " + EntryWhere + " needs at least one value")]
+    [InlineData("        onlyAttributes: []\n", 9, 9,
+        "'onlyAttributes' in the from of rule 'SH-001' needs at least one pattern; to select types without attributes, use isNot: { attributes: [\"**\"] }")]
+    [InlineData("        attributeArguments:\n          - named: { Version: null }\n", 10, 31,
+        "the value of 'Version' in " + EntryWhere + " is null; quote it to match the text 'null'")]
+    [InlineData("        attributeArguments:\n          - arguments: [~]\n", 10, 25,
+        "a value in 'arguments' of " + EntryWhere + " is null; quote it to match the text 'null'")]
+    [InlineData("        attributeArguments:\n          - arguments: [[1, 2]]\n", 10, 25,
+        "a value in 'arguments' of " + EntryWhere + " must be a single value, not a list or mapping")]
+    [InlineData("        attributeArguments:\n          - named: { Version: { Major: 2 } }\n", 10, 31,
+        "the value of 'Version' in " + EntryWhere + " must be a single value, not a list or mapping")]
+    [InlineData("        attributeArguments:\n          - named: { Version: 1, Version: 2 }\n", 10, 34,
+        "duplicate key 'Version' in " + EntryWhere)]
+    [InlineData("        attributeArguments:\n          - named: {}\n", 10, 13,
+        "'named' in " + EntryWhere + " needs at least one name")]
+    [InlineData("        attributeArguments:\n          - arguments: [1]\n            type: \"X\"\n", 11, 13,
+        "unknown key 'type' in " + EntryWhere)]
+    [InlineData("        attributeArguments:\n          - attribute: \"A..B\"\n            arguments: [1]\n", 10, 24,
+        "'A..B' in " + EntryWhere + " is not a valid pattern: pattern 'A..B' has an empty segment")]
+    [InlineData("        attributeArguments: [\"Shop.RouteAttribute\"]\n", 9, 30,
+        "'attributeArguments[0]' in the from of rule 'SH-001' must be a mapping")]
+    [InlineData("        attributeArguments: { arguments: [1] }\n", 9, 9,
+        "'attributeArguments' in the from of rule 'SH-001' must be a list")]
+    [InlineData("        attributeArguments:\n          - arguments: 1\n", 10, 13,
+        "'arguments' in " + EntryWhere + " must be a list")]
+    [InlineData("        attributeArguments:\n          - named: [Version]\n", 10, 13,
+        "'named' in " + EntryWhere + " must be a mapping")]
+    public void Rejects_a_bad_attribute_argument_entry(string from, int line, int column, string message)
+    {
+        Problems(AttributeArgumentsHead + from).Should().Equal(new PackProblem(line, column, message));
+    }
+
+    [Theory]
+    [InlineData("attributeArguments: [{ arguments: [1] }]")]
+    [InlineData("onlyAttributes: [\"Shop.**\"]")]
+    public void Attribute_argument_keys_cannot_mix_with_layers(string entry)
+    {
+        var yaml = RequireHead + $"    require:\n      for: {{ layers: [Domain], {entry} }}\n      layer: Domain\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(7, 14,
+            "a target in rule 'SH-001' cannot mix 'layers' with 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'attributeArguments' or 'onlyAttributes'"));
+    }
+
+    [Theory]
+    [InlineData("attributeArguments: [{ arguments: [1] }]", "attributeArguments")]
+    [InlineData("onlyAttributes: [\"Shop.**\"]", "onlyAttributes")]
+    public void BannedPackages_exception_rejects_attribute_argument_keys(string entry, string key)
+    {
+        var yaml = RequireHead + $"    bannedPackages:\n      packages: [FluentValidation]\n    exceptions:\n      - {entry}\n        because: Old.\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(9, 9,
+            $"'{key}' is not accepted in exceptions[0] of rule 'SH-001'; a package belongs to a project, so the exception of a bannedPackages rule names it by 'assemblies'"));
+    }
+
+    [Fact]
+    public void Capture_in_an_attribute_argument_pattern_of_a_slices_rule_fails()
+    {
+        var yaml = RequireHead + """
+                slices:
+                  matching: ["Shop.(*).**"]
+                  independent: true
+                  allow:
+                    attributeArguments:
+                      - attribute: "Shop.(*).RouteAttribute"
+                        arguments: [1]
+            """;
+
+        Problems(yaml).Should().Equal(new PackProblem(11, 24,
+            "'Shop.(*).RouteAttribute' in attributeArguments[0] of the allow of rule 'SH-001' is not a valid pattern: a capture, (*) or (**), is only accepted in the 'matching' of a slices rule"));
     }
 
     private const string RequireTargetMessage = "'requireTarget' applies only to forbid, allowOnly and uniqueNames rules";

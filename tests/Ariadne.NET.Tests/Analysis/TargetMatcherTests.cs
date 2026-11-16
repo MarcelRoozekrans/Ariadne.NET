@@ -94,10 +94,14 @@ public class TargetMatcherTests
     [InlineData("BaseTypes")]
     [InlineData("Interfaces")]
     [InlineData("Attributes")]
+    [InlineData("AttributeArguments")]
+    [InlineData("OnlyAttributes")]
     public void LayersMixedWithCodeFeatureSelectors_Throws(string key)
     {
         var target = key switch
         {
+            "AttributeArguments" => new TargetSelector { Layers = ["Domain"], AttributeArguments = [new AttributeArgumentMatch { Arguments = ["1"] }] },
+            "OnlyAttributes" => new TargetSelector { Layers = ["Domain"], OnlyAttributes = ["System.**"] },
             "BaseTypes" => new TargetSelector { Layers = ["Domain"], BaseTypes = ["**.Base"] },
             "Interfaces" => new TargetSelector { Layers = ["Domain"], Interfaces = ["**.IRepository"] },
             _ => new TargetSelector { Layers = ["Domain"], Attributes = ["**.ObsoleteAttribute"] },

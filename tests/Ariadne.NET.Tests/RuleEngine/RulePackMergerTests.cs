@@ -271,6 +271,31 @@ public class RulePackMergerTests
     }
 
     [Fact]
+    public void Amendment_AttributeArgumentsOnBannedPackagesRule_Fails()
+    {
+        var result = Amend(BannedRule(), new RuleException
+        {
+            Because = "x",
+            AttributeArguments = [new AttributeArgumentMatch { Arguments = ["1"] }],
+            OnlyAttributes = ["A.**"],
+        });
+
+        Problems(result).Should().HaveCount(2).And.Satisfy(
+            p => p.StartsWith("pack 'child' adds an exception to rule 'B1' with 'attributeArguments'", StringComparison.Ordinal),
+            p => p.StartsWith("pack 'child' adds an exception to rule 'B1' with 'onlyAttributes'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Amendment_AttributeArgumentsOnUniqueNamesRule_Merges()
+    {
+        Amend(UniqueRule(), new RuleException
+        {
+            Because = "x",
+            AttributeArguments = [new AttributeArgumentMatch { Named = new Dictionary<string, string>(StringComparer.Ordinal) { ["Name"] = "x" } }],
+        }).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
     public void Amendment_AttributesOnUniqueNamesRule_Merges()
     {
         Amend(UniqueRule(), new RuleException { Because = "x", Attributes = ["A.BAttribute"] }).IsSuccess.Should().BeTrue();
