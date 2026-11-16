@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.4](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.9.3...v0.9.4) (2026-11-15)
+
+
+### Documentation
+
+* **plan:** groom gap phases 4.8 and 4.9 ([94c68ed](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/94c68eddab6ab59b02adeec9006688a69487585e))
+
 ## [0.9.3](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.9.2...v0.9.3) (2026-11-15)
 
 
