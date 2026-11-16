@@ -32,7 +32,7 @@ public sealed class AttributeArgumentMatch
             return false;
         }
 
-        if (Arguments.Count == 0 && named.Count == 0)
+        if (Arguments is not { Count: > 0 } && named.Count == 0)
         {
             return false;
         }
