@@ -236,6 +236,51 @@ public class ForbidRulesTests
     }
 
     [Fact]
+    public void Exception_with_attribute_arguments_exempts_type()
+    {
+        const string Source = """
+            namespace T { public class X { } }
+            namespace N
+            {
+                public sealed class RouteAttribute : System.Attribute { public RouteAttribute(string path) { } }
+                [Route("legacy")] public class Kept { public T.X? A; }
+                [Route("current")] public class Routed { public T.X? B; }
+                public class Bare { public T.X? C; }
+            }
+            """;
+        var exception = new RuleException
+        {
+            AttributeArguments = [new AttributeArgumentMatch { Attribute = "N.RouteAttribute", Arguments = ["legacy"] }],
+            Because = "Legacy routes may use T.",
+        };
+
+        var pack = PackWith(Rule(new TargetSelector { Namespaces = ["N.**"] }, new TargetSelector { Namespaces = ["T.**"] }, exception));
+
+        Check(Source, pack).Select(v => v.SourceType).Should().BeEquivalentTo("N.Routed", "N.Bare");
+    }
+
+    [Fact]
+    public void Exception_with_only_attributes_exempts_type()
+    {
+        const string Source = """
+            namespace T { public class X { } }
+            namespace N
+            {
+                public sealed class AuditedAttribute : System.Attribute { }
+                public sealed class OtherAttribute : System.Attribute { }
+                [Audited] public class Kept { public T.X? A; }
+                [Audited] [Other] public class Mixed { public T.X? B; }
+                public class Bare { public T.X? C; }
+            }
+            """;
+        var exception = new RuleException { OnlyAttributes = ["N.AuditedAttribute"], Because = "Types with only audit attributes may use T." };
+
+        var pack = PackWith(Rule(new TargetSelector { Namespaces = ["N.**"] }, new TargetSelector { Namespaces = ["T.**"] }, exception));
+
+        Check(Source, pack).Should().ContainSingle().Which.SourceType.Should().Be("N.Mixed");
+    }
+
+    [Fact]
     public void TargetMixingLayersAndNamespaces_Throws()
     {
         var pack = PackWith(Rule(new TargetSelector { Layers = ["Domain"], Namespaces = ["Web.**"] }, new TargetSelector { Namespaces = ["Web.**"] }));
