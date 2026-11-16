@@ -1147,9 +1147,9 @@ public static class ParityCases
             "Parity.CHaveAttributeWithNamedArguments",
             "PARITY-CHAVEATTRIBUTEWITHNAMEDARGUMENTS-NOT",
             Projection.Types,
-            _ => Types().That().ResideInNamespace("Parity.CHaveAttributeWithNamedArguments.NotBroken")
+            a => Types().That().ResideInNamespace("Parity.CHaveAttributeWithNamedArguments.NotBroken")
                 .Or().ResideInNamespace("Parity.CHaveAttributeWithNamedArguments.NotClean")
-                .Should().NotHaveAnyAttributesWithNamedArguments(new (string, object)[] { ("Area", "billing"), ("Audited", true) })),
+                .Should().NotHaveAttributeWithNamedArguments(AttributeOf(a, "Parity.CHaveAttributeWithNamedArguments.Contracts.TagAttribute"), new (string, object)[] { ("Area", "billing"), ("Audited", true) })),
 
         // Phase 4.8 cases: attribute allow-lists. Each fixture holds a Draft type whose only attributes outside the set in IL
         // are NullableContextAttribute and NullableAttribute, which the compiler emits for its nullable fields. Ariadne leaves

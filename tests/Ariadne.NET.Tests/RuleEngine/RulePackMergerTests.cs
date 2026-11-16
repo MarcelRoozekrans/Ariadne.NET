@@ -296,6 +296,40 @@ public class RulePackMergerTests
     }
 
     [Fact]
+    public void Amendment_OnlyAttributesOnUniqueNamesRule_Merges()
+    {
+        var result = Amend(UniqueRule(), new RuleException { Because = "x", OnlyAttributes = ["Shop.*Attribute"] });
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Rules.Should().ContainSingle().Which.Exceptions.Should().ContainSingle().Which.OnlyAttributes.Should().Equal("Shop.*Attribute");
+    }
+
+    [Fact]
+    public void Amendment_AttributeArgumentsAndOnlyAttributesOnForbidRule_Merge()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "F1",
+            Because = "because",
+            Kind = RuleKind.Forbid,
+            From = new TargetSelector { Namespaces = ["Shop.**"] },
+            To = new TargetSelector { Namespaces = ["Lib.**"] },
+        };
+
+        var result = Amend(rule, new RuleException
+        {
+            Because = "x",
+            AttributeArguments = [new AttributeArgumentMatch { Arguments = ["billing"] }],
+            OnlyAttributes = ["Shop.*Attribute"],
+        });
+
+        result.IsSuccess.Should().BeTrue();
+        var exception = result.Value.Rules.Should().ContainSingle().Which.Exceptions.Should().ContainSingle().Subject;
+        exception.AttributeArguments.Should().ContainSingle().Which.Arguments.Should().Equal("billing");
+        exception.OnlyAttributes.Should().Equal("Shop.*Attribute");
+    }
+
+    [Fact]
     public void Amendment_AttributesOnUniqueNamesRule_Merges()
     {
         Amend(UniqueRule(), new RuleException { Because = "x", Attributes = ["A.BAttribute"] }).IsSuccess.Should().BeTrue();

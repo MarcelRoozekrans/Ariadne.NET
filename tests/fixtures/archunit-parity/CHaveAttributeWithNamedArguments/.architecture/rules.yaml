@@ -14,11 +14,13 @@ rules:
           - attribute: "Parity.CHaveAttributeWithNamedArguments.Contracts.TagAttribute"
             named: { Area: "billing", Audited: true }
   - id: PARITY-CHAVEATTRIBUTEWITHNAMEDARGUMENTS-NOT
-    because: Mirrors ArchUnitNET's NotHaveAnyAttributesWithNamedArguments; NotBroken and NotClean must hold neither pair on any attribute, so each pair is its own entry.
+    because: Mirrors ArchUnitNET's NotHaveAttributeWithNamedArguments with TagAttribute; NotBroken and NotClean must hold neither pair on any TagAttribute, so each pair is its own entry and names the attribute.
     require:
       for:
         namespaces: ["Parity.CHaveAttributeWithNamedArguments.NotBroken", "Parity.CHaveAttributeWithNamedArguments.NotClean"]
       isNot:
         attributeArguments:
-          - named: { Area: "billing" }
-          - named: { Audited: true }
+          - attribute: "Parity.CHaveAttributeWithNamedArguments.Contracts.TagAttribute"
+            named: { Area: "billing" }
+          - attribute: "Parity.CHaveAttributeWithNamedArguments.Contracts.TagAttribute"
+            named: { Audited: true }

@@ -211,6 +211,62 @@ public class RulePackResolverTests
         }
     }
 
+    [Theory]
+    [InlineData("attributeArguments: [{ attribute: \"Shop.TagAttribute\", named: { Area: billing } }]")]
+    [InlineData("onlyAttributes: [\"Shop.*Attribute\"]")]
+    public void Resolve_amendment_from_yaml_with_attribute_argument_key_merges(string key)
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"ariadne-resolver-{Guid.NewGuid():N}");
+        var cacheDir = Path.Combine(tempDir, ".architecture", ".cache", "git", "org");
+        Directory.CreateDirectory(cacheDir);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(cacheDir, "org.yaml"), """
+                schema: 2
+                name: org
+                rules:
+                  - id: ORG-UNIQUE
+                    because: Names stay unique.
+                    uniqueNames:
+                      for: { namespaces: ["Shop.Web.**"] }
+                      against: { namespaces: ["Shop.Dtos.**"] }
+                  - id: ORG-FORBID
+                    because: The domain stays pure.
+                    forbid:
+                      from: { namespaces: ["Shop.Domain.**"] }
+                      to: { namespaces: ["Lib.**"] }
+                """);
+            var loader = new YamlRulePackLoader();
+            var user = loader.LoadFromString($"""
+                schema: 2
+                name: team
+                extends: ["import://org"]
+                rules:
+                  - id: ORG-UNIQUE
+                    exceptions:
+                      - {key}
+                        because: Marked types are excused.
+                  - id: ORG-FORBID
+                    exceptions:
+                      - {key}
+                        because: Marked types are excused.
+                """);
+            user.IsSuccess.Should().BeTrue(user.IsSuccess ? string.Empty : user.Error.Detail);
+
+            var result = new RulePackResolver(new BuiltinPackRegistry(loader), loader, new RulePackMerger()).Resolve(user.Value, tempDir);
+
+            result.IsSuccess.Should().BeTrue(result.IsSuccess ? string.Empty : result.Error.Detail);
+            result.Value.Rules.Should().HaveCount(2).And.OnlyContain(r =>
+                r.Exceptions.Count == 1 && r.Exceptions[0].Because == "Marked types are excused." &&
+                (r.Exceptions[0].AttributeArguments.Count == 1 || r.Exceptions[0].OnlyAttributes.Count == 1));
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
     private static RulePackResolver CreateResolver()
     {
         var loader = new YamlRulePackLoader();
