@@ -119,6 +119,8 @@ Methods of `That()`. Each becomes one key of a selector; several keys in one sel
 | `HaveAttributeWithArguments`, `HaveAnyAttributesWithArguments` | `attributeArguments` with `attribute` and `arguments`; the `DoNot…` forms are an exception with one entry per value, see [Attribute arguments](#attribute-arguments) | `p-have-attribute-with-arguments` |
 | `HaveAttributeWithNamedArguments`, `HaveAnyAttributesWithNamedArguments` | `attributeArguments` with `attribute` and `named`; the `DoNot…` forms are an exception with one entry per pair | `p-have-attribute-with-named-arguments` |
 | `OnlyHaveAttributes` | `onlyAttributes`, see [Attribute arguments](#attribute-arguments); `OnlyHaveAttributes()` with no set is an exception with `attributes: ["**"]` | `p-only-have-attributes` |
+| `DependOnAny`, `DoNotDependOnAny` | `dependsOn`, see [Dependency predicates](#dependency-predicates); `DoNotDependOnAny` is an exception with `dependsOn` | `p-depend-on-any` |
+| `OnlyDependOn` | `onlyDependsOn`, see [Dependency predicates](#dependency-predicates) | `p-only-depend-on` |
 
 ### Conditions
 
@@ -162,6 +164,7 @@ Methods of `Should()`. Placement and shape become a `require` rule; the keys `is
 | `HaveAttributeWithArguments`, `HaveAnyAttributesWithArguments` | `is: { attributeArguments }` with `attribute` and `arguments`; the `NotHave…` forms are `isNot` with one entry per value, see [Attribute arguments](#attribute-arguments) | `c-have-attribute-with-arguments` |
 | `HaveAttributeWithNamedArguments`, `HaveAnyAttributesWithNamedArguments` | `is: { attributeArguments }` with `attribute` and `named`; the `NotHave…` forms are `isNot` with one entry per pair | `c-have-attribute-with-named-arguments` |
 | `OnlyHaveAttributes`, `OnlyHaveAttributesThat` | `is: { onlyAttributes: ["Ns.AuditedAttribute"] }`; `OnlyHaveAttributes()` with no set is `isNot: { attributes: ["**"] }` | `c-only-have-attributes` |
+| `DependOnAny`, `DependOnAnyTypesThat` | `is: { dependsOn: … }`, see [Dependency predicates](#dependency-predicates) | `c-depend-on-any` |
 | `OnlyDependOn`, `OnlyDependOnTypesThat` | a layer with `allowedDependencies`; cover the forbidden types with a layer too, see [Things that work differently](#things-that-work-differently) | `c-only-depend-on` |
 
 ### Negation
@@ -170,7 +173,7 @@ ArchUnitNET negates a method with its `DoNot` or `Not` form. A pack negates in t
 
 | ArchUnitNET | Pack YAML | Catalogue id |
 |---|---|---|
-| `That().DoNot…`, such as `DoNotResideInNamespace` or `AreNotAssignableTo` | `exceptions: [{ namespaces: ["Ns"], because: "…" }]`, with the key of the positive form; a list trait such as `kinds` or `accessibility` can also list the other values instead. An exception takes only `namespaces`, `assemblies`, `types`, `attributes` and the type traits. `DoNotHaveAnyAttributes` uses `attributes`. `DoNotImplementInterface` and a negated `baseTypes` predicate such as `DoNotInherit` use `assignableTo`. `assignableTo` also matches the named interface or base class itself, which ArchUnitNET still selects, so that type is exempt as well; add a second rule for it if it must be checked | — |
+| `That().DoNot…`, such as `DoNotResideInNamespace` or `AreNotAssignableTo` | `exceptions: [{ namespaces: ["Ns"], because: "…" }]`, with the key of the positive form; a list trait such as `kinds` or `accessibility` can also list the other values instead. An exception takes only `namespaces`, `assemblies`, `types`, `attributes`, `attributeArguments`, `onlyAttributes`, `dependsOn`, `onlyDependsOn` and the type traits. `DoNotHaveAnyAttributes` uses `attributes`. `DoNotImplementInterface` and a negated `baseTypes` predicate such as `DoNotInherit` use `assignableTo`. `assignableTo` also matches the named interface or base class itself, which ArchUnitNET still selects, so that type is exempt as well; add a second rule for it if it must be checked | — |
 | `Should().Not…`, such as `NotBeSealed` or `NotHaveName` | `isNot` with the key of the positive form, such as `isNot: { sealed: true }`. Each `isNot` key fails a type it matches on its own, so a positive form that needs two keys does not negate by copying both into `isNot`: `NotHaveAssemblyQualifiedName` rejects a type only when its assembly and its name both match, but `isNot: { assemblies: […], types: […] }` rejects a type that matches either. Narrow `for` with one key and put the other in `isNot`, such as `for: { assemblies: [Shop.Domain] }` with `isNot: { types: ["Shop.Domain.Order"] }` | — |
 | `NotDependOnAny`, `NotDependOnAnyTypesThat` | `forbid: { from: …, to: … }` | `c-not-depend-on-any` |
 | `NotExist` | `require` with `isNot: { types: ["**"] }` and `allowEmpty: true` | `c-not-exist` |
@@ -293,6 +296,93 @@ rules:
         attributes: ["**"]
 ```
 
+### Dependency predicates
+
+`DependOnAny` and `OnlyDependOn` select types by what they reference. `dependsOn` and `onlyDependsOn` take a nested selector with the keys of a target (`namespaces`, `assemblies`, `types`, `layers`, the type traits, `baseTypes`, `interfaces`, `attributes`, `attributeArguments` and `onlyAttributes`) and sit next to the other keys, in every place a type trait is accepted. A dependency is a type reference the type writes, once per target type. Keyword types such as `string` and `int` give no reference, so `dependsOn: { namespaces: ["System.**"] }` selects a type that writes `System.String` or `StringBuilder` and not one that only writes `string`.
+
+`DependOnAny(x)` is `dependsOn`. Types that depend on the application layer's `Target` namespace must not depend on `Forbidden`:
+
+```yaml
+schema: 2
+name: depend-on-any
+version: "1.0.0"
+author: team
+
+rules:
+  - id: TARGET-USERS-AVOID-FORBIDDEN
+    because: A type that uses Target must not reach for Forbidden.
+    forbid:
+      from:
+        namespaces: ["Shop.**"]
+        dependsOn:
+          namespaces: ["Shop.Target.**"]
+      to:
+        namespaces: ["Shop.Forbidden.**"]
+```
+
+`DoNotDependOnAny(x)` is an exception with `dependsOn`, which leaves out the types that do depend on `x`:
+
+```yaml
+schema: 2
+name: do-not-depend-on-any
+version: "1.0.0"
+author: team
+
+rules:
+  - id: NON-TARGET-USERS-AVOID-FORBIDDEN
+    because: Types that do not use Target must not reach for Forbidden.
+    forbid:
+      from:
+        namespaces: ["Shop.**"]
+      to:
+        namespaces: ["Shop.Forbidden.**"]
+    exceptions:
+      - dependsOn:
+          namespaces: ["Shop.Target.**"]
+        because: Only types that do not depend on Target are checked.
+```
+
+`DependOnAny` as a condition is `dependsOn` inside `is`. A type with no dependencies fails it, in ArchUnitNET too:
+
+```yaml
+schema: 2
+name: c-depend-on-any
+version: "1.0.0"
+author: team
+
+rules:
+  - id: HANDLERS-USE-TARGET
+    because: Every handler goes through Target.
+    require:
+      for:
+        namespaces: ["Shop.Handlers"]
+      is:
+        dependsOn:
+          namespaces: ["Shop.Target.**"]
+```
+
+`OnlyDependOn(x)` is `onlyDependsOn`. It holds when every dependency on a type of your own solution is selected, and ignores framework types, as ArchUnitNET does. A type with no dependencies holds:
+
+```yaml
+schema: 2
+name: only-depend-on
+version: "1.0.0"
+author: team
+
+rules:
+  - id: ALLOWED-USERS-AVOID-TARGET
+    because: Types that only use Allowed must not use Target.
+    forbid:
+      from:
+        namespaces: ["Shop.**"]
+        onlyDependsOn:
+          namespaces: ["Shop.Allowed.**"]
+      to:
+        namespaces: ["Shop.Allowed.Target.**"]
+```
+
+ArchUnitNET's `ResideInNamespace` inside the argument matches one namespace exactly, so use `namespaces: ["Shop.Target"]` without `.**` for that. The rules of the three `PDependOnAny`, `CDependOnAny` and `POnlyDependOn` fixtures in `tests/fixtures/archunit-parity` are the worked spellings, measured against ArchUnitNET 0.13.5. The condition form of `OnlyDependOn` stays a layer's `allowedDependencies`, see [OnlyDependOn](#onlydependon).
+
 ### Slices
 
 `Slices().Matching(...)` and `MatchingWithPackages(...)` become a `slices` rule. See [Slice patterns](#slice-patterns) for the pattern.
@@ -322,8 +412,6 @@ These rows are `deferred` or `out-of-scope` in the catalogue. Keep such a check 
 | ArchUnitNET | Pack YAML | Catalogue id |
 |---|---|---|
 | `Exist` | for a fact that guards the target of another rule, set `requireTarget: true` on that rule, see [Vacuity replaces the "is loaded" facts](#vacuity-replaces-the-is-loaded-facts). Otherwise any rule with that selector as its subject fails as `VacuousRule` when it selects nothing | `c-exist` |
-| `DependOnAny` as a condition | none yet; dependency as a requirement, see #96 | `c-depend-on-any` |
-| `DependOnAny`, `OnlyDependOn` as a predicate | none yet; dependency as a selector, see #96 | `p-depend-on-any`, `p-only-depend-on` |
 | `CallAny`, `NotCallAny` | none yet; member level, see #94. A `forbid` with `members` in `to` already forbids calls to the members it names | `p-call-any`, `c-call-any` |
 | `HaveMemberWithName` and its method, property and field forms | none yet; member level, see #94 | `p-have-member-with-name`, `c-have-member-with-name` |
 | `AreImmutable`, `BeImmutable` on `Classes()` | none yet; member level, see #94 | `p-are-immutable`, `c-be-immutable` |

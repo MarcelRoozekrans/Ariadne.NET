@@ -142,3 +142,64 @@ What this shows:
 - For the repo pack, caching changes nothing measurable. It selects by assembly name, which Roslyn already holds as a string, and its layer lookup was already cached. The differences above are two more types and noise.
 - For a pack that selects by namespace and type name, the check allocates about 5 MB less, about 2% per type, because each type's names are built once instead of on every edge and rule. The check time median moved from 1443 ms to 1053 ms, but the before runs ranged from 1059 ms to 2042 ms on a loaded VM, so I do not claim a time gain from these numbers.
 - The phase 2.2 increase over phase 2.1 described above is not explained by selector matching: an empty pack allocates as much as the repo pack. It sits in the type graph build over a larger solution, not in the rules. I have not profiled the graph build.
+
+## Phase 4.9 re-measurement
+
+Phase 4.9 added `dependsOn` and `onlyDependsOn`. The validator now builds every project's type graph before it runs any check, and builds a run-wide `DependencyIndex` only when a pack uses either key. The repo's own pack uses neither, so this run shows the cost of the graphs-first order alone.
+
+### Environment
+
+| Item | Value |
+| --- | --- |
+| Date | 2026-11-16 |
+| Commit | `10f9f04` (after) and `77a504e`, the last phase 4.8 commit (before) |
+| CPU | Intel Core Ultra 7 255H |
+| Cores | 12 logical |
+| OS | Debian GNU/Linux 13 (trixie) |
+| `dotnet --version` | 11.0.100 |
+| Configuration | Release |
+
+Same shared VM as the sections above. The load average was between 0.5 and 1.8. The "before" run used a separate checkout of `77a504e`, built in Release, right after the "after" run.
+
+### Command
+
+```
+dotnet build tools/perf/Ariadne.NET.Perf -c Release
+dotnet run --project tools/perf/Ariadne.NET.Perf -c Release --no-build -- src/Ariadne.NET.slnx --runs 5
+```
+
+### Results
+
+Solution: `src/Ariadne.NET.slnx`, 17 projects, 0 violations. The checked rules are the repo's own `.architecture/rules.yaml`.
+
+| Metric (median of 5) | Phase 2.2, after caching | Phase 4.8 (`77a504e`) | Phase 4.9 (`10f9f04`) | Change 4.8 to 4.9 |
+| --- | --- | --- | --- | --- |
+| Types checked | 226 | 468 | 475 | +7 |
+| Load time | not recorded | 4019 ms | 3962 ms | -1% |
+| Check time | 1042.8 ms | 7464.7 ms | 7933.0 ms | +6.3% |
+| Check allocations | 419,041,608 bytes | 3,645,971,392 bytes | 3,908,339,296 bytes | +7.2% |
+
+Individual runs of phase 4.9:
+
+```
+run 1: load 4881 ms, check 8193.8 ms, check allocated 3,908,350,744 bytes
+run 2: load 3962 ms, check 8113.1 ms, check allocated 3,908,362,808 bytes
+run 3: load 3901 ms, check 7925.3 ms, check allocated 3,908,339,296 bytes
+run 4: load 3965 ms, check 7933.0 ms, check allocated 3,908,332,160 bytes
+run 5: load 3910 ms, check 7902.7 ms, check allocated 3,908,332,160 bytes
+```
+
+Individual runs of phase 4.8:
+
+```
+run 1: load 4741 ms, check 7671.0 ms, check allocated 3,645,977,912 bytes
+run 2: load 4042 ms, check 7550.5 ms, check allocated 3,634,021,360 bytes
+run 3: load 3848 ms, check 7464.7 ms, check allocated 3,645,996,536 bytes
+run 4: load 3818 ms, check 7457.0 ms, check allocated 3,645,971,392 bytes
+run 5: load 4019 ms, check 7406.3 ms, check allocated 3,634,015,992 bytes
+```
+
+### What changed
+
+- Phase 4.9 itself costs +6.3% check time and +7.2% allocations over phase 4.8 on this solution, which is 7 types larger (+1.5%). The rest is the graphs-first order, which holds every project's graph at once, and the 7 added types. It stays under the 10% limit.
+- Against the last figure recorded above, the check time is 7.6 times higher (1042.8 ms to 7933.0 ms) and the allocations are 9.3 times higher. Phase 4.9 does not cause that: the phase 4.8 commit already measures 7464.7 ms, and the solution has grown from 226 to 468 types and from 12 to 17 projects since that section. Per checked type the check went from about 4.6 ms to about 16 ms and from 1.85 MB to about 7.8 MB. I did not profile where this growth comes from. Phases 3 to 4.8 added the Razor, slice and role checks and the attribute matchers, and the solution includes the fixture and parity projects. It needs its own look; no recorded measurement lies between phases 2.2 and 4.8.

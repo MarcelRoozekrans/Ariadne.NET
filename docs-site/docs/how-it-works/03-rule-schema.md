@@ -180,6 +180,24 @@ A value in `arguments` or `named` is a YAML scalar, compared with the attribute'
 
 The five keys work in the `for` of a `require` rule and in the targets of `forbid` and `allowOnly`. `attributes`, `attributeArguments` and `onlyAttributes` also work in `exceptions`, including the exceptions of an amendment, except on a `bannedPackages` rule. Like `namespaces`, `assemblies` and `types`, they cannot be mixed with `layers` in one target.
 
+### Dependency selectors
+
+- **`dependsOn`** takes a nested selector and matches a type when at least one of its dependencies is selected by it.
+- **`onlyDependsOn`** takes a nested selector and matches a type when every one of its dependencies on a type declared in a project of the run is selected by it. A type with no dependencies matches.
+
+```yaml
+from:
+  namespaces: ["Shop.Application.**"]
+  dependsOn:
+    namespaces: ["Shop.Infrastructure.**"]
+```
+
+A dependency is an edge of the type graph whose source is the type: each type it references in a base list, member signature, attribute, expression or body, as the original definition, once however often it is written. Keyword types such as `string` and `int` give no edge, so they are not dependencies. `dependsOn: { namespaces: [System.**] }` selects a type that writes `System.String` or uses `StringBuilder`, and does not select a type that only writes `string`. A type declared outside the projects of the run has no dependencies.
+
+`onlyDependsOn` ignores the dependencies on types that no project of the run declares, which are the framework types and the types of packages. Only the types of your own solution count against the list, so `onlyDependsOn: { namespaces: ["Shop.Domain.**"] }` selects a type that uses `StringBuilder` and types of `Shop.Domain` and nothing else of the solution. Name a framework namespace in `dependsOn` to select on it.
+
+The nested selector takes `namespaces`, `assemblies`, `types`, `layers`, `baseTypes`, `interfaces`, `attributes`, `attributeArguments`, `onlyAttributes` and the [type traits](#type-traits), with the same meaning as in a target; `layers` may sit next to traits but not next to the glob keys. It does not take `members`, `dependsOn` or `onlyDependsOn`, and an empty selector is a load error. The two keys work wherever the type traits do, in the `for` of a `require` rule, in the `from` and `to` of `forbid` and `allowOnly`, in the `allow` of `slices`, in the `for` and `against` of `uniqueNames`, in `is` and `isNot`, and in `exceptions`, including those of an amendment. They do not work in a `bannedPackages` exception, in `implements`, in a layer definition or in a role. They may sit next to `layers` in a target. In an exception, `dependsOn: { layers: [Domain] }` works although an exception has no `layers` of its own.
+
 ### Type traits
 
 Eight more keys select by what a type is and not by where it lives or what it references. Like the other keys, values within one list are alternatives, the keys of one selector are AND-ed, and a boolean that is not set does not constrain.
@@ -199,11 +217,11 @@ Eight more keys select by what a type is and not by where it lives or what it re
 
 Traits work in the `for` of a `require` rule, in the `from` and `to` of `forbid` and `allowOnly`, in the `allow` of `slices`, in `is` and `isNot` of a `require` rule (see [Require rules](rule-types.md#require-rules)) and in `exceptions`, including the exceptions of an amendment. They do not work in layer definitions or in the `for` and `against` of `uniqueNames`, although a `uniqueNames` exception takes them. A `bannedPackages` exception does not take them. A selector with only traits is valid.
 
-A target may have `layers` together with traits: a type must be in one of the layers and match every trait. `layers` next to `namespaces`, `assemblies`, `types`, `baseTypes`, `interfaces`, `attributes`, `attributeArguments`, `onlyAttributes` or `members` is still a load error. So `{ layers: [Domain], kinds: [class, record] }` selects the classes and records of the Domain layer.
+A target may have `layers` together with traits: a type must be in one of the layers and match every trait. `layers` next to `namespaces`, `assemblies`, `types`, `baseTypes`, `interfaces`, `attributes`, `attributeArguments`, `onlyAttributes` or `members` is still a load error. `dependsOn` and `onlyDependsOn` may sit next to `layers`. So `{ layers: [Domain], kinds: [class, record] }` selects the classes and records of the Domain layer.
 
 An empty pattern, or one with an empty segment such as `Shop..Domain`, is a load error.
 
-`TargetSelector` has `Layers`, `Namespaces`, `Assemblies`, `Types`, `BaseTypes`, `Interfaces`, `Attributes`, `AttributeArguments` (`IList<AttributeArgumentMatch>`), `OnlyAttributes` and `Members`, and the traits `Names`, `Kinds` (`IList<CSharpTypeKind>`, which includes `Enum` and `Delegate`), `Accessibility`, `AssignableTo`, `Sealed`, `Abstract`, `Static` and `Nested` (`bool?`). `RuleException` has `Namespaces`, `Assemblies`, `Types`, `Attributes`, `AttributeArguments`, `OnlyAttributes`, the same eight traits and a required `Because`.
+`TargetSelector` has `Layers`, `Namespaces`, `Assemblies`, `Types`, `BaseTypes`, `Interfaces`, `Attributes`, `AttributeArguments` (`IList<AttributeArgumentMatch>`), `OnlyAttributes`, `DependsOn` and `OnlyDependsOn` (both `TargetSelector?`) and `Members`, and the traits `Names`, `Kinds` (`IList<CSharpTypeKind>`, which includes `Enum` and `Delegate`), `Accessibility`, `AssignableTo`, `Sealed`, `Abstract`, `Static` and `Nested` (`bool?`). `RuleException` has `Namespaces`, `Assemblies`, `Types`, `Attributes`, `AttributeArguments`, `OnlyAttributes`, `DependsOn`, `OnlyDependsOn`, the same eight traits and a required `Because`.
 
 ## `extends`
 
