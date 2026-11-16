@@ -208,6 +208,7 @@ internal sealed class TypeSelector
                 or "System.Runtime.CompilerServices.NullablePublicOnlyAttribute"
                 or "System.Runtime.CompilerServices.IsReadOnlyAttribute"
                 or "System.Runtime.CompilerServices.IsByRefLikeAttribute"
+                or "System.Reflection.DefaultMemberAttribute"
                 or "Microsoft.CodeAnalysis.EmbeddedAttribute" => true,
             _ => false,
         };

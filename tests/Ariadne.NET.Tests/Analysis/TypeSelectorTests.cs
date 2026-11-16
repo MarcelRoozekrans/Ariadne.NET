@@ -493,10 +493,37 @@ public class TypeSelectorTests
     }
 
     [Fact]
+    public void OnlyAttributes_ignores_default_member_attribute_on_metadata_type_with_indexer()
+    {
+        var library = TestCompilation.Create("""
+            namespace Lib
+            {
+                public sealed class TagAttribute : System.Attribute { }
+                [Tag] public class Indexed { public int this[int index] => index; }
+            }
+            """);
+        using var image = new MemoryStream();
+        library.Emit(image).Success.Should().BeTrue();
+        var consumer = CSharpCompilation.Create(
+            "Consumer",
+            [CSharpSyntaxTree.ParseText("namespace App { public class User { public Lib.Indexed? I; } }")],
+            [.. library.References, MetadataReference.CreateFromImage(image.ToArray())],
+            library.Options);
+        var indexed = Find(consumer, "Lib.Indexed");
+        var names = new TypeNames();
+
+        // The precondition this test exists for: the metadata type with an indexer carries DefaultMemberAttribute.
+        indexed.GetAttributes().Should().Contain(a => names.FullNameOf(a.AttributeClass!) == "System.Reflection.DefaultMemberAttribute");
+        Find(library, "Lib.Indexed").GetAttributes().Should().NotContain(a => names.FullNameOf(a.AttributeClass!) == "System.Reflection.DefaultMemberAttribute");
+
+        var selector = TypeSelector.From(new TargetSelector { OnlyAttributes = ["Lib.TagAttribute"] });
+        selector.Matches(indexed, names).Should().BeTrue();
+        selector.FirstOutsideOnlyAttributes(indexed, names).Should().BeNull();
+    }
+
+    [Fact]
     public void IsCompilerAttribute_holds_the_ignore_list()
     {
-        var compilation = AttributeCompilation.Value;
-        var names = new TypeNames();
         string[] ignored =
         [
             "System.Runtime.CompilerServices.CompilerGeneratedAttribute",
@@ -505,19 +532,27 @@ public class TypeSelectorTests
             "System.Runtime.CompilerServices.NullablePublicOnlyAttribute",
             "System.Runtime.CompilerServices.IsReadOnlyAttribute",
             "System.Runtime.CompilerServices.IsByRefLikeAttribute",
+            "System.Reflection.DefaultMemberAttribute",
+            "Microsoft.CodeAnalysis.EmbeddedAttribute",
         ];
+
+        // Each class is declared in source, so the lookup below always finds it and every list member is checked.
+        var source = string.Concat(ignored.Select(name =>
+        {
+            var dot = name.LastIndexOf('.');
+            return $"namespace {name[..dot]} {{ internal sealed class {name[(dot + 1)..]} : System.Attribute {{ }} }}\n";
+        }));
+        var declared = TestCompilation.Create(source);
+        var compilation = AttributeCompilation.Value;
+        var names = new TypeNames();
 
         foreach (var name in ignored)
         {
-            var symbol = compilation.GetTypeByMetadataName(name);
-            if (symbol is not null)
-            {
-                TypeSelector.IsCompilerAttribute(symbol, names).Should().BeTrue(name);
-            }
+            var symbol = Find(declared, name);
+            symbol.Locations.Should().Contain(l => l.IsInSource, name);
+            TypeSelector.IsCompilerAttribute(symbol, names).Should().BeTrue(name);
         }
 
-        var embedded = TestCompilation.Create("namespace Microsoft.CodeAnalysis { internal sealed class EmbeddedAttribute : System.Attribute { } }");
-        TypeSelector.IsCompilerAttribute(Find(embedded, "Microsoft.CodeAnalysis.EmbeddedAttribute"), names).Should().BeTrue();
         TypeSelector.IsCompilerAttribute(Find(compilation, "N.TagAttribute"), names).Should().BeFalse();
         TypeSelector.IsCompilerAttribute(Find(compilation, "System.ObsoleteAttribute"), names).Should().BeFalse();
     }
