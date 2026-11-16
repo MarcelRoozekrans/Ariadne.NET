@@ -113,7 +113,7 @@ public class DependencyIndexTests
     }
 
     [Fact]
-    public void Metadata_type_of_another_run_project_has_its_dependencies()
+    public void Type_of_another_run_project_seen_through_a_compilation_reference_has_its_dependencies()
     {
         var a = Named("Shop.A", """
             namespace Shop.A
@@ -130,6 +130,24 @@ public class DependencyIndexTests
 
         Names(index.DependenciesOf(order)).Should().Equal("Shop.A.Store");
         Names(index.DependenciesOf(line)).Should().Equal("Shop.A.Order");
+        index.IsDeclaredInRun(order).Should().BeTrue();
+    }
+
+    // A referenced compilation is retargeted when it binds another version of a shared library than the project that
+    // references it; its types are then other symbols than the ones its own graph holds.
+    [Fact]
+    public void Retargeted_type_of_another_run_project_has_its_dependencies()
+    {
+        var libV1 = Image(Named("Shop.Lib", "[assembly: System.Reflection.AssemblyVersion(\"1.0.0.0\")] namespace Shop.Lib { public class Clock { } }"));
+        var libV2 = Image(Named("Shop.Lib", "[assembly: System.Reflection.AssemblyVersion(\"2.0.0.0\")] namespace Shop.Lib { public class Clock { } }"));
+        var a = Named("Shop.A", "namespace Shop.A { public class Store { } public class Order { public Store? Store; public Shop.Lib.Clock? Clock; } }", libV1);
+        var b = Named("Shop.B", "namespace Shop.B { public class Use { public Shop.A.Order? Order; } }", a.ToMetadataReference(), libV2);
+        var index = Index((a, null), (b, null));
+
+        var order = Type(b, "Shop.A.Order");
+
+        order.ContainingAssembly.Should().NotBeSameAs(a.Assembly, because: "the reference is retargeted");
+        Names(index.DependenciesOf(order)).Should().Equal("Shop.A.Store", "Shop.Lib.Clock");
         index.IsDeclaredInRun(order).Should().BeTrue();
     }
 

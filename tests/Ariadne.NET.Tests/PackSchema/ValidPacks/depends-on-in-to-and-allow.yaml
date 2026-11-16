@@ -1,0 +1,29 @@
+schema: 2
+name: x
+layers:
+  - name: Domain
+    id: X-L-DOMAIN
+    because: core
+    namespaces: ["**.Domain.**"]
+  - name: Web
+    id: X-L-WEB
+    because: edge
+    namespaces: ["**.Web.**"]
+    allowedDependencies: [Domain]
+rules:
+  - id: X-R1
+    because: b
+    forbid:
+      from: { namespaces: ["Shop.Web.**"] }
+      to: { layers: [Domain], dependsOn: { namespaces: ["System.Data.**"] } }
+  - id: X-R2
+    because: b
+    allowOnly:
+      from: { namespaces: ["Shop.Api.**"] }
+      to: { namespaces: ["Shop.**"], onlyDependsOn: { layers: [Domain] } }
+  - id: X-R3
+    because: b
+    slices:
+      matching: ["Shop.(*).**"]
+      independent: true
+      allow: { namespaces: ["Shop.Shared.**"], dependsOn: { kinds: [interface] } }

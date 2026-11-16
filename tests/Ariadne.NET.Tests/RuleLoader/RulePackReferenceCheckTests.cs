@@ -570,6 +570,8 @@ public class RulePackReferenceCheckTests
             "the dependsOn of the from of rule 'R-1' has 'members', which the selector under dependsOn or onlyDependsOn does not take" },
         { new TargetSelector { Types = ["**.A"], DependsOn = new TargetSelector { Types = ["**.B"] } },
             "the dependsOn of the from of rule 'R-1' has 'dependsOn', which the selector under dependsOn or onlyDependsOn does not take" },
+        { new TargetSelector { Types = ["**.A"], OnlyDependsOn = new TargetSelector { Types = ["**.B"] } },
+            "the dependsOn of the from of rule 'R-1' has 'onlyDependsOn', which the selector under dependsOn or onlyDependsOn does not take" },
         { new TargetSelector { Layers = ["Domain"], Namespaces = ["Shop.**"] },
             "the dependsOn of the from of rule 'R-1' mixes layers with namespaces, assemblies, types, base types, interfaces, attributes, attribute arguments, attribute allow-lists or members" },
         { new TargetSelector { Accessibility = ["friend"] },
