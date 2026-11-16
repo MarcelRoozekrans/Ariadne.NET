@@ -1,6 +1,7 @@
 using Ariadne.NET.Abstractions;
 using Ariadne.NET.Analysis;
 using Ariadne.NET.Tests.Shared;
+using System.Text.Json;
 using FluentAssertions;
 
 namespace Ariadne.NET.Workspaces.Tests;
@@ -23,7 +24,7 @@ public sealed class PackageGraphTests
 
         var package = Package(PackagesOf(loaded, "Pkg.Core"), Validation);
 
-        package.Version.Should().Be("2.5.0");
+        package.Version.Should().Be(AssetsVersion(Validation, "packages", "broken", "Pkg.Core"));
         package.IsDirect.Should().BeTrue();
         package.Path.Should().Equal(Validation);
     }
@@ -81,7 +82,7 @@ public sealed class PackageGraphTests
         violation.Kind.Should().Be(ViolationKind.BannedPackage);
         violation.SourceType.Should().Be("Pkg.App");
         violation.Message.Should().Be(
-            "Pkg.App references ZeroAlloc.Validation 2.5.0 through Pkg.Core, which rule 'TEST-NO-VALIDATION' bans");
+            $"Pkg.App references ZeroAlloc.Validation {AssetsVersion(Validation, "packages", "broken", "Pkg.App")} through Pkg.Core, which rule 'TEST-NO-VALIDATION' bans");
     }
 
     [Fact]
@@ -126,11 +127,29 @@ public sealed class PackageGraphTests
         violation.SourceType.Should().Be("Daedalus.Domain");
         violation.Target.Should().Be("YamlDotNet");
         violation.Message.Should().Be(
-            "Daedalus.Domain references YamlDotNet 16.3.0 through Daedalus.Infrastructure, which rule 'DAE-DOMAIN-NO-YAML' bans");
+            $"Daedalus.Domain references YamlDotNet {AssetsVersion("YamlDotNet", "daedalus", "broken", "Daedalus.Domain")} through Daedalus.Infrastructure, which rule 'DAE-DOMAIN-NO-YAML' bans");
         Violation(report, "DAE-AGENTS-NO-STATE-MACHINE").Message.Should().Be(
-            "Daedalus.Agents references ZeroAlloc.StateMachine 1.5.3 through ZeroAlloc.Resilience, which rule 'DAE-AGENTS-NO-STATE-MACHINE' bans");
+            $"Daedalus.Agents references ZeroAlloc.StateMachine {AssetsVersion("ZeroAlloc.StateMachine", "daedalus", "broken", "Daedalus.Agents")} through ZeroAlloc.Resilience, which rule 'DAE-AGENTS-NO-STATE-MACHINE' bans");
         Violation(report, "DAE-APP-NO-VALIDATION-LIB").Message.Should().Be(
-            "Daedalus.Application references ZeroAlloc.Validation 2.5.0 directly, which rule 'DAE-APP-NO-VALIDATION-LIB' bans");
+            $"Daedalus.Application references ZeroAlloc.Validation {AssetsVersion(Validation, "daedalus", "broken", "Daedalus.Application")} directly, which rule 'DAE-APP-NO-VALIDATION-LIB' bans");
+    }
+
+    /// <summary>
+    /// The version of <paramref name="id"/> that restore resolved for a fixture project, read from its
+    /// <c>project.assets.json</c>. The expected messages take it from there, so a dependency update of the
+    /// fixtures does not break them.
+    /// </summary>
+    private static string AssetsVersion(string id, params string[] projectPath)
+    {
+        var assets = Path.Combine(FixtureProjects.Path(projectPath), "obj", "project.assets.json");
+        using var document = JsonDocument.Parse(File.ReadAllText(assets));
+        var prefix = id + "/";
+        var versions = document.RootElement.GetProperty("libraries").EnumerateObject()
+            .Where(library => library.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            .Select(library => library.Name[prefix.Length..])
+            .ToList();
+        versions.Should().ContainSingle($"{assets} resolves one version of {id}");
+        return versions[0];
     }
 
     private static ResolvedPackage Package(IReadOnlyList<ResolvedPackage> packages, string id)
