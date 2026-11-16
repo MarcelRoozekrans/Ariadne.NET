@@ -286,6 +286,30 @@ public class RulePackMergerTests
     }
 
     [Fact]
+    public void Amendment_DependsOnOnBannedPackagesRule_Fails()
+    {
+        var result = Amend(BannedRule(), new RuleException
+        {
+            Because = "x",
+            DependsOn = new TargetSelector { Layers = ["Domain"] },
+            OnlyDependsOn = new TargetSelector { Namespaces = ["Shop.**"] },
+        });
+
+        Problems(result).Should().HaveCount(2).And.Satisfy(
+            p => p.StartsWith("pack 'child' adds an exception to rule 'B1' with 'dependsOn'", StringComparison.Ordinal),
+            p => p.StartsWith("pack 'child' adds an exception to rule 'B1' with 'onlyDependsOn'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Amendment_DependsOnOnUniqueNamesRule_Merges()
+    {
+        var result = Amend(UniqueRule(), new RuleException { Because = "x", OnlyDependsOn = new TargetSelector { Layers = ["Domain"] } });
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Rules.Should().ContainSingle().Which.Exceptions.Should().ContainSingle().Which.OnlyDependsOn!.Layers.Should().Equal("Domain");
+    }
+
+    [Fact]
     public void Amendment_AttributeArgumentsOnUniqueNamesRule_Merges()
     {
         Amend(UniqueRule(), new RuleException

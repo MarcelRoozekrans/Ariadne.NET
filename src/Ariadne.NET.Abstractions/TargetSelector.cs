@@ -36,5 +36,12 @@ public sealed class TargetSelector
     /// <summary><c>true</c> matches a type declared inside another type; <c>false</c> matches a top-level type.</summary>
     public bool? Nested { get; init; }
 
+    /// <summary>Holds when at least one dependency of the type is selected by this selector. A dependency is a type the type's own code refers to, as the original definition; a type declared outside the run's projects has none.</summary>
+    [Must(nameof(IsValidDependency), Message = DependencySelectorCheck.Message)] public TargetSelector? DependsOn { get; init; }
+    /// <summary>Holds when every dependency of the type is selected by this selector, and when the type has none. Dependencies on types outside the run's projects are ignored.</summary>
+    [Must(nameof(IsValidDependency), Message = DependencySelectorCheck.Message)] public TargetSelector? OnlyDependsOn { get; init; }
+
+    internal bool IsValidDependency(TargetSelector? nested) => nested is null || DependencySelectorCheck.IsValid(nested);
+
     internal bool HasNoNullEntries<T>(IList<T>? items) => NullEntries.None(items);
 }

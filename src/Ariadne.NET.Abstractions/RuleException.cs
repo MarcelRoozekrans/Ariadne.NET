@@ -32,7 +32,14 @@ public sealed class RuleException
     /// <summary><c>true</c> matches a type declared inside another type; <c>false</c> matches a top-level type.</summary>
     public bool? Nested { get; init; }
 
+    /// <summary>Holds when at least one dependency of the type is selected by this selector, as in a target selector.</summary>
+    [Must(nameof(IsValidDependency), Message = DependencySelectorCheck.Message)] public TargetSelector? DependsOn { get; init; }
+    /// <summary>Holds when every dependency of the type is selected by this selector, and when the type has none.</summary>
+    [Must(nameof(IsValidDependency), Message = DependencySelectorCheck.Message)] public TargetSelector? OnlyDependsOn { get; init; }
+
     [NotEmpty] public required string Because { get; init; }
+
+    internal bool IsValidDependency(TargetSelector? nested) => nested is null || DependencySelectorCheck.IsValid(nested);
 
     internal bool HasNoNullEntries<T>(IList<T>? items) => NullEntries.None(items);
 }

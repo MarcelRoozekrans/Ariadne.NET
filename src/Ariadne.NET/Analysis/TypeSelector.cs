@@ -5,8 +5,8 @@ namespace Ariadne.NET.Analysis;
 
 /// <summary>
 /// Selects types by namespace, assembly, type-name, base-type, interface and attribute globs, by attribute arguments, by an
-/// attribute allow-list, and by the type-level traits of <see cref="TypeTraits"/>. The lists and traits are AND-ed, the
-/// values within a list are OR-ed and an empty list or unset trait does not constrain.
+/// attribute allow-list, by the type-level traits of <see cref="TypeTraits"/>, and by what the type depends on. The lists,
+/// traits and dependency keys are AND-ed, the values within a list are OR-ed and an empty list or unset key does not constrain.
 /// </summary>
 internal sealed class TypeSelector
 {
@@ -20,6 +20,9 @@ internal sealed class TypeSelector
     private readonly Glob[] _onlyAttributes;
     private readonly Glob[] _members;
     private readonly TypeTraits _traits;
+    private readonly TargetMatcher? _dependsOn;
+    private readonly TargetMatcher? _onlyDependsOn;
+    private readonly DependencyIndex? _dependencies;
 
     private TypeSelector(
         Glob[] namespaces,
@@ -31,8 +34,14 @@ internal sealed class TypeSelector
         AttributeArgumentMatcher[] attributeArguments,
         Glob[] onlyAttributes,
         Glob[] members,
-        TypeTraits traits)
+        TypeTraits traits,
+        TargetMatcher? dependsOn,
+        TargetMatcher? onlyDependsOn,
+        DependencyIndex? dependencies)
     {
+        _dependsOn = dependsOn;
+        _onlyDependsOn = onlyDependsOn;
+        _dependencies = dependencies;
         _attributeArguments = attributeArguments;
         _onlyAttributes = onlyAttributes;
         _traits = traits;
@@ -48,20 +57,47 @@ internal sealed class TypeSelector
     /// <summary>Whether the selector holds <c>members</c> globs, which select member uses and never types.</summary>
     public bool HasMembers => _members.Length > 0;
 
-    /// <summary>Whether no type list or trait constrains anything, so the selector would match every type. The <c>members</c> globs do not count: they never select a type.</summary>
+    /// <summary>Whether no type list, trait or dependency key constrains anything, so the selector would match every type. The <c>members</c> globs do not count: they never select a type.</summary>
     public bool IsEmpty => _namespaces.Length == 0 && _assemblies.Length == 0 && _types.Length == 0
-        && _baseTypes.Length == 0 && _interfaces.Length == 0 && !HasAttributeKeys && _traits.IsEmpty;
+        && _baseTypes.Length == 0 && _interfaces.Length == 0 && !HasAttributeKeys && _traits.IsEmpty
+        && _dependsOn is null && _onlyDependsOn is null;
 
     private bool HasAttributeKeys => _attributes.Length > 0 || _attributeArguments.Length > 0 || _onlyAttributes.Length > 0;
 
     /// <summary>Compiles every list and trait of a selector once. <c>layers</c> is not a type selector and is ignored here. The loader validates patterns and values, so an invalid one is a programming error.</summary>
     /// <param name="selector">The selector to compile.</param>
     /// <returns>The selector.</returns>
-    /// <exception cref="ArgumentException">A pattern or an accessibility is invalid.</exception>
+    /// <exception cref="ArgumentException">A pattern or an accessibility is invalid, or the selector holds <c>dependsOn</c> or <c>onlyDependsOn</c>, which need the overload that takes a layer map and a dependency index.</exception>
     public static TypeSelector From(TargetSelector selector)
     {
         ArgumentNullException.ThrowIfNull(selector);
 
+        RejectDependencyKeys(selector.DependsOn, selector.OnlyDependsOn, nameof(selector));
+        return CompileSelector(selector, null, null);
+    }
+
+    /// <summary>
+    /// Compiles every list, trait and dependency key of a selector once. <c>layers</c> is not a type selector and is ignored
+    /// here. <c>dependsOn</c> and <c>onlyDependsOn</c> compile into nested <see cref="TargetMatcher"/>s over the layer map,
+    /// which read the dependencies from the index. The loader validates patterns and values, so an invalid one is a
+    /// programming error.
+    /// </summary>
+    /// <param name="selector">The selector to compile.</param>
+    /// <param name="layers">The layer map that resolves the layer names of a nested selector.</param>
+    /// <param name="dependencies">The run's dependency index; may be <see langword="null"/> only when the selector holds neither dependency key.</param>
+    /// <returns>The selector.</returns>
+    /// <exception cref="ArgumentException">A pattern or an accessibility is invalid, a nested selector mixes layers with glob keys, or a dependency key comes without an index.</exception>
+    public static TypeSelector From(TargetSelector selector, LayerMap layers, DependencyIndex? dependencies)
+    {
+        ArgumentNullException.ThrowIfNull(selector);
+        ArgumentNullException.ThrowIfNull(layers);
+
+        return CompileSelector(selector, layers, dependencies);
+    }
+
+    private static TypeSelector CompileSelector(TargetSelector selector, LayerMap? layers, DependencyIndex? dependencies)
+    {
+        var (dependsOn, onlyDependsOn) = CompileDependencyKeys(selector.DependsOn, selector.OnlyDependsOn, layers, dependencies);
         return Compile(
             selector.Namespaces,
             selector.Assemblies,
@@ -72,7 +108,10 @@ internal sealed class TypeSelector
             selector.AttributeArguments,
             selector.OnlyAttributes,
             selector.Members,
-            TypeTraits.From(selector));
+            TypeTraits.From(selector),
+            dependsOn,
+            onlyDependsOn,
+            dependencies);
     }
 
     /// <summary>
@@ -82,11 +121,35 @@ internal sealed class TypeSelector
     /// </summary>
     /// <param name="exception">The exception to compile.</param>
     /// <returns>The selector.</returns>
-    /// <exception cref="ArgumentException">A pattern or an accessibility is invalid.</exception>
+    /// <exception cref="ArgumentException">A pattern or an accessibility is invalid, or the exception holds <c>dependsOn</c> or <c>onlyDependsOn</c>, which need the overload that takes a layer map and a dependency index.</exception>
     public static TypeSelector From(RuleException exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
 
+        RejectDependencyKeys(exception.DependsOn, exception.OnlyDependsOn, nameof(exception));
+        return CompileException(exception, null, null);
+    }
+
+    /// <summary>
+    /// Compiles a rule exception once, as <see cref="From(RuleException)"/> does, plus its <c>dependsOn</c> and
+    /// <c>onlyDependsOn</c>. The nested selectors may name layers, although the exception itself has none.
+    /// </summary>
+    /// <param name="exception">The exception to compile.</param>
+    /// <param name="layers">The layer map that resolves the layer names of a nested selector.</param>
+    /// <param name="dependencies">The run's dependency index; may be <see langword="null"/> only when the exception holds neither dependency key.</param>
+    /// <returns>The selector.</returns>
+    /// <exception cref="ArgumentException">A pattern or an accessibility is invalid, a nested selector mixes layers with glob keys, or a dependency key comes without an index.</exception>
+    public static TypeSelector From(RuleException exception, LayerMap layers, DependencyIndex? dependencies)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        ArgumentNullException.ThrowIfNull(layers);
+
+        return CompileException(exception, layers, dependencies);
+    }
+
+    private static TypeSelector CompileException(RuleException exception, LayerMap? layers, DependencyIndex? dependencies)
+    {
+        var (dependsOn, onlyDependsOn) = CompileDependencyKeys(exception.DependsOn, exception.OnlyDependsOn, layers, dependencies);
         return Compile(
             exception.Namespaces,
             exception.Assemblies,
@@ -97,7 +160,38 @@ internal sealed class TypeSelector
             exception.AttributeArguments,
             exception.OnlyAttributes,
             [],
-            TypeTraits.From(exception));
+            TypeTraits.From(exception),
+            dependsOn,
+            onlyDependsOn,
+            dependencies);
+    }
+
+    private static void RejectDependencyKeys(TargetSelector? dependsOn, TargetSelector? onlyDependsOn, string parameter)
+    {
+        if (dependsOn is not null || onlyDependsOn is not null)
+        {
+            throw new ArgumentException(
+                "A selector with dependsOn or onlyDependsOn needs the overload that takes the layer map and the dependency index.", parameter);
+        }
+    }
+
+    // The old overloads pass no layer map and no index; RejectDependencyKeys has already turned away both keys there.
+    private static (TargetMatcher? DependsOn, TargetMatcher? OnlyDependsOn) CompileDependencyKeys(
+        TargetSelector? dependsOn, TargetSelector? onlyDependsOn, LayerMap? layers, DependencyIndex? dependencies)
+    {
+        if (dependsOn is null && onlyDependsOn is null)
+        {
+            return (null, null);
+        }
+
+        if (layers is null || dependencies is null)
+        {
+            throw new ArgumentException("A selector with dependsOn or onlyDependsOn needs the run's dependency index.", nameof(dependencies));
+        }
+
+        return (
+            dependsOn is null ? null : TargetMatcher.From(dependsOn, layers, dependencies),
+            onlyDependsOn is null ? null : TargetMatcher.From(onlyDependsOn, layers, dependencies));
     }
 
     /// <summary>Compiles the patterns once. The loader validates patterns, so an invalid one is a programming error.</summary>
@@ -145,7 +239,7 @@ internal sealed class TypeSelector
         IList<string> interfaces,
         IList<string> attributes,
         IList<string> members) =>
-        Compile(namespaces, assemblies, types, baseTypes, interfaces, attributes, [], [], members, TypeTraits.None);
+        Compile(namespaces, assemblies, types, baseTypes, interfaces, attributes, [], [], members, TypeTraits.None, null, null, null);
 
     private static TypeSelector Compile(
         IList<string> namespaces,
@@ -157,7 +251,10 @@ internal sealed class TypeSelector
         IList<AttributeArgumentMatch> attributeArguments,
         IList<string> onlyAttributes,
         IList<string> members,
-        TypeTraits traits)
+        TypeTraits traits,
+        TargetMatcher? dependsOn,
+        TargetMatcher? onlyDependsOn,
+        DependencyIndex? dependencies)
     {
         ArgumentNullException.ThrowIfNull(attributeArguments);
         ArgumentNullException.ThrowIfNull(onlyAttributes);
@@ -185,7 +282,10 @@ internal sealed class TypeSelector
             matchers,
             Glob.CompileAll(onlyAttributes, Glob.Dotted),
             Glob.CompileAll(members, Glob.Dotted),
-            traits);
+            traits,
+            dependsOn,
+            onlyDependsOn,
+            dependencies);
     }
 
     /// <summary>
@@ -242,12 +342,61 @@ internal sealed class TypeSelector
         return null;
     }
 
+    /// <summary>The first dependency of the type, in source order, that the <c>dependsOn</c> selector selects.</summary>
+    /// <param name="type">The type to test.</param>
+    /// <returns>That dependency, or <see langword="null"/> when none is selected or the selector has no <c>dependsOn</c>.</returns>
+    internal INamedTypeSymbol? FirstDependencyMatching(INamedTypeSymbol type)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+
+        if (_dependsOn is null || _dependencies is null)
+        {
+            return null;
+        }
+
+        foreach (var dependency in _dependencies.DependenciesOf(type))
+        {
+            if (_dependsOn.Matches(dependency))
+            {
+                return dependency;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// The first dependency of the type, in source order, that is declared in a run project and that the <c>onlyDependsOn</c>
+    /// selector does not select. Framework and package types never count.
+    /// </summary>
+    /// <param name="type">The type to test.</param>
+    /// <returns>That dependency, or <see langword="null"/> when every counted dependency is selected or the selector has no <c>onlyDependsOn</c>.</returns>
+    internal INamedTypeSymbol? FirstDependencyOutsideOnly(INamedTypeSymbol type)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+
+        if (_onlyDependsOn is null || _dependencies is null)
+        {
+            return null;
+        }
+
+        foreach (var dependency in _dependencies.DependenciesOf(type))
+        {
+            if (_dependencies.IsDeclaredInRun(dependency) && !_onlyDependsOn.Matches(dependency))
+            {
+                return dependency;
+            }
+        }
+
+        return null;
+    }
+
     /// <summary>Whether a member name matches any <c>members</c> glob. Ordinal and case-sensitive.</summary>
     /// <param name="memberName">A <c>Namespace.Type.Member</c> name.</param>
     /// <returns>True when a glob matches.</returns>
     public bool AnyMemberMatches(string memberName) => Glob.AnyMatch(_members, memberName);
 
-    /// <summary>Whether the type satisfies every non-empty list, then every set trait. Ordinal and case-sensitive.</summary>
+    /// <summary>Whether the type satisfies every non-empty list, then every set trait, then the dependency keys. Ordinal and case-sensitive.</summary>
     /// <param name="type">The type to test.</param>
     /// <param name="names">The names of the check, so each type's namespace and full name are built once.</param>
     /// <returns>True when the type is selected.</returns>
@@ -271,13 +420,16 @@ internal sealed class TypeSelector
             return false;
         }
 
-        // The traits that read only the type go before the base, interface and attribute walks; assignableTo walks last.
+        // The traits that read only the type go before the base, interface and attribute walks; assignableTo walks next, and
+        // the dependency keys last, so a type the cheaper keys reject never reads the index.
         var hasTraits = !_traits.IsEmpty;
         return (!hasTraits || _traits.FlagsMatch(type))
             && (_baseTypes.Length == 0 || AnyBaseMatches(type, names))
             && (_interfaces.Length == 0 || AnyInterfaceMatches(type, names))
             && (!HasAttributeKeys || AttributeKeysMatch(type, names))
-            && (!hasTraits || _traits.AssignableMatches(type, names));
+            && (!hasTraits || _traits.AssignableMatches(type, names))
+            && (_dependsOn is null || FirstDependencyMatching(type) is not null)
+            && (_onlyDependsOn is null || FirstDependencyOutsideOnly(type) is null);
     }
 
     private bool AnyBaseMatches(INamedTypeSymbol type, TypeNames names)

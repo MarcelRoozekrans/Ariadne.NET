@@ -76,4 +76,7 @@
   <Project Path="CHaveAttributeWithNamedArguments/Parity.CHaveAttributeWithNamedArguments.csproj" />
   <Project Path="POnlyHaveAttributes/Parity.POnlyHaveAttributes.csproj" />
   <Project Path="COnlyHaveAttributes/Parity.COnlyHaveAttributes.csproj" />
+  <Project Path="PDependOnAny/Parity.PDependOnAny.csproj" />
+  <Project Path="CDependOnAny/Parity.CDependOnAny.csproj" />
+  <Project Path="POnlyDependOn/Parity.POnlyDependOn.csproj" />
 </Solution>

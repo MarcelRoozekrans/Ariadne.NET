@@ -13,7 +13,7 @@ internal sealed class DependencyRuleChecker
     private DependencyRuleChecker(List<Compiled> rules) => _rules = rules;
 
     /// <summary>Compiles the matchers and exception selectors of the rules of one kind, so a run can reuse them for every project.</summary>
-    public static DependencyRuleChecker Compile(LayerMap layers, RulePack pack, RuleKind kind)
+    public static DependencyRuleChecker Compile(LayerMap layers, RulePack pack, RuleKind kind, DependencyIndex? dependencies = null)
     {
         ArgumentNullException.ThrowIfNull(layers);
         ArgumentNullException.ThrowIfNull(pack);
@@ -23,7 +23,7 @@ internal sealed class DependencyRuleChecker
         {
             if (rule.Kind == kind)
             {
-                rules.Add(Compile(rule, layers));
+                rules.Add(Compile(rule, layers, dependencies));
             }
         }
 
@@ -90,15 +90,16 @@ internal sealed class DependencyRuleChecker
         }
     }
 
-    private static Compiled Compile(RuleDefinition rule, LayerMap layers)
+    private static Compiled Compile(RuleDefinition rule, LayerMap layers, DependencyIndex? dependencies)
     {
         var exceptions = new TypeSelector[rule.Exceptions.Count];
         for (var i = 0; i < exceptions.Length; i++)
         {
-            exceptions[i] = TypeSelector.From(rule.Exceptions[i]);
+            exceptions[i] = TypeSelector.From(rule.Exceptions[i], layers, dependencies);
         }
 
-        return new Compiled(rule, TargetMatcher.From(rule.From, layers), TargetMatcher.From(rule.To, layers), exceptions, layers.Names);
+        return new Compiled(
+            rule, TargetMatcher.From(rule.From, layers, dependencies), TargetMatcher.From(rule.To, layers, dependencies), exceptions, layers.Names);
     }
 
     private static ArchitectureViolation ToViolation(Pair pair)

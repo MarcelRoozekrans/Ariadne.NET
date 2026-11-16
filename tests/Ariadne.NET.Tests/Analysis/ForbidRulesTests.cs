@@ -281,6 +281,48 @@ public class ForbidRulesTests
     }
 
     [Fact]
+    public void Exception_with_dependsOn_layers_exempts_type()
+    {
+        var compilation = TestCompilation.Create("""
+            namespace T { public class X { } }
+            namespace Shop.Domain { public class Order { } }
+            namespace N
+            {
+                public class Kept { public T.X? A; public Shop.Domain.Order? O; }
+                public class Bare { public T.X? B; }
+            }
+            """);
+        var exception = new RuleException { DependsOn = new TargetSelector { Layers = ["Domain"] }, Because = "Types that use the domain may use T." };
+        var pack = PackWith(Rule(new TargetSelector { Namespaces = ["N.**"] }, new TargetSelector { Namespaces = ["T.**"] }, exception));
+        var (graph, index) = TestCompilation.GraphAndIndex(compilation);
+
+        var violations = ForbidRules.Compile(new LayerMap(pack), pack, index).Check(graph);
+
+        violations.Should().ContainSingle().Which.SourceType.Should().Be("N.Bare");
+    }
+
+    [Fact]
+    public void From_with_onlyDependsOn_selects_sources()
+    {
+        var compilation = TestCompilation.Create("""
+            namespace T { public class X { } }
+            namespace Shop.Domain { public class Order { } }
+            namespace N
+            {
+                public class Pure { public T.X? A; }
+                public class Mixed { public T.X? B; public Shop.Domain.Order? O; }
+            }
+            """);
+        var from = new TargetSelector { Namespaces = ["N.**"], OnlyDependsOn = new TargetSelector { Namespaces = ["T.**"] } };
+        var pack = PackWith(Rule(from, new TargetSelector { Namespaces = ["T.**"] }));
+        var (graph, index) = TestCompilation.GraphAndIndex(compilation);
+
+        var violations = ForbidRules.Compile(new LayerMap(pack), pack, index).Check(graph);
+
+        violations.Should().ContainSingle().Which.SourceType.Should().Be("N.Pure");
+    }
+
+    [Fact]
     public void TargetMixingLayersAndNamespaces_Throws()
     {
         var pack = PackWith(Rule(new TargetSelector { Layers = ["Domain"], Namespaces = ["Web.**"] }, new TargetSelector { Namespaces = ["Web.**"] }));

@@ -100,6 +100,8 @@ public class PackYamlReaderSlicesTests
         // A capture anywhere but 'matching'.
         { "slices:|  matching: [\"Shop.(*).**\"]|  independent: true|  allow:|    namespaces:|      - Shop.(*).Public", 11, 13, "'Shop.(*).Public' in the allow of rule 'R1' is not a valid pattern: " + Capture },
         { "slices:|  matching: [\"Shop.(*).**\"]|  independent: true|exceptions:|  - namespaces:|      - Shop.(*).Legacy|    because: y", 11, 13, "'Shop.(*).Legacy' in exceptions[0] of rule 'R1' is not a valid pattern: " + Capture },
+        { "slices:|  matching: [\"Shop.(*).**\"]|  independent: true|  allow:|    dependsOn:|      namespaces:|        - Shop.(*).Api", 12, 15, "'Shop.(*).Api' in the dependsOn of the allow of rule 'R1' is not a valid pattern: " + Capture },
+        { "slices:|  matching: [\"Shop.(*).**\"]|  independent: true|exceptions:|  - onlyDependsOn:|      namespaces:|        - Shop.(*).Legacy|    because: y", 12, 15, "'Shop.(*).Legacy' in the onlyDependsOn of exceptions[0] of rule 'R1' is not a valid pattern: " + Capture },
 
         // matching must be a list of non-empty patterns, and a condition must be a boolean.
         { "slices:|  matching: [\"\"]|  independent: true", 7, 18, "pattern must not be empty" },

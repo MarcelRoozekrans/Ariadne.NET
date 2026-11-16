@@ -19,7 +19,7 @@ internal static class RequireRules
         Compile(layers, pack).Check(graph);
 
     /// <summary>Compiles the rules once, for a run that checks several graphs.</summary>
-    public static Checker Compile(LayerMap layers, RulePack pack)
+    public static Checker Compile(LayerMap layers, RulePack pack, DependencyIndex? dependencies = null)
     {
         ArgumentNullException.ThrowIfNull(layers);
         ArgumentNullException.ThrowIfNull(pack);
@@ -29,7 +29,7 @@ internal static class RequireRules
         {
             if (rule.Kind == RuleKind.Require && rule.Require is { } requirement)
             {
-                rules.Add(Compile(rule, requirement, layers));
+                rules.Add(Compile(rule, requirement, layers, dependencies));
             }
         }
 
@@ -65,12 +65,12 @@ internal static class RequireRules
         }
     }
 
-    private static Compiled Compile(RuleDefinition rule, RuleRequirement requirement, LayerMap layers)
+    private static Compiled Compile(RuleDefinition rule, RuleRequirement requirement, LayerMap layers, DependencyIndex? dependencies)
     {
         var exceptions = new TypeSelector[rule.Exceptions.Count];
         for (var i = 0; i < exceptions.Length; i++)
         {
-            exceptions[i] = TypeSelector.From(rule.Exceptions[i]);
+            exceptions[i] = TypeSelector.From(rule.Exceptions[i], layers, dependencies);
         }
 
         TypeSelector? implements = null;
@@ -80,7 +80,7 @@ internal static class RequireRules
             implements = compiled.IsEmpty ? null : compiled;
         }
 
-        return new Compiled(rule, requirement, TargetMatcher.From(rule.From, layers), exceptions, implements, RequireCondition.Compile(requirement.Is, requirement.IsNot));
+        return new Compiled(rule, requirement, TargetMatcher.From(rule.From, layers, dependencies), exceptions, implements, RequireCondition.Compile(requirement.Is, requirement.IsNot, layers, dependencies));
     }
 
     internal sealed class Compiled(RuleDefinition rule, RuleRequirement requirement, TargetMatcher from, TypeSelector[] exceptions, TypeSelector? implements, RequireCondition[] conditions)

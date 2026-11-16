@@ -47,18 +47,31 @@ internal static class PackYamlReader
     internal static readonly string[] TraitKeys =
         ["names", "kinds", "accessibility", "assignableTo", "sealed", "abstract", "static", "nested"];
 
-    // The selector keys of a uniqueNames target, which does not take traits.
+    /// <summary>
+    /// The keys that select a type by what it depends on. Each holds a nested selector. Like the traits they may join
+    /// 'layers', and an exception takes them too, but 'implements' does not.
+    /// </summary>
+    internal static readonly string[] DependencyKeys = ["dependsOn", "onlyDependsOn"];
+
+    // The plain selector keys: neither traits, members nor the dependency keys.
     private static readonly string[] PlainTargetKeys =
         ["layers", "namespaces", "assemblies", "types", "baseTypes", "interfaces", "attributes", "attributeArguments", "onlyAttributes"];
 
-    private static readonly string[] TargetKeys = [.. PlainTargetKeys, .. TraitKeys];
+    private static readonly string[] TargetKeys = [.. PlainTargetKeys, .. TraitKeys, .. DependencyKeys];
+
+    // A uniqueNames target does not take traits, but may select by dependencies.
+    private static readonly string[] UniqueNamesTargetKeys = [.. PlainTargetKeys, .. DependencyKeys];
 
     // Members name APIs, so only the 'to' of forbid and allowOnly takes them.
-    private static readonly string[] ToKeys = [.. PlainTargetKeys, "members", .. TraitKeys];
+    private static readonly string[] ToKeys = [.. PlainTargetKeys, "members", .. TraitKeys, .. DependencyKeys];
 
     // What 'is' and 'isNot' check against the type itself: every selector key except 'layers' and 'members'.
     private static readonly string[] ConditionKeys =
-        ["namespaces", "assemblies", "types", "baseTypes", "interfaces", "attributes", "attributeArguments", "onlyAttributes", .. TraitKeys];
+        ["namespaces", "assemblies", "types", "baseTypes", "interfaces", "attributes", "attributeArguments", "onlyAttributes", .. TraitKeys, .. DependencyKeys];
+
+    // The selector under dependsOn or onlyDependsOn: a rule target without members, and without the dependency keys,
+    // so selectors nest one level only.
+    private static readonly string[] DependencySelectorKeys = [.. PlainTargetKeys, .. TraitKeys];
 
     private static readonly string[] BannedPackagesKeys = ["packages", "from"];
 
@@ -75,7 +88,7 @@ internal static class PackYamlReader
         ["namespaces", "assemblies", "types", "baseTypes", "interfaces", "attributes", "attributeArguments", "onlyAttributes", "members"];
 
     private static readonly string[] ExceptionKeys =
-        ["namespaces", "assemblies", "types", "attributes", "attributeArguments", "onlyAttributes", .. TraitKeys, "because"];
+        ["namespaces", "assemblies", "types", "attributes", "attributeArguments", "onlyAttributes", .. TraitKeys, .. DependencyKeys, "because"];
 
     // The keys of one attributeArguments entry; all three apply to the same attribute instance.
     private static readonly string[] AttributeArgumentKeys = ["attribute", "arguments", "named"];
@@ -165,6 +178,8 @@ internal static class PackYamlReader
 
     private static bool IsTrait(string key) => Array.IndexOf(TraitKeys, key) >= 0;
 
+    private static bool IsDependencyKey(string key) => Array.IndexOf(DependencyKeys, key) >= 0;
+
     private static bool OnlyKeys(Dictionary<string, Field> fields, string[] keys)
     {
         foreach (var key in fields.Keys)
@@ -228,6 +243,7 @@ internal static class PackYamlReader
 
         // Set while a slices rule is read, so the patterns of its exceptions and 'allow' reject a capture.
         private bool _inSlicesRule;
+
         private int _visited;
         private bool _exhausted;
 
@@ -688,8 +704,8 @@ internal static class PackYamlReader
 
             var where = $"the uniqueNames of {ruleWhere}";
             var fields = Fields(map, UniqueNamesKeys, where);
-            var subject = ReadTarget(fields, "for", where, ruleWhere, map, PlainTargetKeys);
-            var against = ReadTarget(fields, "against", where, ruleWhere, map, PlainTargetKeys);
+            var subject = ReadTarget(fields, "for", where, ruleWhere, map, UniqueNamesTargetKeys);
+            var against = ReadTarget(fields, "against", where, ruleWhere, map, UniqueNamesTargetKeys);
             return subject is not null && against is not null ? (subject, against) : null;
         }
 
@@ -832,8 +848,8 @@ internal static class PackYamlReader
         {
             var before = _problems.Count;
             var fields = Fields(map, keys, where);
-            // attributeArguments holds entries, not patterns, so it is read on its own after the pattern lists.
-            var listKeys = Array.FindAll(keys, static k => !IsTrait(k) && !string.Equals(k, "attributeArguments", StringComparison.Ordinal));
+            // attributeArguments holds entries and the dependency keys hold selectors, so they are read on their own.
+            var listKeys = Array.FindAll(keys, static k => !IsTrait(k) && !IsDependencyKey(k) && !string.Equals(k, "attributeArguments", StringComparison.Ordinal));
             var lists = new List<string>?[listKeys.Length];
             var selectors = new (string Key, int? Count)[listKeys.Length + 1];
             for (var i = 0; i < listKeys.Length; i++)
@@ -852,12 +868,13 @@ internal static class PackYamlReader
             var attributeArguments = ReadAttributeArguments(fields, where);
             selectors[^1] = ("attributeArguments", attributeArguments?.Count);
             var traits = ReadTraits(fields, where);
+            var (dependsOn, onlyDependsOn) = ReadDependencyKeys(fields, where);
             if (fields.TryGetValue("layers", out var layersField) && OtherSelectorKeys.Any(fields.ContainsKey))
             {
                 var others = Array.FindAll(keys, static k => Array.IndexOf(OtherSelectorKeys, k) >= 0);
                 Add(layersField.Key, $"a target in {ruleWhere} cannot mix 'layers' with {JoinOr(others)}");
             }
-            else if (NoneSelected(fields, selectors) && !traits.AnySelected(fields))
+            else if (NoneSelected(fields, selectors) && !traits.AnySelected(fields) && !Array.Exists(DependencyKeys, fields.ContainsKey))
             {
                 Add(map, $"{where} needs at least one of {JoinList(keys)}");
             }
@@ -883,8 +900,31 @@ internal static class PackYamlReader
                     Abstract = traits.Abstract,
                     Static = traits.Static,
                     Nested = traits.Nested,
+                    DependsOn = dependsOn,
+                    OnlyDependsOn = onlyDependsOn,
                 }
                 : null;
+        }
+
+        // The dependency keys present in a mapping whose key set allows them; absent keys stay null.
+        private (TargetSelector? DependsOn, TargetSelector? OnlyDependsOn) ReadDependencyKeys(Dictionary<string, Field> fields, string where) =>
+        (
+            fields.TryGetValue("dependsOn", out var dependsOn) ? ReadDependencySelector(in dependsOn, where) : null,
+            fields.TryGetValue("onlyDependsOn", out var onlyDependsOn) ? ReadDependencySelector(in onlyDependsOn, where) : null
+        );
+
+        // The selector under dependsOn or onlyDependsOn. It takes the keys of a rule target except members and the
+        // dependency keys themselves, and follows the same rule for 'layers'. Null when it has a problem, which is reported.
+        private TargetSelector? ReadDependencySelector(in Field field, string where)
+        {
+            if (field.Value is not YamlMappingNode map)
+            {
+                Add(field.Key, $"'{field.Name}' in {where} must be a mapping");
+                return null;
+            }
+
+            var nestedWhere = $"the {field.Name} of {where}";
+            return ReadSelector(map, nestedWhere, nestedWhere, DependencySelectorKeys);
         }
 
         // The trait keys present in a mapping whose key set allows them; absent keys stay null.
@@ -1132,53 +1172,64 @@ internal static class PackYamlReader
                     continue;
                 }
 
-                var where = $"exceptions[{i}] of {ruleWhere}";
-                var before = _problems.Count;
-                var fields = Fields(map, ExceptionKeys, where);
-                var namespaces = PatternList(fields, "namespaces", where, Glob.Dotted);
-                var assemblies = PatternList(fields, "assemblies", where, Glob.Flat);
-                var types = PatternList(fields, "types", where, Glob.Dotted);
-                var attributes = PatternList(fields, "attributes", where, Glob.Dotted);
-                var attributeArguments = ReadAttributeArguments(fields, where);
-                var onlyAttributes = ReadOnlyAttributes(fields, where);
-                var traits = ReadTraits(fields, where);
-                var because = RequiredString(fields, "because", where, map);
-                var misplaced = RejectMisplaced(fields, where, kind);
-                if (!misplaced
-                    && NoneSelected(fields, [
-                        ("namespaces", namespaces?.Count), ("assemblies", assemblies?.Count), ("types", types?.Count), ("attributes", attributes?.Count),
-                        ("attributeArguments", attributeArguments?.Count), ("onlyAttributes", onlyAttributes?.Count),
-                    ])
-                    && !traits.AnySelected(fields))
+                if (ReadException(map, $"exceptions[{i}] of {ruleWhere}", kind) is { } exception)
                 {
-                    var allowed = ExceptionKeyRules.Allowed(kind);
-                    Add(map, allowed.Length == 1 ? $"{where} needs '{allowed[0]}'" : $"{where} needs at least one of {JoinList(allowed)}");
-                }
-
-                if (_problems.Count == before && because is not null)
-                {
-                    exceptions.Add(new RuleException
-                    {
-                        Namespaces = namespaces ?? [],
-                        Assemblies = assemblies ?? [],
-                        Types = types ?? [],
-                        Attributes = attributes ?? [],
-                        AttributeArguments = attributeArguments ?? [],
-                        OnlyAttributes = onlyAttributes ?? [],
-                        Names = traits.Names ?? [],
-                        Kinds = traits.Kinds ?? [],
-                        Accessibility = traits.Accessibility ?? [],
-                        AssignableTo = traits.AssignableTo ?? [],
-                        Sealed = traits.Sealed,
-                        Abstract = traits.Abstract,
-                        Static = traits.Static,
-                        Nested = traits.Nested,
-                        Because = because,
-                    });
+                    exceptions.Add(exception);
                 }
             }
 
             return exceptions;
+        }
+
+        // One exception entry. Null when it has a problem, which is reported.
+        private RuleException? ReadException(YamlMappingNode map, string where, RuleKind kind)
+        {
+            var before = _problems.Count;
+            var fields = Fields(map, ExceptionKeys, where);
+            var namespaces = PatternList(fields, "namespaces", where, Glob.Dotted);
+            var assemblies = PatternList(fields, "assemblies", where, Glob.Flat);
+            var types = PatternList(fields, "types", where, Glob.Dotted);
+            var attributes = PatternList(fields, "attributes", where, Glob.Dotted);
+            var attributeArguments = ReadAttributeArguments(fields, where);
+            var onlyAttributes = ReadOnlyAttributes(fields, where);
+            var traits = ReadTraits(fields, where);
+            var (dependsOn, onlyDependsOn) = ReadDependencyKeys(fields, where);
+            var because = RequiredString(fields, "because", where, map);
+            var misplaced = RejectMisplaced(fields, where, kind);
+            if (!misplaced
+                && NoneSelected(fields, [
+                    ("namespaces", namespaces?.Count), ("assemblies", assemblies?.Count), ("types", types?.Count), ("attributes", attributes?.Count),
+                    ("attributeArguments", attributeArguments?.Count), ("onlyAttributes", onlyAttributes?.Count),
+                ])
+                && !traits.AnySelected(fields)
+                && !Array.Exists(DependencyKeys, fields.ContainsKey))
+            {
+                var allowed = ExceptionKeyRules.Allowed(kind);
+                Add(map, allowed.Length == 1 ? $"{where} needs '{allowed[0]}'" : $"{where} needs at least one of {JoinList(allowed)}");
+            }
+
+            return _problems.Count == before && because is not null
+                ? new RuleException
+                {
+                    Namespaces = namespaces ?? [],
+                    Assemblies = assemblies ?? [],
+                    Types = types ?? [],
+                    Attributes = attributes ?? [],
+                    AttributeArguments = attributeArguments ?? [],
+                    OnlyAttributes = onlyAttributes ?? [],
+                    Names = traits.Names ?? [],
+                    Kinds = traits.Kinds ?? [],
+                    Accessibility = traits.Accessibility ?? [],
+                    AssignableTo = traits.AssignableTo ?? [],
+                    Sealed = traits.Sealed,
+                    Abstract = traits.Abstract,
+                    Static = traits.Static,
+                    Nested = traits.Nested,
+                    DependsOn = dependsOn,
+                    OnlyDependsOn = onlyDependsOn,
+                    Because = because,
+                }
+                : null;
         }
 
         // The keys the rule kind does not take are reported at the key itself.
@@ -1310,6 +1361,12 @@ internal static class PackYamlReader
                 else if (string.Equals(key, "members", StringComparison.Ordinal))
                 {
                     Add(scalar, $"'members' is not accepted in {where}; it names APIs and only the 'to' of a 'forbid' or 'allowOnly' rule takes it");
+                }
+                // Only the selector itself names nesting; a mapping read inside it, such as an attributeArguments entry,
+                // has its own key set and reports the key as unknown.
+                else if (ReferenceEquals(allowed, DependencySelectorKeys) && IsDependencyKey(key))
+                {
+                    Add(scalar, $"'{key}' is not accepted in {where}; selectors nest one level only, so the selector under 'dependsOn' or 'onlyDependsOn' cannot hold either");
                 }
                 else if (isPack && string.Equals(key, CodeFeatureRulesKey, StringComparison.Ordinal))
                 {

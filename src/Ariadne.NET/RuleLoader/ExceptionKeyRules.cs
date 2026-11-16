@@ -11,10 +11,11 @@ internal static class ExceptionKeyRules
     /// <summary>Why the exception key does not apply to the rule kind, or null when it does.</summary>
     public static string? Rejection(RuleKind kind, string key) => kind switch
     {
-        RuleKind.BannedPackages when key is "types" or "namespaces" or "attributes" or "attributeArguments" or "onlyAttributes" || Array.IndexOf(PackYamlReader.TraitKeys, key) >= 0 =>
+        RuleKind.BannedPackages when key is "types" or "namespaces" or "attributes" or "attributeArguments" or "onlyAttributes"
+                || Array.IndexOf(PackYamlReader.TraitKeys, key) >= 0 || Array.IndexOf(PackYamlReader.DependencyKeys, key) >= 0 =>
             "a package belongs to a project, so the exception of a bannedPackages rule names it by 'assemblies'",
         RuleKind.UniqueNames when key is "assemblies" =>
-            "an exception of a uniqueNames rule excuses a type's name, so it takes 'namespaces', 'types', 'attributes', 'attributeArguments', 'onlyAttributes' or a type trait",
+            "an exception of a uniqueNames rule excuses a type's name, so it takes 'namespaces', 'types', 'attributes', 'attributeArguments', 'onlyAttributes', a type trait, 'dependsOn' or 'onlyDependsOn'",
         _ => null,
     };
 
@@ -39,6 +40,8 @@ internal static class ExceptionKeyRules
             ("abstract", exception.Abstract is not null),
             ("static", exception.Static is not null),
             ("nested", exception.Nested is not null),
+            ("dependsOn", exception.DependsOn is not null),
+            ("onlyDependsOn", exception.OnlyDependsOn is not null),
         ];
         return keys.Where(static k => k.Used).Select(static k => k.Key);
     }
@@ -47,7 +50,7 @@ internal static class ExceptionKeyRules
     public static string[] Allowed(RuleKind kind) => kind switch
     {
         RuleKind.BannedPackages => ["assemblies"],
-        RuleKind.UniqueNames => ["namespaces", "types", "attributes", "attributeArguments", "onlyAttributes", .. PackYamlReader.TraitKeys],
-        _ => ["namespaces", "assemblies", "types", "attributes", "attributeArguments", "onlyAttributes", .. PackYamlReader.TraitKeys],
+        RuleKind.UniqueNames => ["namespaces", "types", "attributes", "attributeArguments", "onlyAttributes", .. PackYamlReader.TraitKeys, .. PackYamlReader.DependencyKeys],
+        _ => ["namespaces", "assemblies", "types", "attributes", "attributeArguments", "onlyAttributes", .. PackYamlReader.TraitKeys, .. PackYamlReader.DependencyKeys],
     };
 }
