@@ -699,4 +699,191 @@ public class TypeSelectorTests
             selector.Matches(impl, names);
         }).Should().Be(0);
     }
+
+    private const string DependencySource = """
+        namespace Shop.Infrastructure { public class SqlStore { } public class Cache { } }
+        namespace Shop.Domain { public class Clock { } }
+        namespace Shop.App
+        {
+            public class UsesStore { public Shop.Infrastructure.SqlStore? Store; }
+            public class UsesDomain { public Shop.Domain.Clock? Clock; }
+            public class UsesBoth { public Shop.Domain.Clock? Clock; public Shop.Infrastructure.SqlStore? Store; public Shop.Infrastructure.Cache? Cache; }
+            public class UsesText { public System.Text.StringBuilder? Builder; public System.String? Name; }
+            public class Empty { }
+        }
+        """;
+
+    private static readonly RulePack DependencyPack = new()
+    {
+        Name = "p",
+        Layers = [new LayerDefinition { Name = "Domain", Id = "L-DOMAIN", Because = "Domain.", Namespaces = ["**.Domain.**"] }],
+    };
+
+    private static Func<string, bool> DependencyMatcher(TargetSelector selector)
+    {
+        var compilation = TestCompilation.Create(DependencySource);
+        var (_, index) = TestCompilation.GraphAndIndex(compilation);
+        var layers = new LayerMap(DependencyPack);
+        var compiled = TypeSelector.From(selector, layers, index);
+        return name => compiled.Matches(Find(compilation, name), layers.Names);
+    }
+
+    [Fact]
+    public void DependsOn_matches_with_one_selected_dependency()
+    {
+        var matches = DependencyMatcher(new TargetSelector { DependsOn = new TargetSelector { Namespaces = ["Shop.Infrastructure.**"] } });
+
+        matches("Shop.App.UsesStore").Should().BeTrue();
+        matches("Shop.App.UsesBoth").Should().BeTrue();
+    }
+
+    [Fact]
+    public void DependsOn_does_not_match_without_one()
+    {
+        var matches = DependencyMatcher(new TargetSelector { DependsOn = new TargetSelector { Namespaces = ["Shop.Infrastructure.**"] } });
+
+        matches("Shop.App.UsesDomain").Should().BeFalse();
+        matches("Shop.App.Empty").Should().BeFalse();
+        matches("Shop.Infrastructure.SqlStore").Should().BeFalse();
+    }
+
+    [Fact]
+    public void DependsOn_selects_framework_dependency()
+    {
+        var text = DependencyMatcher(new TargetSelector { DependsOn = new TargetSelector { Namespaces = ["System.Text.**"] } });
+        var system = DependencyMatcher(new TargetSelector { Types = ["Shop.App.*"], DependsOn = new TargetSelector { Namespaces = ["System.**"] } });
+
+        text("Shop.App.UsesText").Should().BeTrue();
+        text("Shop.App.UsesStore").Should().BeFalse();
+        system("Shop.App.UsesText").Should().BeTrue();
+        system("Shop.App.UsesStore").Should().BeFalse();
+    }
+
+    // The keyword 'string' gives no edge, as every keyword type does; the written type name System.String does.
+    [Fact]
+    public void DependsOn_selects_a_type_that_uses_string()
+    {
+        var compilation = TestCompilation.Create("namespace Shop { public class Named { public System.String? Name; } public class Plain { } }");
+        var (_, index) = TestCompilation.GraphAndIndex(compilation);
+        var layers = new LayerMap(DependencyPack);
+        var selector = TypeSelector.From(new TargetSelector { DependsOn = new TargetSelector { Namespaces = ["System.**"] } }, layers, index);
+
+        selector.Matches(Find(compilation, "Shop.Named"), layers.Names).Should().BeTrue();
+        selector.Matches(Find(compilation, "Shop.Plain"), layers.Names).Should().BeFalse();
+    }
+
+    [Fact]
+    public void OnlyDependsOn_matches_when_all_inside()
+    {
+        var matches = DependencyMatcher(new TargetSelector { OnlyDependsOn = new TargetSelector { Namespaces = ["Shop.Domain.**"] } });
+
+        matches("Shop.App.UsesDomain").Should().BeTrue();
+    }
+
+    [Fact]
+    public void OnlyDependsOn_fails_when_one_outside()
+    {
+        var matches = DependencyMatcher(new TargetSelector { OnlyDependsOn = new TargetSelector { Namespaces = ["Shop.Domain.**"] } });
+
+        matches("Shop.App.UsesBoth").Should().BeFalse();
+        matches("Shop.App.UsesStore").Should().BeFalse();
+    }
+
+    [Fact]
+    public void OnlyDependsOn_ignores_framework_dependencies()
+    {
+        var matches = DependencyMatcher(new TargetSelector { OnlyDependsOn = new TargetSelector { Namespaces = ["Shop.Domain.**"] } });
+        var system = DependencyMatcher(new TargetSelector { DependsOn = new TargetSelector { Types = ["System.String"] } });
+
+        matches("Shop.App.UsesText").Should().BeTrue();
+        system("Shop.App.UsesText").Should().BeTrue();
+    }
+
+    [Fact]
+    public void OnlyDependsOn_matches_type_without_dependencies()
+    {
+        var matches = DependencyMatcher(new TargetSelector { OnlyDependsOn = new TargetSelector { Namespaces = ["Shop.Domain.**"] } });
+
+        matches("Shop.App.Empty").Should().BeTrue();
+    }
+
+    [Fact]
+    public void Dependency_keys_with_layers_inside_use_the_layer_map()
+    {
+        var matches = DependencyMatcher(new TargetSelector { OnlyDependsOn = new TargetSelector { Layers = ["Domain"] } });
+
+        matches("Shop.App.UsesDomain").Should().BeTrue();
+        matches("Shop.App.UsesBoth").Should().BeFalse();
+    }
+
+    [Fact]
+    public void Dependency_keys_are_checked_after_the_other_keys()
+    {
+        var matches = DependencyMatcher(new TargetSelector
+        {
+            Namespaces = ["Shop.Domain.**"],
+            DependsOn = new TargetSelector { Namespaces = ["Shop.Infrastructure.**"] },
+        });
+
+        matches("Shop.App.UsesStore").Should().BeFalse();
+    }
+
+    [Fact]
+    public void FirstDependencyOutsideOnly_names_first_in_source_order()
+    {
+        var compilation = TestCompilation.Create(DependencySource);
+        var (_, index) = TestCompilation.GraphAndIndex(compilation);
+        var layers = new LayerMap(DependencyPack);
+        var only = TypeSelector.From(new TargetSelector { OnlyDependsOn = new TargetSelector { Namespaces = ["Shop.Domain.**"] } }, layers, index);
+        var depends = TypeSelector.From(new TargetSelector { DependsOn = new TargetSelector { Namespaces = ["Shop.Infrastructure.**"] } }, layers, index);
+        var both = Find(compilation, "Shop.App.UsesBoth");
+
+        only.FirstDependencyOutsideOnly(both)!.ToDisplayString().Should().Be("Shop.Infrastructure.SqlStore");
+        only.FirstDependencyOutsideOnly(Find(compilation, "Shop.App.UsesText")).Should().BeNull();
+        only.FirstDependencyOutsideOnly(Find(compilation, "Shop.App.Empty")).Should().BeNull();
+        depends.FirstDependencyMatching(both)!.ToDisplayString().Should().Be("Shop.Infrastructure.SqlStore");
+        depends.FirstDependencyMatching(Find(compilation, "Shop.App.UsesDomain")).Should().BeNull();
+        depends.FirstDependencyOutsideOnly(both).Should().BeNull();
+        only.FirstDependencyMatching(both).Should().BeNull();
+    }
+
+    [Fact]
+    public void Old_overload_rejects_dependency_keys()
+    {
+        var nested = new TargetSelector { Namespaces = ["Shop.**"] };
+
+        FluentActions.Invoking(() => TypeSelector.From(new TargetSelector { DependsOn = nested }))
+            .Should().Throw<ArgumentException>().WithParameterName("selector");
+        FluentActions.Invoking(() => TypeSelector.From(new TargetSelector { OnlyDependsOn = nested }))
+            .Should().Throw<ArgumentException>().WithParameterName("selector");
+        FluentActions.Invoking(() => TypeSelector.From(new RuleException { DependsOn = nested, Because = "b" }))
+            .Should().Throw<ArgumentException>().WithParameterName("exception");
+        FluentActions.Invoking(() => TypeSelector.From(new RuleException { OnlyDependsOn = nested, Because = "b" }))
+            .Should().Throw<ArgumentException>().WithParameterName("exception");
+        FluentActions.Invoking(() => TargetMatcher.From(new TargetSelector { DependsOn = nested }, new LayerMap(DependencyPack)))
+            .Should().Throw<ArgumentException>().WithParameterName("target");
+    }
+
+    [Fact]
+    public void Dependency_keys_without_an_index_are_rejected()
+    {
+        var nested = new TargetSelector { Namespaces = ["Shop.**"] };
+
+        FluentActions.Invoking(() => TypeSelector.From(new TargetSelector { DependsOn = nested }, new LayerMap(DependencyPack), null))
+            .Should().Throw<ArgumentException>().WithParameterName("dependencies");
+        FluentActions.Invoking(() => TypeSelector.From(new RuleException { OnlyDependsOn = nested, Because = "b" }, new LayerMap(DependencyPack), null))
+            .Should().Throw<ArgumentException>().WithParameterName("dependencies");
+    }
+
+    [Fact]
+    public void Selector_without_dependency_keys_needs_no_index()
+    {
+        var compilation = TestCompilation.Create(DependencySource);
+        var layers = new LayerMap(DependencyPack);
+
+        TypeSelector.From(new TargetSelector { Namespaces = ["Shop.App.**"] }, layers, null)
+            .Matches(Find(compilation, "Shop.App.Empty"), layers.Names).Should().BeTrue();
+        TypeSelector.From(new RuleException { Types = ["Shop.App.Empty"], Because = "b" }, layers, null)
+            .Matches(Find(compilation, "Shop.App.Empty"), layers.Names).Should().BeTrue();
+    }
 }

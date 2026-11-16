@@ -39,7 +39,7 @@ internal static class VacuityRules
         var count = projects.Select(p => p.Name).Distinct(StringComparer.Ordinal).Count();
         var violations = new List<ArchitectureViolation>();
         var vacuousLayers = CheckLayers(pack, layers, graphs, count, violations);
-        CheckRules(pack, layers, graphs, projects, vacuousLayers, count, violations);
+        CheckRules(pack, layers, graphs, projects, dependencies, vacuousLayers, count, violations);
         CheckRoles(pack, roleMatches, vacuousLayers, count, violations);
         return violations;
     }
@@ -85,11 +85,18 @@ internal static class VacuityRules
     }
 
     private static void CheckRules(
-        RulePack pack, LayerMap map, IReadOnlyList<TypeGraph> graphs, IReadOnlyList<AnalyzedProject> projects, HashSet<string> vacuousLayers, int count, List<ArchitectureViolation> violations)
+        RulePack pack,
+        LayerMap map,
+        IReadOnlyList<TypeGraph> graphs,
+        IReadOnlyList<AnalyzedProject> projects,
+        DependencyIndex? dependencies,
+        HashSet<string> vacuousLayers,
+        int count,
+        List<ArchitectureViolation> violations)
     {
         foreach (var rule in pack.Rules)
         {
-            if (!rule.AllowEmpty && !NamesOnlyVacuousLayers(rule.From, vacuousLayers) && IsVacuous(rule, map, graphs, projects))
+            if (!rule.AllowEmpty && !NamesOnlyVacuousLayers(rule.From, vacuousLayers) && IsVacuous(rule, map, graphs, projects, dependencies))
             {
                 violations.Add(VacuousRule(rule, string.Create(CultureInfo.InvariantCulture, $"Rule '{rule.Id}' selects no type: {Cause(rule, count)}.")));
             }
@@ -97,7 +104,7 @@ internal static class VacuityRules
             if (rule.RequireTarget
                 && TargetOf(rule) is { } target
                 && !NamesOnlyVacuousLayers(target, vacuousLayers)
-                && !IsTargetFound(rule.Kind, target, map, graphs))
+                && !IsTargetFound(rule.Kind, target, map, graphs, dependencies))
             {
                 violations.Add(VacuousRule(rule, TargetCause(rule, target, count)));
             }
@@ -130,9 +137,9 @@ internal static class VacuityRules
 
     // uniqueNames compares declared types only, so its target is found by a source type alone. A members target is found by a
     // member edge only, since it selects no type.
-    private static bool IsTargetFound(RuleKind kind, TargetSelector target, LayerMap map, IReadOnlyList<TypeGraph> graphs)
+    private static bool IsTargetFound(RuleKind kind, TargetSelector target, LayerMap map, IReadOnlyList<TypeGraph> graphs, DependencyIndex? dependencies)
     {
-        var matcher = TargetMatcher.From(target, map);
+        var matcher = TargetMatcher.From(target, map, dependencies);
         foreach (var graph in graphs)
         {
             if (matcher.HasMembers && kind != RuleKind.UniqueNames)
@@ -239,7 +246,8 @@ internal static class VacuityRules
         return true;
     }
 
-    private static bool IsVacuous(RuleDefinition rule, LayerMap map, IReadOnlyList<TypeGraph> graphs, IReadOnlyList<AnalyzedProject> projects)
+    private static bool IsVacuous(
+        RuleDefinition rule, LayerMap map, IReadOnlyList<TypeGraph> graphs, IReadOnlyList<AnalyzedProject> projects, DependencyIndex? dependencies)
     {
         if (rule.Kind == RuleKind.BannedPackages)
         {
@@ -266,7 +274,7 @@ internal static class VacuityRules
             return !SliceRules.PlacesAnyType(rule, graphs);
         }
 
-        var from = TargetMatcher.From(rule.From, map);
+        var from = TargetMatcher.From(rule.From, map, dependencies);
         foreach (var graph in graphs)
         {
             foreach (var type in graph.SourceTypes)

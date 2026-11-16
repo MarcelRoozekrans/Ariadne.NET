@@ -5,8 +5,8 @@ namespace Ariadne.NET.Analysis;
 
 /// <summary>
 /// Tests whether a type is selected by a rule target: a list of layers, or a namespace, assembly and type selector, either
-/// one narrowed by type-level traits. The answer is cached per symbol, so a type that many edges touch is matched once.
-/// Like the layer map it uses, one instance serves one single-threaded check.
+/// one narrowed by type-level traits and by what the type depends on. The answer is cached per symbol, so a type that many
+/// edges touch is matched once. Like the layer map it uses, one instance serves one single-threaded check.
 /// </summary>
 internal sealed class TargetMatcher
 {
@@ -31,8 +31,31 @@ internal sealed class TargetMatcher
     /// <param name="target">The target to compile.</param>
     /// <param name="layers">The layer map that resolves layer names.</param>
     /// <returns>The matcher.</returns>
-    /// <exception cref="ArgumentException">The target mixes layers with namespaces, assemblies, types, base types, interfaces, attributes, attribute arguments, attribute allow-lists or members. Layers with traits are allowed.</exception>
+    /// <exception cref="ArgumentException">The target mixes layers with namespaces, assemblies, types, base types, interfaces, attributes, attribute arguments, attribute allow-lists or members, or holds <c>dependsOn</c> or <c>onlyDependsOn</c>, which need the overload that takes the dependency index. Layers with traits are allowed.</exception>
     public static TargetMatcher From(TargetSelector target, LayerMap layers)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(layers);
+
+        if (target.DependsOn is not null || target.OnlyDependsOn is not null)
+        {
+            throw new ArgumentException(
+                "A target with dependsOn or onlyDependsOn needs the overload that takes the dependency index.", nameof(target));
+        }
+
+        return From(target, layers, null);
+    }
+
+    /// <summary>
+    /// Compiles the target once, its <c>dependsOn</c> and <c>onlyDependsOn</c> included. A target that selects nothing at all
+    /// matches no type. Both dependency keys may sit next to <c>layers</c>, as traits do.
+    /// </summary>
+    /// <param name="target">The target to compile.</param>
+    /// <param name="layers">The layer map that resolves layer names, in the target and in its nested selectors.</param>
+    /// <param name="dependencies">The run's dependency index; may be <see langword="null"/> only when the target holds neither dependency key.</param>
+    /// <returns>The matcher.</returns>
+    /// <exception cref="ArgumentException">The target or a nested selector mixes layers with namespaces, assemblies, types, base types, interfaces, attributes, attribute arguments, attribute allow-lists or members, or a dependency key comes without an index. Layers with traits and dependency keys are allowed.</exception>
+    public static TargetMatcher From(TargetSelector target, LayerMap layers, DependencyIndex? dependencies)
     {
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(layers);
@@ -42,14 +65,14 @@ internal sealed class TargetMatcher
                 || target.OnlyAttributes.Count > 0 || target.Members.Count > 0))
         {
             throw new ArgumentException(
-                "A target selects either layers or namespaces, assemblies, types, base types, interfaces, attributes, attribute arguments, attribute allow-lists and members, not both. Traits may join either.",
+                "A target selects either layers or namespaces, assemblies, types, base types, interfaces, attributes, attribute arguments, attribute allow-lists and members, not both. Traits and dependency keys may join either.",
                 nameof(target));
         }
 
         return new TargetMatcher(
             layers,
             new HashSet<string>(target.Layers, StringComparer.OrdinalIgnoreCase),
-            TypeSelector.From(target));
+            TypeSelector.From(target, layers, dependencies));
     }
 
     /// <summary>

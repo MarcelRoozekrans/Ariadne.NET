@@ -27,21 +27,22 @@ internal static class UniqueNameRules
         {
             if (rule.Kind == RuleKind.UniqueNames)
             {
-                CheckRule(rule, layers, graphs, violations);
+                CheckRule(rule, layers, graphs, dependencies, violations);
             }
         }
 
         return violations;
     }
 
-    private static void CheckRule(RuleDefinition rule, LayerMap layers, IReadOnlyList<TypeGraph> graphs, List<ArchitectureViolation> violations)
+    private static void CheckRule(
+        RuleDefinition rule, LayerMap layers, IReadOnlyList<TypeGraph> graphs, DependencyIndex? dependencies, List<ArchitectureViolation> violations)
     {
-        var from = TargetMatcher.From(rule.From, layers);
-        var against = TargetMatcher.From(rule.Against, layers);
+        var from = TargetMatcher.From(rule.From, layers, dependencies);
+        var against = TargetMatcher.From(rule.Against, layers, dependencies);
         var exceptions = new TypeSelector[rule.Exceptions.Count];
         for (var i = 0; i < exceptions.Length; i++)
         {
-            exceptions[i] = TypeSelector.From(rule.Exceptions[i]);
+            exceptions[i] = TypeSelector.From(rule.Exceptions[i], layers, dependencies);
         }
 
         var (againstByName, forTypes) = Collect(from, against, exceptions, layers, graphs);
