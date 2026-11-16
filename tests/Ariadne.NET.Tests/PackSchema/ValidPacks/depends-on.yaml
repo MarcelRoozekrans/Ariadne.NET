@@ -1,0 +1,34 @@
+schema: 2
+name: x
+layers:
+  - name: Domain
+    id: X-L-DOMAIN
+    because: core
+    namespaces: ["**.Domain.**"]
+  - name: Web
+    id: X-L-WEB
+    because: edge
+    namespaces: ["**.Web.**"]
+    allowedDependencies: [Domain]
+rules:
+  - id: X-R1
+    because: b
+    forbid:
+      from: { layers: [Web], dependsOn: { namespaces: ["System.Data.**"], sealed: true } }
+      to: { namespaces: ["**.Persistence.**"] }
+    exceptions:
+      - dependsOn: { layers: [Domain], kinds: [interface] }
+        because: domain users may use persistence
+      - dependsOn: { types: ["**.Clock"], attributes: ["**.A"] }
+        because: x
+  - id: X-R2
+    because: b
+    require:
+      for: { namespaces: ["Shop.**"] }
+      is: { dependsOn: { layers: [Domain] } }
+      isNot: { dependsOn: { assemblies: ["Legacy.*"], interfaces: ["**.IA"], onlyAttributes: ["**.B"] } }
+  - id: X-R3
+    because: b
+    uniqueNames:
+      for: { layers: [Web], dependsOn: { layers: [Domain] } }
+      against: { namespaces: ["Shop.**"], dependsOn: { baseTypes: ["**.Base"] } }

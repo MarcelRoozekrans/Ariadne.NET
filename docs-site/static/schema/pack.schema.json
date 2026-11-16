@@ -187,6 +187,12 @@
         },
         "nested": {
           "type": "boolean"
+        },
+        "dependsOn": {
+          "$ref": "#/$defs/dependencySelector"
+        },
+        "onlyDependsOn": {
+          "$ref": "#/$defs/dependencySelector"
         }
       },
       "not": {
@@ -296,6 +302,12 @@
         },
         "nested": {
           "type": "boolean"
+        },
+        "dependsOn": {
+          "$ref": "#/$defs/dependencySelector"
+        },
+        "onlyDependsOn": {
+          "$ref": "#/$defs/dependencySelector"
         }
       },
       "not": {
@@ -428,9 +440,19 @@
           "required": [
             "nested"
           ]
+        },
+        {
+          "required": [
+            "dependsOn"
+          ]
+        },
+        {
+          "required": [
+            "onlyDependsOn"
+          ]
         }
       ],
-      "description": "A place where the rule does not apply. On a bannedPackages rule only assemblies, on a uniqueNames rule namespaces, types, attributes and the type traits. Attributes and type traits are accepted on every rule kind except bannedPackages.",
+      "description": "A place where the rule does not apply. On a bannedPackages rule only assemblies, on a uniqueNames rule namespaces, types, attributes and the type traits. Attributes, type traits, dependsOn and onlyDependsOn are accepted on every rule kind except bannedPackages.",
       "properties": {
         "namespaces": {
           "$ref": "#/$defs/patternList"
@@ -480,6 +502,12 @@
         },
         "nested": {
           "type": "boolean"
+        },
+        "dependsOn": {
+          "$ref": "#/$defs/dependencySelector"
+        },
+        "onlyDependsOn": {
+          "$ref": "#/$defs/dependencySelector"
         }
       }
     },
@@ -793,7 +821,9 @@
                     "sealed": false,
                     "abstract": false,
                     "static": false,
-                    "nested": false
+                    "nested": false,
+                    "dependsOn": false,
+                    "onlyDependsOn": false
                   }
                 }
               }
@@ -1003,6 +1033,12 @@
         },
         "onlyAttributes": {
           "$ref": "#/$defs/onlyAttributeList"
+        },
+        "dependsOn": {
+          "$ref": "#/$defs/dependencySelector"
+        },
+        "onlyDependsOn": {
+          "$ref": "#/$defs/dependencySelector"
         }
       },
       "not": {
@@ -1106,6 +1142,12 @@
         },
         "nested": {
           "type": "boolean"
+        },
+        "dependsOn": {
+          "$ref": "#/$defs/dependencySelector"
+        },
+        "onlyDependsOn": {
+          "$ref": "#/$defs/dependencySelector"
         }
       },
       "minProperties": 1
@@ -1165,6 +1207,12 @@
         },
         "nested": {
           "type": "boolean"
+        },
+        "dependsOn": {
+          "$ref": "#/$defs/dependencySelector"
+        },
+        "onlyDependsOn": {
+          "$ref": "#/$defs/dependencySelector"
         }
       },
       "not": {
@@ -1323,6 +1371,112 @@
     },
     "onlyAttributeList": {
       "$ref": "#/$defs/patternList"
+    },
+    "dependencySelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Selects the types a type depends on, for dependsOn and onlyDependsOn: the rule-target keys without members, dependsOn and onlyDependsOn. At least one key. layers cannot be combined with the glob keys, but can with traits.",
+      "properties": {
+        "layers": {
+          "$ref": "#/$defs/patternList"
+        },
+        "namespaces": {
+          "$ref": "#/$defs/patternList"
+        },
+        "assemblies": {
+          "$ref": "#/$defs/patternList"
+        },
+        "types": {
+          "$ref": "#/$defs/patternList"
+        },
+        "baseTypes": {
+          "$ref": "#/$defs/patternList"
+        },
+        "interfaces": {
+          "$ref": "#/$defs/patternList"
+        },
+        "attributes": {
+          "$ref": "#/$defs/patternList"
+        },
+        "attributeArguments": {
+          "$ref": "#/$defs/attributeArgumentList"
+        },
+        "onlyAttributes": {
+          "$ref": "#/$defs/onlyAttributeList"
+        },
+        "names": {
+          "$ref": "#/$defs/nameList"
+        },
+        "kinds": {
+          "$ref": "#/$defs/kindList"
+        },
+        "accessibility": {
+          "$ref": "#/$defs/accessibilityList"
+        },
+        "assignableTo": {
+          "$ref": "#/$defs/patternList"
+        },
+        "sealed": {
+          "type": "boolean"
+        },
+        "abstract": {
+          "type": "boolean"
+        },
+        "static": {
+          "type": "boolean"
+        },
+        "nested": {
+          "type": "boolean"
+        }
+      },
+      "not": {
+        "required": [
+          "layers"
+        ],
+        "anyOf": [
+          {
+            "required": [
+              "namespaces"
+            ]
+          },
+          {
+            "required": [
+              "assemblies"
+            ]
+          },
+          {
+            "required": [
+              "types"
+            ]
+          },
+          {
+            "required": [
+              "baseTypes"
+            ]
+          },
+          {
+            "required": [
+              "interfaces"
+            ]
+          },
+          {
+            "required": [
+              "attributes"
+            ]
+          },
+          {
+            "required": [
+              "attributeArguments"
+            ]
+          },
+          {
+            "required": [
+              "onlyAttributes"
+            ]
+          }
+        ]
+      },
+      "minProperties": 1
     }
   }
 }
