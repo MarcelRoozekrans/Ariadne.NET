@@ -1,6 +1,9 @@
-"""Unit tests for inspect_packages.py: fake packages built with zipfile, no dotnet needed."""
+"""Unit tests for inspect_packages.py: fake packages built with zipfile, no dotnet needed. The embedded PDB check is
+scripts/check-embedded-pdb/check-embedded-pdb.cs; these tests only check which DLLs it is given, with dotnet mocked."""
 import contextlib
 import io
+import json
+import subprocess
 import pathlib
 import tempfile
 import unittest
@@ -35,12 +38,17 @@ def informational(version: str) -> bytes:
     return b"\x01\x00" + bytes([len(text)]) + text + b"\x00\x00"
 
 
+def fake_dll(informational_version: str) -> bytes:
+    # Stands in for a DLL: the inspection only searches its bytes for the informational version attribute. FileVersion
+    # is a four-part string that must never count as the informational version.
+    return b"MZ" + b"\x01\x00\x070.0.0.0\x00\x00" + informational(informational_version)
+
+
 def write_package(directory: pathlib.Path, package_id: str, version: str, *,
                   dll_version: str | None = None, nuspec_version: str | None = None,
                   dependencies: tuple[str, ...] | None = None,
                   abstractions_version: str | None = None, ariadne_version: str | None = None,
-                  workspaces_version: str | None = None,
-                  with_symbols: bool = True) -> None:
+                  workspaces_version: str | None = None) -> None:
     # The SDK writes a project reference as a plain version, so that is what the fake nuspecs carry. Each package lists
     # its direct dependencies only: Workspaces reaches Abstractions through Ariadne.NET, and Testing reaches Ariadne.NET
     # through Workspaces, not directly.
@@ -59,14 +67,10 @@ def write_package(directory: pathlib.Path, package_id: str, version: str, *,
               f'<version>{nuspec_version or version}</version>'
               f'<dependencies><group targetFramework="net10.0">{elements}</group></dependencies>'
               f'</metadata></package>')
-    # FileVersion is a four-part string that must never count as the informational version.
-    dll = b"MZ fake " + b"\x01\x00\x070.0.0.0\x00\x00" + informational(dll_version or (version + "+abc1234"))
+    dll = fake_dll(dll_version or (version + "+abc1234"))
     with zipfile.ZipFile(directory / f"{package_id}.{version}.nupkg", "w") as archive:
         archive.writestr(f"{package_id}.nuspec", nuspec)
         archive.writestr(f"lib/net10.0/{package_id}.dll", dll)
-    if with_symbols:
-        with zipfile.ZipFile(directory / f"{package_id}.{version}.snupkg", "w") as archive:
-            archive.writestr(f"lib/net10.0/{package_id}.pdb", b"pdb")
 
 
 def tool_settings(command: str = "ariadne", entry_point: str = f"{CLI}.dll", runner: str = "dotnet") -> str:
@@ -79,7 +83,7 @@ def write_tool(directory: pathlib.Path, version: str, *,
                dll_version: str | None = None, engine_dll_version: str | None = None,
                nuspec_version: str | None = None, dependencies: tuple[str, ...] = (),
                package_type: str | None = "DotnetTool", settings: str | None = None,
-               extra_files: tuple[str, ...] = (), with_symbols: bool = True) -> None:
+               extra_files: tuple[str, ...] = ()) -> None:
     # A tool bundles everything under tools/<framework>/any/, so its nuspec lists no dependencies and has no lib/.
     elements = "".join(f'<dependency id="{dependency}" version="{version}" />' for dependency in dependencies)
     dependency_group = f"<dependencies><group targetFramework=\"net10.0\">{elements}</group></dependencies>" if elements else ""
@@ -88,22 +92,16 @@ def write_tool(directory: pathlib.Path, version: str, *,
               f'<version>{nuspec_version or version}</version>{package_types}{dependency_group}'
               f'</metadata></package>')
 
-    def dll(informational_version: str) -> bytes:
-        return b"MZ fake " + b"\x01\x00\x070.0.0.0\x00\x00" + informational(informational_version)
-
     with zipfile.ZipFile(directory / f"{CLI}.{version}.nupkg", "w") as archive:
         archive.writestr(f"{CLI}.nuspec", nuspec)
         archive.writestr(f"{TOOL}DotnetToolSettings.xml", settings if settings is not None else tool_settings())
-        archive.writestr(f"{TOOL}{CLI}.dll", dll(dll_version or (version + "+abc1234")))
+        archive.writestr(f"{TOOL}{CLI}.dll", fake_dll(dll_version or (version + "+abc1234")))
         for bundled in (ARIADNE, ABSTRACTIONS, WORKSPACES, "Ariadne.NET.Hooks"):
-            archive.writestr(f"{TOOL}{bundled}.dll", dll(engine_dll_version or (version + "+abc1234")))
-        # Third-party DLLs carry their own versions, which the check must leave alone.
-        archive.writestr(f"{TOOL}YamlDotNet.dll", dll("16.3.0+deadbeef"))
+            archive.writestr(f"{TOOL}{bundled}.dll", fake_dll(engine_dll_version or (version + "+abc1234")))
+        # Third-party DLLs carry their own versions and PDB setup, which the checks must leave alone.
+        archive.writestr(f"{TOOL}YamlDotNet.dll", fake_dll("16.3.0+deadbeef"))
         for name in (*TOOL_MSBUILD_FILES, *extra_files):
             archive.writestr(name, b"MZ")
-    if with_symbols:
-        with zipfile.ZipFile(directory / f"{CLI}.{version}.snupkg", "w") as archive:
-            archive.writestr(f"{TOOL}{CLI}.pdb", b"pdb")
 
 
 class InspectPackagesTests(unittest.TestCase):
@@ -248,18 +246,6 @@ class InspectPackagesTests(unittest.TestCase):
         errors = inspect_packages.problems(self.directory, VERSION)
         self.assertTrue(any(CLI in error and "nuspec version is 0.1.1" in error for error in errors), errors)
 
-    def test_rejects_a_tool_without_symbols(self) -> None:
-        self.write_all(**{CLI: {"with_symbols": False}})
-        errors = inspect_packages.problems(self.directory, VERSION)
-        self.assertTrue(any(CLI in error and f"{CLI}.0.1.0.snupkg is missing" in error for error in errors), errors)
-
-    def test_rejects_a_tool_symbol_package_without_the_pdb(self) -> None:
-        self.write_all()
-        with zipfile.ZipFile(self.directory / f"{CLI}.{VERSION}.snupkg", "w") as archive:
-            archive.writestr(f"{TOOL}{ARIADNE}.pdb", b"pdb")
-        errors = inspect_packages.problems(self.directory, VERSION)
-        self.assertTrue(any(CLI in error and f"has no {CLI}.pdb" in error for error in errors), errors)
-
     def test_rejects_a_missing_testing_package(self) -> None:
         self.write_all()
         (self.directory / f"{TESTING}.{VERSION}.nupkg").unlink()
@@ -328,11 +314,6 @@ class InspectPackagesTests(unittest.TestCase):
         errors = inspect_packages.problems(self.directory, VERSION)
         self.assertTrue(any(f"{WORKSPACES} depends on {ABSTRACTIONS}" in error for error in errors), errors)
 
-    def test_rejects_a_missing_snupkg(self) -> None:
-        self.write_all(**{ABSTRACTIONS: {"with_symbols": False}})
-        errors = inspect_packages.problems(self.directory, VERSION)
-        self.assertTrue(any(ABSTRACTIONS in error and ".snupkg" in error for error in errors), errors)
-
     def test_rejects_an_abstractions_dependency_beyond_results_and_validation(self) -> None:
         self.write_all(**{ABSTRACTIONS: {"dependencies": (*ABSTRACTIONS_DEPENDENCIES, "YamlDotNet")}})
         errors = inspect_packages.problems(self.directory, VERSION)
@@ -385,12 +366,12 @@ class InspectPackagesTests(unittest.TestCase):
         errors = inspect_packages.problems(self.directory, VERSION)
         self.assertTrue(any(ARIADNE in error and "says 0.1.0-local, expected 0.1.0" in error for error in errors), errors)
 
-    def test_rejects_a_symbol_package_without_a_nupkg(self) -> None:
+    def test_rejects_a_symbol_package(self) -> None:
         self.write_all()
-        write_package(self.directory, "Other", VERSION)
-        (self.directory / f"Other.{VERSION}.nupkg").unlink()
+        with zipfile.ZipFile(self.directory / f"{ARIADNE}.{VERSION}.snupkg", "w") as archive:
+            archive.writestr(f"lib/net10.0/{ARIADNE}.pdb", b"pdb")
         errors = inspect_packages.problems(self.directory, VERSION)
-        self.assertTrue(any("Other.0.1.0.snupkg" in error and "no matching" in error for error in errors), errors)
+        self.assertTrue(any(f"{ARIADNE}.0.1.0.snupkg" in error and "embedded" in error for error in errors), errors)
 
     def test_a_longer_version_ending_in_the_release_does_not_count(self) -> None:
         self.write_all(**{ARIADNE: {"dll_version": "10.1.0"}})
@@ -411,21 +392,6 @@ class InspectPackagesTests(unittest.TestCase):
         errors = inspect_packages.problems(self.directory, VERSION)
         self.assertTrue(any(ARIADNE in error and "no DLL under lib/" in error for error in errors), errors)
 
-    def test_rejects_an_invalid_symbol_package(self) -> None:
-        self.write_all()
-        (self.directory / f"{ARIADNE}.{VERSION}.snupkg").write_bytes(b"")
-        errors = inspect_packages.problems(self.directory, VERSION)
-        self.assertTrue(any(ARIADNE in error and "not a valid symbol package" in error for error in errors), errors)
-
-    def test_rejects_a_symbol_package_without_the_pdb(self) -> None:
-        self.write_all()
-        buffer = io.BytesIO()
-        with zipfile.ZipFile(buffer, "w") as archive:
-            archive.writestr("readme.txt", b"x")
-        (self.directory / f"{ARIADNE}.{VERSION}.snupkg").write_bytes(buffer.getvalue())
-        errors = inspect_packages.problems(self.directory, VERSION)
-        self.assertTrue(any(ARIADNE in error and f"has no {ARIADNE}.pdb" in error for error in errors), errors)
-
     def test_main_reports_usage(self) -> None:
         with contextlib.redirect_stderr(io.StringIO()) as stderr:
             self.assertEqual(2, inspect_packages.main([]))
@@ -433,10 +399,52 @@ class InspectPackagesTests(unittest.TestCase):
 
     def test_main_prints_one_error_line_per_problem(self) -> None:
         self.write_all(**{ARIADNE: {"dll_version": "0.1.0-local+abc"}})
-        with unittest.mock.patch("builtins.print") as printed:
+        passed = subprocess.CompletedProcess([], 0)
+        with unittest.mock.patch("builtins.print") as printed, unittest.mock.patch.object(subprocess, "run", return_value=passed):
             self.assertEqual(1, inspect_packages.main([str(self.directory), VERSION]))
         lines = [call.args[0] for call in printed.call_args_list]
         self.assertTrue(lines and all(line.startswith("::error::") for line in lines), lines)
+
+
+    def test_own_dlls_are_the_library_dlls_and_the_bundled_ariadne_assemblies(self) -> None:
+        self.write_all()
+        with tempfile.TemporaryDirectory() as extracted:
+            destination = pathlib.Path(extracted)
+            dlls = inspect_packages.own_dlls(self.directory, VERSION, destination)
+            self.assertTrue(all(dll.is_file() for dll in dlls), dlls)
+            names = {dll.relative_to(destination).as_posix() for dll in dlls}
+        library = {f"{package}/lib/net10.0/{package}.dll" for package in (ARIADNE, ABSTRACTIONS, WORKSPACES, TESTING)}
+        tool = {f"{CLI}/{TOOL}{name}.dll" for name in (CLI, ARIADNE, ABSTRACTIONS, WORKSPACES, "Ariadne.NET.Hooks")}
+        # Third-party DLLs the tool bundles, YamlDotNet and the MSBuild ones, are not ours.
+        self.assertEqual(library | tool, names)
+
+    def test_the_checker_gets_the_prefix_and_every_dll(self) -> None:
+        dlls = [pathlib.Path("a/Ariadne.NET.dll"), pathlib.Path("b/Ariadne.NET.Cli.dll")]
+        with unittest.mock.patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as run:
+            self.assertTrue(inspect_packages.check_embedded_pdbs(dlls))
+        command = run.call_args.args[0]
+        self.assertEqual(["dotnet", "run", inspect_packages.CHECKER, "--", inspect_packages.SOURCE_LINK_PREFIX], command[:5])
+        self.assertEqual([str(dll) for dll in dlls], command[5:])
+        self.assertEqual(inspect_packages.ROOT, run.call_args.kwargs["cwd"])
+
+    def test_no_dll_to_check_fails(self) -> None:
+        with unittest.mock.patch.object(subprocess, "run") as run, contextlib.redirect_stdout(io.StringIO()):
+            self.assertFalse(inspect_packages.check_embedded_pdbs([]))
+        run.assert_not_called()
+
+    def test_main_passes_when_the_packages_and_the_checker_pass(self) -> None:
+        self.write_all()
+        with unittest.mock.patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 0)), \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(0, inspect_packages.main([str(self.directory), VERSION]))
+
+    def test_main_fails_when_the_checker_fails(self) -> None:
+        self.write_all()
+        with unittest.mock.patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 1)):
+            self.assertEqual(1, inspect_packages.main([str(self.directory), VERSION]))
+
+    def test_the_checker_script_exists(self) -> None:
+        self.assertTrue((inspect_packages.ROOT / inspect_packages.CHECKER).is_file())
 
 
 if __name__ == "__main__":
