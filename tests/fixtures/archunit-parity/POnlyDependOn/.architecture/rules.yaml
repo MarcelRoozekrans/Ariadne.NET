@@ -1,0 +1,17 @@
+schema: 2
+name: parity-p-only-depend-on
+version: "1.0.0"
+author: fixture
+
+# ArchUnitNET's OnlyDependOn ignores dependencies on framework types such as System.Text.StringBuilder, and Ariadne's
+# onlyDependsOn ignores dependencies on types no run project declares, so FrameworkProbe is selected by both.
+rules:
+  - id: PARITY-PONLYDEPENDON
+    because: Mirrors ArchUnitNET's OnlyDependOn; the types it selects must not depend on Allowed.Target.
+    forbid:
+      from:
+        namespaces: ["Parity.POnlyDependOn.**"]
+        onlyDependsOn:
+          namespaces: ["Parity.POnlyDependOn.Allowed.**"]
+      to:
+        namespaces: ["Parity.POnlyDependOn.Allowed.Target.**"]

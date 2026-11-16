@@ -1176,6 +1176,44 @@ public static class ParityCases
                     AttributeOf(a, "Parity.COnlyHaveAttributes.Contracts.AuditedAttribute"),
                     AttributeOf(a, "Parity.COnlyHaveAttributes.Contracts.ReviewedAttribute"))),
 
+        // Phase 4.9 cases: dependency predicates. ArchUnitNET's ResideInNamespace matches one namespace exactly, so the
+        // predicate cases select from the kind's whole architecture, which holds only the kind's types.
+        new(
+            "p-depend-on-any",
+            "PDependOnAny",
+            "Parity.PDependOnAny",
+            "PARITY-PDEPENDONANY",
+            Projection.Types,
+            _ => Types().That().DependOnAny(Types().That().ResideInNamespace("Parity.PDependOnAny.Target"))
+                .Should().NotDependOnAny(Types().That().ResideInNamespace("Parity.PDependOnAny.Forbidden"))),
+        new(
+            "p-depend-on-any:not",
+            "PDependOnAny",
+            "Parity.PDependOnAny",
+            "PARITY-PDEPENDONANY-NOT",
+            Projection.Types,
+            _ => Types().That().DoNotDependOnAny(Types().That().ResideInNamespace("Parity.PDependOnAny.Target"))
+                .Should().NotDependOnAny(Types().That().ResideInNamespace("Parity.PDependOnAny.Forbidden"))),
+        new(
+            "c-depend-on-any",
+            "CDependOnAny",
+            "Parity.CDependOnAny",
+            "PARITY-CDEPENDONANY",
+            Projection.Types,
+            _ => Types().That().ResideInNamespace("Parity.CDependOnAny.Broken")
+                .Or().ResideInNamespace("Parity.CDependOnAny.Clean")
+                .Should().DependOnAny(Types().That().ResideInNamespace("Parity.CDependOnAny.Target"))),
+        new(
+            "p-only-depend-on",
+            "POnlyDependOn",
+            "Parity.POnlyDependOn",
+            "PARITY-PONLYDEPENDON",
+            Projection.Types,
+            _ => Types().That().OnlyDependOn(
+                    Types().That().ResideInNamespace("Parity.POnlyDependOn.Allowed")
+                        .Or().ResideInNamespace("Parity.POnlyDependOn.Allowed.Target"))
+                .Should().NotDependOnAny(Types().That().ResideInNamespace("Parity.POnlyDependOn.Allowed.Target"))),
+
         // Phase 4.3 gaps: each has a KnownGaps entry and no rule in its kind's pack. The pattern spans the kind, so every
         // namespace below Parity.<Kind> is its own slice and slice names start with the Broken or Clean namespace.
         new(

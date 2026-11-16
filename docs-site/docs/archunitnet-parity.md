@@ -164,9 +164,9 @@ Methods that every kind of object has, here applied to `Types()`.
 |---|---|---|---|---|
 | `c-not-depend-on-any` | `NotDependOnAny`, `NotDependOnAnyTypesThat` | `forbid` | `covered` | |
 | `c-only-depend-on` | `OnlyDependOn`, `OnlyDependOnTypesThat` | a layer's `allowedDependencies` | `divergence` | Framework types count for neither tool, though ArchUnitNET names `System.Object` in its message. See [c-only-depend-on](#c-only-depend-on). |
-| `c-depend-on-any` | `DependOnAny`, `DependOnAnyTypesThat` | — | `deferred` | dependency as a requirement, see #96 |
-| `p-depend-on-any` | `DependOnAny`, `DoNotDependOnAny` | — | `deferred` | dependency as a selector, see #96 |
-| `p-only-depend-on` | `OnlyDependOn` | — | `deferred` | dependency as a selector, see #96 |
+| `c-depend-on-any` | `DependOnAny`, `DependOnAnyTypesThat` | `require` with `is: { dependsOn }` | `covered` | A type with no dependencies fails it in both tools. |
+| `p-depend-on-any` | `DependOnAny`, `DoNotDependOnAny` | `dependsOn`; `:not` as an exception with `dependsOn` | `covered` | |
+| `p-only-depend-on` | `OnlyDependOn` | `onlyDependsOn` | `covered` | Framework types and a lambda's compiler-generated closure class count for neither tool. |
 | `p-call-any` | `CallAny`, `DoNotCallAny` | — | `deferred` | member level, see #94 |
 | `c-call-any` | `CallAny`, `NotCallAny` | — | `deferred` | member level, see #94 |
 
