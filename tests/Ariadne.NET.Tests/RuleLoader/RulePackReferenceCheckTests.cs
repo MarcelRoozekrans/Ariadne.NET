@@ -491,6 +491,34 @@ public class RulePackReferenceCheckTests
             "exceptions[1] of rule 'R-1' has accessibility 'friend', which must be one of public, internal, protected, private, protected internal, private protected");
     }
 
+    private const string EmptyEntryReason = "needs 'arguments' or 'named'; to select by the attribute alone, use 'attributes'";
+
+    [Fact]
+    public void Exception_WithAnEmptyAttributeArgumentEntry_Fails()
+    {
+        var rule = ForbidRule(new TargetSelector { Types = ["**.X"] }, null,
+            new RuleException { Because = "Empty.", AttributeArguments = [new AttributeArgumentMatch()] });
+
+        Resolve(PackWithRule(rule)).Error.Detail.Should().Be($"attributeArguments[0] in exceptions[0] of rule 'R-1' {EmptyEntryReason}");
+    }
+
+    [Fact]
+    public void RequireCondition_WithAnEmptyAttributeArgumentEntry_Fails()
+    {
+        var condition = new TargetSelector { AttributeArguments = [new AttributeArgumentMatch { Attribute = "**.A" }] };
+
+        Resolve(PackWithRequire(new RuleRequirement { Is = condition })).Error.Detail.Should()
+            .Contain($"attributeArguments[0] in the is of rule 'R-1' {EmptyEntryReason}");
+    }
+
+    [Fact]
+    public void Target_WithAnEmptyAttributeArgumentEntry_Fails()
+    {
+        var rule = ForbidRule(new TargetSelector { AttributeArguments = [new AttributeArgumentMatch()] }, null);
+
+        Resolve(PackWithRule(rule)).Error.Detail.Should().Contain($"attributeArguments[0] in the from of rule 'R-1' {EmptyEntryReason}");
+    }
+
     [Fact]
     public void Exception_SelectingNothing_Fails()
     {

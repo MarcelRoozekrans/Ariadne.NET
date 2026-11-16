@@ -233,6 +233,7 @@ internal static class RulePackReferenceCheck
             }
 
             CheckTraitValues(where, exception.Kinds, exception.Accessibility, failures);
+            CheckArgumentEntries(where, exception.AttributeArguments, failures);
             if (rule.Kind == RuleKind.Slices
                 && HasCapture(exception.Namespaces, exception.Assemblies, exception.Types, exception.Attributes, AttributePatterns(exception.AttributeArguments),
                     exception.OnlyAttributes, exception.Names, exception.AssignableTo))
@@ -324,6 +325,24 @@ internal static class RulePackReferenceCheck
         }
 
         CheckTraitValues(where, target.Kinds, target.Accessibility, failures);
+        CheckArgumentEntries(where, target.AttributeArguments, failures);
+    }
+
+    // An entry with neither arguments nor named values matches every attribute instance, so as an exception it would
+    // exempt every attributed type. The loader rejects it for a YAML pack; a pack built in code is reported here.
+    private static void CheckArgumentEntries(string where, IList<AttributeArgumentMatch> entries, List<string> failures)
+    {
+        for (var i = 0; i < entries.Count; i++)
+        {
+            if (entries[i] is not { } entry)
+            {
+                failures.Add($"attributeArguments[{i}] in {where} must not be null");
+            }
+            else if (entry.Arguments is not { Count: > 0 } && entry.Named is not { Count: > 0 })
+            {
+                failures.Add($"attributeArguments[{i}] in {where} needs 'arguments' or 'named'; to select by the attribute alone, use 'attributes'");
+            }
+        }
     }
 
     private static void CheckTraitValues(string where, IList<CSharpTypeKind> kinds, IList<string> accessibility, List<string> failures)
@@ -404,6 +423,7 @@ internal static class RulePackReferenceCheck
             return;
         }
 
+        CheckArgumentEntries($"the {key} of rule '{id}'", condition.AttributeArguments, failures);
         if (condition.Layers.Count > 0 || condition.Members.Count > 0)
         {
             failures.Add($"the {key} of rule '{id}' has layers or members, which a condition does not take");
