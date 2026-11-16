@@ -535,6 +535,52 @@ public class TypeGraphBuilderTests
     }
 
     [Fact]
+    public void OwnStaticMemberAndNestedType_NoEdge()
+    {
+        var edges = Edges("""
+            namespace Shop.Domain
+            {
+                public class Order
+                {
+                    public static int Count;
+                    public class Line { }
+                    public Line Place() { Count++; return new Line(); }
+                }
+            }
+            """);
+
+        edges.Should().Equal((Order, "Shop.Domain.Order.Line"), (Order, "Shop.Domain.Order.Line"));
+    }
+
+    [Fact]
+    public void UsingStatic_ImportedNameOnTheLeftOfAMemberAccessOrQualifiedName_OneEdgePerUse()
+    {
+        var graph = Build(
+            ("Store.cs", StoreClass + "\nnamespace Shop.Infra { public class Outer { public class Inner { public class Deep { } } } }"),
+            ("Order.cs", """
+                using static Shop.Infra.Store;
+                using static Shop.Infra.Outer;
+
+                namespace Shop.Domain
+                {
+                    public class Order
+                    {
+                        private Inner.Deep? _deep;
+                        public int Place() => Count.CompareTo(1);
+                    }
+                }
+                """));
+
+        AssertOrderEdges(
+            graph,
+            ("Shop.Infra.Outer", 8, 17),
+            ("Shop.Infra.Outer.Inner", 8, 17),
+            ("Shop.Infra.Outer.Inner.Deep", 8, 23),
+            (Store, 9, 31),
+            ("int", 9, 37));
+    }
+
+    [Fact]
     public void StaticMemberOfNestedType_EdgesToOuterAndInnerOnly()
     {
         var graph = Build(
@@ -779,6 +825,65 @@ public class TypeGraphBuilderTests
         edges.Should().BeEmpty();
     }
 
+    [Fact]
+    public void AnonymousTypeMember_NoEdge()
+    {
+        var edges = Edges("""
+            namespace Shop.Domain { public class Order { public int Place() { var line = new { Count = 1 }; return line.Count; } } }
+            """);
+
+        edges.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void IndexerAccess_WithoutMemberPatterns_GivesOnlyTheTypeEdges()
+    {
+        var graph = BuildOrder("""
+            namespace Shop.Domain
+            {
+                public class Order
+                {
+                    public Shop.Infra.Store? Place(Shop.Infra.Store[] stores, System.Collections.Generic.List<Shop.Infra.Store>? list) =>
+                        list?[0] ?? stores[1];
+                }
+            }
+            """);
+
+        graph.MemberEdges.Should().BeEmpty();
+        graph.Edges.Select(Pair).Should().Equal((Order, Store), (Order, Store), (Order, "System.Collections.Generic.List<T>"), (Order, Store));
+    }
+
+    // Code that does not compile: users run the validator on broken code too.
+
+    [Fact]
+    public void MissingTypes_GiveNoEdge()
+    {
+        var graph = BuildBroken("""
+            using Gone = Shop.Infra.Missing;
+            using Lines = System.Collections.Generic.List<Shop.Infra.Missing>;
+            namespace Shop.Domain { public class Order { private Gone? _gone; private Lines? _lines; private Shop.Infra.Box<int>? _box; private Shop.Infra.Store? _store; } }
+            """);
+
+        AssertOrderEdges(graph, ("System.Collections.Generic.List<T>", 3, 75), (Store, 3, 144));
+    }
+
+    [Fact]
+    public void UnresolvedBaseClass_RecordsNoBaseConstructorCall()
+    {
+        var compilation = TestCompilation.Create(("Store.cs", StoreClass))
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(
+                "namespace Shop.Domain { public class Order : Shop.Infra.Missing { public Order() { } public void Place() => Shop.Infra.Store.Make(); } }",
+                path: "Order.cs"));
+
+        var graph = TypeGraphBuilder.Build(compilation, NoGeneratedTrees, NoGeneratedTrees, MemberNameFilter.From(MemberEdgeTests.PackWith("**")), CancellationToken.None);
+
+        graph.MemberEdges
+            .Where(e => string.Equals(e.Source.ToDisplayString(), Order, StringComparison.Ordinal))
+            .Select(e => MemberNames.Chain(e.Member)[0])
+            .Should().Equal("Shop.Infra.Store.Make");
+        AssertOrderEdges(graph, ("Shop.Infra.Store", 1, 120));
+    }
+
     // Generated code
 
     [Fact]
@@ -1003,6 +1108,15 @@ public class TypeGraphBuilderTests
             .Select(e => (e.Source.ToDisplayString(), e.Target.ToDisplayString(), e.Location))
             .Where(e => string.Equals(e.Item1, Order, StringComparison.Ordinal))
             .Should().Equal(expected.Select(x => (Order, x.Target, new SourceLocation("Order.cs", x.Line, x.Column))));
+
+    private static TypeGraph BuildBroken(string orderSource)
+    {
+        var compilation = TestCompilation.Create(("Store.cs", StoreClass))
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(orderSource, path: "Order.cs"));
+        compilation.GetDiagnostics().Should().Contain(d => d.Severity == DiagnosticSeverity.Error);
+
+        return TypeGraphBuilder.Build(compilation, NoGeneratedTrees, CancellationToken.None);
+    }
 
     private static TypeGraph BuildUnsafe(string orderSource)
     {

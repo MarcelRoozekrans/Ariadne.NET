@@ -192,6 +192,16 @@ public class TypeSelectorTests
     }
 
     [Fact]
+    public void BaseTypes_NeverMatchesAnInterface()
+    {
+        var compilation = TestCompilation.Create("namespace N { public interface IA { } public interface IB : IA { } }");
+        var b = Find(compilation, "N.IB");
+
+        TypeSelector.From([], [], [], ["N.IA"], [], []).Matches(b, new TypeNames()).Should().BeFalse();
+        TypeSelector.From([], [], [], ["**"], [], []).Matches(b, new TypeNames()).Should().BeFalse();
+    }
+
+    [Fact]
     public void Interfaces_MatchesInheritedAndGenericInterfaces_ByNameWithoutArity()
     {
         var compilation = TestCompilation.Create(
