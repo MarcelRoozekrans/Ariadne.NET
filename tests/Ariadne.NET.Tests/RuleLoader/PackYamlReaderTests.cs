@@ -1977,6 +1977,82 @@ public class PackYamlReaderTests
         Problems(yaml).Should().Equal(new PackProblem(6, 5, "'requireTarget' in rule 'SH-001' must be true or false"));
     }
 
+    [Theory]
+    [InlineData("~")]
+    [InlineData("null")]
+    [InlineData("Null")]
+    [InlineData("NULL")]
+    public void NullSpellings_AreNotAString(string value)
+    {
+        Problems($"schema: 2\nname: {value}\n").Should().Equal(new PackProblem(2, 1, "'name' in the pack must be a string"));
+    }
+
+    [Theory]
+    [InlineData("\"~\"", "~")]
+    [InlineData("'NULL'", "NULL")]
+    public void QuotedNullSpelling_IsAString(string value, string expected)
+    {
+        var result = PackYamlReader.Read($"schema: 2\nname: {value}\n");
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        result.Value.Name.Should().Be(expected);
+    }
+
+    [Fact]
+    public void SchemaNotAScalar_Fails()
+    {
+        Problems("schema: [2]\nname: shop\n").Should().Equal(new PackProblem(1, 1, "'schema' must be 2"));
+    }
+
+    [Fact]
+    public void RuleWithTwoBodies_ReportsAtTheLaterKey_WhateverTheirOrder()
+    {
+        var yaml = RequireHead + """
+                allowOnly:
+                  from: { namespaces: ["Shop.**"] }
+                  to: { namespaces: ["System.**"] }
+                forbid:
+                  from: { namespaces: ["Shop.**"] }
+                  to: { namespaces: ["System.Data.**"] }
+            """;
+
+        Problems(yaml).Should().Equal(
+            new PackProblem(9, 5, "rule 'SH-001' must have exactly one of 'forbid', 'allowOnly', 'require', 'bannedPackages', 'uniqueNames' or 'slices'"));
+    }
+
+    [Theory]
+    [InlineData("\"  \"")]
+    [InlineData("~")]
+    public void LayerWithBlankName_IsNamedByIndex(string name)
+    {
+        var problems = Problems($"schema: 2\nname: shop\nlayers:\n  - name: {name}\n    nmae: x\n");
+
+        problems.Select(p => p.Message).Should().Contain("unknown key 'nmae' in layers[0]; did you mean 'name'?");
+    }
+
+    [Theory]
+    [InlineData("public", "public")]
+    [InlineData("PUBLIC", "public")]
+    [InlineData(" Internal ", "internal")]
+    public void Require_Accessibility_IsNormalized(string value, string expected)
+    {
+        var yaml = RequireHead + $"    require:\n      for: {{ types: [\"**.X\"] }}\n      accessibility: \"{value}\"\n";
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        result.Value.Rules.First().Require!.Accessibility.Should().Be(expected);
+    }
+
+    [Fact]
+    public void BannedPackages_NullPackages_Fails()
+    {
+        var yaml = RequireHead + "    bannedPackages:\n      packages: ~\n";
+
+        Problems(yaml).Should().ContainSingle().Which.Message.Should().Be(
+            "'packages' in the bannedPackages of rule 'SH-001' must be a list of strings");
+    }
+
     private static IReadOnlyList<PackProblem> Problems(string yaml)
     {
         var result = PackYamlReader.Read(yaml);
