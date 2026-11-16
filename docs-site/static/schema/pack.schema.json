@@ -158,6 +158,12 @@
         "attributes": {
           "$ref": "#/$defs/patternList"
         },
+        "attributeArguments": {
+          "$ref": "#/$defs/attributeArgumentList"
+        },
+        "onlyAttributes": {
+          "$ref": "#/$defs/onlyAttributeList"
+        },
         "names": {
           "$ref": "#/$defs/nameList"
         },
@@ -217,6 +223,16 @@
             "required": [
               "attributes"
             ]
+          },
+          {
+            "required": [
+              "attributeArguments"
+            ]
+          },
+          {
+            "required": [
+              "onlyAttributes"
+            ]
           }
         ]
       },
@@ -247,6 +263,12 @@
         },
         "attributes": {
           "$ref": "#/$defs/patternList"
+        },
+        "attributeArguments": {
+          "$ref": "#/$defs/attributeArgumentList"
+        },
+        "onlyAttributes": {
+          "$ref": "#/$defs/onlyAttributeList"
         },
         "members": {
           "$ref": "#/$defs/patternList"
@@ -313,6 +335,16 @@
           },
           {
             "required": [
+              "attributeArguments"
+            ]
+          },
+          {
+            "required": [
+              "onlyAttributes"
+            ]
+          },
+          {
+            "required": [
               "members"
             ]
           }
@@ -345,6 +377,16 @@
         {
           "required": [
             "attributes"
+          ]
+        },
+        {
+          "required": [
+            "attributeArguments"
+          ]
+        },
+        {
+          "required": [
+            "onlyAttributes"
           ]
         },
         {
@@ -402,6 +444,14 @@
         "attributes": {
           "$ref": "#/$defs/patternList",
           "description": "Attribute classes applied directly to the type, as in a selector. Not accepted on a bannedPackages rule."
+        },
+        "attributeArguments": {
+          "$ref": "#/$defs/attributeArgumentList",
+          "description": "Attribute instances applied directly to the type whose arguments match, as in a selector. Not accepted on a bannedPackages rule."
+        },
+        "onlyAttributes": {
+          "$ref": "#/$defs/onlyAttributeList",
+          "description": "The type carries attributes only from these classes, as in a selector. Not accepted on a bannedPackages rule."
         },
         "because": {
           "$ref": "#/$defs/text",
@@ -734,6 +784,8 @@
                     "namespaces": false,
                     "types": false,
                     "attributes": false,
+                    "attributeArguments": false,
+                    "onlyAttributes": false,
                     "names": false,
                     "kinds": false,
                     "accessibility": false,
@@ -945,6 +997,12 @@
         },
         "attributes": {
           "$ref": "#/$defs/patternList"
+        },
+        "attributeArguments": {
+          "$ref": "#/$defs/attributeArgumentList"
+        },
+        "onlyAttributes": {
+          "$ref": "#/$defs/onlyAttributeList"
         }
       },
       "not": {
@@ -981,6 +1039,16 @@
             "required": [
               "attributes"
             ]
+          },
+          {
+            "required": [
+              "attributeArguments"
+            ]
+          },
+          {
+            "required": [
+              "onlyAttributes"
+            ]
           }
         ]
       },
@@ -1008,6 +1076,12 @@
         },
         "attributes": {
           "$ref": "#/$defs/patternList"
+        },
+        "attributeArguments": {
+          "$ref": "#/$defs/attributeArgumentList"
+        },
+        "onlyAttributes": {
+          "$ref": "#/$defs/onlyAttributeList"
         },
         "names": {
           "$ref": "#/$defs/nameList"
@@ -1062,6 +1136,12 @@
         "attributes": {
           "$ref": "#/$defs/patternList"
         },
+        "attributeArguments": {
+          "$ref": "#/$defs/attributeArgumentList"
+        },
+        "onlyAttributes": {
+          "$ref": "#/$defs/onlyAttributeList"
+        },
         "names": {
           "$ref": "#/$defs/nameList"
         },
@@ -1120,6 +1200,16 @@
           {
             "required": [
               "attributes"
+            ]
+          },
+          {
+            "required": [
+              "attributeArguments"
+            ]
+          },
+          {
+            "required": [
+              "onlyAttributes"
             ]
           }
         ]
@@ -1176,6 +1266,60 @@
           }
         }
       ]
+    },
+    "attributeArgumentMatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "One attribute instance applied directly to the type. attribute, arguments and named all apply to the same instance. arguments each equal some argument value of that instance. Needs arguments or named; to match on the class alone use attributes.",
+      "properties": {
+        "attribute": {
+          "$ref": "#/$defs/text"
+        },
+        "arguments": {
+          "type": "array",
+          "items": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          },
+          "minItems": 1
+        },
+        "named": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          },
+          "minProperties": 1
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "arguments"
+          ]
+        },
+        {
+          "required": [
+            "named"
+          ]
+        }
+      ]
+    },
+    "attributeArgumentList": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/attributeArgumentMatch"
+      },
+      "minItems": 1
+    },
+    "onlyAttributeList": {
+      "$ref": "#/$defs/patternList"
     }
   }
 }
