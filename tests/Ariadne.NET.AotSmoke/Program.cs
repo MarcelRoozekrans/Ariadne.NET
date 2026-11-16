@@ -48,9 +48,9 @@ var pack = new RulePack
 var validator = new RulePackValidator(
     new LayerDefinitionValidator(),
     new ComponentRoleDefinitionValidator(),
-    new RuleDefinitionValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleRequirementValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new TargetSelectorValidator()), new TargetSelectorValidator(), new RuleExceptionValidator(), new SliceDefinitionValidator(new TargetSelectorValidator())),
+    new RuleDefinitionValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new RuleRequirementValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new TargetSelectorValidator(new AttributeArgumentMatchValidator())), new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new RuleExceptionValidator(new AttributeArgumentMatchValidator()), new SliceDefinitionValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator()))),
     new LayerRetargetValidator(),
-    new RuleAmendmentValidator(new RuleExceptionValidator()),
+    new RuleAmendmentValidator(new RuleExceptionValidator(new AttributeArgumentMatchValidator())),
     new NamingConventionsValidator());
 var validation = validator.Validate(pack);
 

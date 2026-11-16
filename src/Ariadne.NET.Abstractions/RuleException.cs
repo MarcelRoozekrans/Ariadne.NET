@@ -11,6 +11,10 @@ public sealed class RuleException
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> Types { get; init; } = [];
     /// <summary>Dotted globs over the full name of the attribute classes applied directly to the type, as in a selector. Any one may match.</summary>
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> Attributes { get; init; } = [];
+    /// <summary>Matches the argument values of attribute instances applied directly to the type. Any one entry may match.</summary>
+    [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<AttributeArgumentMatch> AttributeArguments { get; init; } = [];
+    /// <summary>Dotted globs over the full name of attribute classes. Every attribute applied directly to the type must match one; compiler-emitted attributes are ignored.</summary>
+    [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> OnlyAttributes { get; init; } = [];
     /// <summary>Flat globs (<c>Glob.Flat</c>) over the innermost simple name of the type, without arity. Any one may match.</summary>
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> Names { get; init; } = [];
     /// <summary>Type kinds the type may have: class, interface, record, struct, record struct, enum or delegate. Any one may match.</summary>

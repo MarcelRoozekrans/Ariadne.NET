@@ -10,7 +10,7 @@ public sealed class SliceDefinitionValidatorTests
     [Fact]
     public void Valid_definition_passes()
     {
-        var result = new SliceDefinitionValidator(new TargetSelectorValidator())
+        var result = new SliceDefinitionValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator()))
             .Validate(new SliceDefinition { Matching = ["Shop.(*)"], Independent = true });
 
         result.IsValid.Should().BeTrue();
@@ -19,7 +19,7 @@ public sealed class SliceDefinitionValidatorTests
     [Fact]
     public void Empty_matching_fails()
     {
-        var result = new SliceDefinitionValidator(new TargetSelectorValidator())
+        var result = new SliceDefinitionValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator()))
             .Validate(new SliceDefinition { Matching = [], Independent = true });
 
         result.IsValid.Should().BeFalse();
@@ -29,7 +29,7 @@ public sealed class SliceDefinitionValidatorTests
     [Fact]
     public void Null_entry_fails()
     {
-        var result = new SliceDefinitionValidator(new TargetSelectorValidator())
+        var result = new SliceDefinitionValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator()))
             .Validate(new SliceDefinition { Matching = ["Shop.(*)", null!], Independent = true });
 
         result.IsValid.Should().BeFalse();
@@ -39,7 +39,7 @@ public sealed class SliceDefinitionValidatorTests
     [Fact]
     public void Both_conditions_fail()
     {
-        var result = new SliceDefinitionValidator(new TargetSelectorValidator())
+        var result = new SliceDefinitionValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator()))
             .Validate(new SliceDefinition { Matching = ["Shop.(*)"], FreeOfCycles = true, Independent = true });
 
         result.IsValid.Should().BeFalse();
@@ -49,7 +49,7 @@ public sealed class SliceDefinitionValidatorTests
     [Fact]
     public void Neither_condition_fails()
     {
-        var result = new SliceDefinitionValidator(new TargetSelectorValidator())
+        var result = new SliceDefinitionValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator()))
             .Validate(new SliceDefinition { Matching = ["Shop.(*)"] });
 
         result.IsValid.Should().BeFalse();
@@ -59,7 +59,7 @@ public sealed class SliceDefinitionValidatorTests
     [Fact]
     public void Same_rule_with_independent_set_is_valid()
     {
-        var result = new SliceDefinitionValidator(new TargetSelectorValidator())
+        var result = new SliceDefinitionValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator()))
             .Validate(new SliceDefinition { Matching = ["Shop.(*)"], Independent = true });
 
         result.IsValid.Should().BeTrue();
@@ -77,12 +77,12 @@ public sealed class SliceDefinitionValidatorTests
     public void Rule_validator_checks_the_nested_slices()
     {
         var validator = new RuleDefinitionValidator(
-            new TargetSelectorValidator(),
-            new TargetSelectorValidator(),
-            new RuleRequirementValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new TargetSelectorValidator()),
-            new TargetSelectorValidator(),
-            new RuleExceptionValidator(),
-            new SliceDefinitionValidator(new TargetSelectorValidator()));
+            new TargetSelectorValidator(new AttributeArgumentMatchValidator()),
+            new TargetSelectorValidator(new AttributeArgumentMatchValidator()),
+            new RuleRequirementValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new TargetSelectorValidator(new AttributeArgumentMatchValidator())),
+            new TargetSelectorValidator(new AttributeArgumentMatchValidator()),
+            new RuleExceptionValidator(new AttributeArgumentMatchValidator()),
+            new SliceDefinitionValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator())));
         var rule = new RuleDefinition
         {
             Id = "R",

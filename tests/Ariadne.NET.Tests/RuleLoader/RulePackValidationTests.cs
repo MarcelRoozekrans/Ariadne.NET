@@ -365,12 +365,12 @@ public class RulePackValidationTests
     public void Validator_allows_requireTarget_only_on_target_kinds(RuleKind kind, bool valid)
     {
         var validator = new RuleDefinitionValidator(
-            new TargetSelectorValidator(),
-            new TargetSelectorValidator(),
-            new RuleRequirementValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new TargetSelectorValidator()),
-            new TargetSelectorValidator(),
-            new RuleExceptionValidator(),
-            new SliceDefinitionValidator(new TargetSelectorValidator()));
+            new TargetSelectorValidator(new AttributeArgumentMatchValidator()),
+            new TargetSelectorValidator(new AttributeArgumentMatchValidator()),
+            new RuleRequirementValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new TargetSelectorValidator(new AttributeArgumentMatchValidator())),
+            new TargetSelectorValidator(new AttributeArgumentMatchValidator()),
+            new RuleExceptionValidator(new AttributeArgumentMatchValidator()),
+            new SliceDefinitionValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator())));
         var rule = new RuleDefinition
         {
             Id = "R",
@@ -399,12 +399,12 @@ public class RulePackValidationTests
     public void Validator_accepts_a_rule_without_requireTarget_of_any_kind()
     {
         var validator = new RuleDefinitionValidator(
-            new TargetSelectorValidator(),
-            new TargetSelectorValidator(),
-            new RuleRequirementValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new TargetSelectorValidator()),
-            new TargetSelectorValidator(),
-            new RuleExceptionValidator(),
-            new SliceDefinitionValidator(new TargetSelectorValidator()));
+            new TargetSelectorValidator(new AttributeArgumentMatchValidator()),
+            new TargetSelectorValidator(new AttributeArgumentMatchValidator()),
+            new RuleRequirementValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new TargetSelectorValidator(new AttributeArgumentMatchValidator())),
+            new TargetSelectorValidator(new AttributeArgumentMatchValidator()),
+            new RuleExceptionValidator(new AttributeArgumentMatchValidator()),
+            new SliceDefinitionValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator())));
 
         validator.Validate(new RuleDefinition { Id = "R", Because = "b", Kind = RuleKind.Require, From = new TargetSelector() })
             .IsValid.Should().BeTrue();

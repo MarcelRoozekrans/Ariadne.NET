@@ -13,6 +13,10 @@ public sealed class TargetSelector
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> BaseTypes { get; init; } = [];
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> Interfaces { get; init; } = [];
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> Attributes { get; init; } = [];
+    /// <summary>Matches the argument values of attribute instances applied directly to the type. Any one entry may match.</summary>
+    [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<AttributeArgumentMatch> AttributeArguments { get; init; } = [];
+    /// <summary>Dotted globs over the full name of attribute classes. Every attribute applied directly to the type must match one; compiler-emitted attributes are ignored.</summary>
+    [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> OnlyAttributes { get; init; } = [];
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> Members { get; init; } = [];
 
     /// <summary>Flat globs (<c>Glob.Flat</c>) over the innermost simple name of the type, without arity. Any one may match.</summary>
