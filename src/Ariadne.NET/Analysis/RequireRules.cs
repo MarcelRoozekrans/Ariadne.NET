@@ -19,7 +19,7 @@ internal static class RequireRules
         Compile(layers, pack).Check(graph);
 
     /// <summary>Compiles the rules once, for a run that checks several graphs.</summary>
-    public static Checker Compile(LayerMap layers, RulePack pack)
+    public static Checker Compile(LayerMap layers, RulePack pack, DependencyIndex? dependencies = null)
     {
         ArgumentNullException.ThrowIfNull(layers);
         ArgumentNullException.ThrowIfNull(pack);

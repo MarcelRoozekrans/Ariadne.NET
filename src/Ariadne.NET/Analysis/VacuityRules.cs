@@ -25,9 +25,10 @@ internal static class VacuityRules
     /// <param name="graphs">The type graphs of the run.</param>
     /// <param name="roleMatches">The role matches of the run.</param>
     /// <param name="projects">The projects of the run.</param>
+    /// <param name="dependencies">The run's dependency index, or <see langword="null"/> when the pack uses no dependency key.</param>
     /// <returns>The violations: layers, then rules, then roles, each in pack order.</returns>
     public static IReadOnlyList<ArchitectureViolation> Check(
-        RulePack pack, LayerMap layers, IReadOnlyList<TypeGraph> graphs, IReadOnlyList<RoleMatches> roleMatches, IReadOnlyList<AnalyzedProject> projects)
+        RulePack pack, LayerMap layers, IReadOnlyList<TypeGraph> graphs, IReadOnlyList<RoleMatches> roleMatches, IReadOnlyList<AnalyzedProject> projects, DependencyIndex? dependencies = null)
     {
         ArgumentNullException.ThrowIfNull(pack);
         ArgumentNullException.ThrowIfNull(layers);

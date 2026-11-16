@@ -13,7 +13,7 @@ internal sealed class DependencyRuleChecker
     private DependencyRuleChecker(List<Compiled> rules) => _rules = rules;
 
     /// <summary>Compiles the matchers and exception selectors of the rules of one kind, so a run can reuse them for every project.</summary>
-    public static DependencyRuleChecker Compile(LayerMap layers, RulePack pack, RuleKind kind)
+    public static DependencyRuleChecker Compile(LayerMap layers, RulePack pack, RuleKind kind, DependencyIndex? dependencies = null)
     {
         ArgumentNullException.ThrowIfNull(layers);
         ArgumentNullException.ThrowIfNull(pack);

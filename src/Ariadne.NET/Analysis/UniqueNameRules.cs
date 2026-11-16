@@ -16,7 +16,7 @@ internal static class UniqueNameRules
     /// excuses. The violation's target is the colliding
     /// type's full name without its assembly; when both full names are equal the message names the two assemblies.
     /// </summary>
-    public static IReadOnlyList<ArchitectureViolation> Check(LayerMap layers, RulePack pack, IReadOnlyList<TypeGraph> graphs)
+    public static IReadOnlyList<ArchitectureViolation> Check(LayerMap layers, RulePack pack, IReadOnlyList<TypeGraph> graphs, DependencyIndex? dependencies = null)
     {
         ArgumentNullException.ThrowIfNull(layers);
         ArgumentNullException.ThrowIfNull(pack);

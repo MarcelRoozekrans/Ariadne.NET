@@ -25,10 +25,11 @@ internal static class SliceRules
     /// <param name="layers">The layer map of the pack.</param>
     /// <param name="pack">The resolved pack.</param>
     /// <param name="graphs">The type graphs of the run, each with its project, target framework and referenced graphs.</param>
+    /// <param name="dependencies">The run's dependency index, or <see langword="null"/> when the pack uses no dependency key.</param>
     /// <returns>The violations, in pack rule order.</returns>
     /// <exception cref="ArgumentException">A slices rule has no slices or a malformed pattern, which only a pack built in code can hold.</exception>
     public static IReadOnlyList<ArchitectureViolation> Check(
-        LayerMap layers, RulePack pack, IReadOnlyList<ScopedGraph> graphs)
+        LayerMap layers, RulePack pack, IReadOnlyList<ScopedGraph> graphs, DependencyIndex? dependencies = null)
     {
         ArgumentNullException.ThrowIfNull(layers);
         ArgumentNullException.ThrowIfNull(pack);
