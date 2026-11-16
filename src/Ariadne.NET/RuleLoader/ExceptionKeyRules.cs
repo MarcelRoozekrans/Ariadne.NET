@@ -14,7 +14,7 @@ internal static class ExceptionKeyRules
         RuleKind.BannedPackages when key is "types" or "namespaces" or "attributes" or "attributeArguments" or "onlyAttributes" || Array.IndexOf(PackYamlReader.TraitKeys, key) >= 0 =>
             "a package belongs to a project, so the exception of a bannedPackages rule names it by 'assemblies'",
         RuleKind.UniqueNames when key is "assemblies" =>
-            "an exception of a uniqueNames rule excuses a type's name, so it takes 'namespaces', 'types', 'attributes' or a type trait",
+            "an exception of a uniqueNames rule excuses a type's name, so it takes 'namespaces', 'types', 'attributes', 'attributeArguments', 'onlyAttributes' or a type trait",
         _ => null,
     };
 

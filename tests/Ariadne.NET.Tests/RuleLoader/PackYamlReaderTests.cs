@@ -1298,7 +1298,7 @@ public class PackYamlReaderTests
             """;
 
         Problems(yaml).Should().Equal(
-            new PackProblem(10, 9, "'assemblies' is not accepted in exceptions[0] of rule 'SH-001'; an exception of a uniqueNames rule excuses a type's name, so it takes 'namespaces', 'types', 'attributes' or a type trait"));
+            new PackProblem(10, 9, "'assemblies' is not accepted in exceptions[0] of rule 'SH-001'; an exception of a uniqueNames rule excuses a type's name, so it takes 'namespaces', 'types', 'attributes', 'attributeArguments', 'onlyAttributes' or a type trait"));
     }
 
     [Fact]
@@ -2041,6 +2041,10 @@ public class PackYamlReaderTests
         "duplicate key 'Version' in " + EntryWhere)]
     [InlineData("        attributeArguments:\n          - named: {}\n", 10, 13,
         "'named' in " + EntryWhere + " needs at least one name")]
+    [InlineData("        attributeArguments:\n          - named: { \" \": 1 }\n", 10, 22,
+        "a name in 'named' of " + EntryWhere + " must be a string")]
+    [InlineData("        attributeArguments:\n          - named: { ~: 1 }\n", 10, 22,
+        "a name in 'named' of " + EntryWhere + " must be a string")]
     [InlineData("        attributeArguments:\n          - arguments: [1]\n            type: \"X\"\n", 11, 13,
         "unknown key 'type' in " + EntryWhere)]
     [InlineData("        attributeArguments:\n          - attribute: \"A..B\"\n            arguments: [1]\n", 10, 24,

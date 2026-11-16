@@ -847,6 +847,6 @@ public class RulePackReferenceCheckTests
         };
 
         Resolve(PackWithRule(rule)).Error.Detail.Should().Be(
-            "exceptions[0] of rule 'R-1' has 'assemblies'; an exception of a uniqueNames rule excuses a type's name, so it takes 'namespaces', 'types', 'attributes' or a type trait");
+            "exceptions[0] of rule 'R-1' has 'assemblies'; an exception of a uniqueNames rule excuses a type's name, so it takes 'namespaces', 'types', 'attributes', 'attributeArguments', 'onlyAttributes' or a type trait");
     }
 }

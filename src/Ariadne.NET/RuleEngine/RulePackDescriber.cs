@@ -142,7 +142,7 @@ public static class RulePackDescriber
         return string.Concat(char.ToLowerInvariant(name[0]).ToString(), name.AsSpan(1));
     }
 
-    // Kinds in the order layers, namespaces, assemblies, types, baseTypes, interfaces, attributes, members, then the traits names, kinds, accessibility, assignableTo, sealed, abstract, static, nested; kinds joined by "; ", values by ", ".
+    // Kinds in the order layers, namespaces, assemblies, types, baseTypes, interfaces, attributes, attributeArguments, onlyAttributes, members, then the traits names, kinds, accessibility, assignableTo, sealed, abstract, static, nested; kinds joined by "; ", values by ", ".
     private static string Describe(
         IList<string> namespaces,
         IList<string> assemblies,

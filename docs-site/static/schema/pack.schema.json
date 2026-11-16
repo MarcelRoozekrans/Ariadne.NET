@@ -1288,6 +1288,9 @@
         },
         "named": {
           "type": "object",
+          "propertyNames": {
+            "pattern": "\\S"
+          },
           "additionalProperties": {
             "type": [
               "string",
