@@ -877,4 +877,49 @@ public class RulePackReferenceCheckTests
         Resolve(PackWithRule(rule)).Error.Detail.Should().Be(
             "exceptions[0] of rule 'R-1' has 'assemblies'; an exception of a uniqueNames rule excuses a type's name, so it takes 'namespaces', 'types', 'attributes', 'attributeArguments', 'onlyAttributes' or a type trait");
     }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Null_argument_collection_in_a_target_is_an_error(bool nullArguments)
+    {
+        var match = nullArguments
+            ? new AttributeArgumentMatch { Arguments = null!, Named = new Dictionary<string, string>(StringComparer.Ordinal) { ["k"] = "v" } }
+            : new AttributeArgumentMatch { Arguments = ["1"], Named = null! };
+        var rule = ForbidRule(new TargetSelector { AttributeArguments = [match] }, null);
+
+        var result = Resolve(PackWithRule(rule));
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Detail.Should().Contain("attributeArguments[0] in the from of rule 'R-1' must not have a null 'arguments' or 'named'");
+    }
+
+    [Fact]
+    public void Null_argument_collection_in_an_exception_is_an_error()
+    {
+        var rule = ForbidRule(
+            new TargetSelector { Types = ["**.X"] },
+            null,
+            new RuleException { Because = "Null.", AttributeArguments = [new AttributeArgumentMatch { Arguments = null!, Named = null! }] });
+
+        Resolve(PackWithRule(rule)).Error.Detail.Should().Contain("attributeArguments[0] in exceptions[0] of rule 'R-1' must not have a null");
+    }
+
+    [Fact]
+    public void Null_argument_collection_in_a_condition_is_an_error()
+    {
+        var condition = new TargetSelector { AttributeArguments = [new AttributeArgumentMatch { Arguments = ["1"], Named = null! }] };
+
+        Resolve(PackWithRequire(new RuleRequirement { IsNot = condition })).Error.Detail
+            .Should().Contain("attributeArguments[0] in the is");
+    }
+
+    [Fact]
+    public void Null_value_inside_argument_collections_is_an_error()
+    {
+        var match = new AttributeArgumentMatch { Arguments = ["1", null!] };
+        var rule = ForbidRule(new TargetSelector { AttributeArguments = [match] }, null);
+
+        Resolve(PackWithRule(rule)).Error.Detail.Should().Contain("must not have a null value in 'arguments' or 'named'");
+    }
 }
