@@ -349,6 +349,68 @@ public class RequireRulesTests
             .Should().ContainSingle().Which.Message.Should().Be("Type 'Open' is selected by rule 'R' and should be sealed but is not");
     }
 
+    private const string ShopAttributes =
+        "namespace Shop { public class RouteAttribute : System.Attribute { public RouteAttribute(string p, int v) { } public int Version { get; set; } } } " +
+        "namespace Other { public class TagAttribute : System.Attribute { } } ";
+
+    private static readonly TargetSelector InController = new() { Names = ["OrderController"] };
+
+    private static AttributeArgumentMatch RouteMatch() => new()
+    {
+        Attribute = "Shop.RouteAttribute",
+        Arguments = ["api/orders", "2"],
+        Named = new Dictionary<string, string>(StringComparer.Ordinal) { ["Version"] = "2" },
+    };
+
+    [Fact]
+    public void Is_attributeArguments_message()
+    {
+        var pack = ConditionPack(InController, new RuleRequirement { Is = new TargetSelector { AttributeArguments = [RouteMatch()] } });
+
+        Check(ShopAttributes + "namespace N { public class OrderController { } }", pack).Should().ContainSingle().Which.Message.Should().Be(
+            "Type 'OrderController' is selected by rule 'R' and should have an attribute matching 'Shop.RouteAttribute' with arguments 'api/orders', '2' and named arguments 'Version=2' but does not");
+    }
+
+    [Fact]
+    public void IsNot_attributeArguments_message()
+    {
+        var pack = ConditionPack(InController, new RuleRequirement { IsNot = new TargetSelector { AttributeArguments = [RouteMatch()] } });
+
+        Check(ShopAttributes + "namespace N { [Shop.Route(\"api/orders\", 2, Version = 2)] public class OrderController { } }", pack)
+            .Should().ContainSingle().Which.Message.Should().Be(
+                "Type 'OrderController' is selected by rule 'R' and should not have an attribute matching 'Shop.RouteAttribute' with arguments 'api/orders', '2' and named arguments 'Version=2' but does");
+    }
+
+    [Fact]
+    public void Two_attributeArguments_entries_are_joined_with_or()
+    {
+        var second = new AttributeArgumentMatch { Arguments = ["x"] };
+        var pack = ConditionPack(InController, new RuleRequirement { Is = new TargetSelector { AttributeArguments = [RouteMatch(), second] } });
+
+        Check(ShopAttributes + "namespace N { public class OrderController { } }", pack).Should().ContainSingle().Which.Message.Should().Be(
+            "Type 'OrderController' is selected by rule 'R' and should have an attribute matching 'Shop.RouteAttribute' with arguments 'api/orders', '2' and named arguments 'Version=2' or an attribute with arguments 'x' but does not");
+    }
+
+    [Fact]
+    public void Is_onlyAttributes_message()
+    {
+        var pack = ConditionPack(InController, new RuleRequirement { Is = new TargetSelector { OnlyAttributes = ["Shop.**"] } });
+
+        Check(ShopAttributes + "namespace N { [Shop.Route(\"a\", 1)] [Other.Tag] public class OrderController { } }", pack)
+            .Should().ContainSingle().Which.Message.Should().Be(
+                "Type 'OrderController' is selected by rule 'R' and should only have attributes matching 'Shop.**' but has 'Other.TagAttribute'");
+    }
+
+    [Fact]
+    public void IsNot_onlyAttributes_message()
+    {
+        var pack = ConditionPack(InController, new RuleRequirement { IsNot = new TargetSelector { OnlyAttributes = ["Shop.**"] } });
+
+        Check(ShopAttributes + "namespace N { [Shop.Route(\"a\", 1)] public class OrderController { } }", pack)
+            .Should().ContainSingle().Which.Message.Should().Be(
+                "Type 'OrderController' is selected by rule 'R' and should not only have attributes matching 'Shop.**' but has only attributes matching them");
+    }
+
     [Fact]
     public void RequirementNotMet_is_13() => ((int)ViolationKind.RequirementNotMet).Should().Be(13);
 

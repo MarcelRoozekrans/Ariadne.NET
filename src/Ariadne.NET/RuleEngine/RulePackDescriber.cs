@@ -1,3 +1,4 @@
+using System.Text;
 using Ariadne.NET.Abstractions;
 
 namespace Ariadne.NET.RuleEngine;
@@ -161,6 +162,12 @@ public static class RulePackDescriber
         AddKind(parts, "baseTypes", baseTypes);
         AddKind(parts, "interfaces", interfaces);
         AddKind(parts, "attributes", attributes);
+        if (traits is not null)
+        {
+            AddAttributeArguments(parts, traits.AttributeArguments);
+            AddKind(parts, "onlyAttributes", traits.OnlyAttributes);
+        }
+
         AddKind(parts, "members", members);
         if (traits is not null)
         {
@@ -175,6 +182,31 @@ public static class RulePackDescriber
         }
 
         return parts.Count > 0 ? string.Join("; ", parts) : "no selectors";
+    }
+
+    private static void AddAttributeArguments(List<string> parts, IList<AttributeArgumentMatch> matches)
+    {
+        if (matches.Count > 0)
+        {
+            parts.Add($"attributeArguments {string.Join(" or ", matches.Select(DescribeMatch))}");
+        }
+    }
+
+    private static string DescribeMatch(AttributeArgumentMatch match)
+    {
+        var text = new StringBuilder(match.Attribute ?? "any attribute");
+        if (match.Arguments.Count > 0)
+        {
+            text.Append(" with arguments ").Append(string.Join(", ", match.Arguments));
+        }
+
+        if (match.Named.Count > 0)
+        {
+            text.Append(match.Arguments.Count > 0 ? " and named arguments " : " with named arguments ")
+                .Append(string.Join(", ", match.Named.Select(static pair => $"{pair.Key}={pair.Value}")));
+        }
+
+        return text.ToString();
     }
 
     private static void AddKind(List<string> parts, string label, IList<string>? values)

@@ -82,7 +82,10 @@ internal sealed class RequireCondition
         "names" => string.Create(CultureInfo.InvariantCulture, $"is named '{type.Name}'"),
         "kinds" => string.Create(CultureInfo.InvariantCulture, $"is a '{TypeTraits.KindOf(type)}'"),
         "accessibility" => string.Create(CultureInfo.InvariantCulture, $"is '{RoleRules.Keyword(type.DeclaredAccessibility)}'"),
-        "baseTypes" or "interfaces" or "attributes" => _phraseNegated ? "does" : "does not",
+        "onlyAttributes" => _phraseNegated
+            ? "has only attributes matching them"
+            : Selector.FirstOutsideOnlyAttributes(type, names) is { } outside ? $"has '{outside}'" : "has other attributes",
+        "baseTypes" or "interfaces" or "attributes" or "attributeArguments" => _phraseNegated ? "does" : "does not",
         _ => _phraseNegated ? "is" : "is not",
     };
 
@@ -94,6 +97,26 @@ internal sealed class RequireCondition
         AddList(conditions, "baseTypes", selector.BaseTypes, negated, "derive from a class matching ", static s => new() { BaseTypes = s });
         AddList(conditions, "interfaces", selector.Interfaces, negated, "implement an interface matching ", static s => new() { Interfaces = s });
         AddList(conditions, "attributes", selector.Attributes, negated, "have an attribute matching ", static s => new() { Attributes = s });
+        if (selector.AttributeArguments.Count > 0)
+        {
+            conditions.Add(new RequireCondition(
+                "attributeArguments",
+                TypeSelector.From(new TargetSelector { AttributeArguments = selector.AttributeArguments }),
+                negated,
+                negated,
+                "have " + string.Join(" or ", selector.AttributeArguments.Select(Phrase))));
+        }
+
+        if (selector.OnlyAttributes.Count > 0)
+        {
+            conditions.Add(new RequireCondition(
+                "onlyAttributes",
+                TypeSelector.From(new TargetSelector { OnlyAttributes = selector.OnlyAttributes }),
+                negated,
+                negated,
+                "only have attributes matching " + Quoted(selector.OnlyAttributes)));
+        }
+
         AddList(conditions, "names", selector.Names, negated, "have a name matching ", static s => new() { Names = s });
 
         if (selector.Kinds.Count > 0)
@@ -134,6 +157,30 @@ internal sealed class RequireCondition
             conditions.Add(new RequireCondition(key, TypeSelector.From(only(wanted)), negated, phraseNegated: wanted == negated, "be " + key));
         }
     }
+
+    private static string Phrase(AttributeArgumentMatch match)
+    {
+        var text = new StringBuilder("an attribute");
+        if (match.Attribute is not null)
+        {
+            text.Append(" matching '").Append(match.Attribute).Append('\'');
+        }
+
+        if (match.Arguments.Count > 0)
+        {
+            text.Append(" with arguments ").Append(QuotedList(match.Arguments));
+        }
+
+        if (match.Named.Count > 0)
+        {
+            var pairs = match.Named.Select(static pair => pair.Key + "=" + pair.Value).ToList();
+            text.Append(match.Arguments.Count > 0 ? " and named arguments " : " with named arguments ").Append(QuotedList(pairs));
+        }
+
+        return text.ToString();
+    }
+
+    private static string QuotedList(IList<string> values) => string.Join(", ", values.Select(static v => "'" + v + "'"));
 
     private static string Quoted(IList<string> values)
     {

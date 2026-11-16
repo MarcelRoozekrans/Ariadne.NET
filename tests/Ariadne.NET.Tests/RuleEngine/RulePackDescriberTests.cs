@@ -252,6 +252,33 @@ public class RulePackDescriberTests
     }
 
     [Fact]
+    public void Describes_attributeArguments()
+    {
+        var selector = new TargetSelector
+        {
+            AttributeArguments =
+            [
+                new AttributeArgumentMatch
+                {
+                    Attribute = "Shop.RouteAttribute",
+                    Arguments = ["api/orders", "2"],
+                    Named = new Dictionary<string, string>(StringComparer.Ordinal) { ["Version"] = "2" },
+                },
+                new AttributeArgumentMatch { Arguments = ["x"] },
+            ],
+        };
+
+        RulePackDescriber.Describe(selector).Should().Be(
+            "attributeArguments Shop.RouteAttribute with arguments api/orders, 2 and named arguments Version=2 or any attribute with arguments x");
+    }
+
+    [Fact]
+    public void Describes_onlyAttributes()
+    {
+        RulePackDescriber.Describe(new TargetSelector { OnlyAttributes = ["Shop.**", "Lib.**"] }).Should().Be("onlyAttributes Shop.**, Lib.**");
+    }
+
+    [Fact]
     public void Describe_RequirementWithEveryMember_UsesTheDocumentedOrder()
     {
         var requirement = new RuleRequirement
