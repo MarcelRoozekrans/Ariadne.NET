@@ -1151,6 +1151,31 @@ public static class ParityCases
                 .Or().ResideInNamespace("Parity.CHaveAttributeWithNamedArguments.NotClean")
                 .Should().NotHaveAnyAttributesWithNamedArguments(new (string, object)[] { ("Area", "billing"), ("Audited", true) })),
 
+        // Phase 4.8 cases: attribute allow-lists. Each fixture holds a Draft type whose only attributes outside the set in IL
+        // are NullableContextAttribute and NullableAttribute, which the compiler emits for its nullable fields. Ariadne leaves
+        // the compiler's attributes out, and ArchUnitNET 0.13.5 skips these two when it loads a type, so the tools agree.
+        new(
+            "p-only-have-attributes",
+            "POnlyHaveAttributes",
+            "Parity.POnlyHaveAttributes",
+            "PARITY-PONLYHAVEATTRIBUTES",
+            Projection.Types,
+            a => Types().That().OnlyHaveAttributes(
+                    AttributeOf(a, "Parity.POnlyHaveAttributes.Contracts.AuditedAttribute"),
+                    AttributeOf(a, "Parity.POnlyHaveAttributes.Contracts.ReviewedAttribute"))
+                .Should().NotDependOnAny(Types().That().ResideInNamespace("Parity.POnlyHaveAttributes.Target"))),
+        new(
+            "c-only-have-attributes",
+            "COnlyHaveAttributes",
+            "Parity.COnlyHaveAttributes",
+            "PARITY-CONLYHAVEATTRIBUTES",
+            Projection.Types,
+            a => Types().That().ResideInNamespace("Parity.COnlyHaveAttributes.Broken")
+                .Or().ResideInNamespace("Parity.COnlyHaveAttributes.Clean")
+                .Should().OnlyHaveAttributes(
+                    AttributeOf(a, "Parity.COnlyHaveAttributes.Contracts.AuditedAttribute"),
+                    AttributeOf(a, "Parity.COnlyHaveAttributes.Contracts.ReviewedAttribute"))),
+
         // Phase 4.3 gaps: each has a KnownGaps entry and no rule in its kind's pack. The pattern spans the kind, so every
         // namespace below Parity.<Kind> is its own slice and slice names start with the Broken or Clean namespace.
         new(

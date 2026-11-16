@@ -74,4 +74,6 @@
   <Project Path="CHaveAttributeWithArguments/Parity.CHaveAttributeWithArguments.csproj" />
   <Project Path="PHaveAttributeWithNamedArguments/Parity.PHaveAttributeWithNamedArguments.csproj" />
   <Project Path="CHaveAttributeWithNamedArguments/Parity.CHaveAttributeWithNamedArguments.csproj" />
+  <Project Path="POnlyHaveAttributes/Parity.POnlyHaveAttributes.csproj" />
+  <Project Path="COnlyHaveAttributes/Parity.COnlyHaveAttributes.csproj" />
 </Solution>

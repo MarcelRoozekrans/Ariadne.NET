@@ -180,8 +180,8 @@ Methods that every kind of object has, here applied to `Types()`.
 | `c-have-attribute-with-arguments` | `HaveAttributeWithArguments`, `HaveAnyAttributesWithArguments`, `NotHaveAttributeWithArguments`, `NotHaveAnyAttributesWithArguments` | `require` with `is: { attributeArguments }` with `attribute` and `arguments`; `:not` as `isNot` with one entry per value | `covered` | |
 | `p-have-attribute-with-named-arguments` | `HaveAttributeWithNamedArguments`, `HaveAnyAttributesWithNamedArguments`, `DoNotHaveAttributeWithNamedArguments`, `DoNotHaveAnyAttributesWithNamedArguments` | `attributeArguments` with `attribute` and `named`; `:not` as an exception with one `attributeArguments` entry per pair | `covered` | |
 | `c-have-attribute-with-named-arguments` | `HaveAttributeWithNamedArguments`, `HaveAnyAttributesWithNamedArguments`, `NotHaveAttributeWithNamedArguments`, `NotHaveAnyAttributesWithNamedArguments` | `require` with `is: { attributeArguments }` with `attribute` and `named`; `:not` as `isNot` with one entry per pair | `covered` | |
-| `p-only-have-attributes` | `OnlyHaveAttributes` | — | `deferred` | attribute arguments, see #95 |
-| `c-only-have-attributes` | `OnlyHaveAttributes`, `OnlyHaveAttributesThat` | — | `deferred` | attribute arguments, see #95 |
+| `p-only-have-attributes` | `OnlyHaveAttributes` | `onlyAttributes`; `OnlyHaveAttributes()` with no set as an exception with `attributes: ["**"]` | `covered` | |
+| `c-only-have-attributes` | `OnlyHaveAttributes`, `OnlyHaveAttributesThat` | `require` with `is: { onlyAttributes }`; `OnlyHaveAttributes()` with no set as `isNot: { attributes: ["**"] }` | `covered` | |
 
 ### Custom rules
 
