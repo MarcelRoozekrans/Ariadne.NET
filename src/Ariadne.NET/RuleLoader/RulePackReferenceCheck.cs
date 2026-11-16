@@ -419,11 +419,40 @@ internal static class RulePackReferenceCheck
             {
                 failures.Add($"attributeArguments[{i}] in {where} must not be null");
             }
-            else if (entry.Arguments is not { Count: > 0 } && entry.Named is not { Count: > 0 })
+            else if (entry.Arguments is null || entry.Named is null)
+            {
+                failures.Add($"attributeArguments[{i}] in {where} must not have a null 'arguments' or 'named'");
+            }
+            else if (HasNullValue(entry))
+            {
+                failures.Add($"attributeArguments[{i}] in {where} must not have a null value in 'arguments' or 'named'");
+            }
+            else if (entry.Arguments.Count == 0 && entry.Named.Count == 0)
             {
                 failures.Add($"attributeArguments[{i}] in {where} needs 'arguments' or 'named'; to select by the attribute alone, use 'attributes'");
             }
         }
+    }
+
+    private static bool HasNullValue(AttributeArgumentMatch entry)
+    {
+        foreach (var argument in entry.Arguments)
+        {
+            if (argument is null)
+            {
+                return true;
+            }
+        }
+
+        foreach (var value in entry.Named.Values)
+        {
+            if (value is null)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static void CheckTraitValues(string where, IList<CSharpTypeKind> kinds, IList<string> accessibility, List<string> failures)
