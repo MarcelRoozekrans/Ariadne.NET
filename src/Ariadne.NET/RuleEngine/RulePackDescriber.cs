@@ -181,7 +181,7 @@ public static class RulePackDescriber
         AddKind(parts, "attributes", attributes, quoted);
         if (traits is not null)
         {
-            AddAttributeArguments(parts, traits.AttributeArguments);
+            AddAttributeArguments(parts, traits.AttributeArguments, quoted);
             AddKind(parts, "onlyAttributes", traits.OnlyAttributes, quoted);
         }
 
@@ -203,30 +203,33 @@ public static class RulePackDescriber
         return parts.Count > 0 ? string.Join("; ", parts) : "no selectors";
     }
 
-    private static void AddAttributeArguments(List<string> parts, IList<AttributeArgumentMatch> matches)
+    private static void AddAttributeArguments(List<string> parts, IList<AttributeArgumentMatch> matches, bool quoted)
     {
         if (matches.Count > 0)
         {
-            parts.Add($"attributeArguments {string.Join(" or ", matches.Select(DescribeMatch))}");
+            parts.Add($"attributeArguments {string.Join(" or ", matches.Select(match => DescribeMatch(match, quoted)))}");
         }
     }
 
-    private static string DescribeMatch(AttributeArgumentMatch match)
+    // Quoted, each value is in single quotes, a named argument as 'Name=value'; "any attribute" is prose, so it stays bare.
+    private static string DescribeMatch(AttributeArgumentMatch match, bool quoted)
     {
-        var text = new StringBuilder(match.Attribute ?? "any attribute");
+        var text = new StringBuilder(match.Attribute is { } attribute ? Quote(attribute, quoted) : "any attribute");
         if (match.Arguments.Count > 0)
         {
-            text.Append(" with arguments ").Append(string.Join(", ", match.Arguments));
+            text.Append(" with arguments ").Append(string.Join(", ", match.Arguments.Select(value => Quote(value, quoted))));
         }
 
         if (match.Named.Count > 0)
         {
             text.Append(match.Arguments.Count > 0 ? " and named arguments " : " with named arguments ")
-                .Append(string.Join(", ", match.Named.Select(static pair => $"{pair.Key}={pair.Value}")));
+                .Append(string.Join(", ", match.Named.Select(pair => Quote($"{pair.Key}={pair.Value}", quoted))));
         }
 
         return text.ToString();
     }
+
+    private static string Quote(string value, bool quoted) => quoted ? $"'{value}'" : value;
 
     private static void AddKind(List<string> parts, string label, IList<string>? values, bool quoted)
     {

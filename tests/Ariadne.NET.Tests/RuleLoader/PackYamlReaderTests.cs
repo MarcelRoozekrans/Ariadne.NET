@@ -2237,6 +2237,8 @@ public class PackYamlReaderTests
         "'dependsOn' is not accepted in " + NestedWhere + "; selectors nest one level only, so the selector under 'dependsOn' or 'onlyDependsOn' cannot hold either")]
     [InlineData("        dependsOn: { layers: [A], onlyDependsOn: { layers: [B] } }\n", 9, 35,
         "'onlyDependsOn' is not accepted in " + NestedWhere + "; selectors nest one level only, so the selector under 'dependsOn' or 'onlyDependsOn' cannot hold either")]
+    [InlineData("        dependsOn: { attributeArguments: [{ attribute: X, arguments: [1], dependsOn: { layers: [B] } }] }\n", 9, 75,
+        "unknown key 'dependsOn' in attributeArguments[0] of " + NestedWhere)]
     [InlineData("        dependsOn: { layers: [A], members: [\"**.M\"] }\n", 9, 35,
         "'members' is not accepted in " + NestedWhere + "; it names APIs and only the 'to' of a 'forbid' or 'allowOnly' rule takes it")]
     [InlineData("        dependsOn: { layers: [A], namespaces: [\"X.**\"] }\n", 9, 22,

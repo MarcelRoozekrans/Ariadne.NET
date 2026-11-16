@@ -273,6 +273,31 @@ public class RulePackDescriberTests
     }
 
     [Fact]
+    public void Quoted_description_quotes_attributeArguments_values_but_not_flags()
+    {
+        var selector = new TargetSelector
+        {
+            Sealed = true,
+            DependsOn = new TargetSelector
+            {
+                AttributeArguments =
+                [
+                    new AttributeArgumentMatch
+                    {
+                        Attribute = "Shop.RouteAttribute",
+                        Arguments = ["api/orders", "2"],
+                        Named = new Dictionary<string, string>(StringComparer.Ordinal) { ["Version"] = "2" },
+                    },
+                    new AttributeArgumentMatch { Arguments = ["x"] },
+                ],
+            },
+        };
+
+        RulePackDescriber.DescribeQuoted(selector).Should().Be(
+            "sealed true; dependsOn (attributeArguments 'Shop.RouteAttribute' with arguments 'api/orders', '2' and named arguments 'Version=2' or any attribute with arguments 'x')");
+    }
+
+    [Fact]
     public void Describes_onlyAttributes()
     {
         RulePackDescriber.Describe(new TargetSelector { OnlyAttributes = ["Shop.**", "Lib.**"] }).Should().Be("onlyAttributes Shop.**, Lib.**");

@@ -191,13 +191,16 @@ internal static class RulePackReferenceCheck
         }
     }
 
+    // What the loader calls a rule's From: require and uniqueNames read it from 'for', the others from 'from'.
+    private static string FromKey(RuleKind kind) => kind is RuleKind.Require or RuleKind.UniqueNames ? "for" : "from";
+
     // The loader enforces these for a YAML pack. A pack built in code skips the loader, and the validator would throw on
     // an unknown accessibility or a target mixing layers with code patterns, and an empty exception would exempt every
     // type, so they are reported here. Amendment exceptions are merged in by now, so they are checked too.
     private static void CheckTraitsOf(RuleDefinition rule, List<string> failures)
     {
         var id = PackText.Show(rule.Id);
-        CheckTarget($"the {(rule.Kind == RuleKind.Require ? "for" : "from")} of rule '{id}'", rule.From, failures);
+        CheckTarget($"the {FromKey(rule.Kind)} of rule '{id}'", rule.From, failures);
         CheckTarget($"the to of rule '{id}'", rule.To, failures);
         CheckTarget($"the against of rule '{id}'", rule.Against, failures);
         if (rule.Kind == RuleKind.UniqueNames)
@@ -262,7 +265,7 @@ internal static class RulePackReferenceCheck
     {
         var id = PackText.Show(rule.Id);
         var slices = rule.Kind == RuleKind.Slices;
-        CheckDependencySelectors($"the {(rule.Kind == RuleKind.Require ? "for" : "from")} of rule '{id}'", rule.From.DependsOn, rule.From.OnlyDependsOn, layerNames, slices, failures);
+        CheckDependencySelectors($"the {FromKey(rule.Kind)} of rule '{id}'", rule.From.DependsOn, rule.From.OnlyDependsOn, layerNames, slices, failures);
         CheckDependencySelectors($"the to of rule '{id}'", rule.To.DependsOn, rule.To.OnlyDependsOn, layerNames, slices, failures);
         CheckDependencySelectors($"the against of rule '{id}'", rule.Against.DependsOn, rule.Against.OnlyDependsOn, layerNames, slices, failures);
         if (rule.Slices?.Allow is { } allow)

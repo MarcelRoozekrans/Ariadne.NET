@@ -244,8 +244,6 @@ internal static class PackYamlReader
         // Set while a slices rule is read, so the patterns of its exceptions and 'allow' reject a capture.
         private bool _inSlicesRule;
 
-        // Set while the selector under dependsOn or onlyDependsOn is read, so a dependency key inside it is named as nesting.
-        private bool _inDependencySelector;
         private int _visited;
         private bool _exhausted;
 
@@ -926,15 +924,7 @@ internal static class PackYamlReader
             }
 
             var nestedWhere = $"the {field.Name} of {where}";
-            _inDependencySelector = true;
-            try
-            {
-                return ReadSelector(map, nestedWhere, nestedWhere, DependencySelectorKeys);
-            }
-            finally
-            {
-                _inDependencySelector = false;
-            }
+            return ReadSelector(map, nestedWhere, nestedWhere, DependencySelectorKeys);
         }
 
         // The trait keys present in a mapping whose key set allows them; absent keys stay null.
@@ -1372,7 +1362,9 @@ internal static class PackYamlReader
                 {
                     Add(scalar, $"'members' is not accepted in {where}; it names APIs and only the 'to' of a 'forbid' or 'allowOnly' rule takes it");
                 }
-                else if (_inDependencySelector && IsDependencyKey(key))
+                // Only the selector itself names nesting; a mapping read inside it, such as an attributeArguments entry,
+                // has its own key set and reports the key as unknown.
+                else if (ReferenceEquals(allowed, DependencySelectorKeys) && IsDependencyKey(key))
                 {
                     Add(scalar, $"'{key}' is not accepted in {where}; selectors nest one level only, so the selector under 'dependsOn' or 'onlyDependsOn' cannot hold either");
                 }

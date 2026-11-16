@@ -941,6 +941,38 @@ public class RulePackReferenceCheckTests
     }
 
     [Fact]
+    public void UniqueNames_for_is_named_for_when_it_mixes_layers_with_patterns()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "R-1",
+            Because = "because",
+            Kind = RuleKind.UniqueNames,
+            From = new TargetSelector { Layers = ["Domain"], Namespaces = ["Shop.**"] },
+            Against = new TargetSelector { Layers = ["Domain"] },
+        };
+
+        Resolve(PackWithRule(rule)).Error.Detail.Should().Be(
+            "the for of rule 'R-1' mixes layers with namespaces, assemblies, types, base types, interfaces, attributes, attribute arguments, attribute allow-lists or members");
+    }
+
+    [Fact]
+    public void UniqueNames_for_is_named_for_in_a_bad_dependency_selector()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "R-1",
+            Because = "because",
+            Kind = RuleKind.UniqueNames,
+            From = new TargetSelector { Layers = ["Domain"], DependsOn = new TargetSelector() },
+            Against = new TargetSelector { Layers = ["Domain"] },
+        };
+
+        Resolve(PackWithRule(rule)).Error.Detail.Should().Be(
+            "the dependsOn of the for of rule 'R-1' selects nothing; it needs at least one selector key other than members, dependsOn and onlyDependsOn");
+    }
+
+    [Fact]
     public void RequireRule_ImplementsWithAKeyBeyondNamespacesAssembliesTypes_Fails()
     {
         var requirement = new RuleRequirement { Implements = new TargetSelector { Types = ["**.IX"], Names = ["Legacy*"], Interfaces = ["**.IY"] } };
