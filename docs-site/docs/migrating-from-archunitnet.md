@@ -5,7 +5,7 @@ title: Migrating from ArchUnitNET
 
 # Migrating from ArchUnitNET
 
-This page is for a team that checks its architecture with [ArchUnitNET](https://github.com/TNG/ArchUnitNET) tests and wants to move those rules to an Ariadne pack. It covers `TngTech.ArchUnitNET` 0.13.2, the version the [ArchUnitNET parity](archunitnet-parity.md) catalogue pins. The catalogue is the reference for what a pack covers; this page is the how-to.
+This page is for a team that checks its architecture with [ArchUnitNET](https://github.com/TNG/ArchUnitNET) tests and wants to move those rules to an Ariadne pack. It covers `TngTech.ArchUnitNET` 0.13.5, the version the [ArchUnitNET parity](archunitnet-parity.md) catalogue pins. The catalogue is the reference for what a pack covers; this page is the how-to.
 
 ## What changes
 
@@ -137,7 +137,7 @@ Methods of `Should()`. Placement and shape become a `require` rule; the keys `is
 | `BeValueTypes` | `is: { kinds: [struct, recordStruct, enum] }` | `c-be-value-types` |
 | `BeNested` | `is: { nested: true }` | `c-be-nested` |
 | `BeNestedIn(Outer)` | `is: { nested: true, types: ["Ns.Outer.*"] }` | `c-be-nested-in` |
-| none: 0.13.2 has no type-level `BeStatic` | `is: { static: true }` | `c-be-static` |
+| none: 0.13.5 has no type-level `BeStatic` | `is: { static: true }` | `c-be-static` |
 | `BeAbstract` on `Classes()` | `for: { kinds: [class, record] }` with `is: { abstract: true }` | `c-be-abstract` |
 | `BeSealed` on `Classes()` | `for: { kinds: [class, record] }` with `is: { sealed: true }` | `c-be-sealed` |
 | `BeRecord` on `Classes()` | `for: { kinds: [class, record] }` with `is: { kinds: [record] }` | `c-be-record` |
@@ -298,7 +298,7 @@ rules:
 
 ### Dependency predicates
 
-`DependOnAny` and `OnlyDependOn` select types by what they reference. `dependsOn` and `onlyDependsOn` take a nested selector with the keys of a target (`namespaces`, `assemblies`, `types`, `layers`, the type traits, `baseTypes`, `interfaces`, `attributes`, `attributeArguments` and `onlyAttributes`) and sit next to the other keys, in every place a type trait is accepted. A dependency is a type reference the type writes, once per target type. Keyword types such as `string` and `int` give no reference, so `dependsOn: { namespaces: ["System.**"] }` selects a type that writes `System.String` or `StringBuilder` and not one that only writes `string`.
+`DependOnAny` and `OnlyDependOn` select types by what they reference. `dependsOn` and `onlyDependsOn` take a nested selector with the keys of a target (`namespaces`, `assemblies`, `types`, `layers`, the type traits, `baseTypes`, `interfaces`, `attributes`, `attributeArguments` and `onlyAttributes`) and sit next to the other keys, in every place a type trait is accepted and in the `for` and `against` of a `uniqueNames` rule, which take no traits. A dependency is a type reference the type writes, once per target type. Keyword types such as `string` and `int` give no reference, so `dependsOn: { namespaces: ["System.**"] }` selects a type that writes `System.String` or `StringBuilder` and not one that only writes `string`.
 
 `DependOnAny(x)` is `dependsOn`. Types that depend on the `Target` namespace must not depend on `Forbidden`:
 

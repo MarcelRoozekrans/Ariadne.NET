@@ -76,9 +76,9 @@ internal sealed class TargetMatcher
     }
 
     /// <summary>
-    /// Whether the type is selected. A target with layers selects a type in one of them that also matches the traits; a
-    /// target without layers selects a type its selector matches, and nothing when the selector is empty. A target that
-    /// holds <c>members</c> selects no type. A type covered by more than one layer is in none of them.
+    /// Whether the type is selected. A target with layers selects a type in one of them that also matches the traits and the
+    /// dependency keys; a target without layers selects a type its selector matches, and nothing when the selector is empty.
+    /// A target that holds <c>members</c> selects no type. A type covered by more than one layer is in none of them.
     /// </summary>
     /// <param name="type">The type to test.</param>
     /// <returns>True when the type is selected.</returns>
@@ -88,7 +88,7 @@ internal sealed class TargetMatcher
 
         if (!_cache.TryGetValue(type, out var matches))
         {
-            // With layers, the selector holds traits at most, and an empty one matches every type.
+            // With layers, the selector holds traits and dependency keys at most, and an empty one matches every type.
             matches = !_selector.HasMembers
                 && (_layers.Count > 0
                     ? _layerMap.LayerOf(type) is { } layer && _layers.Contains(layer) && _selector.Matches(type, _layerMap.Names)

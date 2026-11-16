@@ -15,7 +15,7 @@ public static class Divergences
         + "Neither tool can select OrderService and leave out OrderService<T> by name.";
 
     private const string Case =
-        "ArchUnitNET 0.13.2 compares HaveName, HaveFullName and the HaveFullName prefix, suffix and part forms ignoring case, "
+        "ArchUnitNET 0.13.5 compares HaveName, HaveFullName and the HaveFullName prefix, suffix and part forms ignoring case, "
         + "but HaveNameStartingWith, HaveNameEndingWith and HaveNameContaining with case. Ariadne's 'types' and 'names' "
         + "globs always match with case.";
 
