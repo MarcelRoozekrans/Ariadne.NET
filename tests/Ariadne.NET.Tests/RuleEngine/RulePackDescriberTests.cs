@@ -252,6 +252,99 @@ public class RulePackDescriberTests
     }
 
     [Fact]
+    public void Describes_attributeArguments()
+    {
+        var selector = new TargetSelector
+        {
+            AttributeArguments =
+            [
+                new AttributeArgumentMatch
+                {
+                    Attribute = "Shop.RouteAttribute",
+                    Arguments = ["api/orders", "2"],
+                    Named = new Dictionary<string, string>(StringComparer.Ordinal) { ["Version"] = "2" },
+                },
+                new AttributeArgumentMatch { Arguments = ["x"] },
+            ],
+        };
+
+        RulePackDescriber.Describe(selector).Should().Be(
+            "attributeArguments Shop.RouteAttribute with arguments api/orders, 2 and named arguments Version=2 or any attribute with arguments x");
+    }
+
+    [Fact]
+    public void Quoted_description_quotes_attributeArguments_values_but_not_flags()
+    {
+        var selector = new TargetSelector
+        {
+            Sealed = true,
+            DependsOn = new TargetSelector
+            {
+                AttributeArguments =
+                [
+                    new AttributeArgumentMatch
+                    {
+                        Attribute = "Shop.RouteAttribute",
+                        Arguments = ["api/orders", "2"],
+                        Named = new Dictionary<string, string>(StringComparer.Ordinal) { ["Version"] = "2" },
+                    },
+                    new AttributeArgumentMatch { Arguments = ["x"] },
+                ],
+            },
+        };
+
+        RulePackDescriber.DescribeQuoted(selector).Should().Be(
+            "sealed true; dependsOn (attributeArguments 'Shop.RouteAttribute' with arguments 'api/orders', '2' and named arguments 'Version=2' or any attribute with arguments 'x')");
+    }
+
+    [Fact]
+    public void Describes_onlyAttributes()
+    {
+        RulePackDescriber.Describe(new TargetSelector { OnlyAttributes = ["Shop.**", "Lib.**"] }).Should().Be("onlyAttributes Shop.**, Lib.**");
+    }
+
+    [Fact]
+    public void Describes_dependsOn()
+    {
+        RulePackDescriber.Describe(new TargetSelector { Namespaces = ["Shop.**"], DependsOn = new TargetSelector { Interfaces = ["Shop.IClock"] } })
+            .Should().Be("namespaces Shop.**; dependsOn (interfaces Shop.IClock)");
+    }
+
+    [Fact]
+    public void Describes_onlyDependsOn()
+    {
+        RulePackDescriber.Describe(new TargetSelector { OnlyDependsOn = new TargetSelector { Namespaces = ["Shop.Domain.**"], Sealed = true } })
+            .Should().Be("onlyDependsOn (namespaces Shop.Domain.**; sealed true)");
+    }
+
+    [Fact]
+    public void Describes_both_dependency_keys_with_nested_layers_after_the_traits()
+    {
+        var selector = new TargetSelector
+        {
+            Layers = ["Web"],
+            Names = ["*Controller"],
+            DependsOn = new TargetSelector { Layers = ["Infrastructure", "Data"] },
+            OnlyDependsOn = new TargetSelector { Layers = ["Domain"] },
+        };
+
+        RulePackDescriber.Describe(selector).Should().Be(
+            "layers Web; names *Controller; dependsOn (layers Infrastructure, Data); onlyDependsOn (layers Domain)");
+    }
+
+    [Fact]
+    public void Describes_dependency_keys_in_is_and_isNot()
+    {
+        var requirement = new RuleRequirement
+        {
+            Is = new TargetSelector { DependsOn = new TargetSelector { Layers = ["Domain"] } },
+            IsNot = new TargetSelector { OnlyDependsOn = new TargetSelector { Layers = ["Domain"] } },
+        };
+
+        RulePackDescriber.Describe(requirement).Should().Be("is dependsOn (layers Domain), isNot onlyDependsOn (layers Domain)");
+    }
+
+    [Fact]
     public void Describe_RequirementWithEveryMember_UsesTheDocumentedOrder()
     {
         var requirement = new RuleRequirement

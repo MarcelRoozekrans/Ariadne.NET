@@ -40,35 +40,27 @@ public sealed class ArchitectureValidator : IArchitectureValidator
         var bannedPackages = BannedPackageRules.Compile(resolvedPack);
         bannedPackages.RequirePackages(projects, paramName);
 
-        // The layer map and the matchers depend on the pack only, so one set serves every project, and a type's layer,
-        // names and matches are worked out once per run.
+        // The layer map depends on the pack only, so one serves every project, and a type's layer and names are worked out
+        // once per run.
         var layers = new LayerMap(resolvedPack);
-        var forbid = ForbidRules.Compile(layers, resolvedPack);
-        var allowOnly = AllowOnlyRules.Compile(layers, resolvedPack);
-        var require = RequireRules.Compile(layers, resolvedPack);
-        var memberFilter = MemberNameFilter.From(resolvedPack);
 
-        var entries = new List<Entry>(projects.Count);
-        foreach (var project in projects)
-        {
-            ArgumentNullException.ThrowIfNull(project, nameof(projects));
-            cancellationToken.ThrowIfCancellationRequested();
+        // Every graph is built before any check runs, because a dependency key selects a type by the dependencies it has in
+        // any project of the run.
+        var graphs = BuildGraphs(projects, MemberNameFilter.From(resolvedPack), cancellationToken);
 
-            entries.Add(AnalyzeProject(project, layers, resolvedPack, new Matchers(forbid, allowOnly, require, bannedPackages, memberFilter), cancellationToken));
-        }
-
+        var dependencies = IndexFor(resolvedPack, projects, graphs);
+        var entries = AnalyzeProjects(projects, graphs, layers, resolvedPack, dependencies, bannedPackages, cancellationToken);
         AddMissingInterfaceViolations(entries, resolvedPack);
 
         // Name collisions span projects, and a type seen in several target frameworks counts once, so they are found
         // once over all graphs and not merged per project.
-        var graphs = GraphsOf(entries);
-        var nameCollisions = UniqueNameRules.Check(layers, resolvedPack, graphs);
+        var nameCollisions = UniqueNameRules.Check(layers, resolvedPack, graphs, dependencies);
 
         // Slices span projects too, and their edges are checked per target framework scope, so they need each graph's framework,
         // project and referenced graphs.
-        var sliceViolations = SliceRules.Check(layers, resolvedPack, ScopedGraph.Of(projects, graphs));
+        var sliceViolations = SliceRules.Check(layers, resolvedPack, ScopedGraph.Of(projects, graphs), dependencies);
 
-        var vacuity = VacuityRules.Check(resolvedPack, layers, graphs, MatchesOf(entries), projects);
+        var vacuity = VacuityRules.Check(resolvedPack, layers, graphs, MatchesOf(entries), projects, dependencies);
 
         var ordered = GroupByProject(entries);
         var allViolations = new List<ArchitectureViolation>();
@@ -94,9 +86,111 @@ public sealed class ArchitectureValidator : IArchitectureValidator
         };
     }
 
-    private static Entry AnalyzeProject(AnalyzedProject project, LayerMap layers, RulePack pack, in Matchers matchers, CancellationToken cancellationToken)
+    private static List<TypeGraph> BuildGraphs(IReadOnlyList<AnalyzedProject> projects, MemberNameFilter memberFilter, CancellationToken cancellationToken)
     {
-        var graph = TypeGraphBuilder.Build(project.Compilation, project.GeneratedTrees, project.RazorTrees, matchers.MemberFilter, cancellationToken);
+        var graphs = new List<TypeGraph>(projects.Count);
+        foreach (var project in projects)
+        {
+            ArgumentNullException.ThrowIfNull(project, nameof(projects));
+            cancellationToken.ThrowIfCancellationRequested();
+
+            graphs.Add(TypeGraphBuilder.Build(project.Compilation, project.GeneratedTrees, project.RazorTrees, memberFilter, cancellationToken));
+        }
+
+        return graphs;
+    }
+
+    /// <summary>The dependency index of the run, built only when the pack uses <c>dependsOn</c> or <c>onlyDependsOn</c>.</summary>
+    /// <param name="pack">The resolved pack.</param>
+    /// <param name="projects">The projects of the run.</param>
+    /// <param name="graphs">The type graph of each project, in the same order.</param>
+    /// <returns>The index, or <see langword="null"/> when no selector of the pack holds either key.</returns>
+    internal static DependencyIndex? IndexFor(RulePack pack, IReadOnlyList<AnalyzedProject> projects, IReadOnlyList<TypeGraph> graphs) =>
+        UsesDependencyKeys(pack) ? DependencyIndex.Build(projects, graphs) : null;
+
+    /// <summary>
+    /// Whether a selector of the pack holds <c>dependsOn</c> or <c>onlyDependsOn</c>: a rule's <c>from</c>, <c>to</c> or
+    /// <c>against</c>, a requirement's <c>is</c>, <c>isNot</c> or <c>implements</c>, a slices <c>allow</c>, or an exception of a
+    /// rule or of a rule amendment.
+    /// </summary>
+    /// <param name="pack">The resolved pack.</param>
+    /// <returns><see langword="true"/> when the run needs the dependency index.</returns>
+    internal static bool UsesDependencyKeys(RulePack pack)
+    {
+        ArgumentNullException.ThrowIfNull(pack);
+
+        foreach (var rule in pack.Rules)
+        {
+            if (HasDependencyKey(rule.From)
+                || HasDependencyKey(rule.To)
+                || HasDependencyKey(rule.Against)
+                || HasDependencyKey(rule.Require?.Is)
+                || HasDependencyKey(rule.Require?.IsNot)
+                || HasDependencyKey(rule.Require?.Implements)
+                || HasDependencyKey(rule.Slices?.Allow)
+                || AnyHasDependencyKey(rule.Exceptions))
+            {
+                return true;
+            }
+        }
+
+        foreach (var amendment in pack.RuleAmendments)
+        {
+            if (AnyHasDependencyKey(amendment.Exceptions))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasDependencyKey(TargetSelector? selector) =>
+        selector is { DependsOn: not null } or { OnlyDependsOn: not null };
+
+    private static bool AnyHasDependencyKey(IList<RuleException> exceptions)
+    {
+        foreach (var exception in exceptions)
+        {
+            if (exception is { DependsOn: not null } or { OnlyDependsOn: not null })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Runs the per-project checks in project order. The matchers depend on the pack and the run's dependencies only, so one
+    // set serves every project.
+    private static List<Entry> AnalyzeProjects(
+        IReadOnlyList<AnalyzedProject> projects,
+        List<TypeGraph> graphs,
+        LayerMap layers,
+        RulePack pack,
+        DependencyIndex? dependencies,
+        BannedPackageRules.Compiled bannedPackages,
+        CancellationToken cancellationToken)
+    {
+        var matchers = new Matchers(
+            ForbidRules.Compile(layers, pack, dependencies),
+            AllowOnlyRules.Compile(layers, pack, dependencies),
+            RequireRules.Compile(layers, pack, dependencies),
+            bannedPackages);
+
+        var entries = new List<Entry>(projects.Count);
+        for (var i = 0; i < projects.Count; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            entries.Add(AnalyzeProject(projects[i], graphs[i], layers, pack, matchers));
+        }
+
+        return entries;
+    }
+
+    private static Entry AnalyzeProject(AnalyzedProject project, TypeGraph graph, LayerMap layers, RulePack pack, in Matchers matchers)
+    {
         var violations = new List<ArchitectureViolation>(LayerRules.Check(graph, layers, pack));
         violations.AddRange(matchers.Forbid.Check(graph));
         violations.AddRange(matchers.AllowOnly.Check(graph));
@@ -105,17 +199,6 @@ public sealed class ArchitectureValidator : IArchitectureValidator
         violations.AddRange(RoleRules.CheckShape(matches));
         violations.AddRange(matchers.BannedPackages.Check(project));
         return new Entry(project, graph, matches, violations);
-    }
-
-    private static List<TypeGraph> GraphsOf(List<Entry> entries)
-    {
-        var graphs = new List<TypeGraph>(entries.Count);
-        foreach (ref readonly var entry in CollectionsMarshal.AsSpan(entries))
-        {
-            graphs.Add(entry.Graph);
-        }
-
-        return graphs;
     }
 
     private static List<RoleMatches> MatchesOf(List<Entry> entries)
@@ -284,8 +367,7 @@ public sealed class ArchitectureValidator : IArchitectureValidator
         DependencyRuleChecker Forbid,
         DependencyRuleChecker AllowOnly,
         RequireRules.Checker Require,
-        BannedPackageRules.Compiled BannedPackages,
-        MemberNameFilter MemberFilter);
+        BannedPackageRules.Compiled BannedPackages);
 
     private sealed class Entry(AnalyzedProject project, TypeGraph graph, RoleMatches matches, List<ArchitectureViolation> violations)
     {

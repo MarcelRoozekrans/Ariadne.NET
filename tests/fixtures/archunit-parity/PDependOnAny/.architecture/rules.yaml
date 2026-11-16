@@ -1,0 +1,26 @@
+schema: 2
+name: parity-p-depend-on-any
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-PDEPENDONANY
+    because: Mirrors ArchUnitNET's DependOnAny; the types it selects must not depend on Forbidden.
+    forbid:
+      from:
+        namespaces: ["Parity.PDependOnAny.**"]
+        dependsOn:
+          namespaces: ["Parity.PDependOnAny.Target.**"]
+      to:
+        namespaces: ["Parity.PDependOnAny.Forbidden.**"]
+  - id: PARITY-PDEPENDONANY-NOT
+    because: Mirrors ArchUnitNET's DoNotDependOnAny; the types it selects must not depend on Forbidden.
+    forbid:
+      from:
+        namespaces: ["Parity.PDependOnAny.**"]
+      to:
+        namespaces: ["Parity.PDependOnAny.Forbidden.**"]
+    exceptions:
+      - dependsOn:
+          namespaces: ["Parity.PDependOnAny.Target.**"]
+        because: DoNotDependOnAny leaves out the types that depend on Target.

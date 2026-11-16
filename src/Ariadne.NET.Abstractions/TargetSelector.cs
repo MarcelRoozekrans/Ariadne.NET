@@ -13,6 +13,10 @@ public sealed class TargetSelector
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> BaseTypes { get; init; } = [];
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> Interfaces { get; init; } = [];
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> Attributes { get; init; } = [];
+    /// <summary>Matches the argument values of attribute instances applied directly to the type. Any one entry may match.</summary>
+    [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<AttributeArgumentMatch> AttributeArguments { get; init; } = [];
+    /// <summary>Dotted globs over the full name of attribute classes. Every attribute applied directly to the type must match one; compiler-emitted attributes are ignored.</summary>
+    [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> OnlyAttributes { get; init; } = [];
     [NotNull, Must(nameof(HasNoNullEntries), Message = "{PropertyName} must not contain null entries.")] public IList<string> Members { get; init; } = [];
 
     /// <summary>Flat globs (<c>Glob.Flat</c>) over the innermost simple name of the type, without arity. Any one may match.</summary>
@@ -31,6 +35,13 @@ public sealed class TargetSelector
     public bool? Static { get; init; }
     /// <summary><c>true</c> matches a type declared inside another type; <c>false</c> matches a top-level type.</summary>
     public bool? Nested { get; init; }
+
+    /// <summary>Holds when at least one dependency of the type is selected by this selector. A dependency is a type the type's own code refers to, as the original definition; a type declared outside the run's projects has none.</summary>
+    [Must(nameof(IsValidDependency), Message = DependencySelectorCheck.Message)] public TargetSelector? DependsOn { get; init; }
+    /// <summary>Holds when every dependency of the type is selected by this selector, and when the type has none. Dependencies on types outside the run's projects are ignored.</summary>
+    [Must(nameof(IsValidDependency), Message = DependencySelectorCheck.Message)] public TargetSelector? OnlyDependsOn { get; init; }
+
+    internal bool IsValidDependency(TargetSelector? nested) => nested is null || DependencySelectorCheck.IsValid(nested);
 
     internal bool HasNoNullEntries<T>(IList<T>? items) => NullEntries.None(items);
 }

@@ -94,10 +94,14 @@ public class TargetMatcherTests
     [InlineData("BaseTypes")]
     [InlineData("Interfaces")]
     [InlineData("Attributes")]
+    [InlineData("AttributeArguments")]
+    [InlineData("OnlyAttributes")]
     public void LayersMixedWithCodeFeatureSelectors_Throws(string key)
     {
         var target = key switch
         {
+            "AttributeArguments" => new TargetSelector { Layers = ["Domain"], AttributeArguments = [new AttributeArgumentMatch { Arguments = ["1"] }] },
+            "OnlyAttributes" => new TargetSelector { Layers = ["Domain"], OnlyAttributes = ["System.**"] },
             "BaseTypes" => new TargetSelector { Layers = ["Domain"], BaseTypes = ["**.Base"] },
             "Interfaces" => new TargetSelector { Layers = ["Domain"], Interfaces = ["**.IRepository"] },
             _ => new TargetSelector { Layers = ["Domain"], Attributes = ["**.ObsoleteAttribute"] },
@@ -193,5 +197,63 @@ public class TargetMatcherTests
 
         Matches("Shop.Data.SealedCommand").Should().BeTrue();
         Matches("Shop.Data.OpenCommand").Should().BeFalse();
+    }
+
+    [Fact]
+    public void DependsOn_with_layers_inside()
+    {
+        var compilation = TestCompilation.Create("""
+            namespace Shop.Domain { public class Order { } }
+            namespace Shop.Web { public class Page { public Shop.Domain.Order? Order; } public class Other { } }
+            """);
+        var (_, index) = TestCompilation.GraphAndIndex(compilation);
+        var matcher = TargetMatcher.From(new TargetSelector { DependsOn = new TargetSelector { Layers = ["Domain"] } }, new LayerMap(Pack), index);
+
+        matcher.Matches(Find(compilation, "Shop.Web.Page")).Should().BeTrue();
+        matcher.Matches(Find(compilation, "Shop.Web.Other")).Should().BeFalse();
+        matcher.Matches(Find(compilation, "Shop.Domain.Order")).Should().BeFalse();
+    }
+
+    [Fact]
+    public void DependsOn_next_to_layers()
+    {
+        var compilation = TestCompilation.Create("""
+            namespace Shop.Web { public class Page { } }
+            namespace Shop.Domain { public class Order { public Shop.Web.Page? Page; } public class Line { } }
+            namespace Shop.App { public class Handler { public Shop.Web.Page? Page; } }
+            """);
+        var (_, index) = TestCompilation.GraphAndIndex(compilation);
+        var matcher = TargetMatcher.From(
+            new TargetSelector { Layers = ["Domain"], DependsOn = new TargetSelector { Namespaces = ["Shop.Web.**"] } }, new LayerMap(Pack), index);
+
+        matcher.Matches(Find(compilation, "Shop.Domain.Order")).Should().BeTrue();
+        matcher.Matches(Find(compilation, "Shop.Domain.Line")).Should().BeFalse();
+        matcher.Matches(Find(compilation, "Shop.App.Handler")).Should().BeFalse();
+    }
+
+    [Fact]
+    public void OnlyDependsOn_next_to_layers()
+    {
+        var compilation = TestCompilation.Create("""
+            namespace Shop.Web { public class Page { } }
+            namespace Shop.Domain { public class Order { public Shop.Web.Page? Page; } public class Line { public Order? Order; } }
+            """);
+        var (_, index) = TestCompilation.GraphAndIndex(compilation);
+        var matcher = TargetMatcher.From(
+            new TargetSelector { Layers = ["Domain"], OnlyDependsOn = new TargetSelector { Layers = ["Domain"] } }, new LayerMap(Pack), index);
+
+        matcher.Matches(Find(compilation, "Shop.Domain.Line")).Should().BeTrue();
+        matcher.Matches(Find(compilation, "Shop.Domain.Order")).Should().BeFalse();
+    }
+
+    [Fact]
+    public void DependsOn_with_layers_next_to_namespaces_inside_throws()
+    {
+        var act = () => TargetMatcher.From(
+            new TargetSelector { DependsOn = new TargetSelector { Layers = ["Domain"], Namespaces = ["Shop.**"] } },
+            new LayerMap(Pack),
+            TestCompilation.GraphAndIndex(TestCompilation.Create(Source)).Index);
+
+        act.Should().Throw<ArgumentException>().WithParameterName("target");
     }
 }

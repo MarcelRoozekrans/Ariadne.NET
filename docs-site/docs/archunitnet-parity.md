@@ -5,7 +5,7 @@ title: ArchUnitNET parity
 
 # ArchUnitNET parity
 
-This page lists every type-level and slice rule kind of [ArchUnitNET](https://github.com/TNG/ArchUnitNET) and says how a pack expresses it, or why it does not. The version is pinned at `TngTech.ArchUnitNET` 0.13.2; the rows come from that package's public API. Member-level kinds are listed too, as `deferred`.
+This page lists every type-level and slice rule kind of [ArchUnitNET](https://github.com/TNG/ArchUnitNET) and says how a pack expresses it, or why it does not. The version is pinned at `TngTech.ArchUnitNET` 0.13.5; the rows come from that package's public API. Member-level kinds are listed too, as `deferred`.
 
 If you are moving an ArchUnitNET test suite to packs, start with the [migration guide](migrating-from-archunitnet.md).
 
@@ -28,7 +28,7 @@ Each row has one of these statuses:
 | `divergence` | Both tools express it but answer differently on purpose, for example because IL and source differ. See [Divergences](#divergences). |
 | `deferred` | Not part of this comparison yet. The notes link the issue that tracks it. |
 | `out-of-scope` | Ariadne will not add it. The notes give the reason. |
-| `ariadne-only` | Ariadne has it and ArchUnitNET 0.13.2 does not. |
+| `ariadne-only` | Ariadne has it and ArchUnitNET 0.13.5 does not. |
 
 A row pairs a positive method with its negation. The negation is the row's `:not` case. The Ariadne column names the [rule types](how-it-works/rule-types.md) and [selector keys](how-it-works/03-rule-schema.md#selectors) a pack uses. Phase 4.2 added the keys `is`, `isNot`, `names`, `kinds`, `assignableTo`, `sealed`, `abstract`, `static` and `nested`, and the `accessibility` list in a selector.
 
@@ -70,7 +70,7 @@ Methods of `Types().Should()`.
 | `c-be-nested-in` | `BeNestedIn` | `require` with `is: { nested: true, types }` | `covered` | |
 | `c-have-member-with-name` | `HaveMemberWithName`, `HaveMethodMemberWithName`, `HavePropertyMemberWithName`, `HaveFieldMemberWithName`, `NotHaveMemberWithName`, `NotHaveMethodMemberWithName`, `NotHavePropertyMemberWithName`, `NotHaveFieldMemberWithName` | — | `deferred` | member level, see #94 |
 | `c-adhere-to-plant-uml-diagram` | `AdhereToPlantUmlDiagram` | — | `out-of-scope` | Ariadne rules are YAML, not diagrams. A pack's layers and `allowedDependencies` say what a component diagram says. |
-| `c-be-static` | — | `require` with `is: { static: true }` | `ariadne-only` | ArchUnitNET 0.13.2 has no type-level static; added in 4.2 |
+| `c-be-static` | — | `require` with `is: { static: true }` | `ariadne-only` | ArchUnitNET 0.13.5 has no type-level static; added in 4.2 |
 
 ## Class
 
@@ -164,9 +164,9 @@ Methods that every kind of object has, here applied to `Types()`.
 |---|---|---|---|---|
 | `c-not-depend-on-any` | `NotDependOnAny`, `NotDependOnAnyTypesThat` | `forbid` | `covered` | |
 | `c-only-depend-on` | `OnlyDependOn`, `OnlyDependOnTypesThat` | a layer's `allowedDependencies` | `divergence` | Framework types count for neither tool, though ArchUnitNET names `System.Object` in its message. See [c-only-depend-on](#c-only-depend-on). |
-| `c-depend-on-any` | `DependOnAny`, `DependOnAnyTypesThat` | — | `deferred` | dependency as a requirement, see #96 |
-| `p-depend-on-any` | `DependOnAny`, `DoNotDependOnAny` | — | `deferred` | dependency as a selector, see #96 |
-| `p-only-depend-on` | `OnlyDependOn` | — | `deferred` | dependency as a selector, see #96 |
+| `c-depend-on-any` | `DependOnAny`, `DependOnAnyTypesThat` | `require` with `is: { dependsOn }` | `covered` | A type with no dependencies fails it in both tools. |
+| `p-depend-on-any` | `DependOnAny`, `DoNotDependOnAny` | `dependsOn`; `:not` as an exception with `dependsOn` | `covered` | |
+| `p-only-depend-on` | `OnlyDependOn` | `onlyDependsOn` | `covered` | Framework types and a lambda's compiler-generated closure class count for neither tool. |
 | `p-call-any` | `CallAny`, `DoNotCallAny` | — | `deferred` | member level, see #94 |
 | `c-call-any` | `CallAny`, `NotCallAny` | — | `deferred` | member level, see #94 |
 
@@ -176,12 +176,12 @@ Methods that every kind of object has, here applied to `Types()`.
 |---|---|---|---|---|
 | `p-have-any-attributes` | `HaveAnyAttributes`, `DoNotHaveAnyAttributes` | `attributes`; `:not` as an exception with `attributes` | `covered` | |
 | `c-have-any-attributes` | `HaveAnyAttributes`, `HaveAnyAttributesThat`, `NotHaveAnyAttributes`, `NotHaveAnyAttributesThat` | `require` with `is: { attributes }`, `isNot: { attributes }` | `covered` | |
-| `p-have-attribute-with-arguments` | `HaveAttributeWithArguments`, `HaveAnyAttributesWithArguments`, `DoNotHaveAttributeWithArguments`, `DoNotHaveAnyAttributesWithArguments` | — | `deferred` | attribute arguments, see #95 |
-| `c-have-attribute-with-arguments` | `HaveAttributeWithArguments`, `HaveAnyAttributesWithArguments`, `NotHaveAttributeWithArguments`, `NotHaveAnyAttributesWithArguments` | — | `deferred` | attribute arguments, see #95 |
-| `p-have-attribute-with-named-arguments` | `HaveAttributeWithNamedArguments`, `HaveAnyAttributesWithNamedArguments`, `DoNotHaveAttributeWithNamedArguments`, `DoNotHaveAnyAttributesWithNamedArguments` | — | `deferred` | attribute arguments, see #95 |
-| `c-have-attribute-with-named-arguments` | `HaveAttributeWithNamedArguments`, `HaveAnyAttributesWithNamedArguments`, `NotHaveAttributeWithNamedArguments`, `NotHaveAnyAttributesWithNamedArguments` | — | `deferred` | attribute arguments, see #95 |
-| `p-only-have-attributes` | `OnlyHaveAttributes` | — | `deferred` | attribute arguments, see #95 |
-| `c-only-have-attributes` | `OnlyHaveAttributes`, `OnlyHaveAttributesThat` | — | `deferred` | attribute arguments, see #95 |
+| `p-have-attribute-with-arguments` | `HaveAttributeWithArguments`, `HaveAnyAttributesWithArguments`, `DoNotHaveAttributeWithArguments`, `DoNotHaveAnyAttributesWithArguments` | `attributeArguments` with `attribute` and `arguments`; `:not` as an exception with one `attributeArguments` entry per value, with `attribute` set for the `…AttributeWith…` form | `covered` | |
+| `c-have-attribute-with-arguments` | `HaveAttributeWithArguments`, `HaveAnyAttributesWithArguments`, `NotHaveAttributeWithArguments`, `NotHaveAnyAttributesWithArguments` | `require` with `is: { attributeArguments }` with `attribute` and `arguments`; `:not` as `isNot` with one entry per value, with `attribute` set for the `…AttributeWith…` form | `covered` | |
+| `p-have-attribute-with-named-arguments` | `HaveAttributeWithNamedArguments`, `HaveAnyAttributesWithNamedArguments`, `DoNotHaveAttributeWithNamedArguments`, `DoNotHaveAnyAttributesWithNamedArguments` | `attributeArguments` with `attribute` and `named`; `:not` as an exception with one `attributeArguments` entry per pair, with `attribute` set for the `…AttributeWith…` form | `covered` | |
+| `c-have-attribute-with-named-arguments` | `HaveAttributeWithNamedArguments`, `HaveAnyAttributesWithNamedArguments`, `NotHaveAttributeWithNamedArguments`, `NotHaveAnyAttributesWithNamedArguments` | `require` with `is: { attributeArguments }` with `attribute` and `named`; `:not` as `isNot` with one entry per pair, with `attribute` set for the `…AttributeWith…` form | `covered` | |
+| `p-only-have-attributes` | `OnlyHaveAttributes` | `onlyAttributes`; `OnlyHaveAttributes()` with no set as an exception with `attributes: ["**"]` | `covered` | |
+| `c-only-have-attributes` | `OnlyHaveAttributes`, `OnlyHaveAttributesThat` | `require` with `is: { onlyAttributes }`; `OnlyHaveAttributes()` with no set as `isNot: { attributes: ["**"] }` | `covered` | |
 
 ### Custom rules
 
@@ -202,7 +202,7 @@ Methods that every kind of object has, here applied to `Types()`.
 
 ## Member level
 
-Methods of `Members()`, `MethodMembers()`, `PropertyMembers()` and `FieldMembers()`. Field members have no methods of their own in 0.13.2; they use the member and object-level methods.
+Methods of `Members()`, `MethodMembers()`, `PropertyMembers()` and `FieldMembers()`. Field members have no methods of their own in 0.13.5; they use the member and object-level methods.
 
 | Id | ArchUnitNET | Ariadne | Status | Notes |
 |---|---|---|---|---|
@@ -288,16 +288,16 @@ Fixture `tests/fixtures/archunit-parity/CBeAbstract`, rule `Classes().That().Res
 
 Fixture `tests/fixtures/archunit-parity/COnlyDependOn`, rule `Should().OnlyDependOn(Types().That().ResideInNamespace("….Target"))` against a `Subject` layer with `allowedDependencies: [Allowed]`. Both tools flag `Broken.OrderService`, which depends on `Forbidden.Mailer` in a layer the subject may not use. Only ArchUnitNET flags `Broken.AuditTrail`, which depends on `Helpers.Clock`, a type no layer covers. Neither flags `Broken.ReportBuilder`, which depends on `System.Text.StringBuilder`.
 
-- **Reason:** `OnlyDependOn` fails a dependency on any type of the loaded assemblies outside the allowed set. The layer check is open-world: it does not check a dependency on a type no layer covers. Framework types are outside the loaded assemblies, so they count for neither tool, although ArchUnitNET 0.13.2 names `System.Object` in its failure message.
+- **Reason:** `OnlyDependOn` fails a dependency on any type of the loaded assemblies outside the allowed set. The layer check is open-world: it does not check a dependency on a type no layer covers. Framework types are outside the loaded assemblies, so they count for neither tool, although ArchUnitNET 0.13.5 names `System.Object` in its failure message.
 - **Expected:** ArchUnitNET's answer, for a developer who wrote `OnlyDependOn`. In a pack, cover the namespace with a layer that is not in `allowedDependencies`, as the fixture does for `Forbidden`, and Ariadne flags the dependency too.
 
 ### Names: generic arity, nested types and case
 
-Three differences in how the tools read a type's name, measured against ArchUnitNET 0.13.2:
+Three differences in how the tools read a type's name, measured against ArchUnitNET 0.13.5:
 
 - **Generic arity.** ArchUnitNET reads the metadata name, so `OrderService<T>` is named ``OrderService`1``. Ariadne matches `types` globs against the source name without arity, so `OrderService<T>` is `OrderService`. `HaveNameStartingWith` and `HaveNameContaining` agree because the arity sits at the end; `HaveName`, `HaveNameEndingWith`, `HaveFullName` and `HaveFullNameEndingWith` do not.
 - **Nested types.** ArchUnitNET joins a nested type to its outer type with `+`, as in `Outer+OrderService`; Ariadne joins them with `.`. `HaveName` reads the nested type's own name in both tools, so only `HaveFullName` with a dotted name differs.
-- **Case.** ArchUnitNET 0.13.2 ignores case in `HaveName`, `HaveFullName`, `HaveFullNameStartingWith`, `HaveFullNameEndingWith` and `HaveFullNameContaining`, and keeps it in `HaveNameStartingWith`, `HaveNameEndingWith` and `HaveNameContaining`. Ariadne's `types` globs always keep case.
+- **Case.** ArchUnitNET 0.13.5 ignores case in `HaveName`, `HaveFullName`, `HaveFullNameStartingWith`, `HaveFullNameEndingWith` and `HaveFullNameContaining`, and keeps it in `HaveNameStartingWith`, `HaveNameEndingWith` and `HaveNameContaining`. Ariadne's `types` globs always keep case.
 
 **Expected:** Ariadne's answer in all three. In C# the type is named `OrderService`, a developer writes `Outer.OrderService`, and `orderService` is another type than `OrderService`. Neither tool can select `OrderService` and leave out `OrderService<T>` by name; phase 4.2's `names` key reads the name without arity too.
 

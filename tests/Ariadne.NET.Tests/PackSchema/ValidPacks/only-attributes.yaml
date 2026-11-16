@@ -1,0 +1,27 @@
+schema: 2
+name: x
+layers:
+  - name: Domain
+    id: X-L-DOMAIN
+    because: core
+    namespaces: ["**.Domain.**"]
+  - name: Web
+    id: X-L-WEB
+    because: edge
+    namespaces: ["**.Web.**"]
+    allowedDependencies: [Domain]
+rules:
+  - id: X-R1
+    because: b
+    forbid:
+      from: { onlyAttributes: ["**.SerializableAttribute", "System.*"] }
+      to: { namespaces: ["**.Persistence.**"] }
+    exceptions:
+      - onlyAttributes: ["**.AuditedAttribute"]
+        because: audited types may use persistence
+  - id: X-R2
+    because: b
+    require:
+      for: { layers: [Web] }
+      is: { onlyAttributes: ["**.RouteAttribute"] }
+      isNot: { onlyAttributes: ["**.ObsoleteAttribute"] }

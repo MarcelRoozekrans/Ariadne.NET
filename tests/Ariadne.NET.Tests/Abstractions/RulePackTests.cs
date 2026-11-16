@@ -66,7 +66,7 @@ public class RulePackTests
     {
         var exception = new RuleException { Because = "" };
 
-        new RuleExceptionValidator().Validate(exception).IsValid.Should().BeFalse();
+        new RuleExceptionValidator(new AttributeArgumentMatchValidator()).Validate(exception).IsValid.Should().BeFalse();
     }
 
     [Fact]
@@ -90,7 +90,7 @@ public class RulePackTests
     {
         var amendment = new RuleAmendment { Id = "" };
 
-        new RuleAmendmentValidator(new RuleExceptionValidator()).Validate(amendment).IsValid.Should().BeFalse();
+        new RuleAmendmentValidator(new RuleExceptionValidator(new AttributeArgumentMatchValidator())).Validate(amendment).IsValid.Should().BeFalse();
     }
 
     [Theory]
@@ -134,7 +134,7 @@ public class RulePackTests
             _ => new TargetSelector { Attributes = ["Foo", null!] },
         };
 
-        new TargetSelectorValidator().Validate(selector).IsValid.Should().BeFalse();
+        new TargetSelectorValidator(new AttributeArgumentMatchValidator()).Validate(selector).IsValid.Should().BeFalse();
     }
 
     [Fact]
@@ -142,7 +142,7 @@ public class RulePackTests
     {
         var requirement = new RuleRequirement { Implements = new TargetSelector { Interfaces = ["IFoo", null!] } };
 
-        new RuleRequirementValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new TargetSelectorValidator()).Validate(requirement).IsValid.Should().BeFalse();
+        new RuleRequirementValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new TargetSelectorValidator(new AttributeArgumentMatchValidator())).Validate(requirement).IsValid.Should().BeFalse();
     }
 
     [Fact]
@@ -177,7 +177,7 @@ public class RulePackTests
     {
         var selector = new TargetSelector { Members = ["Foo", null!] };
 
-        new TargetSelectorValidator().Validate(selector).IsValid.Should().BeFalse();
+        new TargetSelectorValidator(new AttributeArgumentMatchValidator()).Validate(selector).IsValid.Should().BeFalse();
     }
 
     [Fact]
@@ -213,13 +213,13 @@ public class RulePackTests
     }
 
     private static RuleDefinitionValidator RuleValidator() =>
-        new(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleRequirementValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new TargetSelectorValidator()), new TargetSelectorValidator(), new RuleExceptionValidator(), new SliceDefinitionValidator(new TargetSelectorValidator()));
+        new(new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new RuleRequirementValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new TargetSelectorValidator(new AttributeArgumentMatchValidator())), new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new RuleExceptionValidator(new AttributeArgumentMatchValidator()), new SliceDefinitionValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator())));
 
     private static RulePackValidator PackValidator() => new(
         new LayerDefinitionValidator(),
         new ComponentRoleDefinitionValidator(),
-        new RuleDefinitionValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleRequirementValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new TargetSelectorValidator()), new TargetSelectorValidator(), new RuleExceptionValidator(), new SliceDefinitionValidator(new TargetSelectorValidator())),
+        new RuleDefinitionValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new RuleRequirementValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new TargetSelectorValidator(new AttributeArgumentMatchValidator())), new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new RuleExceptionValidator(new AttributeArgumentMatchValidator()), new SliceDefinitionValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator()))),
         new LayerRetargetValidator(),
-        new RuleAmendmentValidator(new RuleExceptionValidator()),
+        new RuleAmendmentValidator(new RuleExceptionValidator(new AttributeArgumentMatchValidator())),
         new NamingConventionsValidator());
 }

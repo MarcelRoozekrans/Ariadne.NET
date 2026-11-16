@@ -25,10 +25,11 @@ internal static class SliceRules
     /// <param name="layers">The layer map of the pack.</param>
     /// <param name="pack">The resolved pack.</param>
     /// <param name="graphs">The type graphs of the run, each with its project, target framework and referenced graphs.</param>
+    /// <param name="dependencies">The run's dependency index, or <see langword="null"/> when the pack uses no dependency key.</param>
     /// <returns>The violations, in pack rule order.</returns>
     /// <exception cref="ArgumentException">A slices rule has no slices or a malformed pattern, which only a pack built in code can hold.</exception>
     public static IReadOnlyList<ArchitectureViolation> Check(
-        LayerMap layers, RulePack pack, IReadOnlyList<ScopedGraph> graphs)
+        LayerMap layers, RulePack pack, IReadOnlyList<ScopedGraph> graphs, DependencyIndex? dependencies = null)
     {
         ArgumentNullException.ThrowIfNull(layers);
         ArgumentNullException.ThrowIfNull(pack);
@@ -45,9 +46,9 @@ internal static class SliceRules
 
             scopes ??= Scope.Build(graphs);
             var slices = SlicesOf(rule);
-            var sliced = new SlicedTypes(Slicer.From(rule, slices), ExceptionsOf(rule), layers.Names);
+            var sliced = new SlicedTypes(Slicer.From(rule, slices), ExceptionsOf(rule, layers, dependencies), layers.Names);
             sliced.Collect(graphs);
-            var allow = slices.Allow is { } selector ? TargetMatcher.From(selector, layers) : null;
+            var allow = slices.Allow is { } selector ? TargetMatcher.From(selector, layers, dependencies) : null;
             var perGraph = new List<SliceEdges>(graphs.Count);
             foreach (var scoped in graphs)
             {
@@ -95,12 +96,12 @@ internal static class SliceRules
     private static SliceDefinition SlicesOf(RuleDefinition rule) =>
         rule.Slices ?? throw new ArgumentException($"Slices rule '{rule.Id}' has no slices.", nameof(rule));
 
-    private static TypeSelector[] ExceptionsOf(RuleDefinition rule)
+    private static TypeSelector[] ExceptionsOf(RuleDefinition rule, LayerMap layers, DependencyIndex? dependencies)
     {
         var exceptions = new TypeSelector[rule.Exceptions.Count];
         for (var i = 0; i < exceptions.Length; i++)
         {
-            exceptions[i] = TypeSelector.From(rule.Exceptions[i]);
+            exceptions[i] = TypeSelector.From(rule.Exceptions[i], layers, dependencies);
         }
 
         return exceptions;

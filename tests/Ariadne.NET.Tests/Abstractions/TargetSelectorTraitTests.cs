@@ -27,7 +27,7 @@ public sealed class TargetSelectorTraitTests
     [Fact]
     public void Validator_rejects_null_entries_in_new_lists()
     {
-        var validator = new TargetSelectorValidator();
+        var validator = new TargetSelectorValidator(new AttributeArgumentMatchValidator());
 
         var result = validator.Validate(new TargetSelector
         {
@@ -62,7 +62,7 @@ public sealed class TargetSelectorTraitTests
         exception.Static.Should().BeNull();
         exception.Nested.Should().BeNull();
 
-        var result = new RuleExceptionValidator().Validate(
+        var result = new RuleExceptionValidator(new AttributeArgumentMatchValidator()).Validate(
             new RuleException { Because = "x", Names = [null!], Accessibility = [null!], AssignableTo = [null!] });
         result.IsValid.Should().BeFalse();
         PropertyNames(result).Should().Contain(["Names", "Accessibility", "AssignableTo"]);
@@ -72,7 +72,7 @@ public sealed class TargetSelectorTraitTests
     public void Code_built_role_and_require_reject_enum_and_delegate()
     {
         var roleValidator = new ComponentRoleDefinitionValidator();
-        var requirementValidator = new RuleRequirementValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new TargetSelectorValidator());
+        var requirementValidator = new RuleRequirementValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new TargetSelectorValidator(new AttributeArgumentMatchValidator()));
 
         foreach (var kind in new[] { CSharpTypeKind.Enum, CSharpTypeKind.Delegate })
         {

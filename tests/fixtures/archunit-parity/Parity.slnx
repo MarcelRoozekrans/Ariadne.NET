@@ -70,4 +70,13 @@
   <Project Path="SFreeOfCycles/Parity.SFreeOfCycles.csproj" />
   <Project Path="SNotDependOnEachOther/Parity.SNotDependOnEachOther.csproj" />
   <Project Path="SMatchingWithPackages/Parity.SMatchingWithPackages.csproj" />
+  <Project Path="PHaveAttributeWithArguments/Parity.PHaveAttributeWithArguments.csproj" />
+  <Project Path="CHaveAttributeWithArguments/Parity.CHaveAttributeWithArguments.csproj" />
+  <Project Path="PHaveAttributeWithNamedArguments/Parity.PHaveAttributeWithNamedArguments.csproj" />
+  <Project Path="CHaveAttributeWithNamedArguments/Parity.CHaveAttributeWithNamedArguments.csproj" />
+  <Project Path="POnlyHaveAttributes/Parity.POnlyHaveAttributes.csproj" />
+  <Project Path="COnlyHaveAttributes/Parity.COnlyHaveAttributes.csproj" />
+  <Project Path="PDependOnAny/Parity.PDependOnAny.csproj" />
+  <Project Path="CDependOnAny/Parity.CDependOnAny.csproj" />
+  <Project Path="POnlyDependOn/Parity.POnlyDependOn.csproj" />
 </Solution>

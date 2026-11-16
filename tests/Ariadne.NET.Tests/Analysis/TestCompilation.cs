@@ -47,6 +47,16 @@ internal static class TestCompilation
         return compilation;
     }
 
+    /// <summary>Builds the type graph of one compilation and the dependency index of a run made of it alone.</summary>
+    public static (Ariadne.NET.Analysis.TypeGraph Graph, Ariadne.NET.Analysis.DependencyIndex Index) GraphAndIndex(CSharpCompilation compilation)
+    {
+        ArgumentNullException.ThrowIfNull(compilation);
+
+        var project = new Ariadne.NET.Analysis.AnalyzedProject(compilation.AssemblyName ?? string.Empty, null, compilation);
+        var graph = Ariadne.NET.Analysis.TypeGraphBuilder.Build(compilation, new HashSet<SyntaxTree>(), CancellationToken.None);
+        return (graph, Ariadne.NET.Analysis.DependencyIndex.Build([project], [graph]));
+    }
+
     private static IReadOnlyList<MetadataReference> LoadPlatformReferences()
     {
         var tpa = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")

@@ -1,5 +1,6 @@
 using Ariadne.NET.Abstractions;
 using Ariadne.NET.Analysis;
+using Ariadne.NET.RuleLoader;
 using FluentAssertions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -349,6 +350,175 @@ public class RequireRulesTests
             .Should().ContainSingle().Which.Message.Should().Be("Type 'Open' is selected by rule 'R' and should be sealed but is not");
     }
 
+    private const string ShopAttributes =
+        "namespace Shop { public class RouteAttribute : System.Attribute { public RouteAttribute(string p, int v) { } public int Version { get; set; } } } " +
+        "namespace Other { public class TagAttribute : System.Attribute { } } ";
+
+    private static readonly TargetSelector InController = new() { Names = ["OrderController"] };
+
+    private static AttributeArgumentMatch RouteMatch() => new()
+    {
+        Attribute = "Shop.RouteAttribute",
+        Arguments = ["api/orders", "2"],
+        Named = new Dictionary<string, string>(StringComparer.Ordinal) { ["Version"] = "2" },
+    };
+
+    [Fact]
+    public void Is_attributeArguments_message()
+    {
+        var pack = ConditionPack(InController, new RuleRequirement { Is = new TargetSelector { AttributeArguments = [RouteMatch()] } });
+
+        Check(ShopAttributes + "namespace N { public class OrderController { } }", pack).Should().ContainSingle().Which.Message.Should().Be(
+            "Type 'OrderController' is selected by rule 'R' and should have an attribute matching 'Shop.RouteAttribute' with arguments 'api/orders', '2' and named arguments 'Version=2' but does not");
+    }
+
+    [Fact]
+    public void IsNot_attributeArguments_message()
+    {
+        var pack = ConditionPack(InController, new RuleRequirement { IsNot = new TargetSelector { AttributeArguments = [RouteMatch()] } });
+
+        Check(ShopAttributes + "namespace N { [Shop.Route(\"api/orders\", 2, Version = 2)] public class OrderController { } }", pack)
+            .Should().ContainSingle().Which.Message.Should().Be(
+                "Type 'OrderController' is selected by rule 'R' and should not have an attribute matching 'Shop.RouteAttribute' with arguments 'api/orders', '2' and named arguments 'Version=2' but does");
+    }
+
+    [Fact]
+    public void Two_attributeArguments_entries_are_joined_with_or()
+    {
+        var second = new AttributeArgumentMatch { Arguments = ["x"] };
+        var pack = ConditionPack(InController, new RuleRequirement { Is = new TargetSelector { AttributeArguments = [RouteMatch(), second] } });
+
+        Check(ShopAttributes + "namespace N { public class OrderController { } }", pack).Should().ContainSingle().Which.Message.Should().Be(
+            "Type 'OrderController' is selected by rule 'R' and should have an attribute matching 'Shop.RouteAttribute' with arguments 'api/orders', '2' and named arguments 'Version=2' or an attribute with arguments 'x' but does not");
+    }
+
+    [Fact]
+    public void Is_onlyAttributes_message()
+    {
+        var pack = ConditionPack(InController, new RuleRequirement { Is = new TargetSelector { OnlyAttributes = ["Shop.**"] } });
+
+        Check(ShopAttributes + "namespace N { [Shop.Route(\"a\", 1)] [Other.Tag] public class OrderController { } }", pack)
+            .Should().ContainSingle().Which.Message.Should().Be(
+                "Type 'OrderController' is selected by rule 'R' and should only have attributes matching 'Shop.**' but has 'Other.TagAttribute'");
+    }
+
+    [Fact]
+    public void IsNot_onlyAttributes_message()
+    {
+        var pack = ConditionPack(InController, new RuleRequirement { IsNot = new TargetSelector { OnlyAttributes = ["Shop.**"] } });
+
+        Check(ShopAttributes + "namespace N { [Shop.Route(\"a\", 1)] public class OrderController { } }", pack)
+            .Should().ContainSingle().Which.Message.Should().Be(
+                "Type 'OrderController' is selected by rule 'R' and should not only have attributes matching 'Shop.**' but has only attributes matching them");
+    }
+
+    private const string DependencySource = """
+        namespace Shop { public interface IClock { } }
+        namespace Shop.Domain { public class Order { } }
+        namespace Shop.Infrastructure { public class SqlStore { } }
+        namespace Shop.Application
+        {
+            public class OrderHandler { public Shop.Domain.Order? O; public Shop.Infrastructure.SqlStore? S; }
+        }
+        """;
+
+    private static readonly TargetSelector HandlerTypes = new() { Names = ["OrderHandler"] };
+
+    [Fact]
+    public void Is_dependsOn_message()
+    {
+        var pack = PackWith(Rule(HandlerTypes, new RuleRequirement { Is = new TargetSelector { DependsOn = new TargetSelector { Interfaces = ["Shop.IClock"] } } }));
+
+        var v = CheckWithIndex(DependencySource, pack).Should().ContainSingle().Subject;
+
+        v.Kind.Should().Be(ViolationKind.RequirementNotMet);
+        v.SourceType.Should().Be("Shop.Application.OrderHandler");
+        v.Message.Should().Be(
+            "Type 'OrderHandler' is selected by rule 'TEST-REQUIRE' and should depend on a type matching interfaces 'Shop.IClock' but does not");
+    }
+
+    [Fact]
+    public void Is_dependsOn_holds_when_one_dependency_matches()
+    {
+        var pack = PackWith(Rule(HandlerTypes, new RuleRequirement { Is = new TargetSelector { DependsOn = new TargetSelector { Layers = ["Domain"] } } }));
+
+        CheckWithIndex(DependencySource, pack).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void IsNot_dependsOn_message()
+    {
+        var pack = PackWith(Rule(HandlerTypes, new RuleRequirement { IsNot = new TargetSelector { DependsOn = new TargetSelector { Layers = ["Infrastructure"] } } }));
+
+        CheckWithIndex(DependencySource, pack).Should().ContainSingle().Which.Message.Should().Be(
+            "Type 'OrderHandler' is selected by rule 'TEST-REQUIRE' and should not depend on a type matching layers 'Infrastructure' but depends on 'Shop.Infrastructure.SqlStore'");
+    }
+
+    [Fact]
+    public void Is_onlyDependsOn_message()
+    {
+        var pack = PackWith(Rule(HandlerTypes, new RuleRequirement { Is = new TargetSelector { OnlyDependsOn = new TargetSelector { Layers = ["Domain"] } } }));
+
+        CheckWithIndex(DependencySource, pack).Should().ContainSingle().Which.Message.Should().Be(
+            "Type 'OrderHandler' is selected by rule 'TEST-REQUIRE' and should only depend on types matching layers 'Domain' but depends on 'Shop.Infrastructure.SqlStore'");
+    }
+
+    [Fact]
+    public void IsNot_onlyDependsOn_message_on_type_without_dependencies()
+    {
+        var pack = PackWith(Rule(new TargetSelector { Names = ["Order"] }, new RuleRequirement { IsNot = new TargetSelector { OnlyDependsOn = new TargetSelector { Layers = ["Domain"] } } }));
+
+        CheckWithIndex(DependencySource, pack).Should().ContainSingle().Which.Message.Should().Be(
+            "Type 'Order' is selected by rule 'TEST-REQUIRE' and should not only depend on types matching layers 'Domain' but does");
+    }
+
+    [Fact]
+    public void IsNot_onlyDependsOn_holds_when_a_dependency_is_outside()
+    {
+        var pack = PackWith(Rule(HandlerTypes, new RuleRequirement { IsNot = new TargetSelector { OnlyDependsOn = new TargetSelector { Layers = ["Domain"] } } }));
+
+        CheckWithIndex(DependencySource, pack).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Dependency_conditions_from_yaml_are_reported_by_the_validator()
+    {
+        var loaded = new YamlRulePackLoader().LoadFromString("""
+            schema: 2
+            name: shop
+            layers:
+              - name: Domain
+                id: L-DOMAIN
+                because: Domain.
+                namespaces: ["**.Domain.**"]
+              - name: Infrastructure
+                id: L-INFRA
+                because: Infrastructure.
+                namespaces: ["**.Infrastructure.**"]
+                allowedDependencies: [Domain]
+            rules:
+              - id: R-IS
+                because: Handlers use the clock.
+                require:
+                  for: { names: [OrderHandler] }
+                  is: { dependsOn: { interfaces: [Shop.IClock] } }
+              - id: R-ISNOT
+                because: Handlers stay off the store.
+                require:
+                  for: { names: [OrderHandler] }
+                  isNot: { dependsOn: { layers: [Infrastructure] } }
+            """);
+        loaded.IsSuccess.Should().BeTrue(loaded.IsFailure ? loaded.Error.Detail : string.Empty);
+
+        var report = new ArchitectureValidator().Validate(loaded.Value, TestCompilation.Create(DependencySource));
+
+        report.Violations.Where(v => v.Kind == ViolationKind.RequirementNotMet).Select(v => v.Message).Should().BeEquivalentTo(
+        [
+            "Type 'OrderHandler' is selected by rule 'R-IS' and should depend on a type matching interfaces 'Shop.IClock' but does not",
+            "Type 'OrderHandler' is selected by rule 'R-ISNOT' and should not depend on a type matching layers 'Infrastructure' but depends on 'Shop.Infrastructure.SqlStore'",
+        ]);
+    }
+
     [Fact]
     public void RequirementNotMet_is_13() => ((int)ViolationKind.RequirementNotMet).Should().Be(13);
 
@@ -356,5 +526,11 @@ public class RequireRulesTests
     {
         var graph = TypeGraphBuilder.Build(TestCompilation.Create(source), new HashSet<SyntaxTree>(), CancellationToken.None);
         return RequireRules.Check(graph, new LayerMap(pack), pack);
+    }
+
+    private static IReadOnlyList<ArchitectureViolation> CheckWithIndex(string source, RulePack pack)
+    {
+        var (graph, index) = TestCompilation.GraphAndIndex(TestCompilation.Create(source));
+        return RequireRules.Compile(new LayerMap(pack), pack, index).Check(graph);
     }
 }

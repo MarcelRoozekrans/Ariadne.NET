@@ -320,7 +320,7 @@ public class PackYamlReaderTests
             """;
 
         Problems(yaml).Should().Equal(
-            new PackProblem(8, 9, "a target in rule 'SH-001' cannot mix 'layers' with 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces' or 'attributes'"));
+            new PackProblem(8, 9, "a target in rule 'SH-001' cannot mix 'layers' with 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'attributeArguments' or 'onlyAttributes'"));
     }
 
     [Fact]
@@ -346,7 +346,7 @@ public class PackYamlReaderTests
 
         Problems(yaml).Should().Equal(
             new PackProblem(4, 5, "layer 'Domain' needs at least one of 'namespaces', 'assemblies'"),
-            new PackProblem(15, 9, "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'assemblies', 'types', 'attributes', 'names', 'kinds', 'accessibility', 'assignableTo', 'sealed', 'abstract', 'static', 'nested'"));
+            new PackProblem(15, 9, "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'assemblies', 'types', 'attributes', 'attributeArguments', 'onlyAttributes', 'names', 'kinds', 'accessibility', 'assignableTo', 'sealed', 'abstract', 'static', 'nested', 'dependsOn', 'onlyDependsOn'"));
     }
 
     [Fact]
@@ -364,7 +364,7 @@ public class PackYamlReaderTests
             """;
 
         Problems(yaml).Should().Equal(
-            new PackProblem(8, 11, "the to of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'members', 'names', 'kinds', 'accessibility', 'assignableTo', 'sealed', 'abstract', 'static', 'nested'"));
+            new PackProblem(8, 11, "the to of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'attributeArguments', 'onlyAttributes', 'members', 'names', 'kinds', 'accessibility', 'assignableTo', 'sealed', 'abstract', 'static', 'nested', 'dependsOn', 'onlyDependsOn'"));
     }
 
     [Fact]
@@ -893,6 +893,35 @@ public class PackYamlReaderTests
         watch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5));
     }
 
+    [Theory]
+    [InlineData("arguments", "[", "]")]
+    [InlineData("named", "{", "}")]
+    public void AliasExpansion_StopsAtTheBudgetInsideAnAttributeArgumentEntry(string key, string open, string close)
+    {
+        // One rule whose attributeArguments entry holds 1000 values or names, aliased 150 times.
+        const int k = 1000;
+        var yaml = new System.Text.StringBuilder()
+            .Append("schema: 2\nname: shop\nrules:\n")
+            .Append("  - &r\n    id: R1\n    because: x\n    forbid:\n      to: { layers: [B] }\n      from:\n        attributeArguments:\n")
+            .Append("          - ").Append(key).Append(": ").Append(open).Append('\n');
+        for (var i = 0; i < k; i++)
+        {
+            yaml.Append("              ").Append(string.Equals(key, "named", StringComparison.Ordinal) ? $"n{i}: v" : $"v{i}").Append(",\n");
+        }
+
+        yaml.Append("              ").Append(close).Append('\n');
+        for (var i = 1; i < 150; i++)
+        {
+            yaml.Append("  - *r\n");
+        }
+
+        var problems = Problems(yaml.ToString());
+
+        problems.Should().ContainSingle()
+            .Which.Message.Should().Be("the pack expands to more than 100000 entries");
+        problems[0].Line.Should().BeInRange(9, 9 + k, "the budget runs out inside the aliased entry");
+    }
+
     [Fact]
     public void ProblemInANodeReachedTwiceByAlias_ReportedOnce()
     {
@@ -1274,7 +1303,7 @@ public class PackYamlReaderTests
         var yaml = RequireHead + "    uniqueNames:\n      for: {}\n      against: { layers: [Application] }\n";
 
         Problems(yaml).Should().Equal(
-            new PackProblem(7, 12, "the for of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes'"));
+            new PackProblem(7, 12, "the for of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'attributeArguments', 'onlyAttributes', 'dependsOn', 'onlyDependsOn'"));
     }
 
     [Fact]
@@ -1298,7 +1327,7 @@ public class PackYamlReaderTests
             """;
 
         Problems(yaml).Should().Equal(
-            new PackProblem(10, 9, "'assemblies' is not accepted in exceptions[0] of rule 'SH-001'; an exception of a uniqueNames rule excuses a type's name, so it takes 'namespaces', 'types', 'attributes' or a type trait"));
+            new PackProblem(10, 9, "'assemblies' is not accepted in exceptions[0] of rule 'SH-001'; an exception of a uniqueNames rule excuses a type's name, so it takes 'namespaces', 'types', 'attributes', 'attributeArguments', 'onlyAttributes', a type trait, 'dependsOn' or 'onlyDependsOn'"));
     }
 
     [Fact]
@@ -1402,7 +1431,7 @@ public class PackYamlReaderTests
             """;
 
         Problems(yaml).Should().Equal(
-            new PackProblem(9, 9, "a target in rule 'SH-001' cannot mix 'layers' with 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes' or 'members'"));
+            new PackProblem(9, 9, "a target in rule 'SH-001' cannot mix 'layers' with 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'attributeArguments', 'onlyAttributes' or 'members'"));
     }
 
     [Fact]
@@ -1458,7 +1487,7 @@ public class PackYamlReaderTests
         var yaml = RequireHead + "    uniqueNames:\n      for: { layers: [Web] }\n      against: {}\n";
 
         Problems(yaml).Should().Equal(
-            new PackProblem(8, 16, "the against of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes'"));
+            new PackProblem(8, 16, "the against of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'attributeArguments', 'onlyAttributes', 'dependsOn', 'onlyDependsOn'"));
     }
 
     [Fact]
@@ -1484,7 +1513,7 @@ public class PackYamlReaderTests
     {
         var yaml = RequireHead + "    uniqueNames:\n      for: { layers: [Web] }\n      against: { layers: [Application] }\n    exceptions:\n      - because: Old.\n";
 
-        Problems(yaml).Should().Equal(new PackProblem(10, 9, "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'types', 'attributes', 'names', 'kinds', 'accessibility', 'assignableTo', 'sealed', 'abstract', 'static', 'nested'"));
+        Problems(yaml).Should().Equal(new PackProblem(10, 9, "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'types', 'attributes', 'attributeArguments', 'onlyAttributes', 'names', 'kinds', 'accessibility', 'assignableTo', 'sealed', 'abstract', 'static', 'nested', 'dependsOn', 'onlyDependsOn'"));
     }
 
     [Fact]
@@ -1789,7 +1818,7 @@ public class PackYamlReaderTests
         var yaml = RequireHead + "    require:\n      for: { namespaces: [\"Shop.**\"] }\n      is: {}\n";
 
         Problems(yaml).Should().Equal(new PackProblem(8, 11,
-            "the is of rule 'SH-001' needs at least one of 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', " + TraitNames));
+            "the is of rule 'SH-001' needs at least one of 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'attributeArguments', 'onlyAttributes', " + TraitNames + ", " + DependencyNames));
     }
 
     [Fact]
@@ -1812,7 +1841,7 @@ public class PackYamlReaderTests
         var yaml = RequireHead + "    require:\n      for: { layers: [Domain], sealed: true, namespaces: [\"Shop.**\"] }\n      layer: Domain\n";
 
         Problems(yaml).Should().Equal(new PackProblem(7, 14,
-            "a target in rule 'SH-001' cannot mix 'layers' with 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces' or 'attributes'"));
+            "a target in rule 'SH-001' cannot mix 'layers' with 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'attributeArguments' or 'onlyAttributes'"));
     }
 
     [Theory]
@@ -1891,7 +1920,7 @@ public class PackYamlReaderTests
         var yaml = RequireHead + $"    require:\n      for: {{ {entry} }}\n      layer: Domain\n";
 
         Problems(yaml).Should().Equal(new PackProblem(7, 12,
-            "the for of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', " + TraitNames));
+            "the for of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'attributeArguments', 'onlyAttributes', " + TraitNames + ", " + DependencyNames));
     }
 
     [Fact]
@@ -1906,7 +1935,364 @@ public class PackYamlReaderTests
             """;
 
         Problems(yaml).Should().Equal(new PackProblem(10, 9,
-            "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'assemblies', 'types', 'attributes', " + TraitNames));
+            "exceptions[0] of rule 'SH-001' needs at least one of 'namespaces', 'assemblies', 'types', 'attributes', 'attributeArguments', 'onlyAttributes', " + TraitNames + ", " + DependencyNames));
+    }
+
+    [Fact]
+    public void AttributeArguments_in_forbid_from_reads()
+    {
+        var yaml = RequireHead + """
+                forbid:
+                  from:
+                    attributeArguments:
+                      - attribute: "Shop.RouteAttribute"
+                        arguments: ["api/orders", 2]
+                        named: { Version: 2 }
+                  to: { namespaces: ["Lib.**"] }
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var entry = result.Value.Rules.Should().ContainSingle().Subject.From.AttributeArguments.Should().ContainSingle().Subject;
+        entry.Attribute.Should().Be("Shop.RouteAttribute");
+        entry.Arguments.Should().Equal("api/orders", "2");
+        entry.Named.Should().ContainSingle().Which.Should().Be(new KeyValuePair<string, string>("Version", "2"));
+        entry.Named.ContainsKey("version").Should().BeFalse("named argument names compare ordinal");
+    }
+
+    [Fact]
+    public void AttributeArguments_in_is_reads()
+    {
+        var yaml = RequireHead + """
+                require:
+                  for: { namespaces: ["Shop.**"] }
+                  is:
+                    attributeArguments:
+                      - arguments: [Singleton]
+                      - attribute: "**.RouteAttribute"
+                        named: { Name: orders }
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var entries = result.Value.Rules.Should().ContainSingle().Subject.Require!.Is!.AttributeArguments;
+        entries.Should().HaveCount(2);
+        entries[0].Attribute.Should().BeNull();
+        entries[0].Arguments.Should().Equal("Singleton");
+        entries[0].Named.Should().BeEmpty();
+        entries[1].Attribute.Should().Be("**.RouteAttribute");
+        entries[1].Arguments.Should().BeEmpty();
+        entries[1].Named.Should().ContainSingle().Which.Should().Be(new KeyValuePair<string, string>("Name", "orders"));
+    }
+
+    [Fact]
+    public void OnlyAttributes_in_isNot_reads()
+    {
+        var yaml = RequireHead + """
+                require:
+                  for: { namespaces: ["Shop.**"] }
+                  isNot: { onlyAttributes: ["System.**", "Shop.**.AuditedAttribute"] }
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        result.Value.Rules.Should().ContainSingle().Subject.Require!.IsNot!.OnlyAttributes
+            .Should().Equal("System.**", "Shop.**.AuditedAttribute");
+    }
+
+    [Fact]
+    public void Exception_with_only_attribute_arguments_reads()
+    {
+        var yaml = RequireHead + """
+                forbid:
+                  from: { namespaces: ["Shop.**"] }
+                  to: { namespaces: ["Shop.Persistence.**"] }
+                exceptions:
+                  - attributeArguments:
+                      - named: { Legacy: true }
+                    because: Legacy types may use persistence.
+                  - onlyAttributes: ["System.**"]
+                    because: Plain types may too.
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var exceptions = result.Value.Rules.Should().ContainSingle().Subject.Exceptions;
+        exceptions.Should().HaveCount(2);
+        exceptions[0].AttributeArguments.Should().ContainSingle().Which.Named.Should()
+            .ContainSingle().Which.Should().Be(new KeyValuePair<string, string>("Legacy", "true"));
+        exceptions[1].OnlyAttributes.Should().Equal("System.**");
+    }
+
+    [Fact]
+    public void OnlyAttributes_in_uniqueNames_for_reads()
+    {
+        var yaml = RequireHead + """
+                uniqueNames:
+                  for: { onlyAttributes: ["Shop.**"] }
+                  against: { attributeArguments: [{ arguments: [dto] }] }
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var rule = result.Value.Rules.Should().ContainSingle().Subject;
+        rule.From.OnlyAttributes.Should().Equal("Shop.**");
+        rule.Against.AttributeArguments.Should().ContainSingle().Which.Arguments.Should().Equal("dto");
+    }
+
+    // A forbid whose from starts on line 9 at column 9; the entry of attributeArguments starts on line 10 at column 13.
+    private const string AttributeArgumentsHead =
+        RequireHead + "    forbid:\n      to: { namespaces: [\"Lib.**\"] }\n      from:\n";
+
+    private const string EntryWhere = "attributeArguments[0] of the from of rule 'SH-001'";
+
+    [Theory]
+    [InlineData("        attributeArguments:\n          - attribute: \"Shop.RouteAttribute\"\n", 10, 13,
+        EntryWhere + " needs 'arguments' or 'named'; to select by the attribute alone, use 'attributes'")]
+    [InlineData("        attributeArguments:\n          - arguments: []\n", 10, 13,
+        "'arguments' in " + EntryWhere + " needs at least one value")]
+    [InlineData("        onlyAttributes: []\n", 9, 9,
+        "'onlyAttributes' in the from of rule 'SH-001' needs at least one pattern; to select types without attributes, use isNot: { attributes: [\"**\"] }")]
+    [InlineData("        attributeArguments:\n          - named: { Version: null }\n", 10, 31,
+        "the value of 'Version' in " + EntryWhere + " is null; quote it to match the text 'null'")]
+    [InlineData("        attributeArguments:\n          - arguments: [~]\n", 10, 25,
+        "a value in 'arguments' of " + EntryWhere + " is null; quote it to match the text 'null'")]
+    [InlineData("        attributeArguments:\n          - arguments: [[1, 2]]\n", 10, 25,
+        "a value in 'arguments' of " + EntryWhere + " must be a single value, not a list or mapping")]
+    [InlineData("        attributeArguments:\n          - named: { Version: { Major: 2 } }\n", 10, 31,
+        "the value of 'Version' in " + EntryWhere + " must be a single value, not a list or mapping")]
+    [InlineData("        attributeArguments:\n          - named: { Version: 1, Version: 2 }\n", 10, 34,
+        "duplicate key 'Version' in " + EntryWhere)]
+    [InlineData("        attributeArguments:\n          - named: {}\n", 10, 13,
+        "'named' in " + EntryWhere + " needs at least one name")]
+    [InlineData("        attributeArguments:\n          - named: { \" \": 1 }\n", 10, 22,
+        "a name in 'named' of " + EntryWhere + " must be a string")]
+    [InlineData("        attributeArguments:\n          - named: { ~: 1 }\n", 10, 22,
+        "a name in 'named' of " + EntryWhere + " must be a string")]
+    [InlineData("        attributeArguments:\n          - arguments: [1]\n            type: \"X\"\n", 11, 13,
+        "unknown key 'type' in " + EntryWhere)]
+    [InlineData("        attributeArguments:\n          - attribute: \"A..B\"\n            arguments: [1]\n", 10, 24,
+        "'A..B' in " + EntryWhere + " is not a valid pattern: pattern 'A..B' has an empty segment")]
+    [InlineData("        attributeArguments: [\"Shop.RouteAttribute\"]\n", 9, 30,
+        "'attributeArguments[0]' in the from of rule 'SH-001' must be a mapping")]
+    [InlineData("        attributeArguments: { arguments: [1] }\n", 9, 9,
+        "'attributeArguments' in the from of rule 'SH-001' must be a list")]
+    [InlineData("        attributeArguments:\n          - arguments: 1\n", 10, 13,
+        "'arguments' in " + EntryWhere + " must be a list")]
+    [InlineData("        attributeArguments:\n          - named: [Version]\n", 10, 13,
+        "'named' in " + EntryWhere + " must be a mapping")]
+    public void Rejects_a_bad_attribute_argument_entry(string from, int line, int column, string message)
+    {
+        Problems(AttributeArgumentsHead + from).Should().Equal(new PackProblem(line, column, message));
+    }
+
+    [Theory]
+    [InlineData("attributeArguments: [{ arguments: [1] }]")]
+    [InlineData("onlyAttributes: [\"Shop.**\"]")]
+    public void Attribute_argument_keys_cannot_mix_with_layers(string entry)
+    {
+        var yaml = RequireHead + $"    require:\n      for: {{ layers: [Domain], {entry} }}\n      layer: Domain\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(7, 14,
+            "a target in rule 'SH-001' cannot mix 'layers' with 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'attributeArguments' or 'onlyAttributes'"));
+    }
+
+    [Theory]
+    [InlineData("attributeArguments: [{ arguments: [1] }]", "attributeArguments")]
+    [InlineData("onlyAttributes: [\"Shop.**\"]", "onlyAttributes")]
+    public void BannedPackages_exception_rejects_attribute_argument_keys(string entry, string key)
+    {
+        var yaml = RequireHead + $"    bannedPackages:\n      packages: [FluentValidation]\n    exceptions:\n      - {entry}\n        because: Old.\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(9, 9,
+            $"'{key}' is not accepted in exceptions[0] of rule 'SH-001'; a package belongs to a project, so the exception of a bannedPackages rule names it by 'assemblies'"));
+    }
+
+    [Fact]
+    public void Capture_in_an_attribute_argument_pattern_of_a_slices_rule_fails()
+    {
+        var yaml = RequireHead + """
+                slices:
+                  matching: ["Shop.(*).**"]
+                  independent: true
+                  allow:
+                    attributeArguments:
+                      - attribute: "Shop.(*).RouteAttribute"
+                        arguments: [1]
+            """;
+
+        Problems(yaml).Should().Equal(new PackProblem(11, 24,
+            "'Shop.(*).RouteAttribute' in attributeArguments[0] of the allow of rule 'SH-001' is not a valid pattern: a capture, (*) or (**), is only accepted in the 'matching' of a slices rule"));
+    }
+
+    private const string DependencyNames = "'dependsOn', 'onlyDependsOn'";
+
+    [Fact]
+    public void DependsOn_next_to_layers_in_forbid_from_reads()
+    {
+        var yaml = RequireHead + """
+                forbid:
+                  from: { layers: [Web], dependsOn: { layers: [Infrastructure] } }
+                  to: { namespaces: ["Shop.Web.Pages.**"], onlyDependsOn: { namespaces: ["Shop.**"], sealed: true } }
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var rule = result.Value.Rules.Should().ContainSingle().Subject;
+        rule.From.Layers.Should().Equal("Web");
+        rule.From.DependsOn!.Layers.Should().Equal("Infrastructure");
+        rule.From.OnlyDependsOn.Should().BeNull();
+        rule.To.OnlyDependsOn!.Namespaces.Should().Equal("Shop.**");
+        rule.To.OnlyDependsOn.Sealed.Should().BeTrue();
+    }
+
+    [Fact]
+    public void OnlyDependsOn_in_is_reads()
+    {
+        var yaml = RequireHead + """
+                require:
+                  for: { layers: [Domain], dependsOn: { interfaces: ["Shop.IClock"] } }
+                  is: { onlyDependsOn: { layers: [Domain] } }
+                  isNot: { dependsOn: { attributeArguments: [{ arguments: [legacy] }], onlyAttributes: ["Shop.**"] } }
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var rule = result.Value.Rules.Should().ContainSingle().Subject;
+        rule.From.DependsOn!.Interfaces.Should().Equal("Shop.IClock");
+        rule.Require!.Is!.OnlyDependsOn!.Layers.Should().Equal("Domain");
+        rule.Require.IsNot!.DependsOn!.AttributeArguments.Should().ContainSingle().Which.Arguments.Should().Equal("legacy");
+        rule.Require.IsNot.DependsOn.OnlyAttributes.Should().Equal("Shop.**");
+    }
+
+    [Fact]
+    public void DependsOn_in_exception_with_layers_inside_reads()
+    {
+        var yaml = RequireHead + """
+                forbid:
+                  from: { namespaces: ["Shop.**"] }
+                  to: { namespaces: ["System.IO.**"] }
+                exceptions:
+                  - dependsOn: { layers: [Infrastructure] }
+                    because: Adapters.
+                  - onlyDependsOn: { layers: [Domain], kinds: [record] }
+                    because: Pure.
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var exceptions = result.Value.Rules.Should().ContainSingle().Subject.Exceptions;
+        exceptions[0].DependsOn!.Layers.Should().Equal("Infrastructure");
+        exceptions[1].OnlyDependsOn!.Layers.Should().Equal("Domain");
+        exceptions[1].OnlyDependsOn!.Kinds.Should().Equal(CSharpTypeKind.Record);
+    }
+
+    [Fact]
+    public void DependsOn_in_uniqueNames_for_reads()
+    {
+        var yaml = RequireHead + """
+                uniqueNames:
+                  for: { namespaces: ["Shop.Web.**"], dependsOn: { layers: [Infrastructure] } }
+                  against: { onlyDependsOn: { namespaces: ["Shop.Application.**"] } }
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        var rule = result.Value.Rules.Should().ContainSingle().Subject;
+        rule.From.DependsOn!.Layers.Should().Equal("Infrastructure");
+        rule.Against.OnlyDependsOn!.Namespaces.Should().Equal("Shop.Application.**");
+    }
+
+    [Fact]
+    public void DependsOn_in_slices_allow_reads()
+    {
+        var yaml = RequireHead + """
+                slices:
+                  matching: ["Shop.(*).**"]
+                  independent: true
+                  allow: { dependsOn: { namespaces: ["Shop.Shared.**"] } }
+            """;
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
+        result.Value.Rules.Should().ContainSingle().Subject.Slices!.Allow!.DependsOn!.Namespaces.Should().Equal("Shop.Shared.**");
+    }
+
+    private const string NestedWhere = "the dependsOn of the from of rule 'SH-001'";
+
+    [Theory]
+    [InlineData("        dependsOn: {}\n", 9, 20,
+        NestedWhere + " needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'attributeArguments', 'onlyAttributes', 'names', 'kinds', 'accessibility', 'assignableTo', 'sealed', 'abstract', 'static', 'nested'")]
+    [InlineData("        dependsOn: { layers: [A], dependsOn: { layers: [B] } }\n", 9, 35,
+        "'dependsOn' is not accepted in " + NestedWhere + "; selectors nest one level only, so the selector under 'dependsOn' or 'onlyDependsOn' cannot hold either")]
+    [InlineData("        dependsOn: { layers: [A], onlyDependsOn: { layers: [B] } }\n", 9, 35,
+        "'onlyDependsOn' is not accepted in " + NestedWhere + "; selectors nest one level only, so the selector under 'dependsOn' or 'onlyDependsOn' cannot hold either")]
+    [InlineData("        dependsOn: { attributeArguments: [{ attribute: X, arguments: [1], dependsOn: { layers: [B] } }] }\n", 9, 75,
+        "unknown key 'dependsOn' in attributeArguments[0] of " + NestedWhere)]
+    [InlineData("        dependsOn: { layers: [A], members: [\"**.M\"] }\n", 9, 35,
+        "'members' is not accepted in " + NestedWhere + "; it names APIs and only the 'to' of a 'forbid' or 'allowOnly' rule takes it")]
+    [InlineData("        dependsOn: { layers: [A], namespaces: [\"X.**\"] }\n", 9, 22,
+        "a target in " + NestedWhere + " cannot mix 'layers' with 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'attributeArguments' or 'onlyAttributes'")]
+    [InlineData("        dependsOn: Shop.Infrastructure\n", 9, 9,
+        "'dependsOn' in the from of rule 'SH-001' must be a mapping")]
+    [InlineData("        onlyDependsOn: [\"Shop.**\"]\n", 9, 9,
+        "'onlyDependsOn' in the from of rule 'SH-001' must be a mapping")]
+    [InlineData("        dependsOn: { kinds: [enumeration] }\n", 9, 30,
+        "kind 'enumeration' in " + NestedWhere + " must be one of 'class', 'interface', 'record', 'struct', 'recordStruct', 'enum', 'delegate'")]
+    public void Rejects_a_bad_dependency_selector(string from, int line, int column, string message)
+    {
+        Problems(AttributeArgumentsHead + from).Should().Equal(new PackProblem(line, column, message));
+    }
+
+    [Theory]
+    [InlineData("dependsOn")]
+    [InlineData("onlyDependsOn")]
+    public void BannedPackages_exception_rejects_dependency_keys(string key)
+    {
+        var yaml = RequireHead + $"    bannedPackages:\n      packages: [FluentValidation]\n    exceptions:\n      - {key}: {{ layers: [A] }}\n        because: Old.\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(9, 9,
+            $"'{key}' is not accepted in exceptions[0] of rule 'SH-001'; a package belongs to a project, so the exception of a bannedPackages rule names it by 'assemblies'"));
+    }
+
+    [Theory]
+    [InlineData("dependsOn")]
+    [InlineData("onlyDependsOn")]
+    public void Implements_rejects_dependency_keys(string key)
+    {
+        var yaml = RequireHead + $"    require:\n      for: {{ types: [\"**.X\"] }}\n      implements: {{ types: [\"**.I\"], {key}: {{ layers: [A] }} }}\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(8, 38, $"unknown key '{key}' in the implements of rule 'SH-001'"));
+    }
+
+    [Fact]
+    public void Empty_from_names_the_dependency_keys()
+    {
+        var yaml = RequireHead + "    forbid:\n      from: {}\n      to: { namespaces: [\"Lib.**\"] }\n";
+
+        Problems(yaml).Should().Equal(new PackProblem(7, 13,
+            "the from of rule 'SH-001' needs at least one of 'layers', 'namespaces', 'assemblies', 'types', 'baseTypes', 'interfaces', 'attributes', 'attributeArguments', 'onlyAttributes', "
+            + TraitNames + ", " + DependencyNames));
+    }
+
+    [Fact]
+    public void A_selector_with_only_a_dependency_key_is_not_empty()
+    {
+        var yaml = RequireHead + "    require:\n      for: { onlyDependsOn: { layers: [Domain] } }\n      isNot: { dependsOn: { layers: [Web] } }\n";
+
+        var result = PackYamlReader.Read(yaml);
+
+        result.IsSuccess.Should().BeTrue(because: Describe(result));
     }
 
     private const string RequireTargetMessage = "'requireTarget' applies only to forbid, allowOnly and uniqueNames rules";

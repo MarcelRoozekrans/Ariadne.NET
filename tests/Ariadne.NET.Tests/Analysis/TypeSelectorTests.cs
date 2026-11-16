@@ -411,6 +411,271 @@ public class TypeSelectorTests
         RoleRules.ActualKind(Find(compilation, "N.D")).Should().Be(CSharpTypeKind.Class);
     }
 
+    private const string AttributeSource = """
+        namespace N
+        {
+            [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
+            public sealed class RouteAttribute : System.Attribute
+            {
+                public RouteAttribute(string path) { }
+                public RouteAttribute(string path, int version) { }
+                public int Version { get; set; }
+            }
+
+            public sealed class TagAttribute : System.Attribute { public TagAttribute(string name) { } }
+            public sealed class OtherAttribute : System.Attribute { }
+
+            public class Plain { }
+            [Route("api/orders", 2, Version = 3)] [Tag("x")] public class Orders { }
+            [Route("api/a")] [Route("api/b")] public class Split { }
+            [Tag("x")] [Other] public class Mixed { }
+            [Tag("x")] [Other] [Route("r")] public class Many { }
+        }
+        """;
+
+    private static readonly Lazy<CSharpCompilation> AttributeCompilation = new(() => TestCompilation.Create(AttributeSource));
+
+    private static bool AttributeSelects(TargetSelector selector, string metadataName) =>
+        TypeSelector.From(selector).Matches(Find(AttributeCompilation.Value, metadataName), new TypeNames());
+
+    [Fact]
+    public void OnlyAttributes_matches_type_without_attributes()
+    {
+        AttributeSelects(new TargetSelector { OnlyAttributes = ["N.TagAttribute"] }, "N.Plain").Should().BeTrue();
+    }
+
+    [Fact]
+    public void OnlyAttributes_matches_when_all_inside()
+    {
+        AttributeSelects(new TargetSelector { OnlyAttributes = ["N.RouteAttribute", "N.TagAttribute"] }, "N.Orders").Should().BeTrue();
+        AttributeSelects(new TargetSelector { OnlyAttributes = ["N.*Attribute"] }, "N.Orders").Should().BeTrue();
+        AttributeSelects(new TargetSelector { OnlyAttributes = ["N.RouteAttribute"] }, "N.Split").Should().BeTrue();
+    }
+
+    [Fact]
+    public void OnlyAttributes_fails_when_one_outside()
+    {
+        AttributeSelects(new TargetSelector { OnlyAttributes = ["N.TagAttribute"] }, "N.Mixed").Should().BeFalse();
+        AttributeSelects(new TargetSelector { OnlyAttributes = ["N.TagAttribute"] }, "N.Orders").Should().BeFalse();
+    }
+
+    [Fact]
+    public void OnlyAttributes_ignores_compiler_attributes_on_metadata_type()
+    {
+        var library = TestCompilation.Create("""
+            namespace Lib
+            {
+                public sealed class TagAttribute : System.Attribute { }
+                [Tag] public class Holder { public string? First; public string? Second; public object? Third; }
+                public class Bare { public string? First; public string? Second; public object? Third; }
+            }
+            """);
+        using var image = new MemoryStream();
+        library.Emit(image).Success.Should().BeTrue();
+        var consumer = CSharpCompilation.Create(
+            "Consumer",
+            [CSharpSyntaxTree.ParseText("namespace App { public class User { public Lib.Holder? H; public Lib.Bare? B; } }")],
+            [.. library.References, MetadataReference.CreateFromImage(image.ToArray())],
+            library.Options);
+        var holder = Find(consumer, "Lib.Holder");
+        var bare = Find(consumer, "Lib.Bare");
+        var names = new TypeNames();
+
+        // The precondition this test exists for: the metadata type carries a compiler-emitted attribute.
+        bare.GetAttributes().Should().NotBeEmpty();
+        bare.GetAttributes().Should().OnlyContain(a => TypeSelector.IsCompilerAttribute(a.AttributeClass!, names));
+
+        var selector = TypeSelector.From(new TargetSelector { OnlyAttributes = ["Lib.TagAttribute"] });
+        selector.Matches(holder, names).Should().BeTrue();
+        selector.Matches(bare, names).Should().BeTrue();
+        selector.FirstOutsideOnlyAttributes(holder, names).Should().BeNull();
+        TypeSelector.From(new TargetSelector { OnlyAttributes = ["Other.*"] }).Matches(holder, names).Should().BeFalse();
+    }
+
+    [Fact]
+    public void OnlyAttributes_ignores_default_member_attribute_on_metadata_type_with_indexer()
+    {
+        var library = TestCompilation.Create("""
+            namespace Lib
+            {
+                public sealed class TagAttribute : System.Attribute { }
+                [Tag] public class Indexed { public int this[int index] => index; }
+            }
+            """);
+        using var image = new MemoryStream();
+        library.Emit(image).Success.Should().BeTrue();
+        var consumer = CSharpCompilation.Create(
+            "Consumer",
+            [CSharpSyntaxTree.ParseText("namespace App { public class User { public Lib.Indexed? I; } }")],
+            [.. library.References, MetadataReference.CreateFromImage(image.ToArray())],
+            library.Options);
+        var indexed = Find(consumer, "Lib.Indexed");
+        var names = new TypeNames();
+
+        // The precondition this test exists for: the metadata type with an indexer carries DefaultMemberAttribute.
+        indexed.GetAttributes().Should().Contain(a => names.FullNameOf(a.AttributeClass!) == "System.Reflection.DefaultMemberAttribute");
+        Find(library, "Lib.Indexed").GetAttributes().Should().NotContain(a => names.FullNameOf(a.AttributeClass!) == "System.Reflection.DefaultMemberAttribute");
+
+        var selector = TypeSelector.From(new TargetSelector { OnlyAttributes = ["Lib.TagAttribute"] });
+        selector.Matches(indexed, names).Should().BeTrue();
+        selector.FirstOutsideOnlyAttributes(indexed, names).Should().BeNull();
+    }
+
+    [Fact]
+    public void IsCompilerAttribute_holds_the_ignore_list()
+    {
+        string[] ignored =
+        [
+            "System.Runtime.CompilerServices.CompilerGeneratedAttribute",
+            "System.Runtime.CompilerServices.NullableAttribute",
+            "System.Runtime.CompilerServices.NullableContextAttribute",
+            "System.Runtime.CompilerServices.NullablePublicOnlyAttribute",
+            "System.Runtime.CompilerServices.IsReadOnlyAttribute",
+            "System.Runtime.CompilerServices.IsByRefLikeAttribute",
+            "System.Reflection.DefaultMemberAttribute",
+            "Microsoft.CodeAnalysis.EmbeddedAttribute",
+        ];
+
+        // Each class is declared in source, so the lookup below always finds it and every list member is checked.
+        var source = string.Concat(ignored.Select(name =>
+        {
+            var dot = name.LastIndexOf('.');
+            return $"namespace {name[..dot]} {{ internal sealed class {name[(dot + 1)..]} : System.Attribute {{ }} }}\n";
+        }));
+        var declared = TestCompilation.Create(source);
+        var compilation = AttributeCompilation.Value;
+        var names = new TypeNames();
+
+        foreach (var name in ignored)
+        {
+            var symbol = Find(declared, name);
+            symbol.Locations.Should().Contain(l => l.IsInSource, name);
+            TypeSelector.IsCompilerAttribute(symbol, names).Should().BeTrue(name);
+        }
+
+        TypeSelector.IsCompilerAttribute(Find(compilation, "N.TagAttribute"), names).Should().BeFalse();
+        TypeSelector.IsCompilerAttribute(Find(compilation, "System.ObsoleteAttribute"), names).Should().BeFalse();
+    }
+
+    [Fact]
+    public void AttributeArguments_does_not_match_type_without_attributes()
+    {
+        AttributeSelects(new TargetSelector { AttributeArguments = [new AttributeArgumentMatch { Arguments = ["x"] }] }, "N.Plain").Should().BeFalse();
+        AttributeSelects(
+            new TargetSelector { AttributeArguments = [new AttributeArgumentMatch { Named = new Dictionary<string, string>(StringComparer.Ordinal) { ["Version"] = "3" } }] },
+            "N.Plain").Should().BeFalse();
+    }
+
+    [Fact]
+    public void AttributeArguments_entries_are_ored()
+    {
+        var entries = new TargetSelector
+        {
+            AttributeArguments =
+            [
+                new AttributeArgumentMatch { Arguments = ["nope"] },
+                new AttributeArgumentMatch { Attribute = "N.TagAttribute", Arguments = ["x"] },
+            ],
+        };
+
+        AttributeSelects(entries, "N.Orders").Should().BeTrue();
+        AttributeSelects(entries, "N.Split").Should().BeFalse();
+        AttributeSelects(new TargetSelector { AttributeArguments = [new AttributeArgumentMatch { Arguments = ["nope"] }] }, "N.Orders").Should().BeFalse();
+    }
+
+    [Fact]
+    public void AttributeArguments_entry_needs_one_instance_holding_every_value()
+    {
+        AttributeSelects(new TargetSelector { AttributeArguments = [new AttributeArgumentMatch { Arguments = ["api/a", "api/b"] }] }, "N.Split").Should().BeFalse();
+        AttributeSelects(
+            new TargetSelector { AttributeArguments = [new AttributeArgumentMatch { Arguments = ["api/a"] }, new AttributeArgumentMatch { Arguments = ["api/b"] }] },
+            "N.Split").Should().BeTrue();
+        AttributeSelects(
+            new TargetSelector
+            {
+                AttributeArguments =
+                [
+                    new AttributeArgumentMatch
+                    {
+                        Attribute = "N.RouteAttribute",
+                        Arguments = ["2", "api/orders"],
+                        Named = new Dictionary<string, string>(StringComparer.Ordinal) { ["Version"] = "3" },
+                    },
+                ],
+            },
+            "N.Orders").Should().BeTrue();
+    }
+
+    [Fact]
+    public void Both_keys_and_attributes_are_anded()
+    {
+        var selector = new TargetSelector
+        {
+            Attributes = ["N.RouteAttribute"],
+            AttributeArguments = [new AttributeArgumentMatch { Arguments = ["x"] }],
+            OnlyAttributes = ["N.RouteAttribute", "N.TagAttribute"],
+        };
+
+        AttributeSelects(selector, "N.Orders").Should().BeTrue();
+        AttributeSelects(selector, "N.Mixed").Should().BeFalse();
+        AttributeSelects(selector, "N.Many").Should().BeFalse();
+        AttributeSelects(selector, "N.Split").Should().BeFalse();
+        AttributeSelects(
+            new TargetSelector { Attributes = ["N.RouteAttribute"], AttributeArguments = [new AttributeArgumentMatch { Arguments = ["x"] }], OnlyAttributes = ["N.RouteAttribute"] },
+            "N.Orders").Should().BeFalse();
+        AttributeSelects(
+            new TargetSelector { Namespaces = ["Other.**"], AttributeArguments = [new AttributeArgumentMatch { Arguments = ["x"] }] },
+            "N.Orders").Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsEmpty_is_false_with_only_attribute_arguments()
+    {
+        TypeSelector.From(new TargetSelector { AttributeArguments = [new AttributeArgumentMatch { Arguments = ["x"] }] }).IsEmpty.Should().BeFalse();
+        TypeSelector.From(new TargetSelector { OnlyAttributes = ["N.*"] }).IsEmpty.Should().BeFalse();
+        TypeSelector.From(new RuleException { AttributeArguments = [new AttributeArgumentMatch { Arguments = ["x"] }], Because = "B." }).IsEmpty.Should().BeFalse();
+        TypeSelector.From(new RuleException { OnlyAttributes = ["N.*"], Because = "B." }).IsEmpty.Should().BeFalse();
+    }
+
+    [Fact]
+    public void FirstOutsideOnlyAttributes_is_null_without_onlyAttributes()
+    {
+        var selector = TypeSelector.From(new TargetSelector { Attributes = ["N.*"] });
+
+        selector.FirstOutsideOnlyAttributes(Find(AttributeCompilation.Value, "N.Many"), new TypeNames()).Should().BeNull();
+    }
+
+    [Fact]
+    public void FirstOutsideOnlyAttributes_names_first_in_declaration_order()
+    {
+        var names = new TypeNames();
+        var selector = TypeSelector.From(new TargetSelector { OnlyAttributes = ["N.TagAttribute"] });
+
+        selector.FirstOutsideOnlyAttributes(Find(AttributeCompilation.Value, "N.Many"), names).Should().Be("N.OtherAttribute");
+        selector.FirstOutsideOnlyAttributes(Find(AttributeCompilation.Value, "N.Orders"), names).Should().Be("N.RouteAttribute");
+        selector.FirstOutsideOnlyAttributes(Find(AttributeCompilation.Value, "N.Plain"), names).Should().BeNull();
+        TypeSelector.From(new TargetSelector { OnlyAttributes = ["N.*"] }).FirstOutsideOnlyAttributes(Find(AttributeCompilation.Value, "N.Many"), names).Should().BeNull();
+    }
+
+    [Fact]
+    public void Attribute_matching_allocates_nothing_once_names_are_built()
+    {
+        var orders = Find(AttributeCompilation.Value, "N.Orders");
+        var names = new TypeNames();
+        var selector = TypeSelector.From(new TargetSelector
+        {
+            Attributes = ["N.RouteAttribute"],
+            AttributeArguments = [new AttributeArgumentMatch { Attribute = "N.TagAttribute", Arguments = ["x"] }],
+            OnlyAttributes = ["N.RouteAttribute", "N.TagAttribute"],
+        });
+        selector.Matches(orders, names).Should().BeTrue();
+
+        Allocations.PerRound(() =>
+        {
+            selector.Matches(orders, names);
+        }).Should().Be(0);
+    }
+
     [Fact]
     public void Trait_matching_allocates_nothing_once_names_are_built()
     {
@@ -433,5 +698,192 @@ public class TypeSelectorTests
         {
             selector.Matches(impl, names);
         }).Should().Be(0);
+    }
+
+    private const string DependencySource = """
+        namespace Shop.Infrastructure { public class SqlStore { } public class Cache { } }
+        namespace Shop.Domain { public class Clock { } }
+        namespace Shop.App
+        {
+            public class UsesStore { public Shop.Infrastructure.SqlStore? Store; }
+            public class UsesDomain { public Shop.Domain.Clock? Clock; }
+            public class UsesBoth { public Shop.Domain.Clock? Clock; public Shop.Infrastructure.SqlStore? Store; public Shop.Infrastructure.Cache? Cache; }
+            public class UsesText { public System.Text.StringBuilder? Builder; public System.String? Name; }
+            public class Empty { }
+        }
+        """;
+
+    private static readonly RulePack DependencyPack = new()
+    {
+        Name = "p",
+        Layers = [new LayerDefinition { Name = "Domain", Id = "L-DOMAIN", Because = "Domain.", Namespaces = ["**.Domain.**"] }],
+    };
+
+    private static Func<string, bool> DependencyMatcher(TargetSelector selector)
+    {
+        var compilation = TestCompilation.Create(DependencySource);
+        var (_, index) = TestCompilation.GraphAndIndex(compilation);
+        var layers = new LayerMap(DependencyPack);
+        var compiled = TypeSelector.From(selector, layers, index);
+        return name => compiled.Matches(Find(compilation, name), layers.Names);
+    }
+
+    [Fact]
+    public void DependsOn_matches_with_one_selected_dependency()
+    {
+        var matches = DependencyMatcher(new TargetSelector { DependsOn = new TargetSelector { Namespaces = ["Shop.Infrastructure.**"] } });
+
+        matches("Shop.App.UsesStore").Should().BeTrue();
+        matches("Shop.App.UsesBoth").Should().BeTrue();
+    }
+
+    [Fact]
+    public void DependsOn_does_not_match_without_one()
+    {
+        var matches = DependencyMatcher(new TargetSelector { DependsOn = new TargetSelector { Namespaces = ["Shop.Infrastructure.**"] } });
+
+        matches("Shop.App.UsesDomain").Should().BeFalse();
+        matches("Shop.App.Empty").Should().BeFalse();
+        matches("Shop.Infrastructure.SqlStore").Should().BeFalse();
+    }
+
+    [Fact]
+    public void DependsOn_selects_framework_dependency()
+    {
+        var text = DependencyMatcher(new TargetSelector { DependsOn = new TargetSelector { Namespaces = ["System.Text.**"] } });
+        var system = DependencyMatcher(new TargetSelector { Types = ["Shop.App.*"], DependsOn = new TargetSelector { Namespaces = ["System.**"] } });
+
+        text("Shop.App.UsesText").Should().BeTrue();
+        text("Shop.App.UsesStore").Should().BeFalse();
+        system("Shop.App.UsesText").Should().BeTrue();
+        system("Shop.App.UsesStore").Should().BeFalse();
+    }
+
+    // The keyword 'string' gives no edge, as every keyword type does; the written type name System.String does.
+    [Fact]
+    public void DependsOn_selects_a_type_that_uses_string()
+    {
+        var compilation = TestCompilation.Create("namespace Shop { public class Named { public System.String? Name; } public class Plain { } }");
+        var (_, index) = TestCompilation.GraphAndIndex(compilation);
+        var layers = new LayerMap(DependencyPack);
+        var selector = TypeSelector.From(new TargetSelector { DependsOn = new TargetSelector { Namespaces = ["System.**"] } }, layers, index);
+
+        selector.Matches(Find(compilation, "Shop.Named"), layers.Names).Should().BeTrue();
+        selector.Matches(Find(compilation, "Shop.Plain"), layers.Names).Should().BeFalse();
+    }
+
+    [Fact]
+    public void OnlyDependsOn_matches_when_all_inside()
+    {
+        var matches = DependencyMatcher(new TargetSelector { OnlyDependsOn = new TargetSelector { Namespaces = ["Shop.Domain.**"] } });
+
+        matches("Shop.App.UsesDomain").Should().BeTrue();
+    }
+
+    [Fact]
+    public void OnlyDependsOn_fails_when_one_outside()
+    {
+        var matches = DependencyMatcher(new TargetSelector { OnlyDependsOn = new TargetSelector { Namespaces = ["Shop.Domain.**"] } });
+
+        matches("Shop.App.UsesBoth").Should().BeFalse();
+        matches("Shop.App.UsesStore").Should().BeFalse();
+    }
+
+    [Fact]
+    public void OnlyDependsOn_ignores_framework_dependencies()
+    {
+        var matches = DependencyMatcher(new TargetSelector { OnlyDependsOn = new TargetSelector { Namespaces = ["Shop.Domain.**"] } });
+        var system = DependencyMatcher(new TargetSelector { DependsOn = new TargetSelector { Types = ["System.String"] } });
+
+        matches("Shop.App.UsesText").Should().BeTrue();
+        system("Shop.App.UsesText").Should().BeTrue();
+    }
+
+    [Fact]
+    public void OnlyDependsOn_matches_type_without_dependencies()
+    {
+        var matches = DependencyMatcher(new TargetSelector { OnlyDependsOn = new TargetSelector { Namespaces = ["Shop.Domain.**"] } });
+
+        matches("Shop.App.Empty").Should().BeTrue();
+    }
+
+    [Fact]
+    public void Dependency_keys_with_layers_inside_use_the_layer_map()
+    {
+        var matches = DependencyMatcher(new TargetSelector { OnlyDependsOn = new TargetSelector { Layers = ["Domain"] } });
+
+        matches("Shop.App.UsesDomain").Should().BeTrue();
+        matches("Shop.App.UsesBoth").Should().BeFalse();
+    }
+
+    [Fact]
+    public void Dependency_keys_are_checked_after_the_other_keys()
+    {
+        var matches = DependencyMatcher(new TargetSelector
+        {
+            Namespaces = ["Shop.Domain.**"],
+            DependsOn = new TargetSelector { Namespaces = ["Shop.Infrastructure.**"] },
+        });
+
+        matches("Shop.App.UsesStore").Should().BeFalse();
+    }
+
+    [Fact]
+    public void FirstDependencyOutsideOnly_names_first_in_source_order()
+    {
+        var compilation = TestCompilation.Create(DependencySource);
+        var (_, index) = TestCompilation.GraphAndIndex(compilation);
+        var layers = new LayerMap(DependencyPack);
+        var only = TypeSelector.From(new TargetSelector { OnlyDependsOn = new TargetSelector { Namespaces = ["Shop.Domain.**"] } }, layers, index);
+        var depends = TypeSelector.From(new TargetSelector { DependsOn = new TargetSelector { Namespaces = ["Shop.Infrastructure.**"] } }, layers, index);
+        var both = Find(compilation, "Shop.App.UsesBoth");
+
+        only.FirstDependencyOutsideOnly(both)!.ToDisplayString().Should().Be("Shop.Infrastructure.SqlStore");
+        only.FirstDependencyOutsideOnly(Find(compilation, "Shop.App.UsesText")).Should().BeNull();
+        only.FirstDependencyOutsideOnly(Find(compilation, "Shop.App.Empty")).Should().BeNull();
+        depends.FirstDependencyMatching(both)!.ToDisplayString().Should().Be("Shop.Infrastructure.SqlStore");
+        depends.FirstDependencyMatching(Find(compilation, "Shop.App.UsesDomain")).Should().BeNull();
+        depends.FirstDependencyOutsideOnly(both).Should().BeNull();
+        only.FirstDependencyMatching(both).Should().BeNull();
+    }
+
+    [Fact]
+    public void Old_overload_rejects_dependency_keys()
+    {
+        var nested = new TargetSelector { Namespaces = ["Shop.**"] };
+
+        FluentActions.Invoking(() => TypeSelector.From(new TargetSelector { DependsOn = nested }))
+            .Should().Throw<ArgumentException>().WithParameterName("selector");
+        FluentActions.Invoking(() => TypeSelector.From(new TargetSelector { OnlyDependsOn = nested }))
+            .Should().Throw<ArgumentException>().WithParameterName("selector");
+        FluentActions.Invoking(() => TypeSelector.From(new RuleException { DependsOn = nested, Because = "b" }))
+            .Should().Throw<ArgumentException>().WithParameterName("exception");
+        FluentActions.Invoking(() => TypeSelector.From(new RuleException { OnlyDependsOn = nested, Because = "b" }))
+            .Should().Throw<ArgumentException>().WithParameterName("exception");
+        FluentActions.Invoking(() => TargetMatcher.From(new TargetSelector { DependsOn = nested }, new LayerMap(DependencyPack)))
+            .Should().Throw<ArgumentException>().WithParameterName("target");
+    }
+
+    [Fact]
+    public void Dependency_keys_without_an_index_are_rejected()
+    {
+        var nested = new TargetSelector { Namespaces = ["Shop.**"] };
+
+        FluentActions.Invoking(() => TypeSelector.From(new TargetSelector { DependsOn = nested }, new LayerMap(DependencyPack), null))
+            .Should().Throw<ArgumentException>().WithParameterName("dependencies");
+        FluentActions.Invoking(() => TypeSelector.From(new RuleException { OnlyDependsOn = nested, Because = "b" }, new LayerMap(DependencyPack), null))
+            .Should().Throw<ArgumentException>().WithParameterName("dependencies");
+    }
+
+    [Fact]
+    public void Selector_without_dependency_keys_needs_no_index()
+    {
+        var compilation = TestCompilation.Create(DependencySource);
+        var layers = new LayerMap(DependencyPack);
+
+        TypeSelector.From(new TargetSelector { Namespaces = ["Shop.App.**"] }, layers, null)
+            .Matches(Find(compilation, "Shop.App.Empty"), layers.Names).Should().BeTrue();
+        TypeSelector.From(new RuleException { Types = ["Shop.App.Empty"], Because = "b" }, layers, null)
+            .Matches(Find(compilation, "Shop.App.Empty"), layers.Names).Should().BeTrue();
     }
 }

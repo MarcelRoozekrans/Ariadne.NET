@@ -21,14 +21,14 @@ A rule is an entry in `rules:`. It has exactly one of `forbid`, `allowOnly`, `re
 | `bannedPackages` | one of | `{ packages: [...], from: { assemblies: [...] } }`: no project in `from` may resolve a package that `packages` matches. Reported as `BannedPackage`. See [Banned packages](#banned-packages). |
 | `uniqueNames` | one of | `{ for: <target>, against: <target> }`: no type in `for` may share a simple name with a type in `against`. Reported as `NameCollision`. See [Unique names](#unique-names). |
 | `slices` | one of | `{ matching: [...], freeOfCycles or independent, allow }`: cuts the code into slices and keeps them free of cycles or independent. Reported as `SliceCycle` or `SliceDependency`. See [Slices](#slices). |
-| `exceptions` | no | List of selectors, each with a required `because`. A source type that an exception matches is exempt from the rule. On a `bannedPackages` rule an exception takes `assemblies` only, and on a `uniqueNames` rule `namespaces`, `types`, `attributes` and the type traits. |
+| `exceptions` | no | List of selectors, each with a required `because`. A source type that an exception matches is exempt from the rule. On a `bannedPackages` rule an exception takes `assemblies` only, and on a `uniqueNames` rule `namespaces`, `types`, `attributes`, `attributeArguments`, `onlyAttributes`, `dependsOn`, `onlyDependsOn` and the type traits. |
 | `locked` | no, default `false` | A child pack cannot add exceptions to this rule. |
 | `allowEmpty` | no, default `false` | Accepts that the rule selects no type. See [Rules that select nothing](#rules-that-select-nothing). |
 | `requireTarget` | no, default `false` | On a `forbid`, `allowOnly` or `uniqueNames` rule: fails the run when the rule's target matches no type. See [A target that matches nothing](#a-target-that-matches-nothing). Any other rule kind rejects `true`. |
 
-A **target** is either `layers: [...]` or a [selector](03-rule-schema.md#selectors) made of `namespaces`, `assemblies`, `types`, `baseTypes`, `interfaces`, `attributes` and the [type traits](03-rule-schema.md#type-traits). `layers` may sit next to traits, which keeps the types of those layers that match every trait. Mixing `layers` with the other selector kinds in one target is a load error, and a target must select something.
+A **target** is either `layers: [...]` or a [selector](03-rule-schema.md#selectors) made of `namespaces`, `assemblies`, `types`, `baseTypes`, `interfaces`, `attributes`, `attributeArguments`, `onlyAttributes`, `dependsOn`, `onlyDependsOn` and the [type traits](03-rule-schema.md#type-traits). `layers` may sit next to traits and next to `dependsOn` and `onlyDependsOn`, which keeps the types of those layers that match every trait and dependency key. Mixing `layers` with the other selector kinds in one target is a load error, and a target must select something.
 
-An exception takes `namespaces`, `assemblies`, `types`, `attributes` and the [type traits](03-rule-schema.md#type-traits) (at least one key) and a required `because`; the keys of one exception are AND-ed. `attributes` means what it means in a selector: the attribute classes applied directly to the type. On a `bannedPackages` rule an exception takes only `assemblies`, and on a `uniqueNames` rule `namespaces`, `types`, `attributes` and the traits. Exceptions exempt the source type, the same way for `forbid` and `allowOnly`. A negative predicate on a list trait is an exception that names the trait: "no type may depend on `Shop.Legacy.**`, except types assignable to `ILegacyAdapter`" is a `forbid` with this exception, which exempts every depending type assignable to `ILegacyAdapter`.
+An exception takes `namespaces`, `assemblies`, `types`, `attributes`, `attributeArguments`, `onlyAttributes`, `dependsOn`, `onlyDependsOn` and the [type traits](03-rule-schema.md#type-traits) (at least one key) and a required `because`; the keys of one exception are AND-ed. `attributes` means what it means in a selector: the attribute classes applied directly to the type, and `attributeArguments`, `onlyAttributes`, `dependsOn` and `onlyDependsOn` mean what they mean there, see [Dependency selectors](03-rule-schema.md#dependency-selectors). On a `bannedPackages` rule an exception takes only `assemblies`, and on a `uniqueNames` rule `namespaces`, `types`, `attributes`, `attributeArguments`, `onlyAttributes`, `dependsOn`, `onlyDependsOn` and the traits. Exceptions exempt the source type, the same way for `forbid` and `allowOnly`. A negative predicate on a list trait is an exception that names the trait: "no type may depend on `Shop.Legacy.**`, except types assignable to `ILegacyAdapter`" is a `forbid` with this exception, which exempts every depending type assignable to `ILegacyAdapter`.
 
 ```yaml
 rules:
@@ -118,7 +118,7 @@ rules:
 
 #### is and isNot
 
-`is` and `isNot` take a selector with every key except `layers` and `members`: the [type traits](03-rule-schema.md#type-traits) and also `namespaces`, `assemblies`, `types`, `baseTypes`, `interfaces` and `attributes`.
+`is` and `isNot` take a selector with every key except `layers` and `members`: the [type traits](03-rule-schema.md#type-traits) and also `namespaces`, `assemblies`, `types`, `baseTypes`, `interfaces`, `attributes`, `attributeArguments`, `onlyAttributes`, `dependsOn` and `onlyDependsOn`.
 
 ```yaml
 rules:
@@ -226,7 +226,7 @@ Package ids match case-insensitively, since NuGet ids do, with the `*` rules of 
 
 ### Unique names
 
-A `uniqueNames` rule keeps a type from reusing the name of another type. `for` and `against` are both required and take every selector key. A type in `for` that has the same simple name as a type in `against` is one violation, located at the `for` type, with the other type as `Target`.
+A `uniqueNames` rule keeps a type from reusing the name of another type. `for` and `against` are both required and take the plain selector keys and `dependsOn` and `onlyDependsOn`, not the type traits. A type in `for` that has the same simple name as a type in `against` is one violation, located at the `for` type, with the other type as `Target`.
 
 ```yaml
 rules:

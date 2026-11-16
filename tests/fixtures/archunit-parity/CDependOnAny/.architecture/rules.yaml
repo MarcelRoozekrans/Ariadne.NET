@@ -1,0 +1,14 @@
+schema: 2
+name: parity-c-depend-on-any
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-CDEPENDONANY
+    because: Mirrors ArchUnitNET's DependOnAny; Broken and Clean must depend on Target.
+    require:
+      for:
+        namespaces: ["Parity.CDependOnAny.Broken", "Parity.CDependOnAny.Clean"]
+      is:
+        dependsOn:
+          namespaces: ["Parity.CDependOnAny.Target.**"]

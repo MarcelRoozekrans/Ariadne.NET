@@ -24,9 +24,9 @@ internal sealed class PackOperations : IPackOperations
     private static readonly RulePackValidator Validator = new(
         new LayerDefinitionValidator(),
         new ComponentRoleDefinitionValidator(),
-        new RuleDefinitionValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new RuleRequirementValidator(new TargetSelectorValidator(), new TargetSelectorValidator(), new TargetSelectorValidator()), new TargetSelectorValidator(), new RuleExceptionValidator(), new SliceDefinitionValidator(new TargetSelectorValidator())),
+        new RuleDefinitionValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new RuleRequirementValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new TargetSelectorValidator(new AttributeArgumentMatchValidator())), new TargetSelectorValidator(new AttributeArgumentMatchValidator()), new RuleExceptionValidator(new AttributeArgumentMatchValidator()), new SliceDefinitionValidator(new TargetSelectorValidator(new AttributeArgumentMatchValidator()))),
         new LayerRetargetValidator(),
-        new RuleAmendmentValidator(new RuleExceptionValidator()),
+        new RuleAmendmentValidator(new RuleExceptionValidator(new AttributeArgumentMatchValidator())),
         new NamingConventionsValidator());
 
     private PackOperations()

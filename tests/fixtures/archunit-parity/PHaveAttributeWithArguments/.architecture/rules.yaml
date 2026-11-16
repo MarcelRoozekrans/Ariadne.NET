@@ -1,0 +1,27 @@
+schema: 2
+name: parity-p-have-attribute-with-arguments
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-PHAVEATTRIBUTEWITHARGUMENTS
+    because: Mirrors ArchUnitNET's HaveAttributeWithArguments; the types it selects must not depend on Target.
+    forbid:
+      from:
+        attributeArguments:
+          - attribute: "Parity.PHaveAttributeWithArguments.Contracts.TagAttribute"
+            arguments: ["billing", 7]
+      to:
+        namespaces: ["Parity.PHaveAttributeWithArguments.Target.**"]
+  - id: PARITY-PHAVEATTRIBUTEWITHARGUMENTS-NOT
+    because: Mirrors ArchUnitNET's DoNotHaveAnyAttributesWithArguments; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.PHaveAttributeWithArguments.**"]
+      to:
+        namespaces: ["Parity.PHaveAttributeWithArguments.Target.**"]
+    exceptions:
+      - attributeArguments:
+          - arguments: ["billing"]
+          - arguments: [7]
+        because: DoNotHaveAnyAttributesWithArguments leaves out the types with any attribute that holds either value, so each value is its own entry.

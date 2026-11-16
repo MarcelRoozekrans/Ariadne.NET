@@ -271,6 +271,89 @@ public class RulePackMergerTests
     }
 
     [Fact]
+    public void Amendment_AttributeArgumentsOnBannedPackagesRule_Fails()
+    {
+        var result = Amend(BannedRule(), new RuleException
+        {
+            Because = "x",
+            AttributeArguments = [new AttributeArgumentMatch { Arguments = ["1"] }],
+            OnlyAttributes = ["A.**"],
+        });
+
+        Problems(result).Should().HaveCount(2).And.Satisfy(
+            p => p.StartsWith("pack 'child' adds an exception to rule 'B1' with 'attributeArguments'", StringComparison.Ordinal),
+            p => p.StartsWith("pack 'child' adds an exception to rule 'B1' with 'onlyAttributes'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Amendment_DependsOnOnBannedPackagesRule_Fails()
+    {
+        var result = Amend(BannedRule(), new RuleException
+        {
+            Because = "x",
+            DependsOn = new TargetSelector { Layers = ["Domain"] },
+            OnlyDependsOn = new TargetSelector { Namespaces = ["Shop.**"] },
+        });
+
+        Problems(result).Should().HaveCount(2).And.Satisfy(
+            p => p.StartsWith("pack 'child' adds an exception to rule 'B1' with 'dependsOn'", StringComparison.Ordinal),
+            p => p.StartsWith("pack 'child' adds an exception to rule 'B1' with 'onlyDependsOn'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Amendment_DependsOnOnUniqueNamesRule_Merges()
+    {
+        var result = Amend(UniqueRule(), new RuleException { Because = "x", OnlyDependsOn = new TargetSelector { Layers = ["Domain"] } });
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Rules.Should().ContainSingle().Which.Exceptions.Should().ContainSingle().Which.OnlyDependsOn!.Layers.Should().Equal("Domain");
+    }
+
+    [Fact]
+    public void Amendment_AttributeArgumentsOnUniqueNamesRule_Merges()
+    {
+        Amend(UniqueRule(), new RuleException
+        {
+            Because = "x",
+            AttributeArguments = [new AttributeArgumentMatch { Named = new Dictionary<string, string>(StringComparer.Ordinal) { ["Name"] = "x" } }],
+        }).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Amendment_OnlyAttributesOnUniqueNamesRule_Merges()
+    {
+        var result = Amend(UniqueRule(), new RuleException { Because = "x", OnlyAttributes = ["Shop.*Attribute"] });
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Rules.Should().ContainSingle().Which.Exceptions.Should().ContainSingle().Which.OnlyAttributes.Should().Equal("Shop.*Attribute");
+    }
+
+    [Fact]
+    public void Amendment_AttributeArgumentsAndOnlyAttributesOnForbidRule_Merge()
+    {
+        var rule = new RuleDefinition
+        {
+            Id = "F1",
+            Because = "because",
+            Kind = RuleKind.Forbid,
+            From = new TargetSelector { Namespaces = ["Shop.**"] },
+            To = new TargetSelector { Namespaces = ["Lib.**"] },
+        };
+
+        var result = Amend(rule, new RuleException
+        {
+            Because = "x",
+            AttributeArguments = [new AttributeArgumentMatch { Arguments = ["billing"] }],
+            OnlyAttributes = ["Shop.*Attribute"],
+        });
+
+        result.IsSuccess.Should().BeTrue();
+        var exception = result.Value.Rules.Should().ContainSingle().Which.Exceptions.Should().ContainSingle().Subject;
+        exception.AttributeArguments.Should().ContainSingle().Which.Arguments.Should().Equal("billing");
+        exception.OnlyAttributes.Should().Equal("Shop.*Attribute");
+    }
+
+    [Fact]
     public void Amendment_AttributesOnUniqueNamesRule_Merges()
     {
         Amend(UniqueRule(), new RuleException { Because = "x", Attributes = ["A.BAttribute"] }).IsSuccess.Should().BeTrue();

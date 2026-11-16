@@ -111,6 +111,7 @@ internal static class RulePackReferenceCheck
             }
 
             CheckTraitsOf(rule, failures);
+            CheckDependencySelectorsOf(rule, layerNames, failures);
 
             if (rule.Require?.Layer is { } required && !Contains(layerNames, required))
             {
@@ -169,7 +170,8 @@ internal static class RulePackReferenceCheck
         }
 
         CheckTarget($"the allow of rule '{id}'", allow, failures);
-        if (HasCapture(allow.Namespaces, allow.Assemblies, allow.Types, allow.BaseTypes, allow.Interfaces, allow.Attributes, allow.Names, allow.AssignableTo))
+        if (HasCapture(allow.Namespaces, allow.Assemblies, allow.Types, allow.BaseTypes, allow.Interfaces, allow.Attributes, AttributePatterns(allow.AttributeArguments),
+                allow.OnlyAttributes, allow.Names, allow.AssignableTo))
         {
             failures.Add($"the allow of rule '{id}' has a pattern with a capture; {CaptureOutsideMatching}");
         }
@@ -181,13 +183,34 @@ internal static class RulePackReferenceCheck
         else if (allow is
                  {
                      Layers.Count: 0, Namespaces.Count: 0, Assemblies.Count: 0, Types.Count: 0, BaseTypes.Count: 0, Interfaces.Count: 0,
-                     Attributes.Count: 0, Names.Count: 0, Kinds.Count: 0, Accessibility.Count: 0, AssignableTo.Count: 0,
-                     Sealed: null, Abstract: null, Static: null, Nested: null,
+                     Attributes.Count: 0, AttributeArguments.Count: 0, OnlyAttributes.Count: 0, Names.Count: 0, Kinds.Count: 0, Accessibility.Count: 0,
+                     AssignableTo.Count: 0, Sealed: null, Abstract: null, Static: null, Nested: null, DependsOn: null, OnlyDependsOn: null,
                  })
         {
             failures.Add($"the allow of rule '{id}' selects nothing; it needs at least one selector key");
         }
     }
+
+    // The target keys the loader keeps out of one rule kind's targets.
+    private static void CheckKindTargets(RuleDefinition rule, string id, List<string> failures)
+    {
+        if (rule.Kind == RuleKind.UniqueNames)
+        {
+            // The loader keeps traits out of a uniqueNames target; TargetMatcher would narrow the collisions by them.
+            RejectKeys($"the for of rule '{id}'", rule.From, PackYamlReader.TraitKeys, "which a uniqueNames target does not take", failures);
+            RejectKeys($"the against of rule '{id}'", rule.Against, PackYamlReader.TraitKeys, "which a uniqueNames target does not take", failures);
+        }
+        else if (rule.Kind == RuleKind.BannedPackages)
+        {
+            // BannedPackageRules reads only assemblies, so another key would be ignored and the rule would cover every project.
+            RejectKeys($"the from of rule '{id}'", rule.From,
+                [.. SetKeys(rule.From).Where(static key => !string.Equals(key, "assemblies", StringComparison.Ordinal))],
+                "which a bannedPackages from does not take; a package belongs to a project, so it selects projects by 'assemblies' only", failures);
+        }
+    }
+
+    // What the loader calls a rule's From: require and uniqueNames read it from 'for', the others from 'from'.
+    private static string FromKey(RuleKind kind) => kind is RuleKind.Require or RuleKind.UniqueNames ? "for" : "from";
 
     // The loader enforces these for a YAML pack. A pack built in code skips the loader, and the validator would throw on
     // an unknown accessibility or a target mixing layers with code patterns, and an empty exception would exempt every
@@ -195,16 +218,10 @@ internal static class RulePackReferenceCheck
     private static void CheckTraitsOf(RuleDefinition rule, List<string> failures)
     {
         var id = PackText.Show(rule.Id);
-        CheckTarget($"the {(rule.Kind == RuleKind.Require ? "for" : "from")} of rule '{id}'", rule.From, failures);
+        CheckTarget($"the {FromKey(rule.Kind)} of rule '{id}'", rule.From, failures);
         CheckTarget($"the to of rule '{id}'", rule.To, failures);
         CheckTarget($"the against of rule '{id}'", rule.Against, failures);
-        if (rule.Kind == RuleKind.UniqueNames)
-        {
-            // The loader keeps traits out of a uniqueNames target; TargetMatcher would narrow the collisions by them.
-            RejectKeys($"the for of rule '{id}'", rule.From, PackYamlReader.TraitKeys, "which a uniqueNames target does not take", failures);
-            RejectKeys($"the against of rule '{id}'", rule.Against, PackYamlReader.TraitKeys, "which a uniqueNames target does not take", failures);
-        }
-
+        CheckKindTargets(rule, id, failures);
         if (rule.Require is { } requirement)
         {
             if (requirement.Is is { } isCondition)
@@ -224,16 +241,20 @@ internal static class RulePackReferenceCheck
             var where = $"exceptions[{i}] of rule '{id}'";
             if (exception is
                 {
-                    Namespaces.Count: 0, Assemblies.Count: 0, Types.Count: 0, Attributes.Count: 0, Names.Count: 0, Kinds.Count: 0, Accessibility.Count: 0,
-                    AssignableTo.Count: 0, Sealed: null, Abstract: null, Static: null, Nested: null,
+                    Namespaces.Count: 0, Assemblies.Count: 0, Types.Count: 0, Attributes.Count: 0, AttributeArguments.Count: 0, OnlyAttributes.Count: 0,
+                    Names.Count: 0, Kinds.Count: 0, Accessibility.Count: 0, AssignableTo.Count: 0, Sealed: null, Abstract: null, Static: null, Nested: null,
+                    DependsOn: null, OnlyDependsOn: null,
                 })
             {
-                failures.Add($"{where} selects nothing; it needs at least one of namespaces, assemblies, types, attributes or a trait");
+                failures.Add(
+                    $"{where} selects nothing; it needs at least one of namespaces, assemblies, types, attributes, attributeArguments, onlyAttributes, a trait, dependsOn or onlyDependsOn");
             }
 
             CheckTraitValues(where, exception.Kinds, exception.Accessibility, failures);
+            CheckArgumentEntries(where, exception.AttributeArguments, failures);
             if (rule.Kind == RuleKind.Slices
-                && HasCapture(exception.Namespaces, exception.Assemblies, exception.Types, exception.Attributes, exception.Names, exception.AssignableTo))
+                && HasCapture(exception.Namespaces, exception.Assemblies, exception.Types, exception.Attributes, AttributePatterns(exception.AttributeArguments),
+                    exception.OnlyAttributes, exception.Names, exception.AssignableTo))
             {
                 failures.Add($"{where} has a pattern with a capture; {CaptureOutsideMatching}");
             }
@@ -250,6 +271,79 @@ internal static class RulePackReferenceCheck
         }
     }
 
+    // The loader enforces these for a YAML pack. A pack built in code skips the loader, so the selectors under dependsOn and
+    // onlyDependsOn get every check a target gets here, each reported at its own path, as the loader names it.
+    private static void CheckDependencySelectorsOf(RuleDefinition rule, HashSet<string> layerNames, List<string> failures)
+    {
+        var id = PackText.Show(rule.Id);
+        var slices = rule.Kind == RuleKind.Slices;
+        CheckDependencySelectors($"the {FromKey(rule.Kind)} of rule '{id}'", rule.From.DependsOn, rule.From.OnlyDependsOn, layerNames, slices, failures);
+        CheckDependencySelectors($"the to of rule '{id}'", rule.To.DependsOn, rule.To.OnlyDependsOn, layerNames, slices, failures);
+        CheckDependencySelectors($"the against of rule '{id}'", rule.Against.DependsOn, rule.Against.OnlyDependsOn, layerNames, slices, failures);
+        if (rule.Slices?.Allow is { } allow)
+        {
+            CheckDependencySelectors($"the allow of rule '{id}'", allow.DependsOn, allow.OnlyDependsOn, layerNames, slices, failures);
+        }
+
+        if (rule.Require?.Is is { } isCondition)
+        {
+            CheckDependencySelectors($"the is of rule '{id}'", isCondition.DependsOn, isCondition.OnlyDependsOn, layerNames, slices, failures);
+        }
+
+        if (rule.Require?.IsNot is { } isNotCondition)
+        {
+            CheckDependencySelectors($"the isNot of rule '{id}'", isNotCondition.DependsOn, isNotCondition.OnlyDependsOn, layerNames, slices, failures);
+        }
+
+        for (var i = 0; i < rule.Exceptions.Count; i++)
+        {
+            var exception = rule.Exceptions[i];
+            CheckDependencySelectors($"exceptions[{i}] of rule '{id}'", exception.DependsOn, exception.OnlyDependsOn, layerNames, slices, failures);
+        }
+    }
+
+    private static void CheckDependencySelectors(
+        string where, TargetSelector? dependsOn, TargetSelector? onlyDependsOn, HashSet<string> layerNames, bool inSlicesRule, List<string> failures)
+    {
+        CheckDependencySelector($"the dependsOn of {where}", dependsOn, layerNames, inSlicesRule, failures);
+        CheckDependencySelector($"the onlyDependsOn of {where}", onlyDependsOn, layerNames, inSlicesRule, failures);
+    }
+
+    // TypeSelector compiles the nested selector into a TargetMatcher, which would throw on members, a nested dependency key or
+    // layers mixed with code patterns, and an empty one would select every dependency.
+    private static void CheckDependencySelector(string where, TargetSelector? nested, HashSet<string> layerNames, bool inSlicesRule, List<string> failures)
+    {
+        if (nested is null)
+        {
+            return;
+        }
+
+        CheckTarget(where, nested, failures);
+        foreach (var name in nested.Layers)
+        {
+            if (!Contains(layerNames, name))
+            {
+                failures.Add($"{where} refers to unknown layer '{PackText.Show(name)}'");
+            }
+        }
+
+        if (nested.Members.Count > 0 || nested.DependsOn is not null || nested.OnlyDependsOn is not null)
+        {
+            RejectKeys(where, nested, ["members", "dependsOn", "onlyDependsOn"], "which the selector under dependsOn or onlyDependsOn does not take", failures);
+        }
+        else if (!SetKeys(nested).Any())
+        {
+            failures.Add($"{where} selects nothing; it needs at least one selector key other than members, dependsOn and onlyDependsOn");
+        }
+
+        if (inSlicesRule
+            && HasCapture(nested.Namespaces, nested.Assemblies, nested.Types, nested.BaseTypes, nested.Interfaces, nested.Attributes,
+                AttributePatterns(nested.AttributeArguments), nested.OnlyAttributes, nested.Names, nested.AssignableTo))
+        {
+            failures.Add($"{where} has a pattern with a capture; {CaptureOutsideMatching}");
+        }
+    }
+
     // The YAML key of each set selector key, in the loader's order.
     private static IEnumerable<string> SetKeys(TargetSelector selector)
     {
@@ -262,6 +356,8 @@ internal static class RulePackReferenceCheck
             ("baseTypes", selector.BaseTypes.Count > 0),
             ("interfaces", selector.Interfaces.Count > 0),
             ("attributes", selector.Attributes.Count > 0),
+            ("attributeArguments", selector.AttributeArguments.Count > 0),
+            ("onlyAttributes", selector.OnlyAttributes.Count > 0),
             ("members", selector.Members.Count > 0),
             ("names", selector.Names.Count > 0),
             ("kinds", selector.Kinds.Count > 0),
@@ -271,6 +367,8 @@ internal static class RulePackReferenceCheck
             ("abstract", selector.Abstract is not null),
             ("static", selector.Static is not null),
             ("nested", selector.Nested is not null),
+            ("dependsOn", selector.DependsOn is not null),
+            ("onlyDependsOn", selector.OnlyDependsOn is not null),
         ];
         return keys.Where(static k => k.Set).Select(static k => k.Key);
     }
@@ -285,6 +383,10 @@ internal static class RulePackReferenceCheck
             }
         }
     }
+
+    // The attribute class patterns of attribute argument entries, which a capture would turn into literal segments too.
+    private static List<string> AttributePatterns(IList<AttributeArgumentMatch> entries) =>
+        [.. entries.Select(static entry => entry?.Attribute).OfType<string>()];
 
     private const string CaptureOutsideMatching = "a capture, (*) or (**), is only accepted in the matching of a slices rule";
 
@@ -309,12 +411,60 @@ internal static class RulePackReferenceCheck
     private static void CheckTarget(string where, TargetSelector target, List<string> failures)
     {
         if (target.Layers.Count > 0 && (target.Namespaces.Count > 0 || target.Assemblies.Count > 0 || target.Types.Count > 0
-                || target.BaseTypes.Count > 0 || target.Interfaces.Count > 0 || target.Attributes.Count > 0 || target.Members.Count > 0))
+                || target.BaseTypes.Count > 0 || target.Interfaces.Count > 0 || target.Attributes.Count > 0 || target.AttributeArguments.Count > 0
+                || target.OnlyAttributes.Count > 0 || target.Members.Count > 0))
         {
-            failures.Add($"{where} mixes layers with namespaces, assemblies, types, base types, interfaces, attributes or members");
+            failures.Add($"{where} mixes layers with namespaces, assemblies, types, base types, interfaces, attributes, attribute arguments, attribute allow-lists or members");
         }
 
         CheckTraitValues(where, target.Kinds, target.Accessibility, failures);
+        CheckArgumentEntries(where, target.AttributeArguments, failures);
+    }
+
+    // An entry with neither arguments nor named values matches every attribute instance, so as an exception it would
+    // exempt every attributed type. The loader rejects it for a YAML pack; a pack built in code is reported here.
+    private static void CheckArgumentEntries(string where, IList<AttributeArgumentMatch> entries, List<string> failures)
+    {
+        for (var i = 0; i < entries.Count; i++)
+        {
+            if (entries[i] is not { } entry)
+            {
+                failures.Add($"attributeArguments[{i}] in {where} must not be null");
+            }
+            else if (entry.Arguments is null || entry.Named is null)
+            {
+                failures.Add($"attributeArguments[{i}] in {where} must not have a null 'arguments' or 'named'");
+            }
+            else if (HasNullValue(entry))
+            {
+                failures.Add($"attributeArguments[{i}] in {where} must not have a null value in 'arguments' or 'named'");
+            }
+            else if (entry.Arguments.Count == 0 && entry.Named.Count == 0)
+            {
+                failures.Add($"attributeArguments[{i}] in {where} needs 'arguments' or 'named'; to select by the attribute alone, use 'attributes'");
+            }
+        }
+    }
+
+    private static bool HasNullValue(AttributeArgumentMatch entry)
+    {
+        foreach (var argument in entry.Arguments)
+        {
+            if (argument is null)
+            {
+                return true;
+            }
+        }
+
+        foreach (var value in entry.Named.Values)
+        {
+            if (value is null)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static void CheckTraitValues(string where, IList<CSharpTypeKind> kinds, IList<string> accessibility, List<string> failures)
@@ -395,6 +545,7 @@ internal static class RulePackReferenceCheck
             return;
         }
 
+        CheckArgumentEntries($"the {key} of rule '{id}'", condition.AttributeArguments, failures);
         if (condition.Layers.Count > 0 || condition.Members.Count > 0)
         {
             failures.Add($"the {key} of rule '{id}' has layers or members, which a condition does not take");
@@ -402,8 +553,8 @@ internal static class RulePackReferenceCheck
         else if (condition is
                  {
                      Namespaces.Count: 0, Assemblies.Count: 0, Types.Count: 0, BaseTypes.Count: 0, Interfaces.Count: 0, Attributes.Count: 0,
-                     Names.Count: 0, Kinds.Count: 0, Accessibility.Count: 0, AssignableTo.Count: 0,
-                     Sealed: null, Abstract: null, Static: null, Nested: null,
+                     AttributeArguments.Count: 0, OnlyAttributes.Count: 0, Names.Count: 0, Kinds.Count: 0, Accessibility.Count: 0, AssignableTo.Count: 0,
+                     Sealed: null, Abstract: null, Static: null, Nested: null, DependsOn: null, OnlyDependsOn: null,
                  })
         {
             failures.Add($"the {key} of rule '{id}' selects nothing; it needs at least one selector key other than layers and members");

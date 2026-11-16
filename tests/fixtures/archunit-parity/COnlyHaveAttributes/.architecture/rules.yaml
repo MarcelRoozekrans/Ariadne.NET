@@ -1,0 +1,15 @@
+schema: 2
+name: parity-c-only-have-attributes
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-CONLYHAVEATTRIBUTES
+    because: Mirrors ArchUnitNET's OnlyHaveAttributes with Audited and Reviewed; Broken and Clean must satisfy it.
+    require:
+      for:
+        namespaces: ["Parity.COnlyHaveAttributes.Broken", "Parity.COnlyHaveAttributes.Clean"]
+      is:
+        onlyAttributes:
+          - "Parity.COnlyHaveAttributes.Contracts.AuditedAttribute"
+          - "Parity.COnlyHaveAttributes.Contracts.ReviewedAttribute"

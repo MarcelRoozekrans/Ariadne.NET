@@ -1,0 +1,16 @@
+schema: 2
+name: parity-p-only-have-attributes
+version: "1.0.0"
+author: fixture
+
+rules:
+  - id: PARITY-PONLYHAVEATTRIBUTES
+    because: Mirrors ArchUnitNET's OnlyHaveAttributes with Audited and Reviewed; the types it selects must not depend on Target.
+    forbid:
+      from:
+        namespaces: ["Parity.POnlyHaveAttributes.**"]
+        onlyAttributes:
+          - "Parity.POnlyHaveAttributes.Contracts.AuditedAttribute"
+          - "Parity.POnlyHaveAttributes.Contracts.ReviewedAttribute"
+      to:
+        namespaces: ["Parity.POnlyHaveAttributes.Target.**"]

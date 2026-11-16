@@ -692,6 +692,114 @@ public class ArchitectureValidatorTests
         _validator.Validate(pack, TestCompilation.Create(ShopWeb)).IsValid.Should().BeFalse();
     }
 
+    private static readonly TargetSelector DependencyKey = new() { DependsOn = new TargetSelector { Namespaces = ["Shop.Domain.**"] } };
+
+    private static readonly TargetSelector OnlyDependencyKey = new() { OnlyDependsOn = new TargetSelector { Layers = ["Domain"] } };
+
+    private static RuleException ExceptionWith(TargetSelector key) =>
+        new() { DependsOn = key.DependsOn, OnlyDependsOn = key.OnlyDependsOn, Because = "Excused." };
+
+    // A pack that uses every place a selector can sit, none of them with a dependency key.
+    private static RulePack PackWithoutDependencyKeys() => new()
+    {
+        Name = "test",
+        Layers = [VLayer("Web", "Shop.Web.**")],
+        Rules =
+        [
+            new RuleDefinition { Id = "F", Because = "F.", Kind = RuleKind.Forbid, From = VNs("Shop.**"), To = VNs("Shop.Data.**"), Exceptions = [new RuleException { Types = ["Shop.X"], Because = "X." }] },
+            new RuleDefinition { Id = "R", Because = "R.", Kind = RuleKind.Require, From = VNs("Shop.**"), Require = new RuleRequirement { Is = new TargetSelector { Sealed = true }, IsNot = new TargetSelector { Static = true }, Implements = new TargetSelector { Types = ["Shop.IThing"] } } },
+            new RuleDefinition { Id = "S", Because = "S.", Kind = RuleKind.Slices, From = new TargetSelector(), Slices = new SliceDefinition { Matching = ["Shop.(*)"], Independent = true, Allow = VNs("Shop.Shared.**") } },
+            new RuleDefinition { Id = "U", Because = "U.", Kind = RuleKind.UniqueNames, From = VNs("Shop.**"), Against = VNs("Shop.**") },
+        ],
+        RuleAmendments = [new RuleAmendment { Id = "F", Exceptions = [new RuleException { Types = ["Shop.Y"], Because = "Y." }] }],
+    };
+
+    public static TheoryData<string, bool> DependencyKeyPlaces()
+    {
+        var data = new TheoryData<string, bool>();
+        foreach (var place in new[] { "forbid from", "forbid to", "allowOnly from", "allowOnly to", "require for", "require is", "require isNot", "require implements", "rule exception", "amendment exception", "slices allow", "uniqueNames for", "uniqueNames against" })
+        {
+            data.Add(place, false);
+            data.Add(place, true);
+        }
+
+        return data;
+    }
+
+    [Fact]
+    public void UsesDependencyKeys_is_false_for_pack_without_keys()
+    {
+        ArchitectureValidator.UsesDependencyKeys(PackWithoutDependencyKeys()).Should().BeFalse();
+    }
+
+    [Theory]
+    [MemberData(nameof(DependencyKeyPlaces))]
+    public void UsesDependencyKeys_is_true_for_key_in(string place, bool only)
+    {
+        var key = only ? OnlyDependencyKey : DependencyKey;
+        RuleDefinition Rule(RuleKind kind, TargetSelector? from = null, TargetSelector? to = null, TargetSelector? against = null) =>
+            new() { Id = "K", Because = "K.", Kind = kind, From = from ?? VNs("Shop.**"), To = to ?? new TargetSelector(), Against = against ?? new TargetSelector() };
+        var rule = place switch
+        {
+            "forbid from" => Rule(RuleKind.Forbid, from: key),
+            "forbid to" => Rule(RuleKind.Forbid, to: key),
+            "allowOnly from" => Rule(RuleKind.AllowOnly, from: key),
+            "allowOnly to" => Rule(RuleKind.AllowOnly, to: key),
+            "require for" => new RuleDefinition { Id = "K", Because = "K.", Kind = RuleKind.Require, From = key, Require = new RuleRequirement { Is = new TargetSelector { Sealed = true } } },
+            "require is" => new RuleDefinition { Id = "K", Because = "K.", Kind = RuleKind.Require, From = VNs("Shop.**"), Require = new RuleRequirement { Is = key } },
+            "require isNot" => new RuleDefinition { Id = "K", Because = "K.", Kind = RuleKind.Require, From = VNs("Shop.**"), Require = new RuleRequirement { IsNot = key } },
+            "require implements" => new RuleDefinition { Id = "K", Because = "K.", Kind = RuleKind.Require, From = VNs("Shop.**"), Require = new RuleRequirement { Implements = key } },
+            "rule exception" => new RuleDefinition { Id = "K", Because = "K.", Kind = RuleKind.Forbid, From = VNs("Shop.**"), To = VNs("Shop.Data.**"), Exceptions = [ExceptionWith(key)] },
+            "slices allow" => new RuleDefinition { Id = "K", Because = "K.", Kind = RuleKind.Slices, From = new TargetSelector(), Slices = new SliceDefinition { Matching = ["Shop.(*)"], Independent = true, Allow = key } },
+            "uniqueNames for" => Rule(RuleKind.UniqueNames, from: key),
+            "uniqueNames against" => Rule(RuleKind.UniqueNames, against: key),
+            _ => null,
+        };
+        var basePack = PackWithoutDependencyKeys();
+        var pack = new RulePack
+        {
+            Name = basePack.Name,
+            Layers = basePack.Layers,
+            Rules = rule is null ? basePack.Rules : [.. basePack.Rules, rule],
+            RuleAmendments = string.Equals(place, "amendment exception", StringComparison.Ordinal)
+                ? [.. basePack.RuleAmendments, new RuleAmendment { Id = "F", Exceptions = [ExceptionWith(key)] }]
+                : basePack.RuleAmendments,
+        };
+
+        ArchitectureValidator.UsesDependencyKeys(pack).Should().BeTrue();
+    }
+
+    [Fact]
+    public void IndexFor_builds_no_index_for_a_pack_without_dependency_keys()
+    {
+        var compilation = TestCompilation.Create(ShopWeb);
+        AnalyzedProject[] projects = [new AnalyzedProject("Shop", null, compilation)];
+        TypeGraph[] graphs = [TypeGraphBuilder.Build(compilation, new HashSet<SyntaxTree>(), CancellationToken.None)];
+
+        ArchitectureValidator.IndexFor(PackWithoutDependencyKeys(), projects, graphs).Should().BeNull();
+    }
+
+    [Fact]
+    public void IndexFor_builds_the_index_for_a_pack_with_a_dependency_key()
+    {
+        var compilation = TestCompilation.Create(ShopWeb);
+        AnalyzedProject[] projects = [new AnalyzedProject("Shop", null, compilation)];
+        TypeGraph[] graphs = [TypeGraphBuilder.Build(compilation, new HashSet<SyntaxTree>(), CancellationToken.None)];
+        var pack = new RulePack { Name = "test", Rules = [VRule("K", DependencyKey)] };
+
+        ArchitectureValidator.IndexFor(pack, projects, graphs).Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Validate_runs_a_pack_with_a_dependency_key()
+    {
+        var pack = new RulePack { Name = "test", Layers = [VLayer("Web", "Shop.Web.**")], Rules = [VRule("K", DependencyKey, VNs("Shop.Domain.**"))] };
+
+        var report = _validator.Validate(pack, TestCompilation.Create(ShopWeb));
+
+        report.Projects.Should().ContainSingle();
+    }
+
     private static CSharpCompilation Compile(string source, params string[] symbols)
     {
         var tree = CSharpSyntaxTree.ParseText(
