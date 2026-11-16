@@ -116,6 +116,9 @@ Methods of `That()`. Each becomes one key of a selector; several keys in one sel
 | `HaveNameMatching`, `HaveFullNameMatching` | no regex; translate by hand, see [Translating patterns](#translating-patterns) | `p-have-name-matching`, `p-have-full-name-matching` |
 | `HaveAssemblyQualifiedName` and its variants | `assemblies` plus `types` in one selector | `p-have-assembly-qualified-name` |
 | `HaveAnyAttributes` | `attributes: ["Ns.AuditedAttribute"]`, the full name with `Attribute`; `DoNotHaveAnyAttributes` is an exception with `attributes` | `p-have-any-attributes` |
+| `HaveAttributeWithArguments`, `HaveAnyAttributesWithArguments` | `attributeArguments` with `attribute` and `arguments`; the `DoNot…` forms are an exception with one entry per value, see [Attribute arguments](#attribute-arguments) | `p-have-attribute-with-arguments` |
+| `HaveAttributeWithNamedArguments`, `HaveAnyAttributesWithNamedArguments` | `attributeArguments` with `attribute` and `named`; the `DoNot…` forms are an exception with one entry per pair | `p-have-attribute-with-named-arguments` |
+| `OnlyHaveAttributes` | `onlyAttributes`, see [Attribute arguments](#attribute-arguments); `OnlyHaveAttributes()` with no set is an exception with `attributes: ["**"]` | `p-only-have-attributes` |
 
 ### Conditions
 
@@ -156,6 +159,9 @@ Methods of `Should()`. Placement and shape become a `require` rule; the keys `is
 | `HaveNameMatching`, `HaveFullNameMatching` | no regex; translate by hand, see [Translating patterns](#translating-patterns) | `c-have-name-matching`, `c-have-full-name-matching` |
 | `HaveAssemblyQualifiedName` and its variants | `is` with `assemblies` plus `types` | `c-have-assembly-qualified-name` |
 | `HaveAnyAttributes`, `HaveAnyAttributesThat` | `is: { attributes: ["Ns.AuditedAttribute"] }` | `c-have-any-attributes` |
+| `HaveAttributeWithArguments`, `HaveAnyAttributesWithArguments` | `is: { attributeArguments }` with `attribute` and `arguments`; the `NotHave…` forms are `isNot` with one entry per value, see [Attribute arguments](#attribute-arguments) | `c-have-attribute-with-arguments` |
+| `HaveAttributeWithNamedArguments`, `HaveAnyAttributesWithNamedArguments` | `is: { attributeArguments }` with `attribute` and `named`; the `NotHave…` forms are `isNot` with one entry per pair | `c-have-attribute-with-named-arguments` |
+| `OnlyHaveAttributes`, `OnlyHaveAttributesThat` | `is: { onlyAttributes: ["Ns.AuditedAttribute"] }`; `OnlyHaveAttributes()` with no set is `isNot: { attributes: ["**"] }` | `c-only-have-attributes` |
 | `OnlyDependOn`, `OnlyDependOnTypesThat` | a layer with `allowedDependencies`; cover the forbidden types with a layer too, see [Things that work differently](#things-that-work-differently) | `c-only-depend-on` |
 
 ### Negation
@@ -168,6 +174,124 @@ ArchUnitNET negates a method with its `DoNot` or `Not` form. A pack negates in t
 | `Should().Not…`, such as `NotBeSealed` or `NotHaveName` | `isNot` with the key of the positive form, such as `isNot: { sealed: true }`. Each `isNot` key fails a type it matches on its own, so a positive form that needs two keys does not negate by copying both into `isNot`: `NotHaveAssemblyQualifiedName` rejects a type only when its assembly and its name both match, but `isNot: { assemblies: […], types: […] }` rejects a type that matches either. Narrow `for` with one key and put the other in `isNot`, such as `for: { assemblies: [Shop.Domain] }` with `isNot: { types: ["Shop.Domain.Order"] }` | — |
 | `NotDependOnAny`, `NotDependOnAnyTypesThat` | `forbid: { from: …, to: … }` | `c-not-depend-on-any` |
 | `NotExist` | `require` with `isNot: { types: ["**"] }` and `allowEmpty: true` | `c-not-exist` |
+
+### Attribute arguments
+
+`attributeArguments` and `onlyAttributes` sit next to `attributes`, in every place `attributes` is accepted. An `attributeArguments` entry matches one attribute instance applied directly to the type: `attribute` (a dotted glob over the attribute class), `arguments` and `named` must all hold on the same instance. Each value in `arguments` equals some argument value of that instance, constructor or named, in any position, as in ArchUnitNET. Each pair in `named` equals a named argument. An entry without `attribute` matches any attribute class. Entries are OR-ed. Values compare as text, numbers, `true` or `false`, enum member names and `typeof` full names; see [Selectors](./how-it-works/03-rule-schema.md#selectors) for the rules.
+
+`HaveAttributeWithArguments(typeof(TagAttribute), "billing", 7)` needs both values on one instance of `TagAttribute`:
+
+```yaml
+schema: 2
+name: attribute-arguments
+version: "1.0.0"
+author: team
+
+rules:
+  - id: TAGGED-NOT-IN-DOMAIN
+    because: Types tagged for billing with 7 stay out of the domain.
+    forbid:
+      from:
+        attributeArguments:
+          - attribute: "Shop.Contracts.TagAttribute"
+            arguments: ["billing", 7]
+      to:
+        namespaces: ["Shop.Domain.**"]
+```
+
+`HaveAttributeWithNamedArguments` is the same with `named`, a mapping from the property or field name to the value:
+
+```yaml
+schema: 2
+name: attribute-named-arguments
+version: "1.0.0"
+author: team
+
+rules:
+  - id: AUDITED-BILLING-NOT-IN-DOMAIN
+    because: Audited billing types stay out of the domain.
+    forbid:
+      from:
+        attributeArguments:
+          - attribute: "Shop.Contracts.TagAttribute"
+            named: { Area: "billing", Audited: true }
+      to:
+        namespaces: ["Shop.Domain.**"]
+```
+
+The `DoNot…` and `Not…` forms of these methods are not the plain negation. ArchUnitNET rejects a type when any one of the given values or pairs appears on any attribute instance, or on any instance of that attribute for the `…AttributeWith…` forms, while the positive form needs all of them on one instance. A pack says that with one entry per value or pair, in an exception for a predicate and in `isNot` for a condition, with `attribute` set for the `…AttributeWith…` forms:
+
+```yaml
+schema: 2
+name: attribute-arguments-negated
+version: "1.0.0"
+author: team
+
+rules:
+  - id: NOT-TAGGED-NOT-IN-DOMAIN
+    because: DoNotHaveAnyAttributesWithArguments leaves out the types with either value on any attribute, so each value is its own entry.
+    forbid:
+      from:
+        namespaces: ["Shop.**"]
+      to:
+        namespaces: ["Shop.Domain.**"]
+    exceptions:
+      - attributeArguments:
+          - arguments: ["billing"]
+          - arguments: [7]
+        because: Billing and 7 are both marked types.
+  - id: SERVICES-HOLD-NO-TAG-VALUE
+    because: NotHaveAttributeWithNamedArguments, so each pair is its own entry and the attribute names the class.
+    require:
+      for:
+        namespaces: ["Shop.Services"]
+      isNot:
+        attributeArguments:
+          - attribute: "Shop.Contracts.TagAttribute"
+            named: { Area: "billing" }
+          - attribute: "Shop.Contracts.TagAttribute"
+            named: { Audited: true }
+```
+
+`OnlyHaveAttributes(set)` holds when no attribute class on the type is outside the set, and a type with no attributes holds. That is `onlyAttributes`, a list of dotted globs over attribute class names:
+
+```yaml
+schema: 2
+name: only-attributes
+version: "1.0.0"
+author: team
+
+rules:
+  - id: CONTRACTS-ONLY-AUDITED
+    because: A contract carries no attribute beyond Audited and Reviewed.
+    require:
+      for:
+        namespaces: ["Shop.Contracts"]
+      is:
+        onlyAttributes:
+          - "Shop.Contracts.AuditedAttribute"
+          - "Shop.Contracts.ReviewedAttribute"
+```
+
+`onlyAttributes` ignores the attributes the compiler emits: `CompilerGeneratedAttribute`, `NullableAttribute`, `NullableContextAttribute`, `NullablePublicOnlyAttribute`, `IsReadOnlyAttribute`, `IsByRefLikeAttribute` and `EmbeddedAttribute`. ArchUnitNET 0.13.5 does not count the nullable attributes for `OnlyHaveAttributes` either, so the two tools agree on nullable-enabled projects.
+
+`OnlyHaveAttributes()` with no set means "has no attributes". An empty `onlyAttributes` list is a load error, so write that as `isNot: { attributes: ["**"] }` in a condition, or as an exception with `attributes: ["**"]` in a predicate:
+
+```yaml
+schema: 2
+name: no-attributes
+version: "1.0.0"
+author: team
+
+rules:
+  - id: VALUES-HAVE-NO-ATTRIBUTES
+    because: Value objects carry no attributes.
+    require:
+      for:
+        namespaces: ["Shop.Values"]
+      isNot:
+        attributes: ["**"]
+```
 
 ### Slices
 
@@ -203,7 +327,6 @@ These rows are `deferred` or `out-of-scope` in the catalogue. Keep such a check 
 | `CallAny`, `NotCallAny` | none yet; member level, see #94. A `forbid` with `members` in `to` already forbids calls to the members it names | `p-call-any`, `c-call-any` |
 | `HaveMemberWithName` and its method, property and field forms | none yet; member level, see #94 | `p-have-member-with-name`, `c-have-member-with-name` |
 | `AreImmutable`, `BeImmutable` on `Classes()` | none yet; member level, see #94 | `p-are-immutable`, `c-be-immutable` |
-| `HaveAttributeWithArguments`, `HaveAttributeWithNamedArguments`, `OnlyHaveAttributes` and their forms | none yet; attribute arguments, see #95 | `p-have-attribute-with-arguments`, `c-have-attribute-with-arguments`, `p-have-attribute-with-named-arguments`, `c-have-attribute-with-named-arguments`, `p-only-have-attributes`, `c-only-have-attributes` |
 | `FollowCustomPredicate`, `FollowCustomCondition` | none; a pack cannot run C# code | `p-follow-custom-predicate`, `c-follow-custom-condition` |
 | `AdhereToPlantUmlDiagram` | none; layers and `allowedDependencies` say what a component diagram says | `c-adhere-to-plant-uml-diagram` |
 | `Members()`: `AreDeclaredIn`, `AreStatic`, `AreReadOnly`, `AreImmutable` and their conditions | none yet; member level, see #94 | `p-member-are-declared-in`, `c-member-be-declared-in`, `p-member-are-static`, `c-member-be-static`, `p-member-are-read-only`, `c-member-be-read-only`, `p-member-are-immutable`, `c-member-be-immutable` |

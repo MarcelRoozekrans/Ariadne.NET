@@ -163,8 +163,22 @@ Matching is ordinal and case-sensitive, like C# names.
 - **`baseTypes`** match any type in the base class chain of a type, with the `types` grammar. `**.RepositoryBase` selects every class that derives from a `RepositoryBase`, directly or not. A generic base is matched without its type arguments.
 - **`interfaces`** match any interface a type implements or inherits, directly or through a base class, with the `types` grammar. `**.I*Repository` selects every implementation of a repository interface.
 - **`attributes`** match the full name of an attribute applied directly to the type, with the `types` grammar. An attribute the type only inherits from a base class does not count. Write the name as the compiler knows it, so `**.ObsoleteAttribute` and not `**.Obsolete`.
+- **`attributeArguments`** is a list of entries, each with the keys `attribute`, `arguments` and `named`. An entry matches one attribute instance applied directly to the type, and all its keys must hold on that same instance, so two instances that each hold one of two required values do not match. `attribute` is an optional dotted glob over the attribute class's full name; without it any attribute class may match. `arguments` is a list of values that must each equal some argument value of the instance, constructor or named, in any position. `named` is a mapping from a property or field name (ordinal, case-sensitive) to a value that must equal that named argument. An entry needs `arguments` or `named` or both; to match on the attribute alone, use `attributes`. The entries of the list are OR-ed. A type with no attributes never matches.
+- **`onlyAttributes`** is a list of dotted globs over attribute class full names, as `attributes` takes them. It matches a type when every attribute class applied directly to the type matches at least one glob, so a type with no attributes matches. These attribute classes never count against the list, on any type: `System.Runtime.CompilerServices.CompilerGeneratedAttribute`, `NullableAttribute`, `NullableContextAttribute`, `NullablePublicOnlyAttribute`, `IsReadOnlyAttribute` and `IsByRefLikeAttribute`, and `Microsoft.CodeAnalysis.EmbeddedAttribute`. To say that a type has no attributes at all, use `isNot: { attributes: ["**"] }`; an empty list is a load error.
 
-The three keys work in the `for` of a `require` rule and in the targets of `forbid` and `allowOnly`. `attributes` also works in `exceptions`, including the exceptions of an amendment, except on a `bannedPackages` rule. Like `namespaces`, `assemblies` and `types`, they cannot be mixed with `layers` in one target.
+```yaml
+attributeArguments:
+  - attribute: "Shop.RouteAttribute"        # optional
+    arguments: ["api/orders", 2]            # each value equals some argument of the instance
+    named: { Version: 2, Obsolete: false }  # each pair equals a named argument
+onlyAttributes:
+  - "Shop.AuditedAttribute"
+  - "System.SerializableAttribute"
+```
+
+A value in `arguments` or `named` is a YAML scalar, compared with the attribute's constant as follows. A string compares ordinal, and a char as a one-character text. A bool is `true` or `false`, in any case. A number compares numerically when the scalar parses with the invariant culture: an integral constant exactly, so `2` and `2.0` both equal an `int` 2 but `2.5` does not, a `float` constant as a `float` and a `double` constant as a `double`, so `0.1` equals `0.1f`. An enum value is its simple member name, the name qualified with the enum's full name, or its underlying number. A `typeof` value is the type's full name, dotted, with containing types and without arity. Quoting does not change the comparison, so `"2"` and `2` are the same. An array argument or an argument the compiler could not evaluate never matches. The loader rejects a `null` value (quote it to match the text `null`), a list or mapping as a value, an unknown entry key, an entry with neither `arguments` nor `named`, an empty `arguments` list, an empty `named` mapping and an empty `onlyAttributes` list.
+
+The five keys work in the `for` of a `require` rule and in the targets of `forbid` and `allowOnly`. `attributes`, `attributeArguments` and `onlyAttributes` also work in `exceptions`, including the exceptions of an amendment, except on a `bannedPackages` rule. Like `namespaces`, `assemblies` and `types`, they cannot be mixed with `layers` in one target.
 
 ### Type traits
 
@@ -185,11 +199,11 @@ Eight more keys select by what a type is and not by where it lives or what it re
 
 Traits work in the `for` of a `require` rule, in the `from` and `to` of `forbid` and `allowOnly`, in the `allow` of `slices`, in `is` and `isNot` of a `require` rule (see [Require rules](rule-types.md#require-rules)) and in `exceptions`, including the exceptions of an amendment. They do not work in layer definitions or in the `for` and `against` of `uniqueNames`, although a `uniqueNames` exception takes them. A `bannedPackages` exception does not take them. A selector with only traits is valid.
 
-A target may have `layers` together with traits: a type must be in one of the layers and match every trait. `layers` next to `namespaces`, `assemblies`, `types`, `baseTypes`, `interfaces`, `attributes` or `members` is still a load error. So `{ layers: [Domain], kinds: [class, record] }` selects the classes and records of the Domain layer.
+A target may have `layers` together with traits: a type must be in one of the layers and match every trait. `layers` next to `namespaces`, `assemblies`, `types`, `baseTypes`, `interfaces`, `attributes`, `attributeArguments`, `onlyAttributes` or `members` is still a load error. So `{ layers: [Domain], kinds: [class, record] }` selects the classes and records of the Domain layer.
 
 An empty pattern, or one with an empty segment such as `Shop..Domain`, is a load error.
 
-`TargetSelector` has `Layers`, `Namespaces`, `Assemblies`, `Types`, `BaseTypes`, `Interfaces`, `Attributes` and `Members`, and the traits `Names`, `Kinds` (`IList<CSharpTypeKind>`, which includes `Enum` and `Delegate`), `Accessibility`, `AssignableTo`, `Sealed`, `Abstract`, `Static` and `Nested` (`bool?`). `RuleException` has `Namespaces`, `Assemblies`, `Types`, `Attributes`, the same eight traits and a required `Because`.
+`TargetSelector` has `Layers`, `Namespaces`, `Assemblies`, `Types`, `BaseTypes`, `Interfaces`, `Attributes`, `AttributeArguments` (`IList<AttributeArgumentMatch>`), `OnlyAttributes` and `Members`, and the traits `Names`, `Kinds` (`IList<CSharpTypeKind>`, which includes `Enum` and `Delegate`), `Accessibility`, `AssignableTo`, `Sealed`, `Abstract`, `Static` and `Nested` (`bool?`). `RuleException` has `Namespaces`, `Assemblies`, `Types`, `Attributes`, `AttributeArguments`, `OnlyAttributes`, the same eight traits and a required `Because`.
 
 ## `extends`
 
