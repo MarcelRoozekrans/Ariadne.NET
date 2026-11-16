@@ -80,7 +80,7 @@ internal static class RequireRules
             implements = compiled.IsEmpty ? null : compiled;
         }
 
-        return new Compiled(rule, requirement, TargetMatcher.From(rule.From, layers, dependencies), exceptions, implements, RequireCondition.Compile(requirement.Is, requirement.IsNot));
+        return new Compiled(rule, requirement, TargetMatcher.From(rule.From, layers, dependencies), exceptions, implements, RequireCondition.Compile(requirement.Is, requirement.IsNot, layers, dependencies));
     }
 
     internal sealed class Compiled(RuleDefinition rule, RuleRequirement requirement, TargetMatcher from, TypeSelector[] exceptions, TypeSelector? implements, RequireCondition[] conditions)

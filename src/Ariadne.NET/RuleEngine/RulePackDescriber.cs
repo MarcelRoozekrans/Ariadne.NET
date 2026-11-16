@@ -77,21 +77,37 @@ public static class RulePackDescriber
         return slices.Allow is null ? text : $"{text}; allow {Describe(slices.Allow)}";
     }
 
-    /// <summary>The selector kinds that are set, joined by "; ", or <c>no selectors</c>.</summary>
+    /// <summary>
+    /// The selector kinds that are set, joined by "; ", or <c>no selectors</c>. <c>dependsOn</c> and <c>onlyDependsOn</c> come
+    /// last, each with its nested selector in parentheses.
+    /// </summary>
     public static string Describe(TargetSelector selector)
     {
         ArgumentNullException.ThrowIfNull(selector);
-        return Describe(
-            selector.Namespaces,
-            selector.Assemblies,
-            selector.Layers,
-            selector.Types,
-            selector.BaseTypes,
-            selector.Interfaces,
-            selector.Attributes,
-            selector.Members,
-            selector);
+        return Describe(selector, quoted: false);
     }
+
+    /// <summary>
+    /// The selector as <see cref="Describe(TargetSelector)"/> gives it, with each listed value in single quotes, as the
+    /// violation messages quote what a rule names: <c>layers 'Domain'</c>.
+    /// </summary>
+    internal static string DescribeQuoted(TargetSelector selector)
+    {
+        ArgumentNullException.ThrowIfNull(selector);
+        return Describe(selector, quoted: true);
+    }
+
+    private static string Describe(TargetSelector selector, bool quoted) => Describe(
+        selector.Namespaces,
+        selector.Assemblies,
+        selector.Layers,
+        selector.Types,
+        selector.BaseTypes,
+        selector.Interfaces,
+        selector.Attributes,
+        selector.Members,
+        selector,
+        quoted);
 
     /// <summary>The requirement members in the order layer, kind, accessibility, implements, is, isNot, joined by ", ", or <c>no requirement</c>.</summary>
     public static string Describe(RuleRequirement? requirement)
@@ -142,7 +158,7 @@ public static class RulePackDescriber
         return string.Concat(char.ToLowerInvariant(name[0]).ToString(), name.AsSpan(1));
     }
 
-    // Kinds in the order layers, namespaces, assemblies, types, baseTypes, interfaces, attributes, attributeArguments, onlyAttributes, members, then the traits names, kinds, accessibility, assignableTo, sealed, abstract, static, nested; kinds joined by "; ", values by ", ".
+    // Kinds in the order layers, namespaces, assemblies, types, baseTypes, interfaces, attributes, attributeArguments, onlyAttributes, members, then the traits names, kinds, accessibility, assignableTo, sealed, abstract, static, nested, then dependsOn and onlyDependsOn; kinds joined by "; ", values by ", ".
     private static string Describe(
         IList<string> namespaces,
         IList<string> assemblies,
@@ -152,33 +168,36 @@ public static class RulePackDescriber
         IList<string>? interfaces = null,
         IList<string>? attributes = null,
         IList<string>? members = null,
-        TargetSelector? traits = null)
+        TargetSelector? traits = null,
+        bool quoted = false)
     {
         var parts = new List<string>();
-        AddKind(parts, "layers", layers);
-        AddKind(parts, "namespaces", namespaces);
-        AddKind(parts, "assemblies", assemblies);
-        AddKind(parts, "types", types);
-        AddKind(parts, "baseTypes", baseTypes);
-        AddKind(parts, "interfaces", interfaces);
-        AddKind(parts, "attributes", attributes);
+        AddKind(parts, "layers", layers, quoted);
+        AddKind(parts, "namespaces", namespaces, quoted);
+        AddKind(parts, "assemblies", assemblies, quoted);
+        AddKind(parts, "types", types, quoted);
+        AddKind(parts, "baseTypes", baseTypes, quoted);
+        AddKind(parts, "interfaces", interfaces, quoted);
+        AddKind(parts, "attributes", attributes, quoted);
         if (traits is not null)
         {
             AddAttributeArguments(parts, traits.AttributeArguments);
-            AddKind(parts, "onlyAttributes", traits.OnlyAttributes);
+            AddKind(parts, "onlyAttributes", traits.OnlyAttributes, quoted);
         }
 
-        AddKind(parts, "members", members);
+        AddKind(parts, "members", members, quoted);
         if (traits is not null)
         {
-            AddKind(parts, "names", traits.Names);
-            AddKind(parts, "kinds", traits.Kinds.Select(YamlSpelling).ToList());
-            AddKind(parts, "accessibility", traits.Accessibility);
-            AddKind(parts, "assignableTo", traits.AssignableTo);
+            AddKind(parts, "names", traits.Names, quoted);
+            AddKind(parts, "kinds", traits.Kinds.Select(YamlSpelling).ToList(), quoted);
+            AddKind(parts, "accessibility", traits.Accessibility, quoted);
+            AddKind(parts, "assignableTo", traits.AssignableTo, quoted);
             AddFlag(parts, "sealed", traits.Sealed);
             AddFlag(parts, "abstract", traits.Abstract);
             AddFlag(parts, "static", traits.Static);
             AddFlag(parts, "nested", traits.Nested);
+            AddNested(parts, "dependsOn", traits.DependsOn, quoted);
+            AddNested(parts, "onlyDependsOn", traits.OnlyDependsOn, quoted);
         }
 
         return parts.Count > 0 ? string.Join("; ", parts) : "no selectors";
@@ -209,11 +228,21 @@ public static class RulePackDescriber
         return text.ToString();
     }
 
-    private static void AddKind(List<string> parts, string label, IList<string>? values)
+    private static void AddKind(List<string> parts, string label, IList<string>? values, bool quoted)
     {
         if (values is { Count: > 0 })
         {
-            parts.Add($"{label} {string.Join(", ", values)}");
+            parts.Add(quoted
+                ? $"{label} {string.Join(", ", values.Select(static v => $"'{v}'"))}"
+                : $"{label} {string.Join(", ", values)}");
+        }
+    }
+
+    private static void AddNested(List<string> parts, string label, TargetSelector? nested, bool quoted)
+    {
+        if (nested is not null)
+        {
+            parts.Add($"{label} ({Describe(nested, quoted)})");
         }
     }
 

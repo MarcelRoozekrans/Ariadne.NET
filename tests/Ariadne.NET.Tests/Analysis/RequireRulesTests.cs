@@ -1,5 +1,6 @@
 using Ariadne.NET.Abstractions;
 using Ariadne.NET.Analysis;
+using Ariadne.NET.RuleLoader;
 using FluentAssertions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -411,6 +412,113 @@ public class RequireRulesTests
                 "Type 'OrderController' is selected by rule 'R' and should not only have attributes matching 'Shop.**' but has only attributes matching them");
     }
 
+    private const string DependencySource = """
+        namespace Shop { public interface IClock { } }
+        namespace Shop.Domain { public class Order { } }
+        namespace Shop.Infrastructure { public class SqlStore { } }
+        namespace Shop.Application
+        {
+            public class OrderHandler { public Shop.Domain.Order? O; public Shop.Infrastructure.SqlStore? S; }
+        }
+        """;
+
+    private static readonly TargetSelector HandlerTypes = new() { Names = ["OrderHandler"] };
+
+    [Fact]
+    public void Is_dependsOn_message()
+    {
+        var pack = PackWith(Rule(HandlerTypes, new RuleRequirement { Is = new TargetSelector { DependsOn = new TargetSelector { Interfaces = ["Shop.IClock"] } } }));
+
+        var v = CheckWithIndex(DependencySource, pack).Should().ContainSingle().Subject;
+
+        v.Kind.Should().Be(ViolationKind.RequirementNotMet);
+        v.SourceType.Should().Be("Shop.Application.OrderHandler");
+        v.Message.Should().Be(
+            "Type 'OrderHandler' is selected by rule 'TEST-REQUIRE' and should depend on a type matching interfaces 'Shop.IClock' but does not");
+    }
+
+    [Fact]
+    public void Is_dependsOn_holds_when_one_dependency_matches()
+    {
+        var pack = PackWith(Rule(HandlerTypes, new RuleRequirement { Is = new TargetSelector { DependsOn = new TargetSelector { Layers = ["Domain"] } } }));
+
+        CheckWithIndex(DependencySource, pack).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void IsNot_dependsOn_message()
+    {
+        var pack = PackWith(Rule(HandlerTypes, new RuleRequirement { IsNot = new TargetSelector { DependsOn = new TargetSelector { Layers = ["Infrastructure"] } } }));
+
+        CheckWithIndex(DependencySource, pack).Should().ContainSingle().Which.Message.Should().Be(
+            "Type 'OrderHandler' is selected by rule 'TEST-REQUIRE' and should not depend on a type matching layers 'Infrastructure' but depends on 'Shop.Infrastructure.SqlStore'");
+    }
+
+    [Fact]
+    public void Is_onlyDependsOn_message()
+    {
+        var pack = PackWith(Rule(HandlerTypes, new RuleRequirement { Is = new TargetSelector { OnlyDependsOn = new TargetSelector { Layers = ["Domain"] } } }));
+
+        CheckWithIndex(DependencySource, pack).Should().ContainSingle().Which.Message.Should().Be(
+            "Type 'OrderHandler' is selected by rule 'TEST-REQUIRE' and should only depend on types matching layers 'Domain' but depends on 'Shop.Infrastructure.SqlStore'");
+    }
+
+    [Fact]
+    public void IsNot_onlyDependsOn_message_on_type_without_dependencies()
+    {
+        var pack = PackWith(Rule(new TargetSelector { Names = ["Order"] }, new RuleRequirement { IsNot = new TargetSelector { OnlyDependsOn = new TargetSelector { Layers = ["Domain"] } } }));
+
+        CheckWithIndex(DependencySource, pack).Should().ContainSingle().Which.Message.Should().Be(
+            "Type 'Order' is selected by rule 'TEST-REQUIRE' and should not only depend on types matching layers 'Domain' but does");
+    }
+
+    [Fact]
+    public void IsNot_onlyDependsOn_holds_when_a_dependency_is_outside()
+    {
+        var pack = PackWith(Rule(HandlerTypes, new RuleRequirement { IsNot = new TargetSelector { OnlyDependsOn = new TargetSelector { Layers = ["Domain"] } } }));
+
+        CheckWithIndex(DependencySource, pack).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Dependency_conditions_from_yaml_are_reported_by_the_validator()
+    {
+        var loaded = new YamlRulePackLoader().LoadFromString("""
+            schema: 2
+            name: shop
+            layers:
+              - name: Domain
+                id: L-DOMAIN
+                because: Domain.
+                namespaces: ["**.Domain.**"]
+              - name: Infrastructure
+                id: L-INFRA
+                because: Infrastructure.
+                namespaces: ["**.Infrastructure.**"]
+                allowedDependencies: [Domain]
+            rules:
+              - id: R-IS
+                because: Handlers use the clock.
+                require:
+                  for: { names: [OrderHandler] }
+                  is: { dependsOn: { interfaces: [Shop.IClock] } }
+              - id: R-ISNOT
+                because: Handlers stay off the store.
+                require:
+                  for: { names: [OrderHandler] }
+                  isNot: { dependsOn: { layers: [Infrastructure] } }
+            """);
+        loaded.IsSuccess.Should().BeTrue(loaded.IsFailure ? loaded.Error.Detail : string.Empty);
+
+        var report = new ArchitectureValidator().Validate(loaded.Value, TestCompilation.Create(DependencySource));
+
+        report.Violations.Where(v => v.Kind == ViolationKind.RequirementNotMet).Select(v => v.Message).Should().BeEquivalentTo(
+        [
+            "Type 'OrderHandler' is selected by rule 'R-IS' and should depend on a type matching interfaces 'Shop.IClock' but does not",
+            "Type 'OrderHandler' is selected by rule 'R-ISNOT' and should not depend on a type matching layers 'Infrastructure' but depends on 'Shop.Infrastructure.SqlStore'",
+        ]);
+    }
+
     [Fact]
     public void RequirementNotMet_is_13() => ((int)ViolationKind.RequirementNotMet).Should().Be(13);
 
@@ -418,5 +526,11 @@ public class RequireRulesTests
     {
         var graph = TypeGraphBuilder.Build(TestCompilation.Create(source), new HashSet<SyntaxTree>(), CancellationToken.None);
         return RequireRules.Check(graph, new LayerMap(pack), pack);
+    }
+
+    private static IReadOnlyList<ArchitectureViolation> CheckWithIndex(string source, RulePack pack)
+    {
+        var (graph, index) = TestCompilation.GraphAndIndex(TestCompilation.Create(source));
+        return RequireRules.Compile(new LayerMap(pack), pack, index).Check(graph);
     }
 }

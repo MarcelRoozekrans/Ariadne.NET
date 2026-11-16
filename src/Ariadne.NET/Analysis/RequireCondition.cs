@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using Ariadne.NET.Abstractions;
+using Ariadne.NET.RuleEngine;
 using Microsoft.CodeAnalysis;
 
 namespace Ariadne.NET.Analysis;
@@ -32,22 +33,28 @@ internal sealed class RequireCondition
 
     /// <summary>
     /// Compiles every set key of <paramref name="isCondition"/>, then of <paramref name="isNotCondition"/>, in a fixed key order.
-    /// <c>layers</c> and <c>members</c> are not conditions and are left out; the loader rejects them.
+    /// <c>layers</c> and <c>members</c> are not conditions and are left out; the loader rejects them. <c>dependsOn</c> and
+    /// <c>onlyDependsOn</c> come last, their nested selectors compiled over the layer map and the run's dependency index.
     /// </summary>
     /// <param name="isCondition">The <c>is</c> condition, or null.</param>
     /// <param name="isNotCondition">The <c>isNot</c> condition, or null.</param>
+    /// <param name="layers">The layer map the nested selectors of <c>dependsOn</c> and <c>onlyDependsOn</c> read.</param>
+    /// <param name="dependencies">The run's dependency index; required when either condition holds <c>dependsOn</c> or <c>onlyDependsOn</c>.</param>
     /// <returns>The conditions, empty when neither is set.</returns>
-    public static RequireCondition[] Compile(TargetSelector? isCondition, TargetSelector? isNotCondition)
+    /// <exception cref="ArgumentException">A condition holds <c>dependsOn</c> or <c>onlyDependsOn</c> and <paramref name="dependencies"/> is null.</exception>
+    public static RequireCondition[] Compile(TargetSelector? isCondition, TargetSelector? isNotCondition, LayerMap layers, DependencyIndex? dependencies)
     {
+        ArgumentNullException.ThrowIfNull(layers);
+
         var conditions = new List<RequireCondition>();
         if (isCondition is not null)
         {
-            Add(isCondition, negated: false, conditions);
+            Add(isCondition, negated: false, conditions, layers, dependencies);
         }
 
         if (isNotCondition is not null)
         {
-            Add(isNotCondition, negated: true, conditions);
+            Add(isNotCondition, negated: true, conditions, layers, dependencies);
         }
 
         return [.. conditions];
@@ -86,10 +93,17 @@ internal sealed class RequireCondition
             ? "has only attributes matching them"
             : Selector.FirstOutsideOnlyAttributes(type, names) is { } outside ? $"has '{outside}'" : "has other attributes",
         "baseTypes" or "interfaces" or "attributes" or "attributeArguments" => _phraseNegated ? "does" : "does not",
+        "dependsOn" => _phraseNegated ? DependsOnText(Selector.FirstDependencyMatching(type), names) : "does not",
+        "onlyDependsOn" => _phraseNegated ? "does" : DependsOnText(Selector.FirstDependencyOutsideOnly(type), names),
         _ => _phraseNegated ? "is" : "is not",
     };
 
-    private static void Add(TargetSelector selector, bool negated, List<RequireCondition> conditions)
+    // A failed condition always has the dependency it names, so the "does" fallback is not reached through Fails.
+    private static string DependsOnText(INamedTypeSymbol? dependency, TypeNames names) => dependency is null
+        ? "does"
+        : string.Create(CultureInfo.InvariantCulture, $"depends on '{names.FullNameOf(dependency)}'");
+
+    private static void Add(TargetSelector selector, bool negated, List<RequireCondition> conditions, LayerMap layers, DependencyIndex? dependencies)
     {
         AddList(conditions, "namespaces", selector.Namespaces, negated, "be in a namespace matching ", static s => new() { Namespaces = s });
         AddList(conditions, "assemblies", selector.Assemblies, negated, "be in an assembly matching ", static s => new() { Assemblies = s });
@@ -138,6 +152,30 @@ internal sealed class RequireCondition
         AddFlag(conditions, "abstract", selector.Abstract, negated, static v => new() { Abstract = v });
         AddFlag(conditions, "static", selector.Static, negated, static v => new() { Static = v });
         AddFlag(conditions, "nested", selector.Nested, negated, static v => new() { Nested = v });
+        AddDependencies(selector, negated, conditions, layers, dependencies);
+    }
+
+    private static void AddDependencies(TargetSelector selector, bool negated, List<RequireCondition> conditions, LayerMap layers, DependencyIndex? dependencies)
+    {
+        if (selector.DependsOn is { } dependsOn)
+        {
+            conditions.Add(new RequireCondition(
+                "dependsOn",
+                TypeSelector.From(new TargetSelector { DependsOn = dependsOn }, layers, dependencies),
+                negated,
+                negated,
+                "depend on a type matching " + RulePackDescriber.DescribeQuoted(dependsOn)));
+        }
+
+        if (selector.OnlyDependsOn is { } onlyDependsOn)
+        {
+            conditions.Add(new RequireCondition(
+                "onlyDependsOn",
+                TypeSelector.From(new TargetSelector { OnlyDependsOn = onlyDependsOn }, layers, dependencies),
+                negated,
+                negated,
+                "only depend on types matching " + RulePackDescriber.DescribeQuoted(onlyDependsOn)));
+        }
     }
 
     private static void AddList(
