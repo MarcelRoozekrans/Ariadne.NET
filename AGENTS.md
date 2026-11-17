@@ -19,7 +19,7 @@ A pattern-agnostic architecture governance engine for .NET. Architecture pattern
 
 ### Outside src/
 
-- `tools/release/` holds `inspect_packages.py` with its unit tests and the `consumer` and `testing-consumer` sample programs that CI's `pack-validate` job builds against the packed local feed. `tools/perf/Ariadne.NET.Perf` is the load and check benchmark, part of the solution but not packed.
+- `tools/release/` holds `inspect_packages.py`, which also runs `scripts/check-embedded-pdb/check-embedded-pdb.cs` over every packed Ariadne DLL, with its unit tests and the `consumer` and `testing-consumer` sample programs that CI's `pack-validate` job builds against the packed local feed. `tools/perf/Ariadne.NET.Perf` is the load and check benchmark, part of the solution but not packed.
 - `examples/github-actions/` holds the example consumer workflows that CI's `fail-the-build` job mirrors.
 
 ## Architecture

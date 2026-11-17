@@ -5,8 +5,9 @@ Usage: python3 tools/release/inspect_packages.py <directory> <version>
 A NuGet version can be unlisted but never deleted, so ci.yml runs this in pack-validate on every push and again in
 publish-nuget just before the push. It fails when the directory does not hold exactly the five release packages,
 Ariadne.NET, Ariadne.NET.Abstractions, Ariadne.NET.Workspaces, Ariadne.NET.Testing and the dotnet tool
-Ariadne.NET.Cli, at the release version, each with its .snupkg symbol package; when an Ariadne DLL was built without
--p:AriadneRelease=true, which Directory.Build.props versions <release>-local and which is compiled into the DLL;
+Ariadne.NET.Cli, at the release version, or when a .snupkg symbol package is there: the PDB is embedded instead;
+when an Ariadne DLL was built without -p:AriadneRelease=true, which Directory.Build.props versions <release>-local
+and which is compiled into the DLL;
 when Ariadne.NET.Abstractions depends on anything but ZeroAlloc.Results and ZeroAlloc.Validation; when Ariadne.NET
 depends on Ariadne.NET.Abstractions at a different version, or when Ariadne.NET, Ariadne.NET.Abstractions or the
 tool depends on any MSBuild package, since only Ariadne.NET.Workspaces and Ariadne.NET.Testing may reference
@@ -17,11 +18,19 @@ DotnetTool package whose DotnetToolSettings.xml runs the bundled Ariadne.NET.Cli
 command, or when it bundles any Microsoft.Build assembly but Microsoft.Build.Locator.dll, because MSBuildLocator
 must load MSBuild from the .NET SDK. Other third-party dependencies are not checked. Prints one ::error:: line per
 problem, which GitHub Actions shows as an annotation.
+
+It also fails when an Ariadne DLL has no embedded PDB, from a deterministic build, whose Source Link maps every C#
+document of a CI build, under /_/, to raw.githubusercontent.com/MarcelRoozekrans/Ariadne.NET, which Go to Definition in
+a consumer's IDE needs to show the source. That check is scripts/check-embedded-pdb/check-embedded-pdb.cs, which reads
+the PDB with System.Reflection.Metadata, so this script runs it with dotnet run and needs a .NET SDK on the PATH.
 Standard library only.
 """
+import json
 import pathlib
 import re
+import subprocess
 import sys
+import tempfile
 import xml.etree.ElementTree as ElementTree
 import zipfile
 
@@ -60,6 +69,12 @@ TOOL_BUNDLED = ("Ariadne.NET.Cli", "Ariadne.NET", "Ariadne.NET.Abstractions", "A
 # the out-of-process build host locates MSBuild the same way.
 TOOL_MSBUILD_ALLOWED = {"Microsoft.Build.Locator.dll"}
 
+# Source Link in every Ariadne DLL maps the deterministic path root of a CI build to this repository's raw files.
+SOURCE_LINK_PREFIX = "https://raw.githubusercontent.com/MarcelRoozekrans/Ariadne.NET/"
+# The repository's System.Reflection.Metadata check of each DLL's embedded PDB and Source Link map.
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+CHECKER = "scripts/check-embedded-pdb/check-embedded-pdb.cs"
+
 
 def _informational_version_found(dll: bytes, version: str) -> bool:
     # AssemblyInformationalVersion is stored as a length-prefixed UTF-8 string followed by 00 00: the release version,
@@ -83,19 +98,6 @@ def _informational_versions_seen(dll: bytes) -> list[str]:
         if match.start() > 0 and dll[match.start() - 1] == len(text) and not re.fullmatch(r"[0-9]+(\.[0-9]+){3}", text):
             seen.append(text)
     return seen
-
-
-def _symbol_problems(directory: pathlib.Path, package: str, version: str) -> list[str]:
-    path = directory / f"{package}.{version}.snupkg"
-    if not path.is_file():
-        return [f"{package}: {path.name} is missing"]
-    try:
-        with zipfile.ZipFile(path) as archive:
-            if not any(name.endswith(f"{package}.pdb") for name in archive.namelist()):
-                return [f"{package}: {path.name} has no {package}.pdb"]
-    except zipfile.BadZipFile as exc:
-        return [f"{package}: {path.name} is not a valid symbol package: {exc}"]
-    return []
 
 
 def _is_bundled_ariadne_dll(name: str) -> bool:
@@ -192,8 +194,6 @@ def _package_problems(directory: pathlib.Path, package: str, version: str) -> li
             says = f"says {', '.join(seen)}, expected {version}" if seen else f"has no informational version {version}"
             errors.append(f"{package}: {name} {says}; was it built with -p:AriadneRelease=true?")
 
-    errors.extend(_symbol_problems(directory, package, version))
-
     found = _dependencies(nuspec)
     if package == ABSTRACTIONS:
         for dependency in sorted(ABSTRACTIONS_DEPENDENCIES - found.keys()):
@@ -229,13 +229,45 @@ def problems(directory: pathlib.Path, version: str) -> list[str]:
         return [f"expected exactly the five release packages in {directory}; missing {missing}, unexpected {extra}"]
 
     errors: list[str] = []
-    expected_symbols = {f"{package}.{version}.snupkg" for package in PACKAGES}
+    # The PDB is embedded in each DLL, so a symbol package is a leftover of an older build setup and is not pushed.
     for name in sorted(path.name for path in directory.glob("*.snupkg")):
-        if name not in expected_symbols:
-            errors.append(f"{name} has no matching release package")
+        errors.append(f"{name} is a symbol package; the PDBs are embedded in the DLLs, so none is shipped")
     for package in PACKAGES:
         errors.extend(_package_problems(directory, package, version))
     return errors
+
+
+def _is_own_dll(package: str, name: str) -> bool:
+    # A library's DLLs under lib/ or analyzers/ are its own build; the tool also bundles third-party DLLs, so only its
+    # Ariadne assemblies count there.
+    if package == TOOL:
+        return _is_bundled_ariadne_dll(name)
+    return name.startswith(("lib/", "analyzers/")) and name.endswith(".dll")
+
+
+def own_dlls(directory: pathlib.Path, version: str, destination: pathlib.Path) -> list[pathlib.Path]:
+    """Extracts every Ariadne assembly of the release packages to destination/<package>/ and returns their paths."""
+    extracted: list[pathlib.Path] = []
+    for package in PACKAGES:
+        path = directory / f"{package}.{version}.nupkg"
+        if not path.is_file():
+            continue
+        with zipfile.ZipFile(path) as archive:
+            for name in sorted(archive.namelist()):
+                if _is_own_dll(package, name):
+                    extracted.append(pathlib.Path(archive.extract(name, destination / package)))
+    return extracted
+
+
+def check_embedded_pdbs(dlls: list[pathlib.Path]) -> bool:
+    """Runs the System.Reflection.Metadata checker over the DLLs: each must embed its PDB, be a deterministic build, and
+    have a Source Link map that sends every source document to SOURCE_LINK_PREFIX. It prints one line per DLL."""
+    if not dlls:
+        print("::error::the packages hold no Ariadne DLL to check for an embedded PDB")
+        return False
+    command = ["dotnet", "run", CHECKER, "--", SOURCE_LINK_PREFIX, *(str(dll) for dll in dlls)]
+    sys.stdout.flush()  # keeps this script's lines ahead of the checker's in a log
+    return subprocess.run(command, cwd=ROOT, check=False).returncode == 0
 
 
 def main(argv: list[str]) -> int:
@@ -246,7 +278,9 @@ def main(argv: list[str]) -> int:
     errors = problems(directory, version)
     for error in errors:
         print(f"::error::{error}")
-    if errors:
+    with tempfile.TemporaryDirectory() as extracted:
+        pdbs_ok = check_embedded_pdbs(own_dlls(directory, version, pathlib.Path(extracted)))
+    if errors or not pdbs_ok:
         return 1
     print(f"OK: {', '.join(f'{package} {version}' for package in PACKAGES)} are ready to push")
     return 0
