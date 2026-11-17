@@ -245,6 +245,12 @@ public class RulePackDescriberTests
     }
 
     [Fact]
+    public void Describe_RequirementWithoutKind_LeavesTheKindOut()
+    {
+        RulePackDescriber.Describe(new RuleRequirement { Layer = "Domain", Accessibility = "public" }).Should().Be("layer Domain, public");
+    }
+
+    [Fact]
     public void Describe_SelectorWithNothingSelected_SaysNoSelectors()
     {
         // The loader rejects a layer without selectors, so only the renderer can be pinned directly.

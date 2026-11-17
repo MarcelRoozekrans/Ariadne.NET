@@ -153,6 +153,23 @@ public sealed class ResolvedPackageReaderTests : IDisposable
         packages.Select(p => p.Id).Should().Equal("P");
     }
 
+    [Fact]
+    public void RootsAndDependenciesThatNameNoEntry_AreIgnored()
+    {
+        var packages = Read(
+            Assets("""
+                "net10.0": {
+                  "A/1.0.0": { "type": "package", "dependencies": { "Ghost": "1.0.0" } }
+                }
+                """, """ "net10.0": [ "Missing >= 1.0.0", "A >= 1.0.0", "A >= 1.0.0" ] """),
+            "net10.0");
+
+        var a = packages.Should().ContainSingle().Subject;
+        a.Id.Should().Be("A");
+        a.IsDirect.Should().BeTrue();
+        a.Path.Should().Equal("A");
+    }
+
     private static string Assets(string targets, string groups) =>
         $$"""{ "version": 3, "targets": { {{targets}} }, "projectFileDependencyGroups": { {{groups}} } }""";
 

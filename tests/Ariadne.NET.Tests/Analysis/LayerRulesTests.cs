@@ -192,6 +192,34 @@ public class LayerRulesTests
     }
 
     [Fact]
+    public void ViolationsInOneFile_AreOrderedByLineThenColumn()
+    {
+        var violations = Check("""
+            namespace Shop.Infrastructure { public class Store { } public class Cache { } public class Queue { } }
+            namespace Shop.Domain
+            {
+                public class Order { public Shop.Infrastructure.Queue? Q;
+                    public Shop.Infrastructure.Cache? C; public Shop.Infrastructure.Store? S; }
+            }
+            """);
+
+        violations.Select(v => (v.Target, v.Location!.Value.Line))
+            .Should().Equal(("Shop.Infrastructure.Queue", 4), ("Shop.Infrastructure.Cache", 5), ("Shop.Infrastructure.Store", 5));
+        violations[1].Location!.Value.Column.Should().BeLessThan(violations[2].Location!.Value.Column);
+    }
+
+    [Fact]
+    public void ViolationsInTwoFiles_AreOrderedByFileFirst()
+    {
+        var compilation = TestCompilation.Create(
+            ("B.cs", "namespace Shop.Domain { public class Line { public Shop.Infrastructure.Store? S; } }"),
+            ("A.cs", "namespace Shop.Infrastructure { public class Store { } }\nnamespace Shop.Domain { public class Order { public Shop.Infrastructure.Store? S; } }"));
+
+        Check(compilation).Select(v => (v.SourceType, v.Location!.Value.FilePath))
+            .Should().Equal(("Shop.Domain.Order", "A.cs"), ("Shop.Domain.Line", "B.cs"));
+    }
+
+    [Fact]
     public void TwoTargets_TwoViolations()
     {
         var violations = Check("""

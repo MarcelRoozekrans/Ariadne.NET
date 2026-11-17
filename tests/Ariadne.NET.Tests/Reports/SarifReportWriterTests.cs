@@ -147,6 +147,16 @@ public class SarifReportWriterTests
     }
 
     [Fact]
+    public void Write_RootEndingInASeparator_GetsOneTrailingSlash()
+    {
+        using var doc = JsonDocument.Parse(Render(Empty(), Root + Path.DirectorySeparatorChar));
+
+        var uri = doc.RootElement.GetProperty("runs")[0].GetProperty("originalUriBaseIds").GetProperty("%SRCROOT%").GetProperty("uri").GetString()!;
+
+        uri.Should().EndWith("/ariadne-sarif-repo/").And.NotEndWith("//");
+    }
+
+    [Fact]
     public void Write_RootWithHashAndPercent_EscapesThemInTheBaseUri()
     {
         var root = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "a#b%c d"));

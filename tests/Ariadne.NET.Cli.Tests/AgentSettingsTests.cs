@@ -268,4 +268,27 @@ public sealed class AgentSettingsTests
         entries[1]!.ToJsonString().Should().Be("""{"type":"command","command":7}""");
         ((string)entries[3]!["command"]!).Should().Be($"{Prefix} stop");
     }
+
+    [Fact]
+    public void Merge_appends_to_the_first_of_two_groups_with_our_matcher()
+    {
+        var root = Parse(MergeOk(
+            """{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"first"}]},{"hooks":[{"type":"command","command":"second"}]}]}}"""));
+
+        var stop = Groups(root, "Stop");
+        stop.Should().HaveCount(2);
+        ((JsonArray)stop[0]!["hooks"]!).Select(e => (string)e!["command"]!).Should().Equal("first", $"{Prefix} stop");
+        ((JsonArray)stop[1]!["hooks"]!).Select(e => (string)e!["command"]!).Should().Equal("second");
+    }
+
+    [Fact]
+    public void Merge_treats_a_non_string_matcher_as_no_matcher()
+    {
+        var root = Parse(MergeOk("""{"hooks":{"Stop":[{"matcher":5,"hooks":[{"type":"command","command":"lint"}]}]}}"""));
+
+        var stop = Groups(root, "Stop");
+        stop.Should().HaveCount(1);
+        ((int)stop[0]!["matcher"]!).Should().Be(5);
+        Commands(stop).Should().Equal("lint", $"{Prefix} stop");
+    }
 }
