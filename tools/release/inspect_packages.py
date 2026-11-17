@@ -19,9 +19,10 @@ command, or when it bundles any Microsoft.Build assembly but Microsoft.Build.Loc
 must load MSBuild from the .NET SDK. Other third-party dependencies are not checked. Prints one ::error:: line per
 problem, which GitHub Actions shows as an annotation.
 
-It also fails when an Ariadne DLL has no embedded PDB, from a deterministic build, whose Source Link maps every C#
-document of a CI build, under /_/, to raw.githubusercontent.com/MarcelRoozekrans/Ariadne.NET, which Go to Definition in
-a consumer's IDE needs to show the source. That check is scripts/check-embedded-pdb/check-embedded-pdb.cs, which reads
+It also fails when an Ariadne DLL has no embedded PDB, from a deterministic build, whose Source Link maps every
+source document of a CI build, C# or not, under /_/, to raw.githubusercontent.com/MarcelRoozekrans/Ariadne.NET at the
+commit HEAD of this checkout, which Go to Definition in a consumer's IDE needs to show the source. A map to main or to
+another commit fails. That check is scripts/check-embedded-pdb/check-embedded-pdb.cs, which reads
 the PDB with System.Reflection.Metadata, so this script runs it with dotnet run and needs a .NET SDK on the PATH.
 Standard library only.
 """
@@ -69,7 +70,9 @@ TOOL_BUNDLED = ("Ariadne.NET.Cli", "Ariadne.NET", "Ariadne.NET.Abstractions", "A
 # the out-of-process build host locates MSBuild the same way.
 TOOL_MSBUILD_ALLOWED = {"Microsoft.Build.Locator.dll"}
 
-# Source Link in every Ariadne DLL maps the deterministic path root of a CI build to this repository's raw files.
+# Source Link in every Ariadne DLL maps the deterministic path root of a CI build to this repository's raw files, at the
+# commit it was built from. The check expects this prefix with that commit appended, so a map to main or to another
+# commit fails.
 SOURCE_LINK_PREFIX = "https://raw.githubusercontent.com/MarcelRoozekrans/Ariadne.NET/"
 # The repository's System.Reflection.Metadata check of each DLL's embedded PDB and Source Link map.
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -259,13 +262,25 @@ def own_dlls(directory: pathlib.Path, version: str, destination: pathlib.Path) -
     return extracted
 
 
-def check_embedded_pdbs(dlls: list[pathlib.Path]) -> bool:
+def head_commit() -> str | None:
+    """The commit of the checkout the packages were packed from, or None when git cannot tell. Both pack jobs pack in the
+    same job and checkout that runs this script, so HEAD is the commit Source Link stamped into the DLLs."""
+    try:
+        result = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, check=False, capture_output=True, text=True)
+    except OSError:
+        return None
+    commit = result.stdout.strip()
+    return commit if result.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", commit) else None
+
+
+def check_embedded_pdbs(dlls: list[pathlib.Path], commit: str) -> bool:
     """Runs the System.Reflection.Metadata checker over the DLLs: each must embed its PDB, be a deterministic build, and
-    have a Source Link map that sends every source document to SOURCE_LINK_PREFIX. It prints one line per DLL."""
+    have a Source Link map that sends every source document, of any file type, to SOURCE_LINK_PREFIX followed by commit.
+    A map to main or to another commit fails. It prints one line per DLL."""
     if not dlls:
         print("::error::the packages hold no Ariadne DLL to check for an embedded PDB")
         return False
-    command = ["dotnet", "run", CHECKER, "--", SOURCE_LINK_PREFIX, *(str(dll) for dll in dlls)]
+    command = ["dotnet", "run", CHECKER, "--", f"{SOURCE_LINK_PREFIX}{commit}/", *(str(dll) for dll in dlls)]
     sys.stdout.flush()  # keeps this script's lines ahead of the checker's in a log
     return subprocess.run(command, cwd=ROOT, check=False).returncode == 0
 
@@ -278,8 +293,12 @@ def main(argv: list[str]) -> int:
     errors = problems(directory, version)
     for error in errors:
         print(f"::error::{error}")
+    commit = head_commit()
+    if commit is None:
+        print(f"::error::git rev-parse HEAD gave no commit in {ROOT}, so the Source Link prefix cannot be pinned")
+        return 1
     with tempfile.TemporaryDirectory() as extracted:
-        pdbs_ok = check_embedded_pdbs(own_dlls(directory, version, pathlib.Path(extracted)))
+        pdbs_ok = check_embedded_pdbs(own_dlls(directory, version, pathlib.Path(extracted)), commit)
     if errors or not pdbs_ok:
         return 1
     print(f"OK: {', '.join(f'{package} {version}' for package in PACKAGES)} are ready to push")
