@@ -91,6 +91,8 @@ public class TargetMatcherTests
     }
 
     [Theory]
+    [InlineData("Assemblies")]
+    [InlineData("Types")]
     [InlineData("BaseTypes")]
     [InlineData("Interfaces")]
     [InlineData("Attributes")]
@@ -98,6 +100,8 @@ public class TargetMatcherTests
     {
         var target = key switch
         {
+            "Assemblies" => new TargetSelector { Layers = ["Domain"], Assemblies = ["Shop.*"] },
+            "Types" => new TargetSelector { Layers = ["Domain"], Types = ["**.Order"] },
             "BaseTypes" => new TargetSelector { Layers = ["Domain"], BaseTypes = ["**.Base"] },
             "Interfaces" => new TargetSelector { Layers = ["Domain"], Interfaces = ["**.IRepository"] },
             _ => new TargetSelector { Layers = ["Domain"], Attributes = ["**.ObsoleteAttribute"] },
@@ -193,5 +197,31 @@ public class TargetMatcherTests
 
         Matches("Shop.Data.SealedCommand").Should().BeTrue();
         Matches("Shop.Data.OpenCommand").Should().BeFalse();
+    }
+
+    [Fact]
+    public void TargetWithoutMembers_MatchesNoMemberUse()
+    {
+        var compilation = TestCompilation.Create(Source + "namespace Shop.Data { public class Command { public int Execute() => 0; } }");
+        var matcher = TargetMatcher.From(new TargetSelector { Namespaces = ["Shop.Data"] }, new LayerMap(Pack));
+        var use = new MemberEdge(Find(compilation, "Shop.Domain.Order"), Find(compilation, "Shop.Data.Command").GetMembers("Execute")[0], default);
+
+        matcher.TryMatchMember(use, out var matched).Should().BeFalse();
+        matched.Name.Should().BeNull();
+    }
+
+    [Fact]
+    public void Members_with_a_trait_repeated_container_gives_the_same_answer()
+    {
+        var compilation = TestCompilation.Create("""
+            namespace Shop.Data { public sealed class SealedCommand { public int Execute() => 0; public int Prepare() => 0; } }
+            """);
+        var matcher = TargetMatcher.From(new TargetSelector { Members = ["Shop.Data.*.Execute"], Sealed = true }, new LayerMap(Pack));
+        var command = Find(compilation, "Shop.Data.SealedCommand");
+
+        matcher.TryMatchMember(new MemberEdge(command, command.GetMembers("Execute")[0], default), out var first).Should().BeTrue();
+        matcher.TryMatchMember(new MemberEdge(command, command.GetMembers("Prepare")[0], default), out _).Should().BeFalse();
+        matcher.TryMatchMember(new MemberEdge(command, command.GetMembers("Execute")[0], default), out var second).Should().BeTrue();
+        second.Name.Should().Be(first.Name).And.Be("Shop.Data.SealedCommand.Execute");
     }
 }

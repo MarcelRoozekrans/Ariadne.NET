@@ -451,6 +451,17 @@ public sealed class ExitCodeTests : IDisposable
     }
 
     [Fact]
+    public void Validate_OutputPathThatIsTheFileSystemRoot_ReturnsErrorWithAnErrorLine()
+    {
+        var root = Path.GetPathRoot(_tempDir)!;
+
+        var (exitCode, stderr) = RunCapturingStderr("validate", FixtureProjects.Path("twopacks", "Shop.slnx"), "--format", "json", "--output", root);
+
+        exitCode.Should().Be(ExitCodes.Error);
+        stderr.Should().Contain("Error: ").And.Contain($"The report for '{root}' could not be written.");
+    }
+
+    [Fact]
     public void Validate_Help_ShowsFormatAndOutput()
     {
         var (_, stdout) = RunCapturingStdout("validate", "--help");

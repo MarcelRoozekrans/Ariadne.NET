@@ -171,6 +171,30 @@ public class PreToolUseHookTests
     }
 
     [Fact]
+    public async Task A_missing_tool_name_returns_null_and_records_nothing()
+    {
+        using var project = ProjectWith("Shop.Web");
+        using var session = new TestSession();
+
+        var json = await RunAsync(project.Root, session.Id, tool: null, Path.Combine(project.Root, "Shop.Web", "Home.cs")).ConfigureAwait(true);
+
+        json.Should().BeNull();
+        EditedFiles.Read(session.Id).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_missing_file_path_returns_null_and_records_nothing()
+    {
+        using var project = ProjectWith("Shop.Web");
+        using var session = new TestSession();
+
+        var json = await RunAsync(project.Root, session.Id, "Write", file: null).ConfigureAwait(true);
+
+        json.Should().BeNull();
+        EditedFiles.Read(session.Id).Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task A_markdown_file_records_nothing()
     {
         using var project = ProjectWith("Shop.Web");

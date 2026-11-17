@@ -2,6 +2,7 @@ using Ariadne.NET.Abstractions;
 using Ariadne.NET.Analysis;
 using FluentAssertions;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
 namespace Ariadne.NET.Tests.Analysis;
@@ -678,6 +679,213 @@ public class MemberEdgeTests
             filter.CouldMatch("ExecuteReader");
             filter.CouldMatch("Text");
         }).Should().Be(0);
+    }
+
+    [Fact]
+    public void GeneratedCodeType_RecordsNoConstructorOrIndexerUses()
+    {
+        var compilation = TestCompilation.Create(
+            ("Data.cs", DataTypes),
+            ("Tool.cs", """
+                namespace Shop.Domain
+                {
+                    [System.CodeDom.Compiler.GeneratedCode("tool", "1.0")]
+                    public class Tool() : Shop.Data.Connection("x")
+                    {
+                        public Tool(int size) : this() { }
+                        public int Run(Shop.Data.Sheet? sheet)
+                        {
+                            var created = new Shop.Data.SqlCommand("x");
+                            Shop.Data.Sheet other = new();
+                            return other[0] + (sheet?[1] ?? 0) + created.Timeout;
+                        }
+                    }
+                }
+                """));
+
+        var graph = TypeGraphBuilder.Build(compilation, new HashSet<SyntaxTree>(), MemberNameFilter.From(PackWith("**")), CancellationToken.None);
+
+        graph.MemberEdges.Should().OnlyContain(e => string.Equals(e.Location.FilePath, "Data.cs", StringComparison.Ordinal));
+        graph.Edges.Should().NotContain(e => string.Equals(e.Source.Name, "Tool", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void PrimaryConstructorWithBaseArguments_RecordsOnlyTheCalledBaseCtor()
+    {
+        var graph = Build(["**.new"], """
+            namespace Shop.Domain
+            {
+                public class Order(string text) : Shop.Data.SqlCommand(text);
+            }
+            """);
+
+        Uses(graph).Should().Equal(("Shop.Data.SqlCommand.new", 3, 39));
+        ((IMethodSymbol)graph.MemberEdges.First(e => string.Equals(e.Source.ToDisplayString(), Order, StringComparison.Ordinal)).Member)
+            .Parameters.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void PrimaryConstructorOnPartWithoutBaseList_RecordsTheImplicitBaseCall()
+    {
+        // The base class is named on another part, so the primary constructor's part has no base list to pass arguments in.
+        var graph = Build(["**.new"], """
+            namespace Shop.Domain
+            {
+                public partial class Order(int size) { public int Size => size; }
+                public partial class Order : Shop.Data.SqlCommand { }
+            }
+            """);
+
+        Uses(graph).Should().Equal(("Shop.Data.SqlCommand.new", 3, 26));
+        ((IMethodSymbol)graph.MemberEdges.First(e => string.Equals(e.Source.ToDisplayString(), Order, StringComparison.Ordinal)).Member)
+            .Parameters.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ImplicitBaseConstructorCall_WithoutParameterlessCtor_RecordsTheAllOptionalCtor()
+    {
+        var graph = TypeGraphBuilder.Build(
+            TestCompilation.Create(
+                ("Data.cs", "namespace Shop.Data { public class Settings { public Settings(int retries = 3) { } public Settings(string name) { } } }"),
+                ("Order.cs", "namespace Shop.Domain { public class Order : Shop.Data.Settings { } }")),
+            new HashSet<SyntaxTree>(),
+            MemberNameFilter.From(PackWith("**.new")),
+            CancellationToken.None);
+
+        var use = graph.MemberEdges.Should().ContainSingle().Subject;
+        use.Location.Should().Be(new SourceLocation("Order.cs", 1, 38));
+        ((IMethodSymbol)use.Member).Parameters.Should().ContainSingle().Which.Type.SpecialType.Should().Be(SpecialType.System_Int32);
+    }
+
+    [Fact]
+    public void RecordStruct_RecordsNoImplicitBaseConstructorCall()
+    {
+        var graph = Build(["**.new"], """
+            namespace Shop.Domain
+            {
+                public record struct Order(int Size)
+                {
+                    public Order(string size) : this(size.Length) { }
+                }
+            }
+            """);
+
+        Uses(graph).Should().Equal(("Shop.Domain.Order.new", 5, 37));
+    }
+
+    [Fact]
+    public void ReimplementedInterface_ChainNamesTheInterfaceMemberOnce()
+    {
+        // Both the override and the overridden member implement IDbCommand.ExecuteReader, which is reached twice.
+        var graph = Build(["**.ExecuteReader"], """
+            namespace Shop.Domain
+            {
+                public class Order
+                {
+                    public int Place(Shop.Domain.Command command) => command.ExecuteReader();
+                }
+                public class Command : Shop.Data.DbCommand, Shop.Data.IDbCommand
+                {
+                    public override int ExecuteReader() => 3;
+                }
+            }
+            """);
+
+        Chains(graph).Should().Equal("Shop.Domain.Command.ExecuteReader > Shop.Data.DbCommand.ExecuteReader > Shop.Data.IDbCommand.ExecuteReader");
+        MemberNames.ChainMembers(graph.MemberEdges[0].Member).Should().HaveCount(3);
+    }
+
+    [Fact]
+    public void SameNamedMemberOfAnotherKindOrAnotherInterface_NotInTheChain()
+    {
+        var graph = Build(["**.Count", "**.Run"], """
+            namespace Shop.Domain
+            {
+                public interface ICounted { int Count { get; } }
+                public interface IFirst { void Run(); }
+                public interface ISecond { void Run(); }
+                public class Bag : ICounted, IFirst, ISecond
+                {
+                    int ICounted.Count => 0;
+                    public int Count() => 1;
+                    public void Run() { }
+                    void ISecond.Run() { }
+                }
+                public class Order
+                {
+                    public void Place(Bag bag) { bag.Count(); bag.Run(); }
+                }
+            }
+            """);
+
+        Chains(graph).Should().Equal(
+            "Shop.Domain.Bag.Count",
+            "Shop.Domain.Bag.Run > Shop.Domain.IFirst.Run");
+    }
+
+    [Fact]
+    public void AnonymousTypeMember_NotRecorded()
+    {
+        var graph = Build(["**"], """
+            namespace Shop.Domain
+            {
+                public class Order
+                {
+                    public int Place(Shop.Data.SqlCommand command) { var line = new { Count = 1 }; return line.Count + command.Timeout; }
+                }
+            }
+            """);
+
+        Uses(graph).Should().Equal(("Shop.Data.SqlCommand.Timeout", 5, 116));
+    }
+
+    [Fact]
+    public void SameNamedOverloadOfADefaultInterfaceMethod_NotInTheChain()
+    {
+        var graph = Build(["**.Run"], """
+            namespace Shop.Domain
+            {
+                public interface IRunner { void Run() { } }
+                public class Job : IRunner { public void Run(int times) { } }
+                public class Order
+                {
+                    public void Place(Job job) => job.Run(2);
+                }
+            }
+            """);
+
+        Chains(graph).Should().Equal("Shop.Domain.Job.Run");
+    }
+
+    [Fact]
+    public void UnimplementedInterfaceMember_NotInTheChainOfASameNamedMethod()
+    {
+        // Broken code: Job does not implement IRunner.Run yet, so its overload of that name implements nothing.
+        var compilation = TestCompilation.Create(("Data.cs", DataTypes)).AddSyntaxTrees(CSharpSyntaxTree.ParseText("""
+            namespace Shop.Domain
+            {
+                public interface IRunner { void Run(); }
+                public class Job : IRunner { public void Run(int times) { } }
+                public class Order
+                {
+                    public void Place(Job job) => job.Run(2);
+                }
+            }
+            """, path: "Order.cs"));
+        compilation.GetDiagnostics().Should().Contain(d => d.Severity == DiagnosticSeverity.Error);
+
+        var graph = TypeGraphBuilder.Build(compilation, new HashSet<SyntaxTree>(), MemberNameFilter.From(PackWith("**.Run")), CancellationToken.None);
+
+        Chains(graph).Should().Equal("Shop.Domain.Job.Run");
+    }
+
+    [Fact]
+    public void SimpleNameOf_StaticConstructor_IsNew()
+    {
+        var compilation = TestCompilation.Create("namespace Shop.Data { public class Cache { static Cache() { } } }");
+        var cache = compilation.GetTypeByMetadataName("Shop.Data.Cache")!;
+
+        MemberNames.SimpleNameOf(cache.StaticConstructors[0]).Should().Be(MemberNames.ConstructorName);
     }
 
     private const string UsesEverything = """
