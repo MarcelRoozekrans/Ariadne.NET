@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.5](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.9.4...v0.9.5) (2026-11-17)
+
+
+### Bug Fixes
+
+* embed PDBs so Go to Definition shows the package source ([071678b](https://github.com/MarcelRoozekrans/Ariadne.NET/commit/071678b43bc59a7568adc89c28498c18fd0088fd))
+
 ## [0.9.4](https://github.com/MarcelRoozekrans/Ariadne.NET/compare/v0.9.3...v0.9.4) (2026-11-15)
 
 
