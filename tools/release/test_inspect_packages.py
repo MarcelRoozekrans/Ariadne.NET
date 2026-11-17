@@ -12,6 +12,7 @@ import zipfile
 
 import inspect_packages
 
+COMMIT = "0123456789abcdef0123456789abcdef01234567"
 VERSION = "0.1.0"
 ARIADNE = "Ariadne.NET"
 ABSTRACTIONS = "Ariadne.NET.Abstractions"
@@ -400,7 +401,8 @@ class InspectPackagesTests(unittest.TestCase):
     def test_main_prints_one_error_line_per_problem(self) -> None:
         self.write_all(**{ARIADNE: {"dll_version": "0.1.0-local+abc"}})
         passed = subprocess.CompletedProcess([], 0)
-        with unittest.mock.patch("builtins.print") as printed, unittest.mock.patch.object(subprocess, "run", return_value=passed):
+        with unittest.mock.patch("builtins.print") as printed, unittest.mock.patch.object(subprocess, "run", return_value=passed), \
+                unittest.mock.patch.object(inspect_packages, "head_commit", return_value=COMMIT):
             self.assertEqual(1, inspect_packages.main([str(self.directory), VERSION]))
         lines = [call.args[0] for call in printed.call_args_list]
         self.assertTrue(lines and all(line.startswith("::error::") for line in lines), lines)
@@ -421,27 +423,58 @@ class InspectPackagesTests(unittest.TestCase):
     def test_the_checker_gets_the_prefix_and_every_dll(self) -> None:
         dlls = [pathlib.Path("a/Ariadne.NET.dll"), pathlib.Path("b/Ariadne.NET.Cli.dll")]
         with unittest.mock.patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as run:
-            self.assertTrue(inspect_packages.check_embedded_pdbs(dlls))
+            self.assertTrue(inspect_packages.check_embedded_pdbs(dlls, COMMIT))
         command = run.call_args.args[0]
-        self.assertEqual(["dotnet", "run", inspect_packages.CHECKER, "--", inspect_packages.SOURCE_LINK_PREFIX], command[:5])
+        # The prefix carries the commit, so a map to main or to another commit fails the checker.
+        prefix = f"https://raw.githubusercontent.com/MarcelRoozekrans/Ariadne.NET/{COMMIT}/"
+        self.assertEqual(["dotnet", "run", inspect_packages.CHECKER, "--", prefix], command[:5])
         self.assertEqual([str(dll) for dll in dlls], command[5:])
         self.assertEqual(inspect_packages.ROOT, run.call_args.kwargs["cwd"])
 
     def test_no_dll_to_check_fails(self) -> None:
         with unittest.mock.patch.object(subprocess, "run") as run, contextlib.redirect_stdout(io.StringIO()):
-            self.assertFalse(inspect_packages.check_embedded_pdbs([]))
+            self.assertFalse(inspect_packages.check_embedded_pdbs([], COMMIT))
         run.assert_not_called()
 
     def test_main_passes_when_the_packages_and_the_checker_pass(self) -> None:
         self.write_all()
         with unittest.mock.patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 0)), \
+                unittest.mock.patch.object(inspect_packages, "head_commit", return_value=COMMIT), \
                 contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(0, inspect_packages.main([str(self.directory), VERSION]))
 
     def test_main_fails_when_the_checker_fails(self) -> None:
         self.write_all()
-        with unittest.mock.patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 1)):
+        with unittest.mock.patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 1)), \
+                unittest.mock.patch.object(inspect_packages, "head_commit", return_value=COMMIT):
             self.assertEqual(1, inspect_packages.main([str(self.directory), VERSION]))
+
+    def test_main_pins_the_prefix_to_the_commit_it_reads(self) -> None:
+        self.write_all()
+        with unittest.mock.patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as run, \
+                unittest.mock.patch.object(inspect_packages, "head_commit", return_value=COMMIT), \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(0, inspect_packages.main([str(self.directory), VERSION]))
+        self.assertEqual(f"https://raw.githubusercontent.com/MarcelRoozekrans/Ariadne.NET/{COMMIT}/", run.call_args.args[0][4])
+
+    def test_main_fails_when_git_gives_no_commit(self) -> None:
+        self.write_all()
+        with unittest.mock.patch.object(subprocess, "run") as run, unittest.mock.patch.object(inspect_packages, "head_commit", return_value=None), \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(1, inspect_packages.main([str(self.directory), VERSION]))
+        run.assert_not_called()
+
+    def test_head_commit_reads_the_full_sha(self) -> None:
+        done = subprocess.CompletedProcess([], 0, stdout=COMMIT + "\n")
+        with unittest.mock.patch.object(subprocess, "run", return_value=done) as run:
+            self.assertEqual(COMMIT, inspect_packages.head_commit())
+        self.assertEqual(["git", "rev-parse", "HEAD"], run.call_args.args[0])
+        self.assertEqual(inspect_packages.ROOT, run.call_args.kwargs["cwd"])
+
+    def test_head_commit_rejects_a_failed_or_odd_answer(self) -> None:
+        for done in (subprocess.CompletedProcess([], 128, stdout=""), subprocess.CompletedProcess([], 0, stdout="HEAD\n")):
+            with unittest.mock.patch.object(subprocess, "run", return_value=done):
+                self.assertIsNone(inspect_packages.head_commit())
 
     def test_the_checker_script_exists(self) -> None:
         self.assertTrue((inspect_packages.ROOT / inspect_packages.CHECKER).is_file())

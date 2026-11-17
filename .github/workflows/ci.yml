@@ -127,8 +127,8 @@ jobs:
   # Packs the five release packages exactly as publish-nuget does, inspects them, and rehearses the push against a local
   # folder feed, on every push and pull request, so the release path is exercised long before release day. The
   # inspection also runs scripts/check-embedded-pdb/check-embedded-pdb.cs, which checks that every Ariadne DLL embeds its
-  # PDB with a Source Link map and the deterministic /_/ paths that ContinuousIntegrationBuild gives on GitHub Actions,
-  # so the .NET SDK must be set up before it.
+  # PDB with a Source Link map to this checkout's commit and the deterministic /_/ paths that ContinuousIntegrationBuild
+  # gives on GitHub Actions, so the .NET SDK must be set up before it.
   pack-validate:
     runs-on: ubuntu-latest
     timeout-minutes: 30
