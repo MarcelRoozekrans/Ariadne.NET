@@ -4,6 +4,10 @@ This file provides guidance to coding agents when working with code in this repo
 
 A pattern-agnostic architecture governance engine for .NET. Architecture patterns (clean, hexagonal, CQRS, …) are declarative YAML **rule packs**; the engine resolves and merges them, then uses them to generate correctly placed C# components (Roslyn) and to validate existing solutions (semantic type graph). Core principle: *AI generates behavior, the engine governs structure.* Five NuGet packages ship from it: `Ariadne.NET`, `Ariadne.NET.Abstractions`, `Ariadne.NET.Workspaces`, `Ariadne.NET.Testing` and the `ariadne` dotnet tool `Ariadne.NET.Cli`.
 
+## Product-line standards
+
+This repository is part of a .NET product line. Read the [product-line standards](https://github.com/MarcelRoozekrans/product-line/blob/main/standards.md) before changing anything: they hold the rules for every product, including how to build (a failing test first, the cause before a fix, build and test output before calling work done) and what may appear in commits, pull requests and issues. Build sessions do not use superpowers. This file adds what is specific to this repository.
+
 ## Layout
 
 ### Projects
